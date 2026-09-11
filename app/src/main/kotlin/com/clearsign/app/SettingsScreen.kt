@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 /** Settings tab: themes, language, display currency, what the app does, attestation key, about. */
 @Composable
@@ -97,12 +99,68 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?) {
             }
         }
 
+        // ---- Watchtower (Pro) -------------------------------------------------
+        run {
+            val pro by Pro.isPro
+            val on by Settings.watchtower
+            val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
+                if (granted) { Watchtower.ensureChannel(ctx); Settings.setWatchtower(ctx, true); Haptics.tick(ctx) }
+            }
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(HIcon.MEGAPHONE, Halo.cyan, 18.dp) }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.watch_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
+                            Text(if (!pro) stringResource(R.string.watch_pro) else if (on) stringResource(R.string.watch_on) else stringResource(R.string.watch_off), fontFamily = Inter, fontSize = 12.sp, color = if (on) Halo.mint else Halo.muted)
+                        }
+                        if (pro) Text(
+                            if (on) stringResource(R.string.watch_disable) else stringResource(R.string.watch_enable),
+                            fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = if (on) Halo.muted else Halo.mint,
+                            modifier = Modifier.clip(rs(10)).background((if (on) Halo.muted else Halo.mint).copy(alpha = 0.12f)).clickable {
+                                if (on) Settings.setWatchtower(ctx, false)
+                                else if (android.os.Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) permLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                else { Watchtower.ensureChannel(ctx); Settings.setWatchtower(ctx, true); Haptics.tick(ctx) }
+                            }.padding(horizontal = 12.dp, vertical = 7.dp),
+                        )
+                    }
+                    Text(stringResource(R.string.watch_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
+                }
+            }
+        }
+
         // ---- Attestation key ------------------------------------------------
         GlassCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionTitle(stringResource(R.string.proof_key), stringResource(R.string.settings_key_sub), HIcon.KEY)
                 Text(stringResource(R.string.settings_key_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 AttestationKeyRow()
+            }
+        }
+
+        // ---- Swap fees setup --------------------------------------------------
+        if (WalletActions.treasuryConfigured && owner != null) {
+            var busy by remember { mutableStateOf(false) }
+            var msg by remember { mutableStateOf<String?>(null) }
+            val scope = rememberCoroutineScope()
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionTitle(stringResource(R.string.swapfees_title), stringResource(R.string.swapfees_sub), HIcon.COINS)
+                    Text(stringResource(R.string.swapfees_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                    if (busy) Working(stringResource(R.string.theme_unlock_signing))
+                    else GhostButton(stringResource(R.string.swapfees_btn), icon = HIcon.COINS, tint = Halo.mint) {
+                        busy = true; msg = null
+                        scope.launch {
+                            msg = when (val r = WalletActions.activateSwapFees(ctx, signer, owner)) {
+                                is WalletActions.Result.Sent -> ctx.getString(R.string.swapfees_done)
+                                is WalletActions.Result.Failed -> r.message
+                            }
+                            busy = false
+                        }
+                    }
+                    msg?.let { Text(it, fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint) }
+                }
             }
         }
 

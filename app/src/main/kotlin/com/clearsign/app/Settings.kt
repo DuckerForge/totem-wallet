@@ -10,14 +10,26 @@ object Settings {
     private const val PREFS = "clearsign_settings"
     private const val KEY_CURRENCY = "currency"
     private const val KEY_ONBOARDED = "onboarded"
+    private const val KEY_WATCH = "watchtower"
+    private const val KEY_WATCH_WALLET = "watch_wallet"
 
     val currency = mutableStateOf("USD")
     val onboarded = mutableStateOf(true)
+    val watchtower = mutableStateOf(false)
 
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
         onboarded.value = p.getBoolean(KEY_ONBOARDED, false)
+        watchtower.value = p.getBoolean(KEY_WATCH, false)
+    }
+
+    fun watchWallet(ctx: Context): String? = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_WATCH_WALLET, null)
+    fun setWatchWallet(ctx: Context, owner: String) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_WATCH_WALLET, owner).apply() }
+    fun setWatchtower(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_WATCH, on).apply()
+        watchtower.value = on
+        if (on) Watchtower.enable(ctx) else Watchtower.disable(ctx)
     }
 
     fun setOnboarded(ctx: Context) {

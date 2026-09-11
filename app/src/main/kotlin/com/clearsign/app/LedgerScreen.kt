@@ -1,0 +1,186 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
+package com.clearsign.app
+
+import android.text.format.DateUtils
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
+
+/** "Scontrini": the ledger — filters, period totals, one row per transaction, export. */
+@Composable
+internal fun LedgerScreen() {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val currency by Settings.currency
+    val version = Ledger.version.value
+    val months by produceState(initialValue = emptyList<String>(), version) { value = withContext(Dispatchers.IO) { Ledger.months(ctx) } }
+    var month by remember { mutableStateOf<String?>(null) }   // null = all
+    var kind by remember { mutableStateOf<String?>(null) }
+    val entries by produceState(initialValue = emptyList<LedgerEntry>(), version, month) {
+        value = withContext(Dispatchers.IO) { if (month == null) Ledger.all(ctx) else Ledger.month(ctx, month!!) }
+    }
+    val shown = remember(entries, kind) { if (kind == null) entries else entries.filter { it.kind == kind } }
+    var selected by remember { mutableStateOf<LedgerEntry?>(null) }
+    var showExport by remember { mutableStateOf(false) }
+    var backfilling by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.tab_receipts), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Halo.ink)
+                    Text(if (shown.isEmpty()) stringResource(R.string.ledger_empty_sub) else stringResource(R.string.ledger_count, shown.size), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                }
+                if (entries.isNotEmpty()) SmallChip(stringResource(R.string.export_btn), HIcon.DOWNLOAD, Halo.mint) { showExport = true }
+            }
+            ChipRow(listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all)) + months.map { it to monthLabel(it) }, month) { month = it }
+            ChipRow(
+                listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all)) + listOf("tx", "send", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
+                kind,
+            ) { kind = it }
+
+            // ---- period totals ----------------------------------------------
+            if (shown.isNotEmpty()) {
+                val totals = remember(shown, currency) { Totals.of(shown, currency) }
+                Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.ledger_totals), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+                        Spacer(Modifier.weight(1f))
+                        Text(fmtFiat(totals.fiatOut, currency), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.mint, style = Tabular)
+                    }
+                    totals.out.entries.sortedByDescending { it.value }.take(4).forEach { (sym, v) -> StatRow("− $sym", fmtUi(v)) }
+                    totals.inn.entries.sortedByDescending { it.value }.take(3).forEach { (sym, v) -> StatRow("+ $sym", fmtUi(v)) }
+                    StatRow(stringResource(R.string.ledger_fees), fmtSol(totals.fee, 6) + " SOL")
+                    if (totals.unpriced > 0) {
+                        val bf = backfilling
+                        Row(Modifier.fillMaxWidth().clickable(enabled = bf == null) {
+                            scope.launch { backfilling = 0 to totals.unpriced; FiatRates.backfill(ctx, shown, currency) { d, t -> backfilling = d to t }; backfilling = null }
+                        }, verticalAlignment = Alignment.CenterVertically) {
+                            HaloIcon(HIcon.COINS, Halo.amber, 13.dp); Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (bf == null) stringResource(R.string.ledger_unpriced, totals.unpriced, currency) else stringResource(R.string.ledger_backfilling, bf.first, bf.second),
+                                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = Halo.amber,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (shown.isEmpty()) {
+            Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                HaloIcon(HIcon.RECEIPT, Halo.muted, 40.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.ledger_empty), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        } else {
+            val grouped = remember(shown) { shown.groupBy { dayKey(it.at) } }
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                grouped.forEach { (day, list) ->
+                    stickyHeader(key = "h$day") {
+                        Box(Modifier.fillMaxWidth().background(Halo.ground).padding(vertical = 6.dp)) {
+                            Text(DateUtils.formatDateTime(ctx, list.first().at, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_SHOW_WEEKDAY), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+                        }
+                    }
+                    items(list, key = { it.id }) { e -> LedgerRow(e, currency) { selected = e } }
+                }
+            }
+        }
+    }
+    selected?.let { e -> ReceiptDetailSheet(e) { selected = null } }
+    if (showExport) ExportSheet(entries, month) { showExport = false }
+}
+
+/** Sums for a period, in tokens and in fiat. */
+internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>, val fee: Long, val fiatOut: Double, val unpriced: Int) {
+    companion object {
+        fun of(entries: List<LedgerEntry>, currency: String): Totals {
+            val out = HashMap<String, Double>(); val inn = HashMap<String, Double>(); var fee = 0L; var fiat = 0.0; var unpriced = 0
+            for (e in entries) {
+                e.outflows.forEach { out.merge(it.symbol, kotlin.math.abs(it.uiAmount), Double::plus) }
+                e.inflows.forEach { inn.merge(it.symbol, kotlin.math.abs(it.uiAmount), Double::plus) }
+                if (e.feePaidByMe) fee += e.feeLamports
+                if (e.hasValue) { val v = e.fiatValue(currency); if (v == null) unpriced++ else if (e.outflows.isNotEmpty()) fiat += v }
+            }
+            return Totals(out, inn, fee, fiat, unpriced)
+        }
+    }
+}
+
+@Composable
+private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
+    val ctx = LocalContext.current
+    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "send" -> HIcon.SEND; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
+    val danger = e.risks.any { it.severity == "DANGER" }
+    Row(
+        Modifier.fillMaxWidth().clip(rs(14)).background(Halo.card).border(1.dp, if (danger) Halo.red.copy(alpha = 0.5f) else Halo.stroke, rs(14)).clickable { onTap() }.padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.cardSoft), contentAlignment = Alignment.Center) { HaloIcon(icon, if (danger) Halo.red else Halo.cyan, 18.dp) }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(e.dApp + (e.host?.let { " · $it" } ?: ""), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Halo.ink, maxLines = 1)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (e.recipientLabel?.let { " · $it" } ?: ""), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                if (e.attestationSig != null) { Spacer(Modifier.width(5.dp)); HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 11.dp) }
+                if (e.tags.isNotEmpty()) { Spacer(Modifier.width(5.dp)); Text(e.tags.first(), fontFamily = Inter, fontSize = 10.sp, color = Halo.cyan) }
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            e.outflows.take(2).forEach { Text("−" + fmtUi(kotlin.math.abs(it.uiAmount)) + " " + it.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.ink, style = Tabular) }
+            e.inflows.take(1).forEach { Text("+" + fmtUi(kotlin.math.abs(it.uiAmount)) + " " + it.symbol, fontFamily = Sora, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.cyan, style = Tabular) }
+            e.fiatValue(currency)?.let { Text("≈ " + fmtFiat(it, currency), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, style = Tabular) }
+        }
+    }
+}
+
+internal fun kindLabel(ctx: android.content.Context, k: String): String = when (k) {
+    "signin" -> ctx.getString(R.string.kind_signin); "message" -> ctx.getString(R.string.kind_message); "theme" -> ctx.getString(R.string.kind_theme)
+    "revoke" -> ctx.getString(R.string.kind_revoke); "close" -> ctx.getString(R.string.kind_close); "send" -> ctx.getString(R.string.kind_send)
+    else -> ctx.getString(R.string.kind_tx)
+}
+
+internal fun monthLabel(ym: String): String = runCatching {
+    val (y, m) = ym.split("-").map { it.toInt() }
+    java.text.DateFormatSymbols.getInstance().shortMonths[m - 1].replaceFirstChar { it.uppercase() } + " " + y
+}.getOrDefault(ym)
+
+private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(at))
+
+internal fun fmtUi(v: Double): String = String.format(Locale.ROOT, "%,.6f", v).replace(',', ' ').trimEnd('0').trimEnd('.')
+internal fun fmtFiat(v: Double, cur: String): String = String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))

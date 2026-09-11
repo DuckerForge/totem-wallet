@@ -515,4 +515,6 @@
     <string name="health_limited">%1$d approval(s) a delegate can still spend</string>
     <string name="health_dust">%1$d empty account(s) — reclaim the rent</string>
     <string name="health_frozen">%1$d frozen account(s)</string>
+    <string name="trace_run">Deep scan this address</string>
+    <string name="trace_pro">Deep activity scan — a ClearSign Pro feature</string>
 </resources>

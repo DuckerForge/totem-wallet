@@ -517,4 +517,6 @@
     <string name="health_frozen">%1$d account congelati</string>
     <string name="trace_run">Scansiona a fondo questo indirizzo</string>
     <string name="trace_pro">Scan profondo attività — funzione ClearSign Pro</string>
+    <string name="store_reviews">recensioni</string>
+    <string name="store_not_listed">Non sul dApp Store</string>
 </resources>

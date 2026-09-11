@@ -63,6 +63,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -886,6 +887,10 @@ private fun DappStoreLine(store: StoreInfo) {
     }
     val trusted = store.fromDappStore || store.fromPlay
     val col = if (trusted) Halo.muted else Halo.amber
+    // Store reputation (free Seeker Tracker catalog): rating, publisher, last update.
+    val rep by produceState<StoreRep?>(initialValue = null, store.packageName) {
+        value = withContext(Dispatchers.IO) { runCatching { StoreReputation.fetch(store.packageName) }.getOrNull() }
+    }
     // Tap → the app's listing in the Solana dApp Store (publisher, updates, reviews).
     val openListing = {
         runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("solanadappstore://details?id=" + store.packageName))) }
@@ -906,6 +911,24 @@ private fun DappStoreLine(store: StoreInfo) {
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.store_open), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 10.5.sp, color = Halo.cyan)
             Spacer(Modifier.width(2.dp)); HaloIcon(HIcon.EXTERNAL, Halo.cyan, 10.dp)
+        }
+        rep?.let { r ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 18.dp, top = 2.dp)) {
+                if (!r.listed) {
+                    HaloIcon(HIcon.WARNING, Halo.amber, 12.dp); Spacer(Modifier.width(5.dp))
+                    Text(stringResource(R.string.store_not_listed), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber)
+                } else {
+                    HaloIcon(HIcon.SPARK, Halo.mint, 12.dp); Spacer(Modifier.width(5.dp))
+                    Text(
+                        buildString {
+                            r.rating?.let { append("★ %.1f".format(java.util.Locale.ROOT, it)) }
+                            r.reviews?.let { append(" · " + nf(it.toLong()) + " " + ctx.getString(R.string.store_reviews)) }
+                            r.publisher?.let { append(" · " + it + (if (r.verified) " ✓" else "")) }
+                        },
+                        fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular, maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

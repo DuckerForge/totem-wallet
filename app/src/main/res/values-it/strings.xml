@@ -480,4 +480,13 @@
     <string name="split_hdr">Dove vanno i fondi</string>
     <string name="fee_tag">commissione</string>
     <string name="rt_extra_signers">Servono altre firme</string>
+    <string name="onb1_t">Vedi ciò che firmi</string>
+    <string name="onb1_b">Ogni transazione diventa una ricevuta chiara — importo, destinatario e rischio veri — prima che il Seed Vault chieda la tua impronta.</string>
+    <string name="onb2_t">Una prova firmata da tenere</string>
+    <string name="onb2_b">Ogni approvazione è firmata da una chiave hardware dell\'app: prova esportabile e verificabile di ciò che ti è stato mostrato.</string>
+    <string name="onb3_t">Pronto per le tasse</string>
+    <string name="onb3_b">Tutto ciò che firmi finisce in un registro col controvalore in valuta — esporti in Koinly, CoinTracker o PDF con un tocco.</string>
+    <string name="onb_next">Avanti</string>
+    <string name="onb_start">Collega il Seed Vault</string>
+    <string name="onb_skip">Salta</string>
 </resources>

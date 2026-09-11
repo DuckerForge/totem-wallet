@@ -89,6 +89,11 @@ private enum class Tab { WALLET, RECEIPTS, SETTINGS }
 fun HomeScreen(signer: SeedVaultSigner) {
     HaloRoot {
         val ctx = LocalContext.current
+        var onboarded by remember { mutableStateOf(Settings.onboarded.value) }
+        if (!onboarded) {
+            Onboarding { Settings.setOnboarded(ctx); onboarded = true }
+            return@HaloRoot
+        }
         val scope = rememberCoroutineScope()
         // Wallet state lives at the root so switching tabs never drops the Seed Vault session.
         var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(Tab.WALLET) }

@@ -480,4 +480,13 @@
     <string name="split_hdr">Where the funds go</string>
     <string name="fee_tag">fee</string>
     <string name="rt_extra_signers">Extra signatures required</string>
+    <string name="onb1_t">See what you sign</string>
+    <string name="onb1_b">Every transaction becomes a plain receipt — real amount, real recipient, real risk — before the Seed Vault ever asks for your fingerprint.</string>
+    <string name="onb2_t">Signed proof you can keep</string>
+    <string name="onb2_b">Each approval is signed by a hardware key of the app: exportable, verifiable proof of exactly what you were shown.</string>
+    <string name="onb3_t">Ready for your taxes</string>
+    <string name="onb3_b">Everything you sign lands in a ledger with its fiat value — export to Koinly, CoinTracker or PDF in one tap.</string>
+    <string name="onb_next">Next</string>
+    <string name="onb_start">Connect the Seed Vault</string>
+    <string name="onb_skip">Skip</string>
 </resources>

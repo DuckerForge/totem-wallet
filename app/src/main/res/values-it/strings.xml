@@ -515,4 +515,6 @@
     <string name="health_limited">%1$d approvazione/i che un delegato può ancora spendere</string>
     <string name="health_dust">%1$d account vuoti — recupera il rent</string>
     <string name="health_frozen">%1$d account congelati</string>
+    <string name="trace_run">Scansiona a fondo questo indirizzo</string>
+    <string name="trace_pro">Scan profondo attività — funzione ClearSign Pro</string>
 </resources>

@@ -1298,12 +1298,11 @@ private fun AddressSheet(
     var intel by remember { mutableStateOf<SolanaRpc.WalletIntel?>(null) }
     var rep by remember { mutableStateOf<Reputation.Rep?>(null) }
     var repLoaded by remember { mutableStateOf(false) }
+    // The deep scan is the most expensive call (Helius Enhanced). It is a Pro feature
+    // and only runs when the user asks, so it never burns quota on its own.
     var trace by remember { mutableStateOf<AddressTrace.Trace?>(null) }
-    var traceLoaded by remember { mutableStateOf(!AddressTrace.available) }
-    LaunchedEffect(address) {
-        if (!AddressTrace.available) return@LaunchedEffect
-        trace = withContext(Dispatchers.IO) { runCatching { AddressTrace.scan(address) }.getOrNull() }; traceLoaded = true
-    }
+    var traceRunning by remember { mutableStateOf(false) }
+    var traceRan by remember { mutableStateOf(false) }
     var labelInput by remember { mutableStateOf(label ?: "") }
     var saved by remember { mutableStateOf(false) }
     var copied by remember { mutableStateOf(false) }
@@ -1335,7 +1334,13 @@ private fun AddressSheet(
                 }
             }
             WalletIntelBlock(intel)
-            if (AddressTrace.available) TraceBlock(trace, traceLoaded)
+            if (AddressTrace.available) {
+                val scope = rememberCoroutineScope()
+                TraceBlock(trace, traceRunning, traceRan, Pro.isPro.value) {
+                    traceRunning = true
+                    scope.launch { trace = withContext(Dispatchers.IO) { runCatching { AddressTrace.scan(address) }.getOrNull() }; traceRunning = false; traceRan = true }
+                }
+            }
             ReputationBlock(rep, repLoaded)
             Row(Modifier.fillMaxWidth()) {
                 Text(if (isNewAccount) stringResource(R.string.sheet_rent_label) else stringResource(R.string.sheet_receives), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted)
@@ -1361,17 +1366,24 @@ private fun AddressSheet(
 /** On-chain reputation-from-usage for a counterparty: history, age, kind, balance. */
 /** Address scan: what this wallet does, with whom, and the patterns that matter. */
 @Composable
-private fun TraceBlock(t: AddressTrace.Trace?, loaded: Boolean) {
+private fun TraceBlock(t: AddressTrace.Trace?, running: Boolean, ran: Boolean, isPro: Boolean, onRun: () -> Unit) {
     val ctx = LocalContext.current
     Column(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(14)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HaloIcon(HIcon.SCAN, Halo.cyan, 14.dp); Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.trace_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
             Spacer(Modifier.weight(1f))
-            if (!loaded) { Text(stringResource(R.string.analyzing), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted); Spacer(Modifier.width(4.dp)); BlinkCaret(Halo.cyan, 11.dp, 5.dp) }
+            if (running) { Text(stringResource(R.string.analyzing), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted); Spacer(Modifier.width(4.dp)); BlinkCaret(Halo.cyan, 11.dp, 5.dp) }
         }
         when {
-            !loaded -> {}
+            !ran && !running -> {
+                if (isPro) GhostButton(stringResource(R.string.trace_run), icon = HIcon.SCAN, tint = Halo.cyan) { onRun() }
+                else Row(verticalAlignment = Alignment.CenterVertically) {
+                    HaloIcon(HIcon.GEM, Halo.cyan, 13.dp); Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.trace_pro), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                }
+            }
+            running -> {}
             t == null || t.txCount == 0 -> Text(stringResource(R.string.trace_none), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
             else -> {
                 val kinds = t.kinds.take(4).joinToString(" · ") { (k, n) -> "$n " + kindName(ctx, k) }

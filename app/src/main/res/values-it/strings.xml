@@ -537,4 +537,8 @@
     <string name="hero_total">SALDO TOTALE</string>
     <string name="hero_portfolio">PORTAFOGLIO</string>
     <string name="hero_some_unpriced">Alcuni token non hanno ancora un prezzo.</string>
+    <string name="pnl_title">P&amp;L REALIZZATO</string>
+    <string name="pnl_note">Dai tuoi scontrini registrati (FIFO). Le voci senza prezzo sono escluse.</string>
+    <string name="pnl_held">in portafoglio %1$s</string>
+    <string name="pnl_since">dal %1$s</string>
 </resources>

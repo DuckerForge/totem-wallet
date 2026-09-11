@@ -537,4 +537,8 @@
     <string name="hero_total">TOTAL BALANCE</string>
     <string name="hero_portfolio">PORTFOLIO</string>
     <string name="hero_some_unpriced">Some tokens have no live price yet.</string>
+    <string name="pnl_title">REALIZED P&amp;L</string>
+    <string name="pnl_note">From your recorded receipts (FIFO). Entries without a price are skipped.</string>
+    <string name="pnl_held">holding %1$s</string>
+    <string name="pnl_since">since %1$s</string>
 </resources>

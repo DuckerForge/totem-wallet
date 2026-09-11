@@ -1,0 +1,10 @@
+{
+  "_comment": "ClearSign blocklist. 'malicious' => BLOCKED_MALICIOUS (DANGER), 'sanctioned' => SANCTIONED (DANGER). Matched against every address the tx touches (destinations + all account keys). Extend freely; this file is bundled read-only and can be swapped without a code change.",
+  "malicious": [
+    {
+      "address": "1nc1nerator11111111111111111111111111111111",
+      "reason": "Indirizzo di burn: i fondi inviati qui vengono distrutti per sempre."
+    }
+  ],
+  "sanctioned": []
+}

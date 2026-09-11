@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ClearSign mark: a wax seal with an eye. You look first (the eye), then
+     you seal (sign). The seal is also what the attested receipt is. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M54,54 m-46,0 a46,46 0 1,0 92,0 a46,46 0 1,0 -92,0" android:fillColor="#1F4dffd0" />
+    <path android:pathData="M94.00,54.00 Q94.00,54.00 91.85,57.55 Q89.70,61.10 90.33,65.20 Q90.96,69.31 87.61,71.77 Q84.27,74.22 83.27,78.25 Q82.28,82.28 78.25,83.27 Q74.22,84.27 71.77,87.61 Q69.31,90.96 65.20,90.33 Q61.10,89.70 57.55,91.85 Q54.00,94.00 50.45,91.85 Q46.90,89.70 42.80,90.33 Q38.69,90.96 36.23,87.61 Q33.78,84.27 29.75,83.27 Q25.72,82.28 24.73,78.25 Q23.73,74.22 20.39,71.77 Q17.04,69.31 17.67,65.20 Q18.30,61.10 16.15,57.55 Q14.00,54.00 16.15,50.45 Q18.30,46.90 17.67,42.80 Q17.04,38.69 20.39,36.23 Q23.73,33.78 24.73,29.75 Q25.72,25.72 29.75,24.73 Q33.78,23.73 36.23,20.39 Q38.69,17.04 42.80,17.67 Q46.90,18.30 50.45,16.15 Q54.00,14.00 57.55,16.15 Q61.10,18.30 65.20,17.67 Q69.31,17.04 71.77,20.39 Q74.22,23.73 78.25,24.73 Q82.28,25.72 83.27,29.75 Q84.27,33.78 87.61,36.23 Q90.96,38.69 90.33,42.80 Q89.70,46.90 91.85,50.45 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="20" android:startY="20" android:endX="88" android:endY="88">
+                <item android:offset="0.0" android:color="#FF4dffd0" />
+                <item android:offset="1.0" android:color="#FF4cc9ff" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M54,54 m-30,0 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0" android:fillColor="#070b12" />
+    <path android:pathData="M30,54 C40,38 68,38 78,54 C68,70 40,70 30,54 Z"
+        android:strokeColor="#FFE6EEFB" android:strokeWidth="4" android:fillColor="#00000000" android:strokeLineJoin="round" />
+    <path android:pathData="M54,54 m-8.5,0 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="45" android:startY="45" android:endX="63" android:endY="63">
+                <item android:offset="0.0" android:color="#FF4dffd0" />
+                <item android:offset="1.0" android:color="#FF4cc9ff" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M54,54 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" android:fillColor="#070b12" />
+</vector>

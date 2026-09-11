@@ -534,4 +534,7 @@
     <string name="swap_done">Swapped. It confirms in a few seconds.</string>
     <string name="swap_build_failed">Could not build the swap. Try a different amount.</string>
     <string name="swap_btn">Swap</string>
+    <string name="hero_total">TOTAL BALANCE</string>
+    <string name="hero_portfolio">PORTFOLIO</string>
+    <string name="hero_some_unpriced">Some tokens have no live price yet.</string>
 </resources>

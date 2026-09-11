@@ -125,6 +125,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
                             ) {
                                 HomeHeader(accounts.firstOrNull()?.account)
 
+                                // ---- Portfolio hero (value + actions) -------------------------
+                                if (accounts.isNotEmpty()) WalletHero(owner, onSwap = { showSwap = true }, onSend = { showSend = true }, onReceive = { showReceive = true })
+
                 // ---- Wallet ---------------------------------------------------
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -163,11 +166,6 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                         if (h.tokens > 0) Text(stringResource(R.string.tokens_n, h.tokens), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                                     }
                                 }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                GhostButton(stringResource(R.string.swap_btn), Modifier.weight(1f), HIcon.SWAP, tint = Halo.mint) { showSwap = true }
-                                GhostButton(stringResource(R.string.send_btn), Modifier.weight(1f), HIcon.SEND, tint = Halo.mint) { showSend = true }
-                                GhostButton(stringResource(R.string.receive_btn), Modifier.weight(1f), HIcon.RECEIVE, tint = Halo.cyan) { showReceive = true }
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 16.dp); Spacer(Modifier.width(6.dp))

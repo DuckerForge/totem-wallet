@@ -110,7 +110,9 @@ internal fun LedgerScreen() {
             }
         } else {
             val grouped = remember(shown) { shown.groupBy { dayKey(it.at) } }
+            val analytics = remember(shown, currency) { AnalyticsEngine.of(shown, currency) }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (analytics.hasData) item(key = "analytics") { AnalyticsCard(analytics) }
                 grouped.forEach { (day, list) ->
                     stickyHeader(key = "h$day") {
                         Box(Modifier.fillMaxWidth().background(Halo.ground).padding(vertical = 6.dp)) {
@@ -165,6 +167,38 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
             e.outflows.take(2).forEach { Text("−" + fmtUi(kotlin.math.abs(it.uiAmount)) + " " + it.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.ink, style = Tabular) }
             e.inflows.take(1).forEach { Text("+" + fmtUi(kotlin.math.abs(it.uiAmount)) + " " + it.symbol, fontFamily = Sora, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.cyan, style = Tabular) }
             e.fiatValue(currency)?.let { Text("≈ " + fmtFiat(it, currency), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, style = Tabular) }
+        }
+    }
+}
+
+
+/** Realized P&L per token, from the recorded receipts (FIFO). */
+@Composable
+private fun AnalyticsCard(a: Analytics) {
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
+            HaloIcon(HIcon.COINS, Halo.cyan, 14.dp); Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.pnl_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
+            Spacer(Modifier.weight(1f))
+            Text((if (a.totalRealized >= 0) "+" else "") + fmtFiat(a.totalRealized, a.currency), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (a.totalRealized >= 0) Halo.mint else Halo.red, style = Tabular)
+            Spacer(Modifier.width(6.dp)); HaloIcon(if (open) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 16.dp)
+        }
+        if (open) {
+            Text(stringResource(R.string.pnl_note), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
+            a.tokens.take(8).forEach { t ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(t.symbol, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                        val since = t.firstAt?.let { android.text.format.DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), android.text.format.DateUtils.DAY_IN_MILLIS).toString() }
+                        Text(
+                            (if (t.heldUnits > 0) stringResource(R.string.pnl_held, fmtUi(t.heldUnits)) else "") + (since?.let { (if (t.heldUnits > 0) " · " else "") + stringResource(R.string.pnl_since, it) } ?: ""),
+                            fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular,
+                        )
+                    }
+                    if (t.disposals > 0) Text((if (t.realized >= 0) "+" else "") + fmtFiat(t.realized, a.currency), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (t.realized >= 0) Halo.mint else Halo.red, style = Tabular)
+                }
+            }
         }
     }
 }

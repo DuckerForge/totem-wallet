@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Themes.load(this)
         Settings.load(this)
+        Pro.load(this)
         // Must be registered before the Activity is STARTED.
         bridge = ActivityResultBridge(this)
         signer = SeedVaultSigner(this, bridge)

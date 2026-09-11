@@ -489,4 +489,18 @@
     <string name="onb_next">Avanti</string>
     <string name="onb_start">Collega il Seed Vault</string>
     <string name="onb_skip">Salta</string>
+    <string name="theme_note_pro">Tocca una tessera per cambiare stile. I temi premium sono inclusi in ClearSign Pro.</string>
+    <string name="theme_pro_tag">Pro</string>
+    <string name="pro_title">ClearSign Pro</string>
+    <string name="pro_active">Attivo — grazie</string>
+    <string name="pro_price">%1$d SKR, una volta</string>
+    <string name="pro_sheet_note">Pagamento unico in SKR su mainnet, firmato dal Seed Vault.</string>
+    <string name="pro_unlock">Sblocca Pro · %1$d SKR</string>
+    <string name="pro_hold">Tieni premuto per pagare %1$d SKR</string>
+    <string name="pro_done">ClearSign Pro è attivo. Goditelo.</string>
+    <string name="pro_log">ClearSign Pro</string>
+    <string name="pro_f1">Temi premium (carta, terminale, aurora)</string>
+    <string name="pro_f2">Watchtower — avvisi in background sui tuoi indirizzi</string>
+    <string name="pro_f3">Scan profondi attività indirizzi</string>
+    <string name="pro_f4">Export fiscali illimitati</string>
 </resources>

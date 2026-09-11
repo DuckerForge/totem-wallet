@@ -48,7 +48,10 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?) {
     ) {
         Text(stringResource(R.string.tab_settings), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Halo.ink)
 
-        ThemesCard(signer, owner)
+        var showPro by remember { mutableStateOf(false) }
+        ProCard { showPro = true }
+        ThemesCard(signer, owner) { showPro = true }
+        if (showPro) ProSheet(signer, owner) { showPro = false }
 
         // ---- Language -------------------------------------------------------
         GlassCard {

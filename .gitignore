@@ -1,0 +1,30 @@
+# --- Secrets & local machine config (NEVER commit) ---
+local.properties
+*.keystore
+*.jks
+*.pem
+*.p12
+
+# --- Build outputs ---
+**/build/
+.gradle/
+.kotlin/
+*.apk
+*.aab
+captures/
+
+# --- Rust (reputation program) ---
+reputation/target/
+reputation/.anchor/
+reputation/test-ledger/
+
+# --- IDE / OS ---
+.idea/
+*.iml
+.DS_Store
+.vscode/
+
+# --- Internal working notes (not for the public repo) ---
+PROGRESS.md
+SPRINT-2026-09-11.md
+WATCHER-RESULT.md

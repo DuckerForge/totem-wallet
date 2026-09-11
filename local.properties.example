@@ -1,0 +1,8 @@
+## Copy to local.properties and fill in. local.properties is git-ignored (holds secrets).
+sdk.dir=/path/to/Android/Sdk
+
+# Dedicated mainnet RPC (Helius or similar). Leave blank to use public nodes.
+clearsign.heliusRpcUrl=
+
+# Wallet (base58) that receives SKR for ClearSign Pro. Blank = purchases disabled.
+clearsign.skrTreasury=

@@ -1,48 +1,110 @@
-# ClearSign — What You See Is What You Sign
+# ClearSign — What you see is what you sign
 
-A hardware-secured signer for the **Solana Seeker**: no signature ever happens
-without a **plain-language receipt** showing exactly *how much* leaves your
-wallet, *to whom*, *to which address* (with a trust badge), and the fee. Tap OK
-→ the Seed Vault re-simulates in that instant (anti‑TOCTOU) and signs with
-biometrics. Works both as a wallet and as the signing device for external
-dApps/desktops via Mobile Wallet Adapter — the "phone as a Ledger".
+**A safety layer for the Solana Seeker. Every signature comes with a
+plain-language receipt built from the *real* transaction — how much leaves your
+wallet, to whom, at which address (with a trust badge), the fee, and any risk —
+so you never blind-sign again.**
 
-It exists to kill the #1 cause of crypto losses: **blind signing** (wallet
-drainers, malicious dApps, address‑poisoning look‑alikes, unlimited approvals).
+Built for **Clock In · Solana Mobile Hackathon**. Android-native (Jetpack
+Compose), integrates the **Solana Mobile Stack** and **Mobile Wallet Adapter**,
+and signs with the **Seed Vault**.
 
-## Status (2026-09-11)
-- ✅ **`:core`** — pure-Kotlin clear-signing engine, device/network independent, **32 unit tests green**.
-  `AddressTrust` (look-alike detection), `RiskEngine` (instruction + effect risks: drains, brand-new recipient, foreign fee payer, owner change, durable nonce, **fee sanity vs network median**), `SimulationGuard` (anti-TOCTOU with 1 % tolerance), `ReceiptBuilder` + `Localization` (EN/IT/ES), `Ports` + `ClearSignFlow`.
-- ✅ **`:app`** — Jetpack Compose wallet for the Seeker, **18 JVM tests green**, installed on device:
-  - **MWA endpoint** ("phone as a Ledger"): every sign / signAndSend / signMessages / SIWS request gets a plain-language receipt built from the real bytes: simulation (v0 + lookup tables), split map of every destination, wallet intel, community reputation, blocklist scan, decoded **Anchor IDL calls**, STATS. Hold-to-sign with the Seed Vault; a DANGER risk blocks the whole bundle; re-simulation right before signing.
-  - **Wallet features**: Send (same receipt as a dApp request; paste / QR scan / contacts), Receive (QR), **Delegations & accounts** (revoke approvals, close empty accounts and reclaim rent), signature log with **attested receipts** (hardware-key-signed proof of what was shown), trusted contacts, dApp memory ("3rd signature · since Sep 10").
-  - **Themes**: Halo (free) + Aurora · Ember · Phosphor, unlocked with a real **SKR payment** signed by the Seed Vault (treasury wallet in `local.properties`, key `clearsign.skrTreasury`).
-  - Localized EN/IT (per-app language on Android 13+), hand-drawn icon set, haptics, R8 release build ≈ 3 MB.
-- ⏳ **Reputation program** (`reputation/`, Anchor) compiles; not deployed yet (devnet funding).
-- 🧪 **`:testdapp`** — scenarios that exercise every flow (bundles, burn address, drain-all, assign wallet, gasless, priority fee, approvals).
+---
 
-See `PROGRESS.md` for the detailed changelog and what to verify on device.
+## The problem
 
-## Run the tests / build
+The single biggest cause of crypto losses is **blind signing**: you tap
+"Approve" without seeing what you actually authorize. On the Seeker, an app that
+talks straight to the signing service can obtain a signature over a transaction
+that empties your wallet while showing you only its own name — no amount, no
+recipient, no warning. An *unlimited approval* hidden behind a friendly label is
+a standing drain right the attacker reuses until you revoke it.
+
+## What ClearSign does
+
+Every request — from an external dApp over Mobile Wallet Adapter, or from the
+wallet's own Send flow — is turned into a receipt you can read **before** the
+Seed Vault biometric:
+
+- **Real effects, not claims.** The transaction is simulated on-chain (v0 +
+  address-lookup-tables + SPL programs), so the receipt shows the true balance
+  changes, including hidden splits to fee/referral wallets.
+- **A risk engine** that flags drains, unlimited approvals, authority changes,
+  wallet-takeover (`Assign`), foreign fee payers, address-poisoning look-alikes,
+  brand-new recipients, excessive priority fees, and **transactions that need
+  signatures other than yours**. A DANGER risk blocks one-tap approval.
+- **Anti-TOCTOU:** the transaction is re-simulated in the instant before signing
+  and aborted if the outcome drifted from what you saw.
+- **Attested receipts:** each approved receipt is signed by a hardware key of
+  the app (Android Keystore, StrongBox when available) — exportable,
+  independently-verifiable proof of exactly what you were shown.
+- **On-chain decoding:** unknown programs are decoded from their published
+  Anchor IDL ("Jupiter v6 · route · in_amount …") instead of opaque bytes.
+- **A ledger** of everything you sign, with fiat value at signing time and
+  one-tap **CSV (Koinly / CoinTracker) / PDF / JSON** export for taxes.
+
+It works both as a wallet (Send / Receive, revoke approvals, close empty
+accounts and reclaim rent) and as the signing device for any dApp via MWA — the
+phone as a hardware signer.
+
+## Why it's mobile-first
+
+Seed Vault (hardware-backed keys + biometrics), Mobile Wallet Adapter as the
+wallet endpoint, per-app language, haptics, hold-to-sign, and a design system
+(Halo) with three additional themes that restyle typography, shape and the whole
+**receipt layout** — a glass card, a paper till-receipt, or a green terminal.
+
+## Modules
+
+| Module | What |
+|---|---|
+| `:core` | Pure-Kotlin clear-signing engine — `RiskEngine`, `AddressTrust` (look-alike detection), `ReceiptBuilder`, `SimulationGuard` (anti-TOCTOU), localized (EN/IT/ES). Device- and network-independent, fully unit-tested. |
+| `:app` | Jetpack Compose wallet + MWA endpoint, Seed Vault signer, on-chain simulation (Helius/public RPC), ledger + tax exports, themes, attestation. |
+| `:testdapp` | An on-device "attacker" dApp: drain-all, unlimited approve, gasless, bundle, burn-address, unexpected-signer — to exercise every defense live. |
+| `reputation/` | An Anchor program for stake-weighted on-chain address reputation (future work). |
+
+## Build & run
+
+Requires Android SDK and a JDK 17–21 toolchain. Configure secrets locally:
+
 ```bash
-export JAVA_HOME=/home/oliver/Applications/android-studio/jbr
-/home/oliver/gradle/gradle-8.11.1/bin/gradle :core:test :app:testDebugUnitTest :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+cp local.properties.example local.properties
+# set sdk.dir, and optionally clearsign.heliusRpcUrl (blank → public RPC)
 ```
-(JBR 21 is used because Gradle 8.11.1 does not support the system's JDK 25.)
+
+Then:
+
+```bash
+gradle :core:test :app:testDebugUnitTest      # unit tests (core + app, JVM)
+gradle :app:assembleRelease                   # → app/build/outputs/apk/release/app-release.apk
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+The app runs on the Seeker (or any Android device with the Seed Vault, or the
+Seed Vault Simulator). `local.properties` holds machine-local secrets and is
+git-ignored — nothing sensitive is committed.
 
 ## Architecture
+
 The safety brain (`:core`) depends only on interfaces (`Simulator`,
-`TransactionDecoder`, `TransactionScanner`, `HardwareSigner`). The Android app
-supplies the real implementations, so the entire risk/receipt logic is testable
-off‑device. See `core/src/main/kotlin/com/clearsign/core/Ports.kt`.
+`TransactionDecoder`, `TransactionScanner`, `HardwareSigner`), so the entire
+risk/receipt logic is testable off-device. The Android app supplies the real
+implementations. See `core/src/main/kotlin/com/clearsign/core/Ports.kt`.
 
-## On-device next steps (verify first — noted as project risks)
-1. **Seed Vault SDK**: confirm the API for implementing an MWA *wallet* endpoint (and whether secp256k1 signing is possible → the multi‑chain stretch). Seed Vault is Solana/ed25519, Android‑only.
-2. **Blockaid Solana** API access/quota (fallback: GoPlus / self‑hosted heuristics).
-3. **Re‑simulation latency** at signing must stay instant.
+## SKR
 
-## Hackathon demo (3 min)
-1. External dApp swap → readable receipt → sign.
-2. Scam tx (drainer / unlimited approval / **poisoned look‑alike address**) → blocked with a warning.
-3. Seeker signs for a **desktop** dApp over QR — the phone as a Ledger.
+ClearSign Pro (deep address scan, premium themes, background Watchtower alerts,
+unlimited exports) is unlocked with a real **SKR** payment on mainnet, signed by
+the Seed Vault through the same clear-signing receipt.
+
+## Demo (3 min)
+
+1. A malicious dApp offers a "🎁 free airdrop" that is actually a drain →
+   ClearSign shows the real amount and recipient and the risk → **Reject**.
+2. An unlimited approval → **DANGER**, one-tap approval is blocked.
+3. A transaction that needs another signer → **warning**.
+4. A legitimate Send → readable receipt → hold-to-sign with the Seed Vault →
+   the entry lands in the ledger with its € value and an exportable attested
+   proof.
+5. Switch themes live — glass, paper receipt, green terminal.
+6. Unlock Pro by paying SKR.

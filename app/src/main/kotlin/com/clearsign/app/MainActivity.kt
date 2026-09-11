@@ -143,6 +143,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                     try {
                                         val list = signer.authorizeAndListAccounts()
                                         signer.selectAccount(list.first())
+                                        Settings.setWatchWallet(ctx, list.first().pubkeyBase58)
                                         val rpc = SolanaRpc.urlFor(null)
                                         val bal = withContext(Dispatchers.IO) { SolanaRpc.assetsSummaryMulti(rpc, list.map { it.pubkeyBase58 }) }
                                         accounts = list.map { a -> val (l, t) = bal[a.pubkeyBase58] ?: (null to 0); HomeAccount(a, l, t) }

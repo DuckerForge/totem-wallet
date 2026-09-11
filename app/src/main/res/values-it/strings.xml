@@ -541,4 +541,22 @@
     <string name="pnl_note">Dai tuoi scontrini registrati (FIFO). Le voci senza prezzo sono escluse.</string>
     <string name="pnl_held">in portafoglio %1$s</string>
     <string name="pnl_since">dal %1$s</string>
+    <string name="swapfees_title">FEE SWAP</string>
+    <string name="swapfees_sub">Configurazione una tantum</string>
+    <string name="swapfees_note">Crea i token account del wallet fee sui mint principali cosi la fee dello 0,5% arriva sempre. Idempotente.</string>
+    <string name="swapfees_btn">Attiva le fee swap</string>
+    <string name="swapfees_done">Account per le fee swap pronti.</string>
+    <string name="swapfees_log">Attiva account fee swap</string>
+    <string name="watch_channel">Avvisi Watchtower</string>
+    <string name="watch_title">Watchtower</string>
+    <string name="watch_pro">Avvisi in background — funzione ClearSign Pro</string>
+    <string name="watch_on">Attivo — sto sorvegliando il wallet</string>
+    <string name="watch_off">Spento</string>
+    <string name="watch_enable">Attiva</string>
+    <string name="watch_disable">Disattiva</string>
+    <string name="watch_note">Controlla il tuo wallet e gli indirizzi che hai pagato ogni poche ore. Ti avvisa se compare un\'approvazione illimitata o un indirizzo pagato viene segnalato.</string>
+    <string name="watch_flag_title">ClearSign · indirizzo segnalato</string>
+    <string name="watch_flag_body">Un indirizzo che hai pagato è finito nella blocklist. Apri ClearSign per controllare.</string>
+    <string name="watch_appr_title">ClearSign · approvazioni da rivedere</string>
+    <string name="watch_appr_body">%1$d approvazione/i illimitata/e attive sul tuo wallet. Tocca per revocarle.</string>
 </resources>

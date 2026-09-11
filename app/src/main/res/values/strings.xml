@@ -541,4 +541,22 @@
     <string name="pnl_note">From your recorded receipts (FIFO). Entries without a price are skipped.</string>
     <string name="pnl_held">holding %1$s</string>
     <string name="pnl_since">since %1$s</string>
+    <string name="swapfees_title">SWAP FEES</string>
+    <string name="swapfees_sub">One-time setup</string>
+    <string name="swapfees_note">Create the fee wallet token accounts on the main mints so the 0.5% swap fee always lands. Idempotent.</string>
+    <string name="swapfees_btn">Activate swap fees</string>
+    <string name="swapfees_done">Swap fee accounts are ready.</string>
+    <string name="swapfees_log">Activate swap fee accounts</string>
+    <string name="watch_channel">Watchtower alerts</string>
+    <string name="watch_title">Watchtower</string>
+    <string name="watch_pro">Background alerts — a ClearSign Pro feature</string>
+    <string name="watch_on">On — watching your wallet</string>
+    <string name="watch_off">Off</string>
+    <string name="watch_enable">Enable</string>
+    <string name="watch_disable">Disable</string>
+    <string name="watch_note">Checks your wallet and the addresses you have paid every few hours. Alerts you if an unlimited approval appears or a paid address is flagged.</string>
+    <string name="watch_flag_title">ClearSign · address flagged</string>
+    <string name="watch_flag_body">An address you have paid was flagged on the blocklist. Open ClearSign to review.</string>
+    <string name="watch_appr_title">ClearSign · approvals to review</string>
+    <string name="watch_appr_body">%1$d unlimited approval(s) are live on your wallet. Tap to revoke them.</string>
 </resources>

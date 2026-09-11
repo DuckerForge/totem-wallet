@@ -119,6 +119,30 @@ object WalletActions {
         return Result.Sent(sig)
     }
 
+    private val FEE_MINTS = listOf(
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        SKR_MINT,
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    )
+
+    /** One-time: create the fee wallet's ATAs for the main mints so the swap fee lands. Idempotent. */
+    suspend fun activateSwapFees(ctx: Context, signer: SeedVaultSigner, owner: String): Result {
+        val treasury = Base58.decodePubkey(BuildConfig.SKR_TREASURY) ?: return Result.Failed(ctx.getString(R.string.theme_unlock_no_treasury))
+        val ownerKey = Base58.decodePubkey(owner) ?: return Result.Failed(ctx.getString(R.string.wa_bad_address))
+        val program = Base58.decode(SolanaTx.TOKEN_PROGRAM)
+        val ixs = buildList {
+            add(WalletTx.setComputeUnitLimit(120_000))
+            for (m in FEE_MINTS) {
+                val mint = Base58.decode(m)
+                add(WalletTx.createAtaIdempotent(ownerKey, Pda.associatedTokenAddress(treasury, mint, program), treasury, mint, program))
+            }
+        }
+        return signAndSend(ctx, signer, owner, ixs, LogInfo(kind = "setup", recipientLabel = ctx.getString(R.string.swapfees_log)))
+    }
+
     private fun humanError(sim: SolanaRpc.SimResult): String {
         val log = sim.logs.lastOrNull { it.contains("Error", true) || it.contains("insufficient", true) || it.contains("failed", true) }
         return log?.substringAfter("Program log: ")?.take(120) ?: sim.err?.take(120) ?: "?"

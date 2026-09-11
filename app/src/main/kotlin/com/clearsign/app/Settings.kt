@@ -9,12 +9,20 @@ import java.util.Locale
 object Settings {
     private const val PREFS = "clearsign_settings"
     private const val KEY_CURRENCY = "currency"
+    private const val KEY_ONBOARDED = "onboarded"
 
     val currency = mutableStateOf("USD")
+    val onboarded = mutableStateOf(true)
 
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
+        onboarded.value = p.getBoolean(KEY_ONBOARDED, false)
+    }
+
+    fun setOnboarded(ctx: Context) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ONBOARDED, true).apply()
+        onboarded.value = true
     }
 
     fun setCurrency(ctx: Context, code: String) {

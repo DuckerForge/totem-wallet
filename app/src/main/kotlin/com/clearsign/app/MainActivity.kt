@@ -175,7 +175,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
                     }
                 }
 
-                // ---- Delegations & accounts -----------------------------------
+                // ---- Wallet health (the score) --------------------------------
+                WalletHealthCard(owner)
+
+                // ---- Delegations & accounts (the one-tap fixes) ---------------
                 AccountsCard(signer, owner)
 
                 // ---- Contacts -------------------------------------------------

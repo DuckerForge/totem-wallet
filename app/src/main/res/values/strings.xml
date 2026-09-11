@@ -503,4 +503,16 @@
     <string name="pro_f2">Watchtower — background alerts on your addresses</string>
     <string name="pro_f3">Deep address activity scans</string>
     <string name="pro_f4">Unlimited tax exports</string>
+    <string name="health_title">WALLET HEALTH</string>
+    <string name="health_great">Your wallet is clean</string>
+    <string name="health_ok">Mostly safe</string>
+    <string name="health_weak">Needs attention</string>
+    <string name="health_risky">At risk</string>
+    <string name="health_clean">No live approvals, nothing to reclaim.</string>
+    <string name="health_issues">%1$d thing(s) to fix</string>
+    <string name="health_fix_hint">Fix these in “Delegations &amp; accounts” below — one signature.</string>
+    <string name="health_unlimited">%1$d unlimited approval(s) — %2$s can drain those tokens</string>
+    <string name="health_limited">%1$d approval(s) a delegate can still spend</string>
+    <string name="health_dust">%1$d empty account(s) — reclaim the rent</string>
+    <string name="health_frozen">%1$d frozen account(s)</string>
 </resources>

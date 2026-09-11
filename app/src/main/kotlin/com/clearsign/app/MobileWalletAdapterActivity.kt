@@ -69,6 +69,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Themes.load(this)
         Settings.load(this)
+        Pro.load(this)
         bridge = ActivityResultBridge(this)
         signer = SeedVaultSigner(this, bridge)
         // Bind the websocket server FIRST, before the (slow) Compose init, so the

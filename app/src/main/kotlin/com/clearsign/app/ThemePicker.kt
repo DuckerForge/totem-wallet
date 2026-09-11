@@ -50,10 +50,9 @@ import kotlinx.coroutines.launch
  * token buys something you see every day.
  */
 @Composable
-internal fun ThemesCard(signer: SeedVaultSigner, owner: String?) {
+internal fun ThemesCard(signer: SeedVaultSigner, owner: String?, onNeedPro: () -> Unit) {
     val ctx = LocalContext.current
-    var unlockTarget by remember { mutableStateOf<HaloPalette?>(null) }
-    var unlocked by remember { mutableStateOf(Themes.unlockedIds(ctx)) }
+    val pro by Pro.isPro
     val current = Halo.palette
 
     GlassCard {
@@ -61,28 +60,20 @@ internal fun ThemesCard(signer: SeedVaultSigner, owner: String?) {
             SectionTitle(stringResource(R.string.home_themes_hdr), stringResource(R.string.home_themes_sub), HIcon.PALETTE)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Palettes.all.forEach { p ->
-                    val isUnlocked = Themes.ALL_FREE || p.isFree || p.id in unlocked
+                    val isUnlocked = p.isFree || pro
                     ThemeTile(
                         p = p, active = p.id == current.id, locked = !isUnlocked,
                         modifier = Modifier.weight(1f),
-                        onTap = {
-                            if (isUnlocked) { Themes.select(ctx, p.id); Haptics.tick(ctx) } else unlockTarget = p
-                        },
-                        onDevUnlock = if (BuildConfig.DEBUG && !isUnlocked) ({
-                            Themes.unlock(ctx, p.id, null); unlocked = Themes.unlockedIds(ctx); Themes.select(ctx, p.id); Haptics.success(ctx)
-                        }) else null,
+                        onTap = { if (isUnlocked) { Themes.select(ctx, p.id); Haptics.tick(ctx) } else onNeedPro() },
+                        onDevUnlock = if (BuildConfig.DEBUG && !isUnlocked) ({ Pro.set(ctx, null); Themes.select(ctx, p.id); Haptics.success(ctx) }) else null,
                     )
                 }
             }
             Text(
-                when { Themes.ALL_FREE -> stringResource(R.string.theme_note_all_free); current.isFree -> stringResource(R.string.theme_note_free); else -> stringResource(R.string.theme_note_paid, stringResource(current.nameRes)) },
+                if (pro || current.premium) stringResource(R.string.theme_note_pro) else stringResource(R.string.theme_note_free),
                 fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted,
             )
         }
-    }
-
-    unlockTarget?.let { p ->
-        ThemeUnlockSheet(p, signer, owner, onDismiss = { unlockTarget = null; unlocked = Themes.unlockedIds(ctx) })
     }
 }
 
@@ -144,91 +135,8 @@ private fun ThemeTile(p: HaloPalette, active: Boolean, locked: Boolean, modifier
         }
         Text(stringResource(p.nameRes), fontFamily = Sora, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = if (active) Halo.ink else Halo.muted, maxLines = 1)
         Text(
-            when { p.isFree || Themes.ALL_FREE -> stringResource(R.string.theme_free); locked -> stringResource(R.string.theme_price, WalletActions.THEME_PRICE_SKR); else -> stringResource(R.string.theme_owned) },
+            when { p.isFree -> stringResource(R.string.theme_free); locked -> stringResource(R.string.theme_pro_tag); else -> stringResource(R.string.theme_owned) },
             fontFamily = Inter, fontSize = 10.5.sp, color = if (locked) Halo.amber else Halo.muted, textAlign = TextAlign.Center, style = Tabular,
         )
-    }
-}
-
-private sealed interface UnlockState {
-    data object Checking : UnlockState
-    data class Ready(val quote: WalletActions.SkrQuote) : UnlockState
-    data class Blocked(val message: String) : UnlockState   // no wallet / no SKR / not enough / not configured
-    data object Signing : UnlockState
-    data class Done(val signature: String) : UnlockState
-    data class Error(val message: String) : UnlockState
-}
-
-@Composable
-private fun ThemeUnlockSheet(p: HaloPalette, signer: SeedVaultSigner, owner: String?, onDismiss: () -> Unit) {
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var state by remember { mutableStateOf<UnlockState>(UnlockState.Checking) }
-    val name = stringResource(p.nameRes)
-
-    LaunchedEffect(p.id, owner) {
-        state = when {
-            owner == null -> UnlockState.Blocked(ctx.getString(R.string.theme_unlock_connect))
-            !WalletActions.treasuryConfigured -> UnlockState.Blocked(ctx.getString(R.string.theme_unlock_no_treasury))
-            else -> {
-                val q = runCatching { WalletActions.skrQuote(owner) }.getOrNull()
-                when {
-                    q == null -> UnlockState.Error(ctx.getString(R.string.wa_no_blockhash))
-                    q.account == null -> UnlockState.Blocked(ctx.getString(R.string.theme_unlock_no_skr))
-                    !q.enough -> UnlockState.Blocked(ctx.getString(R.string.theme_unlock_insufficient, q.uiBalance(), WalletActions.THEME_PRICE_SKR))
-                    else -> UnlockState.Ready(q)
-                }
-            }
-        }
-    }
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).clip(rs(12)).background(Brush.linearGradient(listOf(p.accent, p.accent2))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.PALETTE, p.ground, 22.dp) }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(stringResource(R.string.theme_unlock_title, name), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
-                    Text(stringResource(R.string.theme_unlock_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
-                }
-            }
-            when (val s = state) {
-                UnlockState.Checking -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.theme_unlock_checking), fontFamily = Mono, fontSize = 12.5.sp, color = Halo.muted); Spacer(Modifier.width(6.dp)); BlinkCaret(Halo.mint, 13.dp)
-                }
-                is UnlockState.Ready -> {
-                    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
-                        StatRow(stringResource(R.string.theme_unlock_price), "${WalletActions.THEME_PRICE_SKR} SKR", accent = true)
-                        StatRow(stringResource(R.string.theme_unlock_balance), s.quote.uiBalance() + " SKR")
-                        StatRow(stringResource(R.string.theme_unlock_fee), "≈ 0.00001 SOL")
-                        StatRow(stringResource(R.string.theme_unlock_signer), stringResource(R.string.seed_vault))
-                    }
-                    HoldToConfirm(stringResource(R.string.theme_unlock_hold, WalletActions.THEME_PRICE_SKR)) {
-                        state = UnlockState.Signing
-                        scope.launch {
-                            state = when (val r = WalletActions.payTheme(ctx, signer, owner!!, p, s.quote)) {
-                                is WalletActions.Result.Sent -> UnlockState.Done(r.signature)
-                                is WalletActions.Result.Failed -> UnlockState.Error(r.message)
-                            }
-                        }
-                    }
-                }
-                is UnlockState.Blocked -> {
-                    Banner(s.message, Halo.amber, HIcon.INFO)
-                    GhostButton(stringResource(R.string.close)) { onDismiss() }
-                }
-                UnlockState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
-                is UnlockState.Done -> {
-                    Banner(stringResource(R.string.theme_unlock_done, name), Halo.mint, HIcon.CHECK)
-                    Text(s.signature, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, maxLines = 1)
-                    PrimaryButton(stringResource(R.string.done), danger = false) { onDismiss() }
-                }
-                is UnlockState.Error -> {
-                    Banner(s.message, Halo.red, HIcon.WARNING)
-                    GhostButton(stringResource(R.string.close)) { onDismiss() }
-                }
-            }
-        }
     }
 }

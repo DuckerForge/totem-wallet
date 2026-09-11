@@ -12,9 +12,6 @@ object Themes {
     private const val KEY_SELECTED = "selected"
     private const val KEY_UNLOCKED = "unlocked"
 
-    /** Hackathon build: every theme is free. Flip to false to sell premium themes in SKR again. */
-    const val ALL_FREE = true
-
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /** Apply the saved selection. Call before `setContent` in every activity. */
@@ -30,10 +27,10 @@ object Themes {
         Halo.palette = p
     }
 
+    /** A theme is available if it's the free Halo, or ClearSign Pro is unlocked. */
     fun isUnlocked(ctx: Context, id: String?): Boolean {
-        if (ALL_FREE) return true
         val p = Palettes.byId(id)
-        return p.isFree || p.id in unlockedIds(ctx)
+        return p.isFree || Pro.isPro.value
     }
 
     fun unlockedIds(ctx: Context): Set<String> = prefs(ctx).getStringSet(KEY_UNLOCKED, emptySet()) ?: emptySet()

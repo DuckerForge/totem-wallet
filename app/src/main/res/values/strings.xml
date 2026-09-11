@@ -489,4 +489,18 @@
     <string name="onb_next">Next</string>
     <string name="onb_start">Connect the Seed Vault</string>
     <string name="onb_skip">Skip</string>
+    <string name="theme_note_pro">Tap a tile to change the look. Premium themes come with ClearSign Pro.</string>
+    <string name="theme_pro_tag">Pro</string>
+    <string name="pro_title">ClearSign Pro</string>
+    <string name="pro_active">Active — thank you</string>
+    <string name="pro_price">%1$d SKR, one time</string>
+    <string name="pro_sheet_note">One-time SKR payment on mainnet, signed by your Seed Vault.</string>
+    <string name="pro_unlock">Unlock Pro · %1$d SKR</string>
+    <string name="pro_hold">Hold to pay %1$d SKR</string>
+    <string name="pro_done">ClearSign Pro is active. Enjoy.</string>
+    <string name="pro_log">ClearSign Pro</string>
+    <string name="pro_f1">Premium themes (paper, terminal, aurora)</string>
+    <string name="pro_f2">Watchtower — background alerts on your addresses</string>
+    <string name="pro_f3">Deep address activity scans</string>
+    <string name="pro_f4">Unlimited tax exports</string>
 </resources>

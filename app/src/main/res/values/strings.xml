@@ -519,4 +519,19 @@
     <string name="trace_pro">Deep activity scan — a ClearSign Pro feature</string>
     <string name="store_reviews">reviews</string>
     <string name="store_not_listed">Not on the dApp Store</string>
+    <string name="swap_title">Swap</string>
+    <string name="swap_sub">Best route via Jupiter · signed in ClearSign</string>
+    <string name="swap_you_pay">You pay</string>
+    <string name="swap_you_get">You receive (est.)</string>
+    <string name="swap_from_hint">Swap from any token you hold</string>
+    <string name="swap_rate">Rate</string>
+    <string name="swap_route">Route</string>
+    <string name="swap_fee">ClearSign fee (%1$s%%)</string>
+    <string name="swap_impact">Price impact</string>
+    <string name="swap_review">Review &amp; sign</string>
+    <string name="swap_building">Finding the best route…</string>
+    <string name="swap_hold">Hold to swap for %1$s %2$s</string>
+    <string name="swap_done">Swapped. It confirms in a few seconds.</string>
+    <string name="swap_build_failed">Could not build the swap. Try a different amount.</string>
+    <string name="swap_btn">Swap</string>
 </resources>

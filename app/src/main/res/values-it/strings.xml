@@ -519,4 +519,19 @@
     <string name="trace_pro">Scan profondo attività — funzione ClearSign Pro</string>
     <string name="store_reviews">recensioni</string>
     <string name="store_not_listed">Non sul dApp Store</string>
+    <string name="swap_title">Swap</string>
+    <string name="swap_sub">Miglior rotta via Jupiter · firmato in ClearSign</string>
+    <string name="swap_you_pay">Paghi</string>
+    <string name="swap_you_get">Ricevi (stima)</string>
+    <string name="swap_from_hint">Scambia da qualsiasi token che possiedi</string>
+    <string name="swap_rate">Tasso</string>
+    <string name="swap_route">Rotta</string>
+    <string name="swap_fee">Fee ClearSign (%1$s%%)</string>
+    <string name="swap_impact">Impatto sul prezzo</string>
+    <string name="swap_review">Rivedi &amp; firma</string>
+    <string name="swap_building">Cerco la rotta migliore…</string>
+    <string name="swap_hold">Tieni premuto per ricevere %1$s %2$s</string>
+    <string name="swap_done">Scambiato. Si conferma in pochi secondi.</string>
+    <string name="swap_build_failed">Impossibile costruire lo swap. Prova un altro importo.</string>
+    <string name="swap_btn">Swap</string>
 </resources>

@@ -105,6 +105,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showDemo by remember { mutableStateOf(false) }
         var showSend by remember { mutableStateOf(false) }
         var showReceive by remember { mutableStateOf(false) }
+        var showSwap by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) { contacts = Contacts.allowlist(ctx); Exports.clean(ctx) }
         val owner = accounts.firstOrNull()?.account?.pubkeyBase58
 
@@ -164,6 +165,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                GhostButton(stringResource(R.string.swap_btn), Modifier.weight(1f), HIcon.SWAP, tint = Halo.mint) { showSwap = true }
                                 GhostButton(stringResource(R.string.send_btn), Modifier.weight(1f), HIcon.SEND, tint = Halo.mint) { showSend = true }
                                 GhostButton(stringResource(R.string.receive_btn), Modifier.weight(1f), HIcon.RECEIVE, tint = Halo.cyan) { showReceive = true }
                             }
@@ -226,6 +228,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         val first = accounts.firstOrNull()?.account
         if (showSend && first != null) SendSheet(signer, first.pubkeyBase58) { showSend = false }
         if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label) { showReceive = false }
+        if (showSwap && first != null) SwapSheet(signer, first.pubkeyBase58) { showSwap = false }
     }
 }
 

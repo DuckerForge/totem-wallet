@@ -33,6 +33,8 @@ enum class HIcon {
     LOCK, COINS, QR, PALETTE, RECEIVE, PASTE, SCAN, SHARE,
     // brand: a shield sealed with a signature check
     SEAL,
+    // swap: two arrows
+    SWAP,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
 }
@@ -139,6 +141,10 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 val eye = Path().apply { moveTo(6.2f * u, 12f * u); cubicTo(8.6f * u, 8.2f * u, 15.4f * u, 8.2f * u, 17.8f * u, 12f * u); cubicTo(15.4f * u, 15.8f * u, 8.6f * u, 15.8f * u, 6.2f * u, 12f * u); close() }
                 s.drawPath(eye, tint, style = Stroke(width = 1.1f * u, join = StrokeJoin.Round))
                 s.drawCircle(tint, 2.2f * u, p(12f, 12f))
+            }
+            HIcon.SWAP -> {
+                path { moveTo(7f, 8f); lineTo(19f, 8f) }; poly(15.5f, 4.5f, 19f, 8f, 15.5f, 11.5f)
+                path { moveTo(17f, 16f); lineTo(5f, 16f) }; poly(8.5f, 12.5f, 5f, 16f, 8.5f, 19.5f)
             }
             HIcon.RECEIPT -> {
                 path { moveTo(6f, 3f); lineTo(18f, 3f); lineTo(18f, 21f); lineTo(15.5f, 19f); lineTo(13f, 21f); lineTo(10.5f, 19f); lineTo(8f, 21f); lineTo(6f, 19f); close() }

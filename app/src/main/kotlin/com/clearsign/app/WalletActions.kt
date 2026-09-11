@@ -85,6 +85,40 @@ object WalletActions {
         return Result.Sent(sig)
     }
 
+    /**
+     * Sign and send a transaction that was built elsewhere (a Jupiter swap): we
+     * do not rebuild it — the bytes are signed as-is after the user approved the
+     * receipt. The Seed Vault signs the message; the signature is spliced back.
+     */
+    suspend fun signAndSendRaw(
+        ctx: Context, signer: SeedVaultSigner, owner: String, txBytes: ByteArray,
+        receipt: com.clearsign.core.Receipt?, kind: String, cluster: String? = null,
+    ): Result {
+        val rpc = SolanaRpc.urlFor(cluster)
+        try { signer.ensureAccount(owner) } catch (e: Exception) { return Result.Failed(e.message ?: ctx.getString(R.string.sv_not_connected)) }
+        val signature = try { signer.signSuspend(txBytes) } catch (e: Exception) { return Result.Failed(e.message ?: ctx.getString(R.string.sign_error)) }
+        val signed = SolanaTx.attachSignature(txBytes, 0, signature)
+        val out = withContext(Dispatchers.IO) { SolanaRpc.send(rpc, signed) }
+        val sig = out.signature ?: return Result.Failed(ctx.getString(R.string.wa_send_failed, out.error ?: "?"))
+        val at = System.currentTimeMillis()
+        val statement = Attestation.statement(
+            at, "ClearSign", null, cluster, listOf(Attestation.sha256Hex(txBytes)),
+            receipt?.outflows?.map { "−" + it.symbol } ?: emptyList(), receipt?.inflows?.map { "+" + it.symbol } ?: emptyList(),
+            receipt?.risks?.map { it.flag.name }?.distinct() ?: emptyList(), owner, sig,
+        )
+        val attSig = Attestation.sign(statement)
+        LedgerRecorder.record(
+            ctx,
+            LedgerRecorder.fromReceipt(
+                at = at, kind = kind, dApp = "Jupiter", host = "jup.ag", pkg = ctx.packageName, cluster = cluster, wallet = owner,
+                r = receipt, signature = sig, sent = true, txIndex = 0, txCount = 1, groupId = LedgerRecorder.newId(),
+                attestation = if (attSig != null) statement else null, attestationSig = attSig,
+            ),
+        )
+        Haptics.success(ctx)
+        return Result.Sent(sig)
+    }
+
     private fun humanError(sim: SolanaRpc.SimResult): String {
         val log = sim.logs.lastOrNull { it.contains("Error", true) || it.contains("insufficient", true) || it.contains("failed", true) }
         return log?.substringAfter("Program log: ")?.take(120) ?: sim.err?.take(120) ?: "?"

@@ -208,6 +208,14 @@ object SolanaRpc {
         owner: String,
         destinations: List<String> = emptyList(),
         txKeys: Set<String>? = null,
+        /**
+         * Mints the caller expects to receive. Buying a coin for the first time
+         * creates its token account inside the same transaction, and a Jupiter
+         * swap hides that account in an address lookup table, so it is in neither
+         * the wallet's account list nor the transaction's static keys. Given the
+         * mint we can derive the address ourselves and watch it.
+         */
+        expectMints: List<String> = emptyList(),
     ): SimOutcome {
         val allTokens = tokenAccountsOf(rpcUrl, owner)
         val tokenAccts = when {
@@ -215,6 +223,12 @@ object SolanaRpc {
             else -> allTokens.take(25)
         }
         val tokenPubkeys = tokenAccts.map { it.pubkey }.toSet()
+        // Accounts this transaction touches that we do not own a token account for
+        // yet. Buying a coin for the first time creates its account inside the same
+        // transaction, so it can never appear in the list above; without this the
+        // simulation showed the SOL leaving and nothing arriving, and the intent
+        // check correctly called that a lie.
+        val fresh = expectedAtas(owner, expectMints).filter { it !in tokenPubkeys }
         // Candidate destination wallets (excl. the owner and its own token accounts).
         val dests = destinations.asSequence().filter { it != owner && it !in tokenPubkeys }.distinct().take(24).toList()
         Log.i(TAG, "effects: tokenAccts=${tokenAccts.size}/${allTokens.size}, dests=${dests.size}")
@@ -222,20 +236,26 @@ object SolanaRpc {
         // Pre-state (one getMultipleAccounts) and the simulation are independent:
         // run them concurrently. Fallbacks shrink the tracked set if the node
         // rejects the fat request, so the SOL cost still shows instead of a blanket fail.
-        val preOrder = listOf(owner) + tokenAccts.map { it.pubkey } + dests
+        val preOrder = listOf(owner) + tokenAccts.map { it.pubkey } + dests + fresh
         val preF = async { getAccountsMulti(rpcUrl, preOrder) }
 
         var trackedTokens = tokenAccts
         var trackedDests = dests
-        var value = simulateValue(rpcUrl, txBytes, listOf(owner) + tokenAccts.map { it.pubkey } + dests)
+        var trackedFresh = fresh
+        var value = simulateValue(rpcUrl, txBytes, listOf(owner) + tokenAccts.map { it.pubkey } + dests + fresh)
+        if (value == null && fresh.isNotEmpty()) {
+            Log.i(TAG, "full simulate failed → retry without the new accounts")
+            trackedFresh = emptyList()
+            value = simulateValue(rpcUrl, txBytes, listOf(owner) + tokenAccts.map { it.pubkey } + dests)
+        }
         if (value == null && (tokenAccts.isNotEmpty() || dests.isNotEmpty())) {
             Log.i(TAG, "full simulate failed → retry SOL accounts only")
-            trackedTokens = emptyList()
+            trackedTokens = emptyList(); trackedFresh = emptyList()
             value = simulateValue(rpcUrl, txBytes, listOf(owner) + dests)
         }
         if (value == null && dests.isNotEmpty()) {
             Log.i(TAG, "retry owner-only")
-            trackedDests = emptyList()
+            trackedDests = emptyList(); trackedFresh = emptyList()
             value = simulateValue(rpcUrl, txBytes, listOf(owner))
         }
         val pre = runCatching { preF.get() }.getOrDefault(emptyMap())
@@ -268,6 +288,7 @@ object SolanaRpc {
         }
         // finally: destination wallets — their SOL change reveals the split
         val destBase = 1 + trackedTokens.size
+        val freshBase = destBase + trackedDests.size
         trackedDests.forEachIndexed { i, addr ->
             val preLam = pre[addr]?.lamports ?: return@forEachIndexed
             val acc = accounts.optJSONObject(destBase + i) ?: return@forEachIndexed
@@ -276,8 +297,67 @@ object SolanaRpc {
             // rent to *create* it (ATA/PDA), not a payment to someone's wallet.
             if (d != 0L) deltas.add(com.clearsign.core.BalanceDelta(addr, com.clearsign.core.NATIVE_SOL_MINT, "SOL", 9, d, createdAccount = preLam == 0L))
         }
-        Log.i(TAG, "effects OK: deltas=${deltas.size}, cu=$computeUnits, dests=${trackedDests.size}")
+        // Token accounts that came into existence inside this transaction. We only
+        // count one if the simulated account says, in its own bytes, that we own
+        // it: a token account carries its mint at offset 0 and its owner at 32, so
+        // this is the account itself claiming us, not us assuming.
+        trackedFresh.forEachIndexed { i, addr ->
+            val acc = accounts.optJSONObject(freshBase + i) ?: return@forEachIndexed
+            val before = pre[addr]?.tokenAmount ?: 0L
+            val t = tokenAccountFrom(acc) ?: return@forEachIndexed
+            if (t.owner != owner) return@forEachIndexed
+            val d = t.amount - before
+            if (d == 0L) return@forEachIndexed
+            // Already counted if we were tracking this mint through an account we
+            // owned before the transaction.
+            if (trackedTokens.any { it.mint == t.mint }) return@forEachIndexed
+            deltas.add(com.clearsign.core.BalanceDelta(owner, t.mint, TokenSymbols.symbol(t.mint), t.decimals, d))
+        }
+        Log.i(TAG, "effects OK: deltas=${deltas.size}, cu=$computeUnits, dests=${trackedDests.size}, new=${trackedFresh.size}")
         return SimOutcome.Ok(deltas, computeUnits, logCount, preBalances)
+    }
+
+    /**
+     * Where a coin would land: the owner's associated token account, under both
+     * token programs because we do not know which one the mint uses until we
+     * read it back, and asking costs a round trip on the hot path.
+     */
+    private fun expectedAtas(owner: String, mints: List<String>): List<String> {
+        if (mints.isEmpty()) return emptyList()
+        val o = Base58.decodePubkey(owner) ?: return emptyList()
+        val out = ArrayList<String>()
+        for (m in mints.distinct().take(4)) {
+            val mint = Base58.decodePubkey(m) ?: continue
+            for (prog in listOf(TOKEN_PROGRAM, TOKEN_2022)) {
+                runCatching { Base58.encode(Pda.associatedTokenAddress(o, mint, Base58.decode(prog))) }.getOrNull()?.let { out.add(it) }
+            }
+        }
+        return out
+    }
+
+    /** A simulated SPL token account, read out of its own bytes. */
+    private data class TokenAcct(val mint: String, val owner: String, val amount: Long, val decimals: Int)
+
+    /**
+     * Decode a token account from the simulation's account data.
+     *
+     * Layout, both Token and Token-2022: mint at 0, owner at 32, amount as a
+     * little-endian u64 at 64. Decimals are not in the account, they are on the
+     * mint, so we take the symbol table's answer and fall back to a sane guess
+     * rather than another round trip inside the hot path.
+     */
+    private fun tokenAccountFrom(acc: JSONObject): TokenAcct? {
+        val b64 = acc.optJSONArray("data")?.optString(0) ?: return null
+        val bytes = try { Base64.decode(b64, Base64.DEFAULT) } catch (_: Exception) { return null }
+        if (bytes.size < 72) return null
+        val ownerProg = acc.optString("owner")
+        if (ownerProg != TOKEN_PROGRAM && ownerProg != TOKEN_2022) return null
+        val mint = Base58.encode(bytes.copyOfRange(0, 32))
+        val who = Base58.encode(bytes.copyOfRange(32, 64))
+        var v = 0L
+        for (i in 0 until 8) v = v or ((bytes[64 + i].toLong() and 0xFF) shl (8 * i))
+        val decimals = JupiterTokens.cached(mint)?.decimals ?: 6
+        return TokenAcct(mint, who, v, decimals)
     }
 
     /** What a raw account read tells us: lamports (0 = doesn't exist) and, for SPL token accounts, the amount. */
@@ -500,9 +580,13 @@ object SolanaRpc {
      * A symbol is only trusted when it's short and printable; anything else stays
      * an address, so a scam token can't impersonate "USDC" through metadata alone.
      */
-    fun dasSymbols(mints: List<String>): Map<String, String> {
+    /** What DAS knows about a mint: symbol/name, a logo URL, and whether it's an NFT-like asset. */
+    data class DasAsset(val symbol: String?, val name: String?, val image: String?, val isNft: Boolean)
+
+    /** Metadata for [mints] via DAS `getAssetBatch` (Helius only; one call per 100 mints, best effort). */
+    fun dasAssets(mints: List<String>): Map<String, DasAsset> {
         val das = customRpc ?: return emptyMap()
-        val out = HashMap<String, String>()
+        val out = HashMap<String, DasAsset>()
         mints.chunked(100).forEach { chunk ->
             val params = JSONObject().put("ids", JSONArray(chunk))
             val resp = runCatching { postOnce(das, "getAssetBatch", params) }.getOrNull() as? Http.Ok ?: return@forEach
@@ -510,13 +594,28 @@ object SolanaRpc {
             for (i in 0 until arr.length()) {
                 val a = arr.optJSONObject(i) ?: continue
                 val id = a.optString("id"); if (id.isEmpty()) continue
-                val meta = a.optJSONObject("content")?.optJSONObject("metadata")
-                val sym = (a.optJSONObject("token_info")?.optString("symbol")?.takeIf { it.isNotBlank() } ?: meta?.optString("symbol"))?.trim().orEmpty()
-                if (sym.length in 1..10 && sym.all { it.isLetterOrDigit() || it in "._-\$" }) out[id] = sym
+                val content = a.optJSONObject("content")
+                val meta = content?.optJSONObject("metadata")
+                val ti = a.optJSONObject("token_info")
+                val symRaw = (ti?.optString("symbol")?.takeIf { it.isNotBlank() } ?: meta?.optString("symbol"))?.trim().orEmpty()
+                val sym = symRaw.takeIf { it.length in 1..10 && it.all { c -> c.isLetterOrDigit() || c in "._-\$" } }
+                val name = meta?.optString("name")?.trim()?.takeIf { it.isNotEmpty() && it.length <= 40 }
+                val files = content?.optJSONArray("files")?.optJSONObject(0)
+                val image = listOfNotNull(
+                    content?.optJSONObject("links")?.optString("image"),
+                    files?.optString("cdn_uri"), files?.optString("uri"),
+                ).firstOrNull { it.startsWith("https://") }
+                val iface = a.optString("interface")
+                val isNft = iface.contains("NFT", ignoreCase = true) ||
+                    (ti != null && ti.optInt("decimals", -1) == 0 && ti.optLong("supply", -1L) == 1L)
+                out[id] = DasAsset(sym, name, image, isNft)
             }
         }
         return out
     }
+
+    fun dasSymbols(mints: List<String>): Map<String, String> =
+        dasAssets(mints).mapNotNull { (k, v) -> v.symbol?.let { k to it } }.toMap()
 
     // ---- building our own transactions ---------------------------------------
 

@@ -55,7 +55,7 @@ class ReceiptPdf(private val ctx: Context) {
     private fun drawReceipt(p: Page, e: LedgerEntry, cur: String) {
         p.right("CLEARSIGN · " + ctx.getString(R.string.pdf_receipt).uppercase(), "#" + e.id.take(8), bold)
         p.line(utc.format(Date(e.at)) + "   " + (e.cluster ?: "mainnet-beta"), dim)
-        p.line("${ctx.getString(R.string.pdf_dapp)}  ${e.dApp}" + (e.host?.let { " ($it)" } ?: "") + "   ${ctx.getString(R.string.pdf_kind)}  ${e.kind}" + (if (e.txCount > 1) "  ${e.txIndex + 1}/${e.txCount}" else ""))
+        p.line("${ctx.getString(R.string.pdf_dapp)}  ${e.dApp}" + (e.host?.let { " ($it)" } ?: "") + "   ${ctx.getString(R.string.pdf_kind)}  ${kindLabel(ctx, e.kind)}" + (if (e.txCount > 1) "  ${e.txIndex + 1}/${e.txCount}" else ""))
         p.line(rule, dim)
         for (l in e.outflows) p.right("OUT  -" + fmt(l.rawAmount, l.decimals) + " " + l.symbol, fiat(e, l, cur))
         for (l in e.inflows) p.right("IN   +" + fmt(l.rawAmount, l.decimals) + " " + l.symbol, fiat(e, l, cur))

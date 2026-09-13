@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Richiesta di pagamento · Apex</title>
+<meta name="theme-color" content="#070b12">
+<link rel="icon" href="../icon.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <div class="brand" id="brand"></div>
+
+  <div class="card" id="card">
+    <h1 id="title"></h1>
+    <div class="amount" id="amount" hidden></div>
+    <p class="note" id="note" hidden></p>
+    <p class="small" id="whoLabel"></p>
+    <p class="who" id="who"></p>
+    <a class="btn primary" id="open" href="#"></a>
+    <p class="warn" id="missed" hidden></p>
+    <button class="btn ghost" id="copy"></button>
+    <a class="btn ghost" id="get" href=""></a>
+    <p class="small" id="foot"></p>
+  </div>
+</main>
+
+<script src="../i18n.js"></script>
+<script>
+(function () {
+  brand(T('Firma sapendo cosa firmi', 'Sign knowing what you sign'));
+
+  const q = new URLSearchParams(location.search);
+  const to = (q.get('to') || '').trim();
+  const amount = q.get('amount');
+  const message = q.get('message');
+  const label = q.get('label');
+  const mint = q.get('spl-token');
+
+  const $ = (id) => document.getElementById(id);
+
+  if (!to) {
+    $('title').textContent = T('Link incompleto', 'Incomplete link');
+    $('whoLabel').textContent = T('Manca l’indirizzo di chi riceve. Chiedi che te lo rimandino.',
+                                  'The recipient address is missing. Ask for the link again.');
+    $('open').hidden = true; $('get').hidden = true;
+    return;
+  }
+
+  const unit = mint ? 'token' : 'SOL';
+  $('title').textContent = label
+    ? T(label + ' ti chiede un pagamento', label + ' is asking you to pay')
+    : T('Ti stanno chiedendo un pagamento', 'Someone is asking you to pay');
+
+  if (amount) {
+    $('amount').hidden = false;
+    $('amount').innerHTML = amount + ' <small>' + unit + '</small>';
+  } else {
+    $('title').textContent = T('Il tuo indirizzo per essere pagato', 'An address to pay');
+  }
+
+  if (message) { $('note').hidden = false; $('note').textContent = '“' + message + '”'; }
+
+  $('whoLabel').textContent = T('I soldi vanno a questo indirizzo Solana:', 'The money goes to this Solana address:');
+  $('who').textContent = to;
+
+  // The same request in the form every Solana wallet already understands.
+  let pay = 'solana:' + to;
+  const params = [];
+  if (amount) params.push('amount=' + encodeURIComponent(amount));
+  if (message) params.push('message=' + encodeURIComponent(message));
+  if (label) params.push('label=' + encodeURIComponent(label));
+  if (mint) params.push('spl-token=' + encodeURIComponent(mint));
+  if (params.length) pay += '?' + params.join('&');
+
+  $('open').textContent = T('Apri col mio portafoglio', 'Open with my wallet');
+  $('open').href = pay;
+
+  // A solana: link that nobody handles fails silently — the browser simply stays
+  // put and the person is left wondering. If we are still on this page a moment
+  // after the tap, no wallet answered, and saying so beats saying nothing.
+  $('open').addEventListener('click', function () {
+    $('missed').hidden = true;
+    setTimeout(function () {
+      if (document.visibilityState === 'visible' && document.hasFocus()) {
+        $('missed').hidden = false;
+        $('missed').textContent = T(
+          'Nessun portafoglio ha risposto. Se ne hai uno, aprilo e incolla l’indirizzo qui sotto; se non ce l’hai, scarica Apex.',
+          'No wallet answered. If you have one, open it and paste the address below; if you have none, get Apex.');
+      }
+    }, 1500);
+  });
+
+  // Works with no wallet at all: the address by hand is always a way through.
+  $('copy').textContent = T('Copia l’indirizzo', 'Copy the address');
+  $('copy').addEventListener('click', async function () {
+    const done = T('Indirizzo copiato', 'Address copied');
+    try {
+      await navigator.clipboard.writeText(to);
+      $('copy').textContent = done;
+    } catch (e) {
+      // Clipboard is blocked on insecure or unfocused contexts: select it instead.
+      const r = document.createRange();
+      r.selectNodeContents($('who'));
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      $('copy').textContent = T('Selezionato: tieni premuto e copia', 'Selected: long-press and copy');
+    }
+    setTimeout(function () { $('copy').textContent = T('Copia l’indirizzo', 'Copy the address'); }, 2500);
+  });
+  $('get').textContent = T('Non ho un portafoglio · scarica Apex', 'No wallet yet · get Apex');
+  $('get').href = APK;
+  $('foot').textContent = T(
+    'Questa pagina non tocca i tuoi soldi e non può muovere niente: passa la richiesta al portafoglio, che te la fa vedere e firmare.',
+    'This page never touches your money and cannot move anything: it hands the request to your wallet, which shows it to you before you sign.');
+})();
+</script>
+</body>
+</html>

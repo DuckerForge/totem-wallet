@@ -17,12 +17,13 @@ object WalletTx {
     val COMPUTE_BUDGET: ByteArray = Base58.decode(SolanaTx.COMPUTE_BUDGET_PROGRAM)
 
     class AccountMeta(val pubkey: ByteArray, val isSigner: Boolean, val isWritable: Boolean)
-    class Instruction(val programId: ByteArray, val keys: List<AccountMeta>, val data: ByteArray)
+    /** [lamportsMoved] is bookkeeping for error messages, not part of the wire format. */
+    class Instruction(val programId: ByteArray, val keys: List<AccountMeta>, val data: ByteArray, val lamportsMoved: Long = 0L)
 
     fun tokenProgramFor(id: String): ByteArray = if (id == SolanaTx.TOKEN_2022_PROGRAM) TOKEN_2022 else TOKEN_PROGRAM
 
     fun systemTransfer(from: ByteArray, to: ByteArray, lamports: Long) = Instruction(
-        SYSTEM_PROGRAM, listOf(AccountMeta(from, true, true), AccountMeta(to, false, true)), le32(2) + le64(lamports),
+        SYSTEM_PROGRAM, listOf(AccountMeta(from, true, true), AccountMeta(to, false, true)), le32(2) + le64(lamports), lamports,
     )
 
     /** SPL Revoke (5): the delegate on [source] can no longer spend. */
@@ -38,6 +39,13 @@ object WalletTx {
     )
 
     /** SPL TransferChecked (12). */
+    /** BurnChecked (ix 15): destroys [amount] raw units of [mint] held in [account]; the owner signs. */
+    fun tokenBurnChecked(account: ByteArray, mint: ByteArray, owner: ByteArray, amount: Long, decimals: Int, program: ByteArray = TOKEN_PROGRAM) = Instruction(
+        program,
+        listOf(AccountMeta(account, false, true), AccountMeta(mint, false, true), AccountMeta(owner, true, false)),
+        byteArrayOf(15) + le64(amount) + byteArrayOf(decimals.toByte()),
+    )
+
     fun tokenTransferChecked(source: ByteArray, mint: ByteArray, dest: ByteArray, owner: ByteArray, amount: Long, decimals: Int, program: ByteArray = TOKEN_PROGRAM) = Instruction(
         program,
         listOf(AccountMeta(source, false, true), AccountMeta(mint, false, false), AccountMeta(dest, false, true), AccountMeta(owner, true, false)),

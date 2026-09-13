@@ -6,7 +6,12 @@ import android.os.Bundle
 import android.text.format.DateUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -68,6 +76,97 @@ class MainActivity : ComponentActivity() {
     private lateinit var bridge: ActivityResultBridge
     private lateinit var signer: SeedVaultSigner
 
+    /** A payment request read by tapping, or arrived as a link. */
+    var incoming by mutableStateOf<com.clearsign.core.PayRequest?>(null)
+    /** Stamped when a tap carried no payment request, so the screen can say so. */
+    var tapMiss by mutableStateOf(0L)
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        readRequest(intent)
+    }
+
+    /**
+     * Reader mode: while Apex is in front, holding it against a tag or another
+     * phone reads the request straight into the send form. It is only a read —
+     * nothing is signed, and the ordinary receipt still has to be approved.
+     */
+    private fun startReaderMode() {
+        // Reading and pretending to be a tag are the same radio, and reader mode
+        // wins: with it on, this phone polls for tags and emulates nothing. So
+        // while the tap screen is armed we must stay out of the way, or the other
+        // phone finds no card to read — which is exactly what "the tap does
+        // nothing" looked like.
+        if (TapService.armed.value) return
+        val nfc = android.nfc.NfcAdapter.getDefaultAdapter(this) ?: return
+        nfc.enableReaderMode(
+            this,
+            { tag ->
+                val ndef = android.nfc.tech.Ndef.get(tag) ?: return@enableReaderMode
+                val message = runCatching {
+                    ndef.connect()
+                    ndef.ndefMessage ?: ndef.cachedNdefMessage
+                }.getOrNull()
+                runCatching { ndef.close() }
+                val uri = message?.records?.firstNotNullOfOrNull { r ->
+                    runCatching { com.clearsign.core.Ndef.uriOf(r.payload.let { byteArrayOf() } + r.toByteArray()) }.getOrNull()
+                        ?: runCatching { r.toUri()?.toString() }.getOrNull()
+                }
+                val parsed = uri?.let { com.clearsign.core.SolanaPay.parse(it) }
+                runOnUiThread {
+                    if (parsed != null) { Haptics.tick(this); incoming = parsed } else { tapMiss = System.currentTimeMillis() }
+                }
+            },
+            android.nfc.NfcAdapter.FLAG_READER_NFC_A or android.nfc.NfcAdapter.FLAG_READER_NFC_B or
+                android.nfc.NfcAdapter.FLAG_READER_NFC_F or android.nfc.NfcAdapter.FLAG_READER_NFC_V or
+                android.nfc.NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS,
+            null,
+        )
+    }
+
+    private fun stopReaderMode() {
+        runCatching { android.nfc.NfcAdapter.getDefaultAdapter(this)?.disableReaderMode(this) }
+    }
+
+    private fun readRequest(intent: android.content.Intent?) {
+        val data = intent?.data ?: return
+        val scheme = data.scheme ?: return
+        // `solana:` from a tag or a chat, and the web form of the same request from a
+        // link somebody tapped. Both end up in the send form, neither signs anything.
+        if (!scheme.equals("solana", ignoreCase = true) && !scheme.equals("https", ignoreCase = true)) return
+        incoming = com.clearsign.core.SolanaPay.parse(data.toString()) ?: return
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopReaderMode()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Voice.release()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        startReaderMode()
+        // Hand the radio back and forth as the tap screen arms and disarms.
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                TapService.armed.collect { emitting -> if (emitting) stopReaderMode() else startReaderMode() }
+            }
+        }
+        // The widget mirrors what the app knows; refresh it whenever we come to the front.
+        lifecycleScope.launch { runCatching { HealthWidgetData.refresh(this@MainActivity) } }
+        // A paired agent link should be listening whenever the phone is up.
+        if (AgentLink.current(this) != null && SessionWallet.current(this) != null) AgentLinkService.start(this)
+        // And so should the trader. Without this the loop came back only at the
+        // next fifteen-minute keeper window, so after force-stopping the app it
+        // read as switched on and doing nothing at all.
+        TraderKeeper.sync(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -78,13 +177,13 @@ class MainActivity : ComponentActivity() {
         bridge = ActivityResultBridge(this)
         signer = SeedVaultSigner(this, bridge)
         enableEdgeToEdge()
-        setContent { HomeScreen(signer) }
+        setContent { ScaledText { HomeScreen(signer) } }
     }
 }
 
 private data class HomeAccount(val account: SvAccount, val lamports: Long?, val tokens: Int)
 
-private enum class Tab { WALLET, RECEIPTS, SETTINGS }
+private enum class Tab { WALLET, AGENT, RECEIPTS, SETTINGS }
 
 @Composable
 fun HomeScreen(signer: SeedVaultSigner) {
@@ -97,17 +196,87 @@ fun HomeScreen(signer: SeedVaultSigner) {
         }
         val scope = rememberCoroutineScope()
         // Wallet state lives at the root so switching tabs never drops the Seed Vault session.
-        var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(Tab.WALLET) }
+        var tab by androidx.compose.runtime.saveable.rememberSaveable {
+            mutableStateOf(if ((ctx as? android.app.Activity)?.intent?.getStringExtra("open") == "agent") Tab.AGENT else Tab.WALLET)
+        }
         var accounts by remember { mutableStateOf<List<HomeAccount>>(emptyList()) }
         var busy by remember { mutableStateOf(false) }
         var status by remember { mutableStateOf<String?>(null) }
         var contacts by remember { mutableStateOf(Contacts.allowlist(ctx)) }
-        var showDemo by remember { mutableStateOf(false) }
-        var showSend by remember { mutableStateOf(false) }
-        var showReceive by remember { mutableStateOf(false) }
-        var showSwap by remember { mutableStateOf(false) }
+        // A widget quick action asks for a specific sheet.
+        val requested = remember { (ctx as? android.app.Activity)?.intent?.getStringExtra("open") }
+        var showSend by remember { mutableStateOf(requested == "send") }
+        var showReceive by remember { mutableStateOf(requested == "receive") }
+        var showSwap by remember { mutableStateOf(requested == "swap") }
+        var showChat by remember { mutableStateOf(false) }
+        var showGift by remember { mutableStateOf(false) }
+        var showTap by remember { mutableStateOf(false) }
+        var showMore by remember { mutableStateOf(false) }
+        var showHealth by remember { mutableStateOf(false) }
+        var showPnl by remember { mutableStateOf(false) }
+        var headline by remember { mutableStateOf<String?>(null) }
+        // One scroll state for the wallet, hoisted so the header and the bottom
+        // bar can both react to it. Nothing in the app did this before.
+        var scanError by remember { mutableStateOf<String?>(null) }
+        val scanHome = rememberAgentScan { scanError = it }
+        val walletScroll = rememberScrollState()
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val collapse by remember {
+            derivedStateOf { (walletScroll.value / with(density) { 180.dp.toPx() }).coerceIn(0f, 1f) }
+        }
+        // A tapped or linked request opens the ordinary send form, already filled in.
+        val request = (ctx as? MainActivity)?.incoming
+        LaunchedEffect(request) { if (request != null) showSend = true }
         LaunchedEffect(Unit) { contacts = Contacts.allowlist(ctx); Exports.clean(ctx) }
+        /**
+         * Unlock: what the door does when this phone has been here before.
+         *
+         * The fingerprint every time you come back, the way Jupiter does it. The
+         * address is already remembered, so nothing needs the vault to *show* a
+         * balance; what the print buys is that the person holding the phone is
+         * you. Signing later calls `ensureAccount`, which authorises the vault
+         * properly at the moment something is actually signed.
+         */
+        suspend fun unlock(saved: String): Boolean {
+            val act = ctx as? android.app.Activity ?: return false
+            val ok = Presence.confirm(act, ctx.getString(R.string.lock_title), ctx.getString(R.string.lock_sub))
+            if (!ok) return false
+            val key = Base58.decodePubkey(saved) ?: return false
+            val shell = SvAccount(label = null, derivationUri = android.net.Uri.EMPTY, pubkeyBase58 = saved, pubkeyBytes = key)
+            val bal = withContext(Dispatchers.IO) { runCatching { SolanaRpc.assetsSummaryMulti(SolanaRpc.urlFor(null), listOf(saved)) }.getOrNull() }
+            val (lam, toks) = bal?.get(saved) ?: (null to 0)
+            accounts = listOf(HomeAccount(shell, lam, toks))
+            return true
+        }
+
+        // Leaving the app locks it. Coming back always goes through the door, so
+        // "sometimes it asks and sometimes it doesn't" stops being a thing: it
+        // asks, always.
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+        androidx.compose.runtime.DisposableEffect(lifecycle) {
+            val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+                if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP) accounts = emptyList()
+            }
+            lifecycle.addObserver(obs)
+            onDispose { lifecycle.removeObserver(obs) }
+        }
         val owner = accounts.firstOrNull()?.account?.pubkeyBase58
+
+        fun connect() {
+            busy = true; status = null
+            scope.launch {
+                try {
+                    val list = signer.authorizeAndListAccounts()
+                    signer.selectAccount(list.first())
+                    Settings.setWatchWallet(ctx, list.first().pubkeyBase58)
+                    val rpc = SolanaRpc.urlFor(null)
+                    val bal = withContext(Dispatchers.IO) { SolanaRpc.assetsSummaryMulti(rpc, list.map { it.pubkeyBase58 }) }
+                    accounts = list.map { a -> val (l, t) = bal[a.pubkeyBase58] ?: (null to 0); HomeAccount(a, l, t) }
+                } catch (e: Exception) {
+                    status = e.message ?: ctx.getString(R.string.connect_failed)
+                } finally { busy = false }
+            }
+        }
 
         Box(
             Modifier.fillMaxSize()
@@ -117,43 +286,66 @@ fun HomeScreen(signer: SeedVaultSigner) {
         ) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when (tab) {
+                    // With no wallet there is nothing on any of the four tabs, and
+                    // the old screen said so with a small card and two thirds of an
+                    // empty page under it. One door, the whole screen, and the tab
+                    // bar stays away until there is something behind it.
+                    if (accounts.isEmpty()) {
+                        val saved = remember { Settings.watchWallet(ctx) }
+                        fun ask() {
+                            busy = true; status = null
+                            scope.launch {
+                                val ok = runCatching { unlock(saved!!) }.getOrDefault(false)
+                                busy = false
+                                if (!ok) status = ctx.getString(R.string.lock_failed)
+                            }
+                        }
+                        // The print asks itself, the moment the door appears. The
+                        // button underneath is only there for after you dismiss it.
+                        LaunchedEffect(saved) { if (saved != null) ask() }
+                        ConnectDoor(busy, status, returning = saved != null) {
+                            if (saved == null) connect() else ask()
+                        }
+                    }
+                    else when (tab) {
                         Tab.WALLET -> androidx.compose.runtime.CompositionLocalProvider(LocalEntrance provides remember { java.util.concurrent.atomic.AtomicInteger() }) {
                             Column(
-                                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                                Modifier.fillMaxSize().verticalScroll(walletScroll).padding(horizontal = 20.dp, vertical = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(20.dp),
                             ) {
-                                HomeHeader(accounts.firstOrNull()?.account)
+                                HomeHeader(accounts.firstOrNull()?.account, headline, collapse, onScan = { scanHome() })
 
-                                // ---- Portfolio hero (value + actions) -------------------------
-                                if (accounts.isNotEmpty()) WalletHero(owner, onSwap = { showSwap = true }, onSend = { showSend = true }, onReceive = { showReceive = true })
+                                // ---- the balance, the eight actions, the holdings --------------
+                                if (accounts.isNotEmpty()) {
+                                    WalletHero(
+                                        owner, signer, collapse,
+                                        onAction = { a ->
+                                            when (a) {
+                                                HomeAction.SEND -> showSend = true
+                                                HomeAction.RECEIVE -> showReceive = true
+                                                HomeAction.SWAP -> showSwap = true
+                                                HomeAction.SCAN -> scanHome()
+                                                HomeAction.TAP -> showTap = true
+                                                HomeAction.LINK -> showGift = true
+                                                // One "Agent" means one place. This used to open the
+                                                // chat directly, which with no key is a grey paragraph
+                                                // and a Close button, and never mentions the budget.
+                                                HomeAction.AGENT -> tab = Tab.AGENT
+                                                HomeAction.MORE -> showMore = true
+                                            }
+                                        },
+                                        onPnl = { showPnl = true },
+                                        onTotal = { headline = it },
+                                    )
+                                    RecentReceiptsCard { tab = Tab.RECEIPTS }
+                                    AgentGlanceCard { tab = Tab.AGENT }
+                                }
 
                 // ---- Wallet ---------------------------------------------------
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SectionTitle(stringResource(R.string.home_wallet_hdr), stringResource(R.string.home_wallet_sub), HIcon.WALLET)
-                        if (accounts.isEmpty()) {
-                            Text(
-                                stringResource(R.string.home_wallet_note),
-                                fontFamily = Inter, fontSize = 13.sp, color = Halo.muted,
-                            )
-                            PrimaryButton(if (busy) stringResource(R.string.connecting) else stringResource(R.string.connect_seed_vault), danger = false, enabled = !busy, icon = HIcon.FINGERPRINT) {
-                                busy = true; status = null
-                                scope.launch {
-                                    try {
-                                        val list = signer.authorizeAndListAccounts()
-                                        signer.selectAccount(list.first())
-                                        Settings.setWatchWallet(ctx, list.first().pubkeyBase58)
-                                        val rpc = SolanaRpc.urlFor(null)
-                                        val bal = withContext(Dispatchers.IO) { SolanaRpc.assetsSummaryMulti(rpc, list.map { it.pubkeyBase58 }) }
-                                        accounts = list.map { a -> val (l, t) = bal[a.pubkeyBase58] ?: (null to 0); HomeAccount(a, l, t) }
-                                    } catch (e: Exception) {
-                                        status = e.message ?: ctx.getString(R.string.connect_failed)
-                                    } finally { busy = false }
-                                }
-                            }
-                            status?.let { Text(it, color = Halo.red, fontFamily = Inter, fontSize = 12.5.sp) }
-                        } else {
+                        run {
                             accounts.forEach { h ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Avatar(h.account.pubkeyBase58, 38.dp)
@@ -176,6 +368,56 @@ fun HomeScreen(signer: SeedVaultSigner) {
                     }
                 }
 
+                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                        Tab.AGENT -> AgentScreen(owner, signer, onChat = { showChat = true })
+                        Tab.RECEIPTS -> LedgerScreen()
+                        Tab.SETTINGS -> SettingsScreen(signer, owner) { SecurityTools(signer, owner, contacts) }
+                    }
+                }
+                if (accounts.isNotEmpty()) BottomBar(tab, collapse) { tab = it }
+            }
+            // Inside this Box on purpose. The sheets below are windows of their own
+            // and can live anywhere; a conversation is an ordinary composable, and
+            // out there — emitted straight into the root — it had no height to fill
+            // and folded up into a strip at the top of the screen.
+            if (showChat) ChatScreen { showChat = false }
+        }
+        val first = accounts.firstOrNull()?.account
+        if (showSend && first != null) {
+            SendSheet(
+                signer, first.pubkeyBase58,
+                prefillTo = request?.recipient, prefillAmount = request?.amount?.let { fmtUi(it) },
+                onGift = { showSend = false; showGift = true },
+            ) { showSend = false; (ctx as? MainActivity)?.incoming = null }
+        }
+        if (showTap && owner != null) TapSheet(owner) { showTap = false }
+        if (showMore) {
+            MoreSheet(
+                onHealth = { showMore = false; showHealth = true },
+                onContacts = { showMore = false; tab = Tab.SETTINGS },
+                onSettings = { showMore = false; tab = Tab.SETTINGS },
+            ) { showMore = false }
+        }
+        if (showHealth) HealthSheet(owner) { showHealth = false }
+        if (showPnl) PnlSheet { showPnl = false }
+        if (showGift && owner != null) GiftSheet(signer, owner) { showGift = false }
+        if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label, onTap = { showReceive = false; showTap = true }) { showReceive = false }
+        if (showSwap && first != null) SwapSheet(signer, first.pubkeyBase58) { showSwap = false }
+    }
+}
+
+
+/**
+ * Wallet health, delegations, trusted contacts and the offline demo. They used to
+ * stack under the portfolio on the Wallet tab; they live in Settings now so the
+ * home stays a wallet (balance, actions, holdings) and not a dashboard.
+ */
+@Composable
+private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map<String, String>) {
+    var showDemo by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 // ---- Wallet health (the score) --------------------------------
                 WalletHealthCard(owner)
 
@@ -211,62 +453,153 @@ fun HomeScreen(signer: SeedVaultSigner) {
                             Spacer(Modifier.weight(1f))
                             HaloIcon(if (showDemo) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
                         }
-                        if (showDemo) DemoSection(signer, accounts.firstOrNull()?.account?.pubkeyBase58)
+                        if (showDemo) DemoSection(signer, owner)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                            }
-                        }
-                        Tab.RECEIPTS -> LedgerScreen()
-                        Tab.SETTINGS -> SettingsScreen(signer, owner)
-                    }
-                }
-                BottomBar(tab) { tab = it }
-            }
-        }
-        val first = accounts.firstOrNull()?.account
-        if (showSend && first != null) SendSheet(signer, first.pubkeyBase58) { showSend = false }
-        if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label) { showReceive = false }
-        if (showSwap && first != null) SwapSheet(signer, first.pubkeyBase58) { showSwap = false }
     }
 }
 
 /** Three tabs on a hairline-topped bar; the active one sits on a soft pill. */
+/**
+ * The door, when there is no wallet yet.
+ *
+ * It used to be a card at the top of the Wallet tab with two thirds of an empty
+ * page under it and four tabs at the bottom that all led nowhere. Nothing in
+ * this app works without a key, so until there is one there is one screen and
+ * one thing to do on it.
+ */
 @Composable
-private fun BottomBar(tab: Tab, onSelect: (Tab) -> Unit) {
+private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onConnect: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(bottom = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // High on the page on purpose: the fingerprint sheet comes up over the
+        // bottom half, and the mark and the sentence have to stay readable behind
+        // it. Centred, they would have been the part the sheet covers.
+        // The name alone, high on the page. The launcher art was here too and it
+        // was the wrong hero: a light square in the middle of a dark screen,
+        // pulling the eye away from the thing worth watching underneath.
+        Spacer(Modifier.weight(0.08f))
+        // The one orchestrated moment in the app: the name comes up out of the
+        // dark like a light being switched on above it. Once, on arrival, and
+        // never again — everywhere else motion answers something you did.
+        val lit = remember { androidx.compose.animation.core.Animatable(0f) }
+        LaunchedEffect(Unit) { lit.animateTo(1f, tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+        Box(contentAlignment = Alignment.Center) {
+            // The beam itself: a soft pool of light that opens above the letters.
+            Box(
+                Modifier.matchParentSize().scale(1f + 2.4f * lit.value, 1f + 1.2f * lit.value)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(Halo.cyan.copy(alpha = 0.22f * lit.value), Color.Transparent),
+                        ),
+                    ),
+            )
+            Text(
+                stringResource(R.string.door_title).uppercase(),
+                style = HaloType.screen,
+                color = Halo.ink.copy(alpha = 0.22f + 0.78f * lit.value),
+                letterSpacing = 3.sp,
+            )
+        }
+        Spacer(Modifier.height(26.dp))
+        // Shown, not told: a payment crossing to another phone while a slice peels
+        // off to somewhere nobody mentioned. It is the one thing this app is for,
+        // and a paragraph saying the same would be skimmed.
+        HiddenCutDemo()
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.door_pitch),
+            fontFamily = Inter, fontSize = 14.sp, color = Halo.muted, lineHeight = 21.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.weight(1f))
+        PrimaryButton(
+            when {
+                busy -> stringResource(R.string.connecting)
+                returning -> stringResource(R.string.lock_open)
+                else -> stringResource(R.string.connect_seed_vault)
+            },
+            danger = false, enabled = !busy, icon = HIcon.FINGERPRINT,
+        ) { onConnect() }
+        status?.let {
+            Spacer(Modifier.height(12.dp))
+            Text(it, color = Halo.red, fontFamily = Inter, fontSize = 12.5.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
     val ctx = LocalContext.current
     Row(
         Modifier.fillMaxWidth().background(Halo.card).border(androidx.compose.foundation.BorderStroke(1.dp, Halo.stroke)).padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
-        listOf(Tab.WALLET to (HIcon.WALLET to R.string.tab_wallet), Tab.RECEIPTS to (HIcon.RECEIPT to R.string.tab_receipts), Tab.SETTINGS to (HIcon.SETTINGS to R.string.tab_settings)).forEach { (t, v) ->
+        listOf(
+            Tab.WALLET to (HIcon.WALLET to R.string.tab_wallet),
+            Tab.AGENT to (HIcon.PIGEON to R.string.tab_agent),
+            Tab.RECEIPTS to (HIcon.RECEIPT to R.string.tab_receipts),
+            Tab.SETTINGS to (HIcon.SETTINGS to R.string.tab_settings),
+        ).forEach { (t, v) ->
             val (icon, label) = v
             val active = t == tab
             val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Column(
                 Modifier.pressScale(src).clip(rs(12)).then(if (active) Modifier.background(Halo.mint.copy(alpha = 0.12f)) else Modifier)
                     .clickable(interactionSource = src, indication = null) { if (!active) { onSelect(t); Haptics.tick(ctx) } }
-                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HaloIcon(icon, if (active) Halo.mint else Halo.muted, 22.dp)
-                Text(stringResource(label), fontFamily = Inter, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, fontSize = 10.5.sp, color = if (active) Halo.mint else Halo.muted)
+                // Scrolling down hands the screen back to the content: the labels
+                // fade and the bar closes up. Coming back up brings them out again.
+                if (collapse < 0.98f) {
+                    Text(
+                        stringResource(label), style = HaloType.label,
+                        color = if (active) Halo.mint else Halo.muted,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = 1f - collapse
+                            scaleY = 1f - collapse
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HomeHeader(account: SvAccount?) {
+private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: Float = 0f, onScan: (() -> Unit)? = null) {
+    // Scanning an Agent Gate request lives here, where wallets put the scanner.
+    var scanError by remember { mutableStateOf<String?>(null) }
+    val ownScan = rememberAgentScan { scanError = it }
+    val scan = onScan ?: ownScan
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(34.dp).clip(rs(10)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))),
-            contentAlignment = Alignment.Center,
-        ) { HaloIcon(HIcon.SEAL, Halo.ground, 26.dp) }
+        // The real artwork, not a glyph on a gradient. It was already in the project,
+        // used by the launcher and by nothing inside the app; scaled to show the
+        // adaptive icon's visible middle rather than its full bleed.
+        Box(Modifier.size(38.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.mipmap.ic_launcher_bird),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().scale(1.5f),
+            )
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("ClearSign", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 21.sp, color = Halo.ink)
-            Text(stringResource(R.string.tagline), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
+            Text(stringResource(R.string.app_name), style = HaloType.title, color = Halo.ink)
+            // Once the big number has scrolled away the header takes it over, so
+            // the figure that matters is never off screen.
+            if (headline != null) {
+                Text(
+                    headline, style = HaloType.small, color = Halo.ink,
+                    modifier = Modifier.graphicsLayer { alpha = collapse },
+                )
+            }
         }
         if (account != null) {
             Row(
@@ -279,6 +612,7 @@ private fun HomeHeader(account: SvAccount?) {
             }
         }
     }
+    scanError?.let { Spacer(Modifier.height(8.dp)); Banner(it, Halo.amber, HIcon.WARNING) }
 }
 
 @Composable

@@ -2,7 +2,15 @@ package com.clearsign.app
 
 import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -80,11 +88,68 @@ fun Modifier.themeFlash(): Modifier {
     }
 }
 
-/** Everything a screen's root needs on top of its background: grain, scanlines, flash. */
+/**
+ * CRT / old-TV overlay: heavy scanlines, a bright roll bar drifting down, a faint
+ * green phosphor tint, a slow tear line and a subtle flicker. Pure overlay draw
+ * (no content sampling), so it runs anywhere and costs one rect pass per frame.
+ */
+@Composable
+fun Modifier.crt(tint: Color, enabled: Boolean): Modifier {
+    if (!enabled) return this
+    val density = LocalDensity.current.density
+    val lines = remember(density) { scanlineBrush(density) }
+    val tr = rememberInfiniteTransition(label = "crt")
+    val roll by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "roll")
+    val tear by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(7000, easing = LinearEasing)), label = "tear")
+    val flick by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "flick")
+    return drawWithContent {
+        drawContent()
+        // Phosphor glow: a whisper of the theme colour over everything.
+        drawRect(tint, alpha = 0.05f)
+        // Scanlines, stronger than the static ones.
+        drawRect(brush = lines, alpha = 0.12f)
+        // Roll bar: a soft bright band sweeping top→bottom.
+        val bandH = size.height * 0.22f
+        val y = roll * (size.height + bandH) - bandH
+        drawRect(
+            brush = Brush.verticalGradient(
+                0f to Color.Transparent, 0.5f to Color.White.copy(alpha = 0.045f), 1f to Color.Transparent,
+                startY = y, endY = y + bandH,
+            ),
+            topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, bandH),
+        )
+        // Tear line: a thin bright glitch line that drifts and fades in/out.
+        val ty = tear * size.height
+        val ta = (kotlin.math.sin(tear * Math.PI * 6).toFloat()).coerceAtLeast(0f) * 0.18f
+        if (ta > 0.01f) drawRect(tint.copy(alpha = ta), topLeft = Offset(0f, ty), size = androidx.compose.ui.geometry.Size(size.width, density * 1.5f))
+        // Flicker: a barely-there brightness jitter.
+        val f = (kotlin.math.sin(flick * Math.PI * 2).toFloat()) * 0.012f
+        if (f > 0f) drawRect(Color.White, alpha = f) else if (f < 0f) drawRect(Color.Black, alpha = -f)
+    }
+}
+
+/** Everything a screen's root needs on top of its background: grain, scanlines/CRT, flash. */
 @Composable
 fun Modifier.haloSurface(): Modifier {
     val p = Halo.palette
     var m = this.grain(p.grainAlpha)
-    if (p.scanlines) m = m.scanlines()
+    // Scanline themes (Phosphor) get the full CRT when the user leaves it on; otherwise plain scanlines.
+    m = if (p.scanlines && Settings.crt.value) m.crt(Halo.mint, true)
+        else if (p.scanlines) m.scanlines()
+        else m
     return m.themeFlash()
+}
+
+/**
+ * Wraps content in the user's chosen global text scale (Settings.textScale) on top
+ * of the system font scale, so every sp in the app grows or shrinks together.
+ */
+@androidx.compose.runtime.Composable
+internal fun ScaledText(content: @androidx.compose.runtime.Composable () -> Unit) {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    val scale by Settings.textScale
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density, d.fontScale * scale),
+        content = content,
+    )
 }

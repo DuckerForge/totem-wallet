@@ -41,6 +41,10 @@ class RiskEngine(private val locale: String = "en") {
             risks += Risk(RiskFlag.BLOCKED_MALICIOUS, Severity.DANGER, scan.reason ?: Localization.riskDetail(RiskFlag.BLOCKED_MALICIOUS, locale))
         }
 
+        // The signer's own wallet is never a "recipient": burning/closing an account
+        // refunds the rent to yourself, and moving between your own accounts is safe.
+        fun isSelf(a: String?) = a != null && myWallet != null && a == myWallet
+
         for (ix in instructions) {
             val dest = ix.destination
 
@@ -53,7 +57,7 @@ class RiskEngine(private val locale: String = "en") {
                     risks += if (ix.isUnlimitedApproval) risk(RiskFlag.UNLIMITED_APPROVAL, Severity.DANGER)
                     else risk(RiskFlag.LIMITED_APPROVAL, Severity.WARN)
                 InstructionKind.SET_AUTHORITY -> risks += risk(RiskFlag.AUTHORITY_CHANGE, Severity.DANGER)
-                InstructionKind.CLOSE_ACCOUNT -> if (dest != null && trust.level(dest) == TrustLevel.NEW) {
+                InstructionKind.CLOSE_ACCOUNT -> if (dest != null && !isSelf(dest) && trust.level(dest) == TrustLevel.NEW) {
                     risks += risk(RiskFlag.ACCOUNT_CLOSE, Severity.WARN)
                 }
                 InstructionKind.ASSIGN_OWNER ->
@@ -64,7 +68,7 @@ class RiskEngine(private val locale: String = "en") {
                 else -> {}
             }
 
-            if (dest != null && ix.kind != InstructionKind.ASSIGN_OWNER) {
+            if (dest != null && !isSelf(dest) && ix.kind != InstructionKind.ASSIGN_OWNER) {
                 trust.lookalikeOf(dest)?.let { impersonated ->
                     risks += risk(RiskFlag.LOOKALIKE_ADDRESS, Severity.DANGER, impersonated)
                 }
@@ -85,8 +89,9 @@ class RiskEngine(private val locale: String = "en") {
      */
     fun assessEffects(deltas: List<BalanceDelta>, ctx: EffectContext, trust: AddressTrust): List<Risk> {
         val risks = mutableListOf<Risk>()
+        val recipientIsSelf = ctx.primaryRecipient != null && ctx.primaryRecipient == ctx.myWallet
         val recipientTrust = ctx.primaryRecipient?.let { trust.level(it) }
-        val recipientUnknown = recipientTrust == null || recipientTrust == TrustLevel.NEW
+        val recipientUnknown = !recipientIsSelf && (recipientTrust == null || recipientTrust == TrustLevel.NEW)
         val brandNew = ctx.recipientBrandNew == true && recipientUnknown
 
         if (brandNew) risks += risk(RiskFlag.BRAND_NEW_RECIPIENT, Severity.WARN)

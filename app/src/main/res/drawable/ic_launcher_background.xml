@@ -1,25 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Blue-black ground -->
-    <path
-        android:pathData="M0,0 h108 v108 h-108 z"
-        android:fillColor="#070b12" />
-    <!-- Soft mint/cyan glow behind the mark -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M0,0 h108 v108 h-108 z" android:fillColor="#FF070B12" />
     <path android:pathData="M0,0 h108 v108 h-108 z">
         <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="54"
-                android:centerY="50"
-                android:gradientRadius="60">
-                <item android:offset="0.0" android:color="#264dffd0" />
-                <item android:offset="0.55" android:color="#12142033" />
-                <item android:offset="1.0" android:color="#00070b12" />
+            <gradient android:type="radial" android:centerX="54" android:centerY="58" android:gradientRadius="62">
+                <item android:offset="0.0" android:color="#2E5CC8FF" />
+                <item android:offset="0.55" android:color="#140E2A4A" />
+                <item android:offset="1.0" android:color="#00070B12" />
             </gradient>
         </aapt:attr>
     </path>

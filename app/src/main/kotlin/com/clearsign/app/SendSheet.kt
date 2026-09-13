@@ -71,9 +71,21 @@ private sealed interface Asset {
     val symbol: String
     val decimals: Int
     val available: Long
-    data class Sol(override val available: Long) : Asset { override val symbol = "SOL"; override val decimals = 9 }
+    /** Needed to show the coin's own logo, not just its name. */
+    val mint: String
+    val name: String?
+    data class Sol(override val available: Long) : Asset {
+        override val symbol = "SOL"
+        override val decimals = 9
+        override val mint = com.clearsign.core.NATIVE_SOL_MINT
+        override val name = "Solana"
+    }
     data class Token(val acct: SolanaRpc.TokenAccountInfo) : Asset {
-        override val symbol = TokenSymbols.symbol(acct.mint); override val decimals = acct.decimals; override val available = acct.amount
+        override val symbol = TokenSymbols.symbol(acct.mint)
+        override val decimals = acct.decimals
+        override val available = acct.amount
+        override val mint = acct.mint
+        override val name = TokenSymbols.name(acct.mint)
     }
 }
 
@@ -87,18 +99,34 @@ private sealed interface SendState {
 }
 
 @Composable
-internal fun SendSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> Unit) {
+internal fun SendSheet(
+    signer: SeedVaultSigner,
+    owner: String,
+    /** Filled in by a tap or a payment link: the form opens ready to review. */
+    prefillTo: String? = null,
+    prefillAmount: String? = null,
+    onGift: () -> Unit = {},
+    onDismiss: () -> Unit,
+) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var state by remember { mutableStateOf<SendState>(SendState.Form) }
 
-    var to by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
+    var to by remember { mutableStateOf(prefillTo.orEmpty()) }
+    var amount by remember { mutableStateOf(prefillAmount.orEmpty()) }
     var assets by remember { mutableStateOf<List<Asset>>(emptyList()) }
     var asset by remember { mutableStateOf<Asset?>(null) }
     var formError by remember { mutableStateOf<String?>(null) }
+    var tapping by remember { mutableStateOf(false) }
     val contacts = remember { Contacts.allowlist(ctx) }
+
+    // A tap can land while this screen is already open: `to` was only seeded once,
+    // so without this the form sat there empty with the request already read.
+    LaunchedEffect(prefillTo, prefillAmount) {
+        prefillTo?.takeIf { it.isNotBlank() }?.let { to = it; tapping = false; Haptics.tick(ctx) }
+        prefillAmount?.takeIf { it.isNotBlank() }?.let { amount = it }
+    }
 
     LaunchedEffect(owner) {
         val rpc = SolanaRpc.urlFor(null)
@@ -107,6 +135,9 @@ internal fun SendSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
             val t = runCatching { SolanaRpc.tokenAccountsOf(rpc, owner) }.getOrDefault(emptyList()).filter { it.amount > 0 && !it.isFrozen }
             l to t
         }
+        // Jupiter's registry names and pictures the coins the metadata pass could
+        // not, so the chips below carry a real logo instead of four letters.
+        withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(toks.map { it.mint }) } }
         assets = listOf(Asset.Sol(lam)) + toks.sortedByDescending { it.amount }.map { Asset.Token(it) }
         if (asset == null) asset = assets.first()
     }
@@ -116,18 +147,12 @@ internal fun SendSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.94f).imePadding()) {
-            // header
-            Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clip(rs(12)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(HIcon.SEND, Halo.cyan, 20.dp) }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.send_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
-                    Text(
-                        when (state) { is SendState.Review -> stringResource(R.string.send_review_sub); else -> stringResource(R.string.send_sub) },
-                        fontFamily = Inter, fontSize = 12.sp, color = Halo.muted,
-                    )
-                }
-            }
+            SheetHeader(
+                stringResource(R.string.send_title),
+                when (state) { is SendState.Review -> stringResource(R.string.send_review_sub); else -> stringResource(R.string.send_sub) },
+                HIcon.SEND,
+                onClose = onDismiss,
+            )
 
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 when (val s = state) {
@@ -142,10 +167,29 @@ internal fun SendSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                             colors = fieldColors(if (to.isBlank()) Halo.stroke else if (destValid) Halo.mint else Halo.red),
                             shape = rs(14),
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Four ways to fill the address in, all the same size, all one tap.
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SmallChip(stringResource(R.string.send_paste), HIcon.PASTE) { to = clipboardText(ctx)?.trim().orEmpty() }
-                            SmallChip(stringResource(R.string.send_scan), HIcon.SCAN) {
-                                scanLauncher.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false).setPrompt(""))
+                            SmallChip(stringResource(R.string.send_scan), HIcon.SCAN, tint = Halo.cyan) {
+                                scanLauncher.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(true).setCaptureActivity(ScanPortraitActivity::class.java).setPrompt(""))
+                            }
+                            // The radio is already listening while the app is in front. The
+                            // button does not switch it on: it gives the person a moment
+                            // where they can see that it is, and somewhere to read how.
+                            if (TapService.isSupported(ctx)) {
+                                SmallChip(stringResource(R.string.send_tap), HIcon.NFC, tint = Halo.cyan) { tapping = !tapping }
+                            }
+                            // No address? Then the link is the address.
+                            SmallChip(stringResource(R.string.gift_chip), HIcon.GIFT, tint = Halo.mint) { onGift() }
+                        }
+                        if (tapping) {
+                            SheetBlock(stringResource(R.string.send_tap), stringResource(R.string.send_block_nfc_sub), HIcon.NFC) {
+                                TapAnimation(active = true, height = 126.dp)
+                                Text(
+                                    stringResource(R.string.send_tap_listening),
+                                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 16.sp,
+                                )
                             }
                         }
                         if (contacts.isNotEmpty()) {
@@ -171,9 +215,13 @@ internal fun SendSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                                         .border(1.dp, if (active) Halo.mint else Halo.stroke, rs(12))
                                         .clickable { asset = a; amount = ""; Haptics.tick(ctx) }.padding(horizontal = 12.dp, vertical = 8.dp),
                                 ) {
-                                    Column {
-                                        Text(a.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (active) Halo.mint else Halo.ink)
-                                        Text(fmtSol(a.available, minOf(a.decimals, 4)).let { if (a.decimals == 9) it else fmtUnits(a.available, a.decimals) }, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, style = Tabular)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        TokenLogo(a.mint, a.symbol, TokenSymbols.image(a.mint), 24.dp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text(a.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (active) Halo.mint else Halo.ink)
+                                            Text(fmtSol(a.available, minOf(a.decimals, 4)).let { if (a.decimals == 9) it else fmtUnits(a.available, a.decimals) }, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, style = Tabular)
+                                        }
                                     }
                                 }
                             }
@@ -320,9 +368,13 @@ internal fun fmtUnits(raw: Long, decimals: Int): String {
     return if (s.contains('.')) s.trimEnd('0').trimEnd('.') else s
 }
 
-/** A scanned QR may be a bare address or a Solana Pay URI (`solana:<addr>?…`). */
+/**
+ * A scanned QR may be a bare address, a Solana Pay URI (`solana:<addr>?…`), or the
+ * web link Apex hands out — the one a phone without a wallet can also open.
+ */
 private fun parseScanned(text: String): String {
     val t = text.trim()
+    com.clearsign.core.SolanaPay.parse(t)?.let { return it.recipient }
     val body = if (t.startsWith("solana:", ignoreCase = true)) t.substringAfter(':').substringBefore('?') else t
     return body.trim()
 }

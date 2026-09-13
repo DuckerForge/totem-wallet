@@ -83,10 +83,15 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     // QR: scan a recipient (camera) and render your own address.
+    implementation("io.coil-kt:coil-compose:2.7.0")   // token logos
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.glance:glance-appwidget:1.1.1")   // home-screen Wallet Health widget
+    // Ed25519 in software, for the agent envelope: a key we must be able to hand
+    // over cannot live in the Seed Vault, which never exports anything.
+    implementation("net.i2p.crypto:eddsa:0.3.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")

@@ -41,7 +41,7 @@ internal fun Onboarding(onDone: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val slides = listOf(
-        Triple(HIcon.SEAL, R.string.onb1_t to R.string.onb1_b, Halo.mint),
+        Triple(HIcon.PIGEON, R.string.onb1_t to R.string.onb1_b, Halo.mint),
         Triple(HIcon.SHIELD_LOCK, R.string.onb2_t to R.string.onb2_b, Halo.cyan),
         Triple(HIcon.RECEIPT, R.string.onb3_t to R.string.onb3_b, Halo.mint),
     )
@@ -56,9 +56,9 @@ internal fun Onboarding(onDone: () -> Unit) {
     ) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 28.dp, vertical = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(rs(10)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.SEAL, Halo.ground, 20.dp) }
+                Box(Modifier.size(34.dp).clip(rs(10)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.PIGEON, Halo.ground, 20.dp) }
                 Spacer(Modifier.width(10.dp))
-                Text("ClearSign", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Halo.ink)
+                Text(stringResource(R.string.app_name), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Halo.ink)
             }
 
             HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { i ->

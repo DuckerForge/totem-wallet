@@ -16,8 +16,9 @@ import java.net.URL
  */
 object Jupiter {
     private const val TAG = "ClearSign-Jup"
-    private const val QUOTE = "https://quote-api.jup.ag/v6/quote"
-    private const val SWAP = "https://quote-api.jup.ag/v6/swap"
+    // quote-api.jup.ag/v6 was shut down (2026-09: no response at all). Swap API v1:
+    // the free "lite" host first, the keyed host as a fallback (it also answers without a key, rate-limited).
+    private val HOSTS = listOf("https://lite-api.jup.ag/swap/v1", "https://api.jup.ag/swap/v1")
 
     /** Our cut of a swap, in basis points (50 = 0.5%). */
     const val PLATFORM_FEE_BPS = 50
@@ -33,10 +34,19 @@ object Jupiter {
         val routeLabels: List<String>,   // AMMs in the route, in order
     )
 
-    /** Best route for [amount] raw units of [inputMint] → [outputMint]. Null on failure. */
-    fun quote(inputMint: String, outputMint: String, amount: Long, slippageBps: Int = 50): Quote? {
-        val url = "$QUOTE?inputMint=$inputMint&outputMint=$outputMint&amount=$amount&slippageBps=$slippageBps&platformFeeBps=$PLATFORM_FEE_BPS"
-        val o = getJson(url) ?: return null
+    /**
+     * Best route for [amount] raw units of [inputMint] → [outputMint]. Null on failure.
+     *
+     * [feeBps] is our cut, and asking for one is a promise to provide a token
+     * account to receive it: Jupiter answers `feeAccount is required for swap
+     * with platformFee` when the quote carries a fee and the build does not.
+     * The agent passes 0, because it trades coins whose fee account does not
+     * exist yet, and a swap that cannot be built earns nothing anyway.
+     */
+    fun quote(inputMint: String, outputMint: String, amount: Long, slippageBps: Int = 50, feeBps: Int = PLATFORM_FEE_BPS): Quote? {
+        val q = "inputMint=$inputMint&outputMint=$outputMint&amount=$amount&slippageBps=$slippageBps" +
+            (if (feeBps > 0) "&platformFeeBps=$feeBps" else "")
+        val o = HOSTS.firstNotNullOfOrNull { getJson("$it/quote?$q") } ?: return null
         if (o.has("error")) { Log.w(TAG, "quote error: ${o.optString("error")}"); return null }
         val out = o.optString("outAmount").toLongOrNull() ?: return null
         val labels = o.optJSONArray("routePlan")?.let { rp ->
@@ -46,8 +56,29 @@ object Jupiter {
             raw = o, inMint = inputMint, outMint = outputMint,
             inAmount = o.optString("inAmount").toLongOrNull() ?: amount, outAmount = out,
             priceImpactPct = o.optString("priceImpactPct").toDoubleOrNull() ?: 0.0,
-            feeBps = PLATFORM_FEE_BPS, routeLabels = labels,
+            feeBps = feeBps, routeLabels = labels,
         )
+    }
+
+    /**
+     * Can this token be sold back again?
+     *
+     * A honeypot quotes beautifully on the way in and has no route out, so the
+     * only honest test is to ask for the opposite trade before buying. Three
+     * answers, not two: true (a route exists), false (Jupiter says there is
+     * none), null (we could not reach it — which is never an accusation).
+     */
+    fun sellableBack(mint: String, decimals: Int, usd: Double?): Boolean? {
+        if (mint == SOL_MINT || mint == com.clearsign.core.NATIVE_SOL_MINT) return true
+        // About ten dollars' worth, or one whole token when the price is unknown:
+        // dust gets "no route" from every AMM and would libel an honest coin.
+        val unit = Math.pow(10.0, decimals.toDouble())
+        val amount = (if (usd != null && usd > 0) (10.0 / usd) * unit else unit)
+            .coerceIn(1.0, 1e18).toLong()
+        val q = "inputMint=$mint&outputMint=$SOL_MINT&amount=$amount&slippageBps=300"
+        val o = HOSTS.firstNotNullOfOrNull { getJson("$it/quote?$q") } ?: return null
+        if (o.has("error")) return false
+        return o.optString("outAmount").toLongOrNull()?.let { it > 0 }
     }
 
     /**
@@ -62,7 +93,7 @@ object Jupiter {
             .put("wrapAndUnwrapSol", true)
             .put("dynamicComputeUnitLimit", true)
         if (feeAccount != null) body.put("feeAccount", feeAccount)
-        val o = postJson(SWAP, body) ?: return null
+        val o = HOSTS.firstNotNullOfOrNull { postJson("$it/swap", body) } ?: return null
         val b64 = o.optString("swapTransaction").takeIf { it.isNotEmpty() } ?: run { Log.w(TAG, "swap error: $o"); return null }
         return runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
     }

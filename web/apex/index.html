@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apex · il portafoglio che ti fa capire cosa firmi</title>
+<meta name="theme-color" content="#070b12">
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <div class="brand" id="brand"></div>
+  <div class="card">
+    <h1 id="h"></h1>
+    <p id="p1"></p>
+    <p id="p2"></p>
+    <a class="btn primary" id="store" href="solanadappstore://details?id=com.clearsign.app"></a>
+    <p class="small" id="foot"></p>
+  </div>
+</main>
+<script src="i18n.js"></script>
+<script>
+brand(T('Firma sapendo cosa firmi', 'Sign knowing what you sign'));
+document.getElementById('h').textContent = T('Apex', 'Apex');
+document.getElementById('p1').textContent = T(
+  'Un portafoglio Solana per il Seeker: prima di ogni firma simula la transazione e ti dice, in italiano, cosa esce, a chi va e quanto costa.',
+  'A Solana wallet for the Seeker: before every signature it simulates the transaction and tells you, in plain words, what leaves, where it goes and what it costs.');
+document.getElementById('p2').textContent = T(
+  'Le chiavi restano nel Seed Vault del telefono. Chi propone una transazione — una dApp, uno script, un modello — non firma mai.',
+  'Keys stay in the phone’s Seed Vault. Whoever proposes a transaction — a dApp, a script, a model — never signs it.');
+document.getElementById('store').textContent = T('Apri nel dApp Store', 'Open in the dApp Store');
+document.getElementById('foot').textContent = T(
+  'Sei arrivato qui da un link di pagamento o da un regalo? Apri di nuovo quel link dopo aver installato l’app.',
+  'Came here from a payment link or a gift? Open that link again once the app is installed.');
+</script>
+</body>
+</html>

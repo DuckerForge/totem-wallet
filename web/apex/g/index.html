@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Un regalo per te · Apex</title>
+<meta name="theme-color" content="#070b12">
+<link rel="icon" href="../icon.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <div class="brand" id="brand"></div>
+
+  <div class="card">
+    <h1 id="title"></h1>
+    <p class="note" id="note" hidden></p>
+    <div class="amount" id="amount" hidden></div>
+    <p id="state"></p>
+
+    <div id="claim" hidden>
+      <p class="small" id="askAddr"></p>
+      <input id="dest" inputmode="text" autocomplete="off" spellcheck="false" placeholder="">
+      <button class="btn primary" id="take"></button>
+      <p class="err" id="err" hidden></p>
+    </div>
+
+    <div id="done" hidden>
+      <p class="ok" id="doneText"></p>
+      <p class="small"><a class="plain" id="explorer" href="#" target="_blank" rel="noopener"></a></p>
+    </div>
+
+    <a class="btn ghost" id="get" href=""></a>
+    <p class="small" id="foot"></p>
+  </div>
+</main>
+
+<script src="../i18n.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.4/lib/index.iife.min.js"></script>
+<script>
+(function () {
+  brand(T('Un regalo, dentro un link', 'A gift, inside a link'));
+  const $ = (id) => document.getElementById(id);
+
+  // The key rides in the fragment on purpose: a fragment never reaches the server,
+  // so whoever hosts this page never sees it.
+  const frag = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const k = frag.get('k') || new URLSearchParams(location.search).get('k');
+  const note = frag.get('n') || new URLSearchParams(location.search).get('n');
+
+  $('get').textContent = T('Scarica Apex', 'Get Apex');
+  $('get').href = APK;
+  $('foot').textContent = T(
+    'Chi ha questo link ha i soldi: non condividerlo con nessun altro. Finché non lo ritiri, chi te l’ha mandato può riprenderselo.',
+    'Whoever holds this link holds the money: do not forward it. Until you take it, the sender can take it back.');
+
+  if (note) { $('note').hidden = false; $('note').textContent = '“' + decodeURIComponent(note) + '”'; }
+
+  if (!k) {
+    $('title').textContent = T('Link incompleto', 'Incomplete link');
+    $('state').textContent = T('Manca la chiave del regalo. Fattelo rimandare per intero.',
+                               'The gift key is missing. Ask for the whole link again.');
+    return;
+  }
+
+  let pair;
+  try {
+    const seed = b58decode(k);
+    if (seed.length !== 32) throw new Error('bad seed');
+    pair = solanaWeb3.Keypair.fromSeed(seed);
+  } catch (e) {
+    $('title').textContent = T('Link non valido', 'Invalid link');
+    $('state').textContent = T('Questa chiave non è leggibile.', 'That key cannot be read.');
+    return;
+  }
+
+  $('title').textContent = T('Ti hanno regalato dei soldi', 'Someone sent you money');
+  $('state').textContent = T('Controllo quanto c’è…', 'Checking how much is there…');
+  $('askAddr').textContent = T('Incolla il tuo indirizzo Solana: li mando lì.',
+                               'Paste your Solana address and I will send it there.');
+  $('dest').placeholder = T('Il tuo indirizzo Solana', 'Your Solana address');
+  $('take').textContent = T('Ritira il regalo', 'Take the gift');
+
+  // api.mainnet-beta.solana.com answers 403 to anything that sends an Origin
+  // header, i.e. to every browser: this page needs a node that allows CORS.
+  const conn = new solanaWeb3.Connection('https://solana-rpc.publicnode.com', 'confirmed');
+  const FEE = 5000;
+  let lamports = 0;
+
+  conn.getBalance(pair.publicKey).then(function (v) {
+    lamports = v;
+    if (lamports <= FEE) {
+      $('state').textContent = T('Questo regalo è già stato ritirato.', 'This gift has already been taken.');
+      return;
+    }
+    $('amount').hidden = false;
+    $('amount').innerHTML = ((lamports - FEE) / 1e9).toFixed(5).replace(/0+$/, '').replace(/\.$/, '') + ' <small>SOL</small>';
+    $('state').textContent = T('Se hai Apex, aprilo dal link e basta. Altrimenti:',
+                               'If you have Apex, just open the link with it. Otherwise:');
+    $('claim').hidden = false;
+  }).catch(function () {
+    $('state').textContent = T('Non riesco a leggere la rete Solana. Riprova fra poco.',
+                               'I cannot reach the Solana network. Try again shortly.');
+  });
+
+  $('take').addEventListener('click', async function () {
+    const dest = $('dest').value.trim();
+    $('err').hidden = true;
+    let to;
+    try {
+      to = new solanaWeb3.PublicKey(dest);
+    } catch (e) {
+      $('err').hidden = false;
+      $('err').textContent = T('Questo non sembra un indirizzo Solana.', 'That does not look like a Solana address.');
+      return;
+    }
+    $('take').disabled = true;
+    $('take').textContent = T('Sto mandando…', 'Sending…');
+    try {
+      const tx = new solanaWeb3.Transaction().add(
+        solanaWeb3.SystemProgram.transfer({ fromPubkey: pair.publicKey, toPubkey: to, lamports: lamports - FEE }),
+      );
+      const sig = await solanaWeb3.sendAndConfirmTransaction(conn, tx, [pair], { commitment: 'confirmed' });
+      $('claim').hidden = true;
+      $('done').hidden = false;
+      $('doneText').textContent = T('Fatto: i soldi sono tuoi.', 'Done: the money is yours.');
+      $('explorer').textContent = T('Guarda la transazione', 'See the transaction');
+      $('explorer').href = 'https://solscan.io/tx/' + sig;
+    } catch (e) {
+      $('take').disabled = false;
+      $('take').textContent = T('Ritira il regalo', 'Take the gift');
+      $('err').hidden = false;
+      $('err').textContent = T('Non è andata: ', 'It did not go through: ') + (e && e.message ? e.message : e);
+    }
+  });
+})();
+</script>
+</body>
+</html>

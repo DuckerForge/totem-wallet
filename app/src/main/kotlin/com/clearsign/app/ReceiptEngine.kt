@@ -40,6 +40,14 @@ object ReceiptEngine {
         val receipt: Receipt,
         val destinations: List<String>,
         val txKeys: Set<String>?,
+        /**
+         * The mints this analysis was told to expect. Carried so the pre-signing
+         * re-check can watch the same accounts: without it the preview saw a coin
+         * arriving and the re-check did not, the two delta sets disagreed, and
+         * every purchase of a coin you had never held was blocked as "the state
+         * changed" when nothing had.
+         */
+        val expectMints: List<String> = emptyList(),
     )
 
     /**
@@ -52,7 +60,16 @@ object ReceiptEngine {
      * Wire work is concurrent: lookup-table resolution → (simulation ∥ pre-state)
      * ∥ community reputation. Everything else is local.
      */
-    suspend fun analyze(ctx: Context, scanner: TransactionScanner, payload: ByteArray, myWallet: String, cluster: String?, requireSim: Boolean): Analyzed = coroutineScope {
+    suspend fun analyze(
+        ctx: Context,
+        scanner: TransactionScanner,
+        payload: ByteArray,
+        myWallet: String,
+        cluster: String?,
+        requireSim: Boolean,
+        /** Mints the caller expects to receive; see [SolanaRpc.simulateEffects]. */
+        expectMints: List<String> = emptyList(),
+    ): Analyzed = coroutineScope {
         val rpc = SolanaRpc.urlFor(cluster)
         // Trust from the local address book: enables trusted/known badges and
         // address-poisoning look-alike detection against addresses the user knows.
@@ -74,7 +91,7 @@ object ReceiptEngine {
         // a recipient + hidden fee/referral wallets shows each split, not one total.
         val destinations = decoded?.let { (it.writableKeys + loadedW).filter { k -> k != myWallet }.distinct() } ?: emptyList()
 
-        val simD = async(Dispatchers.IO) { SolanaRpc.simulateEffects(rpc, payload, myWallet, destinations, txKeys) }
+        val simD = async(Dispatchers.IO) { SolanaRpc.simulateEffects(rpc, payload, myWallet, destinations, txKeys, expectMints) }
         // On-chain community reputation on the primary recipient, bounded so a slow
         // devnet read can never hold the receipt hostage.
         val primaryDest = instructions.firstOrNull { it.destination != null && it.kind != com.clearsign.core.InstructionKind.ASSIGN_OWNER }?.destination
@@ -183,8 +200,12 @@ object ReceiptEngine {
             )
         }
         val fee = baseFee + (stats?.priorityFeeLamports ?: 0L)
-        val receipt = ReceiptBuilder(trust).build(myWallet, deltas, instructions, fee, risks, stats).copy(calls = callsD.await())
-        Analyzed(payload, receipt, destinations, txKeys)
+        var receipt = ReceiptBuilder(trust).build(myWallet, deltas, instructions, fee, risks, stats).copy(calls = callsD.await())
+        // The signer's own wallet is not a stranger: name it and trust it (rent refunds, self-transfers).
+        if (receipt.primaryRecipient == myWallet) {
+            receipt = receipt.copy(recipientTrust = com.clearsign.core.TrustLevel.TRUSTED, recipientLabel = ctx.getString(R.string.recipient_self))
+        }
+        Analyzed(payload, receipt, destinations, txKeys, expectMints)
     }
 
     /** Analyze every payload concurrently (bounds latency to ~1 analysis). */
@@ -202,7 +223,7 @@ object ReceiptEngine {
         val rpc = SolanaRpc.urlFor(cluster)
         val checks = items.mapIndexed { i, a ->
             async(Dispatchers.IO) {
-                val fresh = (SolanaRpc.simulateEffects(rpc, a.payload, myWallet, a.destinations, a.txKeys)
+                val fresh = (SolanaRpc.simulateEffects(rpc, a.payload, myWallet, a.destinations, a.txKeys, a.expectMints)
                     as? SolanaRpc.SimOutcome.Ok)?.deltas ?: return@async null
                 val guard = SimulationGuard.confirm(a.receipt.deltas, fresh)
                 if (guard.driftDetected) { Log.w(TAG, "STATE_DRIFT on payload $i"); guard.risk } else null

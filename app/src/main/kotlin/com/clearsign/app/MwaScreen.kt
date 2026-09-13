@@ -62,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -71,7 +72,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
@@ -312,10 +316,10 @@ private fun Header(danger: Boolean, dApp: DappId?) {
             Modifier.size(32.dp).clip(rs(10))
                 .background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))),
             contentAlignment = Alignment.Center,
-        ) { HaloIcon(HIcon.SEAL, Halo.ground, 24.dp) }
+        ) { HaloIcon(HIcon.PIGEON, Halo.ground, 24.dp) }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("ClearSign", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
+            Text(stringResource(R.string.app_name), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
             Text(
                 if (danger) stringResource(R.string.header_danger) else stringResource(R.string.tagline),
                 fontFamily = Inter, fontSize = 11.5.sp, color = if (danger) Halo.red else Halo.muted,
@@ -384,6 +388,7 @@ private fun DappHero(dApp: DappId, subtitle: String) {
             Text(dApp.host ?: subtitle, fontFamily = Inter, fontSize = 12.5.sp, color = if (dApp.host != null) Halo.cyan else Halo.muted)
             Spacer(Modifier.height(3.dp))
             DappMemory(dApp)
+            AgentOrigin(dApp)
             dApp.store?.let { Spacer(Modifier.height(3.dp)); DappStoreLine(it) }
         }
     }
@@ -443,9 +448,12 @@ internal fun Banner(message: String, color: Color, icon: HIcon? = null) {
 }
 
 @Composable
-internal fun PrimaryButton(label: String, danger: Boolean, enabled: Boolean = true, icon: HIcon? = null, onClick: () -> Unit) {
+internal fun PrimaryButton(label: String, danger: Boolean, enabled: Boolean = true, icon: HIcon? = null, fillWidth: Boolean = true, onClick: () -> Unit) {
     val shape = rs(16)
-    val mod = Modifier.fillMaxWidth().height(54.dp).clip(shape)
+    // These two buttons used to force `fillMaxWidth` on themselves, which is right
+    // for the bottom of a sheet and wrong inside a row: the button ate the row and
+    // squeezed whatever shared it — a title, a text field — down to nothing.
+    val mod = (if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(54.dp).clip(shape)
     val fg = if (danger) Halo.red else Halo.ground
     val src = remember { MutableInteractionSource() }
     Row(
@@ -459,11 +467,11 @@ internal fun PrimaryButton(label: String, danger: Boolean, enabled: Boolean = tr
 }
 
 @Composable
-internal fun GhostButton(label: String, modifier: Modifier = Modifier, icon: HIcon? = null, tint: Color = Halo.muted, onClick: () -> Unit) {
+internal fun GhostButton(label: String, modifier: Modifier = Modifier, icon: HIcon? = null, tint: Color = Halo.muted, fillWidth: Boolean = true, onClick: () -> Unit) {
     val shape = rs(16)
     val src = remember { MutableInteractionSource() }
     Row(
-        modifier.pressScale(src).fillMaxWidth().height(48.dp).clip(shape).border(1.dp, Halo.stroke, shape).clickable(interactionSource = src, indication = null) { onClick() },
+        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(48.dp).clip(shape).border(1.dp, Halo.stroke, shape).clickable(interactionSource = src, indication = null) { onClick() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { HaloIcon(icon, tint, 17.dp); Spacer(Modifier.width(8.dp)) }
@@ -700,6 +708,8 @@ private fun SignPrompt(ui: MwaUi.SignRequest) {
     val danger = receipts.any { it.blocksApproval }   // any DANGER in the bundle blocks all
     var sel by remember { mutableStateOf(0) }
     val selIdx = sel.coerceIn(0, receipts.size - 1)
+    // Which transactions the user has actually opened — so a bundle can nudge them to review each.
+    val viewed = remember { mutableStateListOf(0) }
 
     // Feel the warning before you read it.
     val ctx = LocalContext.current
@@ -711,6 +721,7 @@ private fun SignPrompt(ui: MwaUi.SignRequest) {
     )
     Spacer(Modifier.height(4.dp))
     DappMemory(ui.dApp)
+    AgentOrigin(ui.dApp)
     ui.dApp.store?.let { Spacer(Modifier.height(3.dp)); DappStoreLine(it) }
     Spacer(Modifier.height(12.dp))
 
@@ -722,8 +733,14 @@ private fun SignPrompt(ui: MwaUi.SignRequest) {
         Spacer(Modifier.height(10.dp))
         BundleStrip(receipts, danger)
         Spacer(Modifier.height(10.dp))
-        TxSelector(receipts, selIdx) { sel = it }
-        Spacer(Modifier.height(12.dp))
+        TxSelector(receipts, selIdx, viewed.toSet()) { sel = it; if (it !in viewed) viewed.add(it) }
+        Spacer(Modifier.height(6.dp))
+        val allSeen = viewed.size >= receipts.size
+        Text(
+            if (allSeen) stringResource(R.string.bundle_all_seen) else stringResource(R.string.bundle_tap_hint),
+            fontFamily = Inter, fontSize = 11.sp, color = if (allSeen) Halo.mint else Halo.amber,
+        )
+        Spacer(Modifier.height(10.dp))
         Text(
             stringResource(R.string.tx_n_of, selIdx + 1, ui.count),
             fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
@@ -791,6 +808,12 @@ internal fun SignReceiptBody(r: Receipt, cluster: String?) {
         )
     }
 
+    // What is arriving, judged on its own. Right under the amount, because a coin
+    // that cannot be sold back is a reason to stop and belongs above the fold
+    // just as much as a risk in the transaction itself.
+    Spacer(Modifier.height(12.dp))
+    IncomingCoinCard(r, null)
+
     // Risks right under the headline: the reason to stop must never be below the fold.
     if (r.risks.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
@@ -809,7 +832,7 @@ internal fun SignReceiptBody(r: Receipt, cluster: String?) {
             )
             .border(1.dp, Halo.stroke, rs(18)),
     ) {
-        NodeMap(dests = dests, danger = danger) { d -> if (d.address != null) sheetAddr = d }
+        NodeMap(dests = dests, danger = danger, coin = rememberCoinBitmap(r.outflows.firstOrNull()?.mint)) { d -> if (d.address != null) sheetAddr = d }
         Text(
             stringResource(R.string.tap_node),
             fontFamily = Inter, fontSize = 11.sp, color = Halo.muted,
@@ -829,10 +852,6 @@ internal fun SignReceiptBody(r: Receipt, cluster: String?) {
     if (r.calls.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
         CallsCard(r.calls)
-    }
-    r.stats?.let {
-        Spacer(Modifier.height(12.dp))
-        StatsCard(it)
     }
     }
 
@@ -876,58 +895,141 @@ internal fun CallsCard(calls: List<com.clearsign.core.ProgramCall>) {
 
 /** Store intel for a native dApp: origin (dApp Store / Play / sideload), version, install and update dates. */
 @Composable
-private fun DappStoreLine(store: StoreInfo) {
+private fun DappStoreLine(store: StoreInfo) = DappStoreCard(store)
+
+/** App logo straight from the installed package — the real "store logo", not a favicon. */
+@Composable
+private fun rememberPkgIcon(pkg: String): androidx.compose.ui.graphics.ImageBitmap? {
+    val ctx = LocalContext.current
+    return remember(pkg) {
+        runCatching {
+            val d = ctx.packageManager.getApplicationIcon(pkg)
+            val w = d.intrinsicWidth.coerceIn(1, 192); val h = d.intrinsicHeight.coerceIn(1, 192)
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val c = android.graphics.Canvas(bmp); d.setBounds(0, 0, w, h); d.draw(c)
+            bmp.asImageBitmap()
+        }.getOrNull()
+    }
+}
+
+/** One labelled stat in the store card (rating, version, age…). */
+@Composable
+private fun StatTile(modifier: Modifier, icon: HIcon, value: String, label: String, tint: Color = Halo.cyan) {
+    Column(
+        modifier.clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)).padding(horizontal = 8.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloIcon(icon, tint, 12.dp); Spacer(Modifier.width(4.dp))
+            Text(
+                value, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.ink, style = Tabular,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        Text(label, fontFamily = Inter, fontSize = 9.sp, color = Halo.muted, maxLines = 2, lineHeight = 10.sp)
+    }
+}
+
+/**
+ * The "who is this app" card: its real logo, a verified/sideload badge, and a
+ * grid of stats (rating, reviews, version, install age, publisher). Everything is
+ * either from the phone (package info, tamper-proof) or the free Seeker Tracker
+ * catalog. Tap opens the app's dApp Store listing.
+ */
+@Composable
+private fun DappStoreCard(store: StoreInfo) {
     val ctx = LocalContext.current
     val now = System.currentTimeMillis()
     fun ago(t: Long) = android.text.format.DateUtils.getRelativeTimeSpanString(t, now, android.text.format.DateUtils.DAY_IN_MILLIS).toString()
-    val origin = when {
-        store.fromDappStore -> stringResource(R.string.store_dapp_store)
-        store.fromPlay -> stringResource(R.string.store_play)
-        else -> stringResource(R.string.store_sideload)
-    }
     val trusted = store.fromDappStore || store.fromPlay
-    val col = if (trusted) Halo.muted else Halo.amber
-    // Store reputation (free Seeker Tracker catalog): rating, publisher, last update.
+    val badgeTint = if (trusted) Halo.mint else Halo.amber
+    val origin = when { store.fromDappStore -> stringResource(R.string.store_dapp_store); store.fromPlay -> stringResource(R.string.store_play); else -> stringResource(R.string.store_sideload) }
     val rep by produceState<StoreRep?>(initialValue = null, store.packageName) {
         value = withContext(Dispatchers.IO) { runCatching { StoreReputation.fetch(store.packageName) }.getOrNull() }
     }
-    // Tap → the app's listing in the Solana dApp Store (publisher, updates, reviews).
-    val openListing = {
-        runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("solanadappstore://details?id=" + store.packageName))) }
-    }
-    Column(Modifier.clickable { openListing() }) {
+    val icon = rememberPkgIcon(store.packageName)
+    val openListing = { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("solanadappstore://details?id=" + store.packageName))) }; Unit }
+    // Collapsed by default: who is asking and whether it came from a store is
+    // what you must read before signing. The numbers are one tap away.
+    var open by remember(store.packageName) { mutableStateOf(false) }
+
+    Column(
+        Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HaloIcon(if (trusted) HIcon.SHIELD_LOCK else HIcon.WARNING, if (trusted) Halo.mint else Halo.amber, 13.dp); Spacer(Modifier.width(5.dp))
-            Text(
-                origin + " · v" + (store.versionName ?: store.versionCode.toString()) + " (" + store.versionCode + ")",
-                fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 11.5.sp, color = col, style = Tabular, maxLines = 1,
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 18.dp)) {
-            Text(
-                stringResource(R.string.store_dates, ago(store.firstInstall), if (store.neverUpdated) stringResource(R.string.store_never_updated) else ago(store.lastUpdate)),
-                fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular,
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.store_open), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 10.5.sp, color = Halo.cyan)
-            Spacer(Modifier.width(2.dp)); HaloIcon(HIcon.EXTERNAL, Halo.cyan, 10.dp)
-        }
-        rep?.let { r ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 18.dp, top = 2.dp)) {
-                if (!r.listed) {
-                    HaloIcon(HIcon.WARNING, Halo.amber, 12.dp); Spacer(Modifier.width(5.dp))
-                    Text(stringResource(R.string.store_not_listed), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber)
-                } else {
-                    HaloIcon(HIcon.SPARK, Halo.mint, 12.dp); Spacer(Modifier.width(5.dp))
-                    Text(
-                        buildString {
-                            r.rating?.let { append("★ %.1f".format(java.util.Locale.ROOT, it)) }
-                            r.reviews?.let { append(" · " + nf(it.toLong()) + " " + ctx.getString(R.string.store_reviews)) }
-                            r.publisher?.let { append(" · " + it + (if (r.verified) " ✓" else "")) }
-                        },
-                        fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular, maxLines = 1,
-                    )
+            Box(Modifier.size(44.dp).clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)), contentAlignment = Alignment.Center) {
+                if (icon != null) androidx.compose.foundation.Image(icon, contentDescription = null, modifier = Modifier.size(38.dp).clip(rs(10)))
+                else HaloIcon(HIcon.WALLET, Halo.muted, 20.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(rep?.name ?: store.label, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                    Box(Modifier.clip(rs(6)).background(badgeTint.copy(alpha = 0.14f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            HaloIcon(if (trusted) HIcon.SHIELD_LOCK else HIcon.WARNING, badgeTint, 10.dp); Spacer(Modifier.width(3.dp))
+                            Text(origin, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = badgeTint, maxLines = 1)
+                        }
+                    }
+                    rep?.publisher?.let { pub ->
+                        Spacer(Modifier.width(6.dp))
+                        Text(pub + (if (rep?.verified == true) " ✓" else ""), fontFamily = Inter, fontSize = 10.5.sp, color = if (rep?.verified == true) Halo.mint else Halo.muted, maxLines = 1)
+                    }
                 }
+            }
+            Box(
+                Modifier.size(26.dp).clip(rs(999)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(999)).clickable { open = !open },
+                contentAlignment = Alignment.Center,
+            ) { HaloIcon(HIcon.INFO, if (open) Halo.cyan else Halo.muted, 14.dp) }
+        }
+        if (!open) return@Column
+        Row(Modifier.fillMaxWidth().clickable { openListing() }, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.store_open), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.cyan)
+            Spacer(Modifier.width(4.dp)); HaloIcon(HIcon.EXTERNAL, Halo.cyan, 13.dp)
+        }
+        // Stat tiles: two rows of three.
+        val ver = "v" + (store.versionName ?: store.versionCode.toString())
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(Modifier.weight(1f), HIcon.SPARK, rep?.rating?.let { "%.1f".format(java.util.Locale.ROOT, it) } ?: "—", stringResource(R.string.store_stat_rating), if (rep?.rating != null) Halo.mint else Halo.muted)
+            StatTile(Modifier.weight(1f), HIcon.CONTACTS, rep?.reviews?.let { nf(it.toLong()) } ?: "—", stringResource(R.string.store_stat_reviews))
+            StatTile(Modifier.weight(1f), HIcon.INFO, ver, stringResource(R.string.store_stat_version), if (trusted) Halo.cyan else Halo.amber)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(Modifier.weight(1f), HIcon.SEEDLING, ago(store.firstInstall), stringResource(R.string.store_stat_installed))
+            StatTile(Modifier.weight(1f), HIcon.HISTORY, if (store.neverUpdated) stringResource(R.string.store_never_updated) else ago(store.lastUpdate), stringResource(R.string.store_stat_updated))
+            StatTile(Modifier.weight(1f), if (rep?.listed == true) HIcon.SHIELD_LOCK else HIcon.WARNING, if (rep == null) "…" else if (rep?.listed == true) stringResource(R.string.store_stat_listed_yes) else stringResource(R.string.store_stat_listed_no), stringResource(R.string.store_stat_listed), if (rep?.listed == true) Halo.mint else Halo.amber)
+        }
+        if (!trusted) {
+            Row(verticalAlignment = Alignment.Top) {
+                HaloIcon(HIcon.INFO, Halo.amber, 13.dp); Spacer(Modifier.width(6.dp))
+                Text(
+                    if (rep?.listed == true) stringResource(R.string.store_sideload_but_listed) else stringResource(R.string.store_sideload_explain),
+                    fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * For a request that named itself (an agent through the Agent Gate): what we could
+ * verify, and a plain warning that the name above is only a claim. An app can call
+ * itself anything; it cannot fake the package Android reports or how the link arrived.
+ */
+@Composable
+private fun AgentOrigin(dApp: DappId) {
+    val origin = dApp.origin ?: return
+    val verified = origin.startsWith(stringResource(R.string.agent_origin_app).substringBefore("%"))
+    Column(Modifier.padding(top = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloIcon(if (verified) HIcon.SHIELD_LOCK else HIcon.INFO, if (verified) Halo.mint else Halo.amber, 13.dp)
+            Spacer(Modifier.width(5.dp))
+            Text(origin, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 11.5.sp, color = if (verified) Halo.mint else Halo.amber, maxLines = 2)
+        }
+        if (dApp.nameIsClaimed) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 18.dp, top = 2.dp)) {
+                Text(stringResource(R.string.agent_name_claimed), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, maxLines = 2)
             }
         }
     }
@@ -998,6 +1100,7 @@ internal fun riskIcon(f: RiskFlag): HIcon = when (f) {
     RiskFlag.BLOCKED_MALICIOUS -> HIcon.SKULL; RiskFlag.SANCTIONED -> HIcon.BAN; RiskFlag.UNLIMITED_APPROVAL -> HIcon.INFINITY
     RiskFlag.AUTHORITY_CHANGE -> HIcon.KEY; RiskFlag.ACCOUNT_CLOSE -> HIcon.TRASH; RiskFlag.NEW_UNKNOWN_RECIPIENT -> HIcon.SPARK
     RiskFlag.LOOKALIKE_ADDRESS -> HIcon.MASK; RiskFlag.SIMULATION_FAILED -> HIcon.FLASK; RiskFlag.STATE_DRIFT -> HIcon.DRIFT
+    RiskFlag.AGENT_INTENT_MISMATCH -> HIcon.MASK; RiskFlag.AGENT_INTENT_OK -> HIcon.CHECK
     RiskFlag.COMMUNITY_FLAGGED -> HIcon.MEGAPHONE; RiskFlag.DRAINS_BALANCE -> HIcon.DRAIN; RiskFlag.WALLET_OWNER_CHANGE -> HIcon.FLAG
     RiskFlag.DURABLE_NONCE -> HIcon.HOURGLASS; RiskFlag.FOREIGN_FEE_PAYER -> HIcon.GIFT; RiskFlag.BRAND_NEW_RECIPIENT -> HIcon.SEEDLING; RiskFlag.LIMITED_APPROVAL -> HIcon.UNLOCK
     RiskFlag.FEE_EXCESSIVE -> HIcon.COINS
@@ -1010,6 +1113,7 @@ internal fun riskTitle(f: RiskFlag): Int = when (f) {
     RiskFlag.ACCOUNT_CLOSE -> R.string.rt_close; RiskFlag.NEW_UNKNOWN_RECIPIENT -> R.string.rt_new_recipient
     RiskFlag.LOOKALIKE_ADDRESS -> R.string.rt_lookalike; RiskFlag.SIMULATION_FAILED -> R.string.rt_simulation
     RiskFlag.STATE_DRIFT -> R.string.rt_drift; RiskFlag.COMMUNITY_FLAGGED -> R.string.rt_community
+    RiskFlag.AGENT_INTENT_MISMATCH -> R.string.rt_agent_mismatch; RiskFlag.AGENT_INTENT_OK -> R.string.rt_agent_ok
     RiskFlag.DRAINS_BALANCE -> R.string.rt_drain; RiskFlag.WALLET_OWNER_CHANGE -> R.string.rt_owner_change
     RiskFlag.DURABLE_NONCE -> R.string.rt_nonce; RiskFlag.FOREIGN_FEE_PAYER -> R.string.rt_fee_payer
     RiskFlag.BRAND_NEW_RECIPIENT -> R.string.rt_brand_new; RiskFlag.LIMITED_APPROVAL -> R.string.rt_limited
@@ -1044,7 +1148,7 @@ private fun BundleStrip(receipts: List<Receipt>, danger: Boolean) {
 
 /** Chip row to browse each transaction in the bundle; red chip = that tx is DANGER. */
 @Composable
-private fun TxSelector(receipts: List<Receipt>, selected: Int, onSelect: (Int) -> Unit) {
+private fun TxSelector(receipts: List<Receipt>, selected: Int, viewed: Set<Int>, onSelect: (Int) -> Unit) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1062,11 +1166,16 @@ private fun TxSelector(receipts: List<Receipt>, selected: Int, onSelect: (Int) -
                     .clickable { onSelect(i) }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
-                Text(
-                    "tx ${i + 1}" + (if (r.blocksApproval) " !" else "") + amt,
-                    fontFamily = Sora, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 12.5.sp, color = col, style = Tabular,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // A dot on transactions not yet opened; a check once reviewed.
+                    if (i in viewed) { HaloIcon(HIcon.CHECK, col, 11.dp); Spacer(Modifier.width(5.dp)) }
+                    else { Box(Modifier.size(6.dp).clip(rs(999)).background(Halo.amber)); Spacer(Modifier.width(5.dp)) }
+                    Text(
+                        "tx ${i + 1}" + (if (r.blocksApproval) " !" else "") + amt,
+                        fontFamily = Sora, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.5.sp, color = col, style = Tabular,
+                    )
+                }
             }
         }
     }
@@ -1134,15 +1243,15 @@ internal fun HeroPay(r: Receipt, danger: Boolean) {
         Modifier.fillMaxWidth().clip(rs(20))
             .background(accent.copy(alpha = 0.08f))
             .border(1.dp, accent.copy(alpha = 0.32f), rs(20))
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
     ) {
         Column {
             Text(stringResource(R.string.pay), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
             Spacer(Modifier.height(6.dp))
             if (r.outflows.isEmpty()) {
-                Text(stringResource(R.string.no_transfer), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Halo.ink)
+                Text(stringResource(R.string.no_transfer), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Halo.ink)
             } else {
-                r.outflows.forEachIndexed { i, d -> AmountText("−", d, 32.sp, accent, countUp = i == 0) }
+                r.outflows.forEachIndexed { i, d -> AmountText("−", d, 26.sp, accent, countUp = i == 0) }
             }
             if (r.inflows.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
@@ -1177,7 +1286,16 @@ private fun ReceiptDetails(r: Receipt, recipientLabel: String, showRecipient: Bo
                 Spacer(Modifier.weight(1f))
                 Text(fmtSol(r.feeLamports, 6) + " SOL", fontFamily = Inter, fontSize = 14.sp, color = Halo.ink, style = Tabular)
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // The technical numbers used to hang off a small circle floating
+            // under the card, which was one more thing on the screen and looked
+            // like a stray. They live behind this row now: same tap, nothing
+            // floating, and the numbers are still one tap away when something
+            // looks wrong.
+            var stats by remember(r) { mutableStateOf(false) }
+            Row(
+                Modifier.fillMaxWidth().then(if (r.stats != null) Modifier.clickable { stats = !stats } else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(stringResource(R.string.verdict), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted)
                 Spacer(Modifier.weight(1f))
                 val (txt, col) = when (r.highestSeverity) {
@@ -1186,7 +1304,12 @@ private fun ReceiptDetails(r: Receipt, recipientLabel: String, showRecipient: Bo
                     Severity.INFO -> stringResource(R.string.verdict_ok) to Halo.mint
                 }
                 Text(txt, fontFamily = Sora, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = col)
+                if (r.stats != null) {
+                    Spacer(Modifier.width(6.dp))
+                    HaloIcon(if (stats) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 15.dp)
+                }
             }
+            if (stats) r.stats?.let { StatsCard(it) }
         }
     }
 }
@@ -1529,26 +1652,55 @@ private fun kindText(k: SolanaRpc.WalletIntel.Kind): String = stringResource(
     },
 )
 
+/**
+ * The coin's logo as something a Canvas can draw.
+ *
+ * Loaded through the image loader directly rather than with a painter:
+ * `rememberAsyncImagePainter` only starts its request when something draws it,
+ * and nothing draws this one, so the painter sat empty forever and the logo
+ * never arrived.
+ *
+ * Null until it loads, and null forever for a coin with no icon, which is why
+ * the map keeps working without it: the logo is an improvement on the dot, not
+ * a requirement for it.
+ */
+@Composable
+internal fun rememberCoinBitmap(mint: String?): ImageBitmap? {
+    val ctx = LocalContext.current
+    val url = mint?.let { TokenSymbols.image(it) }
+    var bmp by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(url) {
+        if (url == null) return@LaunchedEffect
+        val req = coil.request.ImageRequest.Builder(ctx).data(url).size(72).allowHardware(false).build()
+        val d = runCatching { coil.ImageLoader(ctx).execute(req).drawable }.getOrNull() ?: return@LaunchedEffect
+        bmp = runCatching {
+            // A bitmap drawable already is one; anything else gets rasterised once
+            // at a size the canvas will never need to grow past.
+            (d as? android.graphics.drawable.BitmapDrawable)?.bitmap?.asImageBitmap() ?: run {
+                val b = android.graphics.Bitmap.createBitmap(72, 72, android.graphics.Bitmap.Config.ARGB_8888)
+                d.setBounds(0, 0, 72, 72)
+                d.draw(android.graphics.Canvas(b))
+                b.asImageBitmap()
+            }
+        }.getOrNull()
+    }
+    return bmp
+}
+
 // ---- node map (all geometry in dp → px, so it looks the same on every density) ----
 
 @Composable
-internal fun NodeMap(dests: List<NodeDest>, danger: Boolean, onTap: (NodeDest) -> Unit) {
+internal fun NodeMap(dests: List<NodeDest>, danger: Boolean, coin: ImageBitmap? = null, onTap: (NodeDest) -> Unit) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
     val sora = remember { runCatching { ResourcesCompat.getFont(ctx, R.font.sora) }.getOrNull() ?: Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
-    // The particles flow for a while, then rest: a receipt left open must not burn a frame budget forever.
-    var animate by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(9_000); animate = false }
-    val tState: State<Float>; val pulseState: State<Float>
-    if (animate) {
-        val flow = rememberInfiniteTransition(label = "flow")
-        tState = flow.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "t")
-        pulseState = flow.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "p")
-    } else {
-        tState = remember { mutableStateOf(0.62f) }; pulseState = remember { mutableStateOf(0f) }
-    }
-    val t by tState
-    val pulse by pulseState
+    // The flow used to stop after twenty seconds to save frames, and a receipt you
+    // were still reading turned into a frozen picture: money that had stopped
+    // moving. It runs for as long as the receipt is on screen, and stops when the
+    // composable leaves, which is the only moment it costs nothing to stop.
+    val flow = rememberInfiniteTransition(label = "flow")
+    val t by flow.animateFloat(0f, 1f, infiniteRepeatable(tween(2000, easing = LinearEasing)), label = "t")
+    val pulse by flow.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "p")
     val reveal = remember { Animatable(0f) }
     LaunchedEffect(dests) { reveal.snapTo(0f); reveal.animateTo(1f, tween(700)) }
     val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; typeface = sora } }
@@ -1584,8 +1736,30 @@ internal fun NodeMap(dests: List<NodeDest>, danger: Boolean, onTap: (NodeDest) -
                 val p = ((t + k / 3f) % 1f) * alpha; val mt = 1 - p
                 val px = mt * mt * you.x + 2 * mt * p * ctrl.x + p * p * dest.x
                 val py = mt * mt * you.y + 2 * mt * p * ctrl.y + p * p * dest.y
-                drawCircle(d.color.copy(alpha = 0.22f * alpha), dp(4f), Offset(px, py))
-                drawCircle(d.color, dp(1.6f), Offset(px, py))
+                // The leading particle carries the coin's own logo, so what you
+                // watch crossing to the address is the thing you are sending, not
+                // an abstract dot. The two behind stay dots: a trail of three
+                // logos reads as three payments.
+                if (k == 0 && coin != null) {
+                    val cs = dp(if (n > 3) 13f else 16f)
+                    val at = Offset(px, py)
+                    drawCircle(d.color.copy(alpha = 0.30f * alpha), cs * 0.85f, at)
+                    // A square logo on a wire looks like a sticker. Clipped to a
+                    // circle with a rim around it, it reads as a coin going
+                    // somewhere, which is the whole point of the animation.
+                    clipPath(Path().apply { addOval(Rect(at.x - cs / 2f, at.y - cs / 2f, at.x + cs / 2f, at.y + cs / 2f)) }) {
+                        drawImage(
+                            image = coin,
+                            dstOffset = androidx.compose.ui.unit.IntOffset((px - cs / 2f).toInt(), (py - cs / 2f).toInt()),
+                            dstSize = androidx.compose.ui.unit.IntSize(cs.toInt(), cs.toInt()),
+                            alpha = alpha,
+                        )
+                    }
+                    drawCircle(d.color.copy(alpha = 0.85f * alpha), cs / 2f, at, style = Stroke(width = dp(1.2f)))
+                } else {
+                    drawCircle(d.color.copy(alpha = 0.22f * alpha), dp(4f), Offset(px, py))
+                    drawCircle(d.color, dp(1.6f), Offset(px, py))
+                }
             }
             // Amount sits just left of its node, so five edges never pile up mid-canvas.
             amtPaint.color = d.color.copy(alpha = alpha).toArgb(); amtPaint.textSize = dp(if (n > 3) 11f else 13f)
@@ -1618,7 +1792,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
     LaunchedEffect(Unit) { Haptics.success(ctx) }
     val draw = remember { Animatable(0f) }
     LaunchedEffect(Unit) { draw.animateTo(1f, tween(650)) }
-    // Hand control back to the dApp after a beat; the session stays alive for its next request.
+    // Hand control back to the dApp after a beat (see MobileWalletAdapterActivity.backToDapp).
     val activity = ctx as? MobileWalletAdapterActivity
     var left by remember { mutableStateOf(3) }
     LaunchedEffect(Unit) {
@@ -1645,7 +1819,19 @@ private fun DoneScreen(ui: MwaUi.Done) {
             }
         }
         Text(ui.message, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Halo.ink, modifier = Modifier.padding(horizontal = 8.dp))
-        PrimaryButton(stringResource(R.string.back_to_dapp, left), danger = false, icon = HIcon.CHEVRON_RIGHT) { activity?.backToDapp() }
+        PrimaryButton(stringResource(R.string.back_to_dapp, left), danger = false, icon = HIcon.CHEVRON_RIGHT) { activity?.backToDapp(explicit = true) }
+        ui.signedTx?.let { raw ->
+            Column(
+                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.agent_signed_tx), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+                QrTile(raw, size = 200.dp)
+                Text(stringResource(R.string.agent_signed_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+                GhostButton(stringResource(R.string.copy), Modifier.fillMaxWidth(), HIcon.COPY) { clip.setText(AnnotatedString(raw)) }
+            }
+        }
         ui.signature?.let { sig ->
             Box(
                 Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(14.dp),

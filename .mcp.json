@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "apex": {
+      "command": "python3",
+      "args": ["scripts/apex_agent/mcp_server.py"]
+    }
+  }
+}

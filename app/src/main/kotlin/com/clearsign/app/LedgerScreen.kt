@@ -66,11 +66,17 @@ internal fun LedgerScreen() {
                     Text(stringResource(R.string.tab_receipts), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Halo.ink)
                     Text(if (shown.isEmpty()) stringResource(R.string.ledger_empty_sub) else stringResource(R.string.ledger_count, shown.size), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 }
-                if (entries.isNotEmpty()) SmallChip(stringResource(R.string.export_btn), HIcon.DOWNLOAD, Halo.mint) { showExport = true }
+                if (shown.isNotEmpty()) SmallChip(stringResource(R.string.export_btn), HIcon.DOWNLOAD, Halo.mint) { showExport = true }
             }
-            ChipRow(listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all)) + months.map { it to monthLabel(it) }, month) { month = it }
+            // Two rows of chips that both began with "All", one under the other and
+            // both selected at the start, are impossible to tell apart. Each says
+            // what it filters, and each "All" names its own thing.
+            FilterLabel(stringResource(R.string.ledger_period))
+            ChipRow(listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all_months)) + months.map { it to monthLabel(it) }, month) { month = it }
+            FilterLabel(stringResource(R.string.ledger_kind))
             ChipRow(
-                listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all)) + listOf("tx", "send", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
+                listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all_kinds)) +
+                    listOf("tx", "send", "agent", "gift", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
                 kind,
             ) { kind = it }
 
@@ -125,7 +131,9 @@ internal fun LedgerScreen() {
         }
     }
     selected?.let { e -> ReceiptDetailSheet(e) { selected = null } }
-    if (showExport) ExportSheet(entries, month) { showExport = false }
+    // What you see is what you export: passing `entries` here ignored the kind
+    // filter, so "Sep 2026 + Gift" said three rows and wrote out all of September.
+    if (showExport) ExportSheet(shown, month) { showExport = false }
 }
 
 /** Sums for a period, in tokens and in fiat. */
@@ -147,7 +155,7 @@ internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>
 @Composable
 private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
-    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "send" -> HIcon.SEND; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
+    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "agent" -> if (e.host == "refused") HIcon.BLOCK else HIcon.PIGEON; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
     Row(
         Modifier.fillMaxWidth().clip(rs(14)).background(Halo.card).border(1.dp, if (danger) Halo.red.copy(alpha = 0.5f) else Halo.stroke, rs(14)).clickable { onTap() }.padding(12.dp),
@@ -158,7 +166,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(e.dApp + (e.host?.let { " · $it" } ?: ""), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Halo.ink, maxLines = 1)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (e.recipientLabel?.let { " · $it" } ?: ""), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (if (e.kind == "agent") agentHow(ctx, e.host) else "") + (e.recipientLabel?.let { " · $it" } ?: ""), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (e.attestationSig != null) { Spacer(Modifier.width(5.dp)); HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 11.dp) }
                 if (e.tags.isNotEmpty()) { Spacer(Modifier.width(5.dp)); Text(e.tags.first(), fontFamily = Inter, fontSize = 10.sp, color = Halo.cyan) }
             }
@@ -174,7 +182,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
 
 /** Realized P&L per token, from the recorded receipts (FIFO). */
 @Composable
-private fun AnalyticsCard(a: Analytics) {
+internal fun AnalyticsCard(a: Analytics) {
     var open by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
@@ -203,18 +211,41 @@ private fun AnalyticsCard(a: Analytics) {
     }
 }
 
+/** How an agent row went: " · da solo", " · confermato", " · rifiutato". */
+internal fun agentHow(ctx: android.content.Context, host: String?): String = when (host) {
+    "auto" -> " · " + ctx.getString(R.string.agent_how_auto)
+    "asked" -> " · " + ctx.getString(R.string.agent_how_asked)
+    "refused" -> " · " + ctx.getString(R.string.agent_how_refused)
+    else -> ""
+}
+
 internal fun kindLabel(ctx: android.content.Context, k: String): String = when (k) {
     "signin" -> ctx.getString(R.string.kind_signin); "message" -> ctx.getString(R.string.kind_message); "theme" -> ctx.getString(R.string.kind_theme)
-    "revoke" -> ctx.getString(R.string.kind_revoke); "close" -> ctx.getString(R.string.kind_close); "send" -> ctx.getString(R.string.kind_send)
+    "revoke" -> ctx.getString(R.string.kind_revoke); "close" -> ctx.getString(R.string.kind_close); "burn" -> ctx.getString(R.string.kind_burn); "envelope" -> ctx.getString(R.string.kind_envelope); "send" -> ctx.getString(R.string.kind_send)
+    "agent" -> ctx.getString(R.string.kind_agent); "gift" -> ctx.getString(R.string.kind_gift)
     else -> ctx.getString(R.string.kind_tx)
 }
 
+/**
+ * "Set 2026". The app can be set to a different language from the phone, so the
+ * month has to follow the app's choice, not `Locale.getDefault()`.
+ */
 internal fun monthLabel(ym: String): String = runCatching {
     val (y, m) = ym.split("-").map { it.toInt() }
-    java.text.DateFormatSymbols.getInstance().shortMonths[m - 1].replaceFirstChar { it.uppercase() } + " " + y
+    val locale = androidx.core.os.LocaleListCompat.getAdjustedDefault()[0] ?: Locale.getDefault()
+    java.text.DateFormatSymbols.getInstance(locale).shortMonths[m - 1].replaceFirstChar { it.uppercase() } + " " + y
 }.getOrDefault(ym)
 
 private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(at))
 
 internal fun fmtUi(v: Double): String = String.format(Locale.ROOT, "%,.6f", v).replace(',', ' ').trimEnd('0').trimEnd('.')
 internal fun fmtFiat(v: Double, cur: String): String = String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
+
+/** The caption that says what a row of chips filters. */
+@Composable
+private fun FilterLabel(text: String) {
+    Text(
+        text.uppercase(), fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+        color = Halo.muted, modifier = Modifier.padding(top = 2.dp),
+    )
+}

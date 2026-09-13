@@ -1,0 +1,65 @@
+/* Apex link pages — the same dark, mint-on-ink look as the app. */
+:root {
+  --ground: #070b12;
+  --card: #0e1522;
+  --stroke: #1d2839;
+  --ink: #eaf2ff;
+  --muted: #8ea0bb;
+  --mint: #4dffd0;
+  --cyan: #4cc9ff;
+  --amber: #ffc14d;
+  --red: #ff6b6b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(120% 90% at 50% 0%, #0d1626 0%, var(--ground) 60%);
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 28px 18px 48px;
+}
+main { width: 100%; max-width: 420px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+.brand img { width: 36px; height: 36px; border-radius: 11px; }
+.brand b { font-size: 16px; letter-spacing: .2px; }
+.brand span { color: var(--muted); font-size: 12px; display: block; font-weight: 400; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 22px;
+  padding: 22px;
+  margin-bottom: 14px;
+}
+h1 { font-size: 19px; margin: 0 0 6px; letter-spacing: .2px; }
+p { margin: 0 0 10px; color: var(--muted); font-size: 13.5px; }
+.amount { font-size: 38px; font-weight: 700; letter-spacing: -.5px; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.amount small { font-size: 17px; color: var(--muted); font-weight: 600; margin-left: 6px; }
+.who { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--ink); word-break: break-all; }
+.note { color: var(--ink); font-size: 14px; font-style: italic; }
+.btn {
+  display: block; width: 100%; text-align: center; text-decoration: none; cursor: pointer;
+  border-radius: 14px; padding: 14px 16px; font-size: 14.5px; font-weight: 700;
+  border: 1px solid transparent; margin-top: 10px; font-family: inherit;
+}
+.btn.primary { background: var(--mint); color: #04211b; }
+.btn.ghost { background: transparent; border-color: var(--stroke); color: var(--ink); }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+input {
+  width: 100%; margin-top: 10px; padding: 13px 14px; border-radius: 14px;
+  background: #0a1020; border: 1px solid var(--stroke); color: var(--ink);
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+input:focus { outline: none; border-color: var(--cyan); }
+.row { display: flex; gap: 10px; align-items: center; }
+.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--stroke); border-radius: 999px; padding: 4px 10px; }
+.warn { color: var(--amber); font-size: 12.5px; }
+.err { color: var(--red); font-size: 13px; }
+.ok { color: var(--mint); font-weight: 700; }
+.small { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.qr { background: #fff; border-radius: 16px; padding: 12px; display: none; margin-top: 14px; }
+.qr img, .qr canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+a.plain { color: var(--cyan); }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .2s ease; } }

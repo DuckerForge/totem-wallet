@@ -32,6 +32,8 @@ object LedgerCsv {
     /** (sent leg?, received leg?) pairs of one entry: swap rows first, then leftovers. */
     internal fun rows(e: LedgerEntry): List<Pair<Leg?, Leg?>> {
         val out = e.outflows.toMutableList(); val inn = e.inflows.toMutableList()
+        // A burn is not a trade: the token is destroyed (lost) and the rent refund is your own deposit back.
+        if (e.kind == "burn") return out.map { it to null } + inn.map { null to it }
         val rows = ArrayList<Pair<Leg?, Leg?>>()
         while (out.isNotEmpty() && inn.isNotEmpty()) rows.add(out.removeAt(0) to inn.removeAt(0))
         out.forEach { rows.add(it to null) }; inn.forEach { rows.add(null to it) }
@@ -42,6 +44,7 @@ object LedgerCsv {
     fun koinlyLabel(e: LedgerEntry): String = when {
         "gift" in e.tags -> "gift"; "income" in e.tags -> "income"; "expense" in e.tags -> "cost"
         e.kind == "theme" -> "cost"
+        e.kind == "burn" -> "lost"
         else -> ""
     }
 
@@ -70,6 +73,7 @@ object LedgerCsv {
 
     fun coinTrackerTag(e: LedgerEntry): String = when {
         "gift" in e.tags -> "gift"; "expense" in e.tags || e.kind == "theme" -> "payment"
+        e.kind == "burn" -> "lost"
         else -> ""
     }
 

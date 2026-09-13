@@ -35,6 +35,7 @@ import com.solana.mobilewalletadapter.walletlib.scenario.SignInResult
 import com.solana.mobilewalletadapter.walletlib.scenario.SignMessagesRequest
 import com.solana.mobilewalletadapter.walletlib.scenario.SignTransactionsRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -63,6 +64,24 @@ class MobileWalletAdapterActivity : ComponentActivity() {
 
     private var ui by mutableStateOf<MwaUi>(MwaUi.Preparing)
     private var servingClients = false
+    private var watchdog: Job? = null
+
+    /**
+     * Nothing should hang forever on a spinner. If we sit in a waiting state with no
+     * request to show, either the dApp never connected (show an actionable error) or
+     * it connected, got what it needed and went idle (hand control back, don't freeze).
+     */
+    private fun armWaitWatchdog() {
+        watchdog?.cancel()
+        watchdog = lifecycleScope.launch {
+            delay(if (servingClients) 12_000L else 30_000L)
+            if (ui is MwaUi.Preparing || ui is MwaUi.Working) {
+                if (servingClients) { if (!isTaskRoot) moveTaskToBack(true) else finishAndRemoveTask() }
+                else ui = MwaUi.Error(getString(R.string.err_dapp_timeout))
+            }
+        }
+    }
+    private fun cancelWatchdog() { watchdog?.cancel(); watchdog = null }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -75,8 +94,9 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         // Bind the websocket server FIRST, before the (slow) Compose init, so the
         // dApp can connect within its timeout.
         startSession(intent)
+        armWaitWatchdog()
         enableEdgeToEdge()
-        setContent { MwaScreen(ui) }
+        setContent { ScaledText { MwaScreen(ui) } }
     }
 
     // singleTask: a new association reuses this instance, so restart the session.
@@ -88,8 +108,10 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         scenario = null
         servingClients = false
         ui = MwaUi.Preparing
+        sessionOver = false
         old?.close() // its teardown callbacks are ignored: they no longer own `scenario`
         startSession(intent)
+        armWaitWatchdog()
     }
 
     /** The native app that opened us (android-app://<package>), or null for a browser/web dApp. */
@@ -111,7 +133,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
             /* noConnectionWarningTimeoutMs = */ 10_000L,
         )
         val callbacks = Callbacks()
-        val sc = associationUri.createScenario(this, config, AuthIssuerConfig("ClearSign"), callbacks)
+        val sc = associationUri.createScenario(this, config, AuthIssuerConfig("Apex"), callbacks)
         callbacks.owner = sc
         scenario = sc
         // Reference pattern (fakewallet): drive the local server on an IO thread
@@ -121,18 +143,32 @@ class MobileWalletAdapterActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        cancelWatchdog()
         scenario?.close()
     }
 
     private fun onMain(block: () -> Unit) = runOnUiThread(block)
 
     /**
-     * Go back to the dApp while keeping the MWA session alive: a dApp that
-     * signs "one by one" sends the next request on the same session, and
-     * [bringToFront] surfaces us again for it. Called from the Done screen.
+     * Hand control back to the dApp from the Done screen.
+     *
+     * dApps start us with startActivityForResult, so despite `singleTask` this
+     * activity usually lives INSIDE the dApp's task: moveTaskToBack() there would
+     * hide the dApp as well and drop the user on the launcher. Once the dApp has
+     * closed the session (the common case: RN `transact()` closes right after the
+     * response) simply finishing reveals the dApp underneath. With a still-open
+     * session we only background ourselves when we own the task; otherwise the
+     * automatic countdown waits for the session to end (finishSoon) and only an
+     * explicit tap finishes — which closes the session, as the user asked to leave.
      */
-    fun backToDapp() {
-        if (ui is MwaUi.Done) moveTaskToBack(true)
+    fun backToDapp(explicit: Boolean = false) {
+        if (ui !is MwaUi.Done) return
+        when {
+            sessionOver -> finishAndRemoveTask()
+            isTaskRoot -> moveTaskToBack(true)
+            explicit -> finishAndRemoveTask()
+            else -> Unit
+        }
     }
 
     private fun bringToFront() {
@@ -143,8 +179,12 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         )
     }
 
+    /** True once the dApp has closed the MWA session (no further requests can arrive). */
+    private var sessionOver = false
+
     /** Let the Done screen breathe before the session end closes the task. */
     private fun finishSoon() {
+        sessionOver = true
         lifecycleScope.launch {
             if (ui is MwaUi.Done) delay(1600)
             finishAndRemoveTask()
@@ -247,7 +287,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         }
 
         override fun onAuthorizeRequest(request: AuthorizeRequest) {
-            onMain { bringToFront() }
+            onMain { bringToFront(); cancelWatchdog() }
             Log.i(TAG, "onAuthorizeRequest from ${request.identityName}, chain=${request.chain}, cluster=${request.cluster}, siws=${request.signInPayload != null}")
             val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
             val siws = request.signInPayload
@@ -324,10 +364,11 @@ class MobileWalletAdapterActivity : ComponentActivity() {
             ui = MwaUi.Working(getString(R.string.w_authorizing))
             lifecycleScope.launch {
                 try {
-                    val label = acc.label ?: "ClearSign"
+                    val label = acc.label ?: "Apex"
                     if (signIn == null) request.completeWithAuthorize(acc.pubkeyBytes, label, null, null)
                     else request.completeWithAuthorize(AuthorizedAccount(acc.pubkeyBytes, label, null, null, null), null, null, signIn)
                     ui = MwaUi.Working(getString(R.string.w_waiting_dapp))
+                    armWaitWatchdog()
                 } catch (e: Exception) {
                     Log.e(TAG, "completeWithAuthorize failed", e)
                     request.completeWithDecline()
@@ -343,7 +384,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         }
 
         override fun onSignTransactionsRequest(request: SignTransactionsRequest) {
-            onMain { bringToFront() }
+            onMain { bringToFront(); cancelWatchdog() }
             Log.i(TAG, "onSignTransactionsRequest: ${request.payloads.size} payload(s)")
             val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
             val payloads = request.payloads.toList()
@@ -395,7 +436,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         }
 
         override fun onSignAndSendTransactionsRequest(request: SignAndSendTransactionsRequest) {
-            onMain { bringToFront() }
+            onMain { bringToFront(); cancelWatchdog() }
             Log.i(TAG, "onSignAndSendTransactionsRequest: ${request.payloads.size} payload(s), cluster=${request.cluster}")
             val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
             val payloads = request.payloads.toList()
@@ -462,7 +503,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         }
 
         override fun onSignMessagesRequest(request: SignMessagesRequest) {
-            onMain { bringToFront() }
+            onMain { bringToFront(); cancelWatchdog() }
             Log.i(TAG, "onSignMessagesRequest: ${request.payloads.size} message(s)")
             val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
             val payloads = request.payloads
@@ -510,7 +551,19 @@ class MobileWalletAdapterActivity : ComponentActivity() {
 }
 
 /** Who is asking: the dApp's declared name, its verified host, and its icon (absolute URL). */
-data class DappId(val name: String, val host: String?, val iconUrl: String?, val store: StoreInfo? = null)
+/**
+ * Who is asking. [name] is what gets shown; when it came from the request itself
+ * (an agent naming itself) [nameIsClaimed] is true and [origin] carries what we
+ * could actually verify — the calling package, or how the request arrived.
+ */
+data class DappId(
+    val name: String,
+    val host: String?,
+    val iconUrl: String?,
+    val store: StoreInfo? = null,
+    val origin: String? = null,
+    val nameIsClaimed: Boolean = false,
+)
 
 sealed interface MwaUi {
     data object Preparing : MwaUi
@@ -550,6 +603,6 @@ sealed interface MwaUi {
         val onDecline: () -> Unit,
     ) : MwaUi
     data class Working(val message: String) : MwaUi
-    data class Done(val message: String, val signature: String? = null, val cluster: String? = null) : MwaUi
+    data class Done(val message: String, val signature: String? = null, val cluster: String? = null, val signedTx: String? = null) : MwaUi
     data class Error(val message: String) : MwaUi
 }

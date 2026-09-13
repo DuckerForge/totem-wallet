@@ -12,16 +12,24 @@ object Settings {
     private const val KEY_ONBOARDED = "onboarded"
     private const val KEY_WATCH = "watchtower"
     private const val KEY_WATCH_WALLET = "watch_wallet"
+    private const val KEY_CRT = "crt_effect"
+    private const val KEY_TEXT_SCALE = "text_scale"
 
     val currency = mutableStateOf("USD")
     val onboarded = mutableStateOf(true)
     val watchtower = mutableStateOf(false)
+    /** CRT / old-TV overlay on scanline themes (Phosphor). Reading mode, toggleable. */
+    val crt = mutableStateOf(true)
+    /** Global text-size multiplier (0.85–1.30). Applied via LocalDensity.fontScale. */
+    val textScale = mutableStateOf(1f)
 
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
         onboarded.value = p.getBoolean(KEY_ONBOARDED, false)
         watchtower.value = p.getBoolean(KEY_WATCH, false)
+        crt.value = p.getBoolean(KEY_CRT, true)
+        textScale.value = p.getFloat(KEY_TEXT_SCALE, 1f)
     }
 
     fun watchWallet(ctx: Context): String? = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_WATCH_WALLET, null)
@@ -30,6 +38,17 @@ object Settings {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_WATCH, on).apply()
         watchtower.value = on
         if (on) Watchtower.enable(ctx) else Watchtower.disable(ctx)
+    }
+
+    fun setCrt(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CRT, on).apply()
+        crt.value = on
+    }
+
+    fun setTextScale(ctx: Context, v: Float) {
+        val c = v.coerceIn(0.85f, 1.30f)
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putFloat(KEY_TEXT_SCALE, c).apply()
+        textScale.value = c
     }
 
     fun setOnboarded(ctx: Context) {

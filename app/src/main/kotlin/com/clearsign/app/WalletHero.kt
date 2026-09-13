@@ -11,6 +11,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,10 +24,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -30,58 +40,209 @@ import androidx.compose.ui.unit.sp
 
 /** The Jupiter-style top of the wallet: total value + a valued portfolio list. */
 @Composable
-internal fun WalletHero(owner: String?, onSwap: () -> Unit, onSend: () -> Unit, onReceive: () -> Unit) {
+internal fun WalletHero(
+    owner: String?,
+    signer: SeedVaultSigner,
+    /** 0 = the balance is at full size, 1 = it has gone up into the header. */
+    collapse: Float,
+    onAction: (HomeAction) -> Unit,
+    onPnl: () -> Unit,
+    /** The header takes the balance over once the big one has scrolled away. */
+    onTotal: (String?) -> Unit = {},
+) {
     val currency by Settings.currency
-    val pv by produceState<PortfolioView?>(initialValue = null, owner, currency) {
+    var refreshKey by remember { mutableStateOf(0) }
+    val pv by produceState<PortfolioView?>(initialValue = null, owner, currency, refreshKey) {
         value = owner?.let { runCatching { Portfolio.load(it, currency) }.getOrNull() }
     }
-    GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(stringResource(R.string.hero_total), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+    LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
+    var picked by remember { mutableStateOf<Holding?>(null) }
+    picked?.let { h -> if (owner != null) TokenSheet(h, owner, signer, currency, onDismiss = { changed -> picked = null; if (changed) refreshKey++ }) }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xl)) {
+        // The one hero of the page, and it sits on the page rather than in a card:
+        // a box around the number would make it one panel among the others.
+        Column(
+            Modifier.fillMaxWidth().graphicsLayer {
+                alpha = 1f - collapse
+                scaleX = 1f - collapse * 0.35f
+                scaleY = 1f - collapse * 0.35f
+                translationY = -collapse * 40.dp.toPx()
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Space.xs),
+        ) {
+            Text(stringResource(R.string.hero_total), style = HaloType.label, color = Halo.muted)
             Text(
                 pv?.let { fmtFiat(it.total, it.currency) } ?: "…",
-                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 34.sp, color = Halo.ink, style = Tabular,
+                style = HaloType.amount, color = Halo.ink,
             )
-            // actions
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                HeroAction(HIcon.SWAP, stringResource(R.string.swap_btn), Halo.mint, Modifier.weight(1f), owner != null, onSwap)
-                HeroAction(HIcon.SEND, stringResource(R.string.send_btn), Halo.mint, Modifier.weight(1f), owner != null, onSend)
-                HeroAction(HIcon.RECEIVE, stringResource(R.string.receive_btn), Halo.cyan, Modifier.weight(1f), owner != null, onReceive)
+            pv?.let { v ->
+                val d = v.change24hValue
+                val p = v.change24hPct
+                if (d != null && p != null) ChangePill(d, p, v.currency, Modifier.clickable(onClick = onPnl))
             }
-            pv?.holdings?.filter { it.raw > 0 }?.take(6)?.let { list ->
-                if (list.isNotEmpty()) {
-                    Text(stringResource(R.string.hero_portfolio), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
-                    list.forEach { h -> HoldingRow(h, currency) }
-                    if ((pv?.unpriced ?: 0) > 0) Text(stringResource(R.string.hero_some_unpriced), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
+        }
+
+        HomeActions(enabled = owner != null, onAction = onAction)
+
+        pv?.let { view ->
+            val main = view.main.filter { it.raw > 0 }
+            val others = view.others.filter { it.raw > 0 }
+            if (main.isNotEmpty() || others.isNotEmpty()) {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                        var showAll by remember(view) { mutableStateOf(false) }
+                        var showOthers by remember(view) { mutableStateOf(false) }
+                        Text(stringResource(R.string.hero_portfolio), style = HaloType.label, color = Halo.muted)
+                        (if (showAll || main.size <= MAX_COLLAPSED) main else main.take(MAX_COLLAPSED)).forEach { h -> HoldingRow(h, currency) { picked = h } }
+                        if (main.size > MAX_COLLAPSED) {
+                            LinkRow(if (showAll) stringResource(R.string.hero_show_less) else stringResource(R.string.hero_show_all, main.size)) { showAll = !showAll }
+                        }
+                        if (view.unpriced > 0) Text(stringResource(R.string.hero_some_unpriced), style = HaloType.label, color = Halo.muted)
+                        if (others.isNotEmpty()) {
+                            LinkRow(if (showOthers) stringResource(R.string.hero_others_hide) else stringResource(R.string.hero_others, others.size)) { showOthers = !showOthers }
+                            if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/** Three rows is a glance; everything else hides behind "show all". */
+private const val MAX_COLLAPSED = 3
+
 @Composable
-private fun HeroAction(icon: HIcon, label: String, tint: androidx.compose.ui.graphics.Color, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
-    Column(
-        modifier.clip(rs(14)).background(tint.copy(alpha = if (enabled) 0.10f else 0.04f)).border(1.dp, tint.copy(alpha = if (enabled) 0.4f else 0.15f), rs(14))
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier).padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        HaloIcon(icon, if (enabled) tint else Halo.muted, 22.dp)
-        Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = if (enabled) Halo.ink else Halo.muted)
+private fun LinkRow(label: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(rs(10)).clickable(onClick = onClick).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.cyan)
+        Spacer(Modifier.width(4.dp))
+        HaloIcon(HIcon.CHEVRON_RIGHT, Halo.cyan, 14.dp)
     }
 }
 
+/** A stable, saturated hue per mint so the list reads as a set of distinct assets. */
+internal fun tokenColor(mint: String): androidx.compose.ui.graphics.Color {
+    val hue = ((mint.hashCode() % 360) + 360) % 360
+    return androidx.compose.ui.graphics.Color.hsl(hue.toFloat(), 0.62f, 0.60f)
+}
+
+/** Logo from the token metadata, or coloured initials while it loads / when there is none. */
 @Composable
-private fun HoldingRow(h: Holding, currency: String) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(30.dp).clip(rs(999)).background(Halo.cardSoft), contentAlignment = Alignment.Center) {
-            Text(h.symbol.take(2), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Halo.cyan)
+internal fun TokenLogo(mint: String, symbol: String, image: String?, size: androidx.compose.ui.unit.Dp) {
+    val tint = tokenColor(mint)
+    val initials: @Composable () -> Unit = {
+        Box(Modifier.size(size).clip(rs(999)).background(tint.copy(alpha = 0.22f)).border(1.dp, tint.copy(alpha = 0.5f), rs(999)), contentAlignment = Alignment.Center) {
+            Text(symbol.take(2).uppercase(), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.36f).sp, color = tint)
         }
-        Spacer(Modifier.width(10.dp))
+    }
+    if (image == null) initials()
+    else coil.compose.SubcomposeAsyncImage(
+        model = image, contentDescription = null,
+        modifier = Modifier.size(size).clip(rs(999)),
+        loading = { initials() }, error = { initials() },
+    )
+}
+
+@Composable
+private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(rs(Radius.row)).clickable(onClick = onClick).padding(vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TokenLogo(h.mint, h.symbol, h.image, 38.dp)
+        Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
-            Text(h.symbol, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Halo.ink, maxLines = 1)
-            Text(fmtUi(h.ui) + " " + h.symbol, fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular)
+            Text(h.name?.takeIf { TokenSymbols.isKnown(h.mint) } ?: h.symbol, style = HaloType.body, color = Halo.ink, maxLines = 1)
+            Text(fmtUi(h.ui) + " " + h.symbol, style = HaloType.label, color = Halo.muted, maxLines = 1)
         }
-        Text(h.fiat?.let { fmtFiat(it, currency) } ?: "—", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.ink, style = Tabular)
+        Column(horizontalAlignment = Alignment.End) {
+            // The number you came to see: it reads at body size, not as a footnote.
+            Text(
+                h.fiat?.let { fmtFiat(it, currency) } ?: "—",
+                style = HaloType.body.copy(fontFamily = Sora, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
+                color = if (h.fiat != null) Halo.ink else Halo.muted,
+            )
+            h.change24h?.let { c -> Text(pct(c), style = HaloType.label, color = if (c >= 0) Halo.mint else Halo.red) }
+        }
+    }
+}
+
+private fun pct(c: Double): String = (if (c >= 0) "+" else "−") + "%.1f%%".format(kotlin.math.abs(c))
+
+/** "+1,23 € · +2,0 % oggi": the day's move, green up / red down. */
+@Composable
+private fun ChangePill(delta: Double, p: Double, currency: String, modifier: Modifier = Modifier) {
+    val up = delta >= 0
+    val tint = if (up) Halo.mint else Halo.red
+    Row(
+        modifier.clip(rs(Radius.pill)).background(tint.copy(alpha = 0.12f)).padding(start = 12.dp, end = 8.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            (if (up) "+" else "−") + fmtFiat(kotlin.math.abs(delta), currency) + "  ·  " + pct(p) + "  " + stringResource(R.string.hero_today),
+            style = HaloType.small, color = tint,
+        )
+        // The chevron is the promise that there is something behind the number.
+        HaloIcon(HIcon.CHEVRON_RIGHT, tint, 15.dp)
+    }
+}
+
+/**
+ * One token, tapped from the portfolio: what it is, what it's worth, and — for
+ * anything that isn't SOL — "burn and reclaim the rent": every unit is destroyed
+ * and the token account closed, so its ~0.002 SOL deposit comes back. Simulated
+ * before the biometric prompt; the Seed Vault signs; the burn lands in the ledger.
+ */
+@Composable
+private fun TokenSheet(h: Holding, owner: String, signer: SeedVaultSigner, currency: String, onDismiss: (Boolean) -> Unit) {
+    val ctx = LocalContext.current
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var accounts by remember { mutableStateOf<List<SolanaRpc.TokenAccountInfo>?>(null) }
+    var burn by remember { mutableStateOf<HygieneAction.Burn?>(null) }
+    val isSol = h.mint == com.clearsign.core.NATIVE_SOL_MINT
+    LaunchedEffect(h.mint) {
+        if (isSol) return@LaunchedEffect
+        accounts = withContext(Dispatchers.IO) {
+            runCatching { SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner).filter { it.mint == h.mint } }.getOrDefault(emptyList())
+        }
+    }
+    burn?.let { b -> HygieneSheet(b, signer, owner) { done -> burn = null; if (done) onDismiss(true) } }
+    ModalBottomSheet(onDismissRequest = { onDismiss(false) }, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TokenLogo(h.mint, h.symbol, h.image, 46.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(h.name?.takeIf { TokenSymbols.isKnown(h.mint) } ?: h.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink, maxLines = 1)
+                    Text(h.symbol + (if (h.isNft) "  ·  NFT" else ""), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                }
+            }
+            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
+                StatRow(stringResource(R.string.token_amount), fmtUi(h.ui) + " " + h.symbol)
+                StatRow(stringResource(R.string.token_value), h.fiat?.let { fmtFiat(it, currency) } ?: stringResource(R.string.burn_value_none), accent = h.fiat != null)
+                if (!isSol) {
+                    StatRow(stringResource(R.string.token_mint), shorten(h.mint, 6))
+                    accounts?.let { StatRow(stringResource(R.string.token_rent), "+" + fmtSol(it.sumOf { a -> a.lamports }, 5) + " SOL") }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY) {
+                    (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("mint", h.mint))
+                }
+                GhostButton("Solscan", Modifier.weight(1f), HIcon.EXTERNAL, tint = Halo.cyan) {
+                    runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(h.mint, null)))) }
+                }
+            }
+            if (!isSol) {
+                Text(stringResource(R.string.token_burn_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                PrimaryButton(stringResource(R.string.token_burn_btn), danger = true, enabled = !accounts.isNullOrEmpty(), icon = HIcon.TRASH) {
+                    accounts?.takeIf { it.isNotEmpty() }?.let { burn = HygieneAction.Burn(h, it) }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
     }
 }

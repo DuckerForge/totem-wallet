@@ -5,6 +5,8 @@ package com.clearsign.app
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -24,6 +27,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,9 +116,11 @@ internal fun AccountsCard(signer: SeedVaultSigner, owner: String?) {
     }
 }
 
-private sealed interface HygieneAction {
+internal sealed interface HygieneAction {
     data class Revoke(val account: SolanaRpc.TokenAccountInfo) : HygieneAction
     data class Close(val accounts: List<SolanaRpc.TokenAccountInfo>) : HygieneAction
+    /** Burn every unit of one token the wallet holds, then close its account(s) to get the rent back. */
+    data class Burn(val holding: Holding, val accounts: List<SolanaRpc.TokenAccountInfo>) : HygieneAction
 }
 
 @Composable
@@ -174,12 +181,14 @@ private sealed interface SheetState {
 }
 
 @Composable
-private fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner: String, onDismiss: (Boolean) -> Unit) {
+internal fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner: String, onDismiss: (Boolean) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var state by remember { mutableStateOf<SheetState>(SheetState.Ready) }
     val done = state is SheetState.Done
+    var preview by remember { mutableStateOf<ReceiptEngine.Analyzed?>(null) }
+    var previewError by remember { mutableStateOf<String?>(null) }
 
     val title: String; val what: String; val hold: String; val icon: HIcon; val tint: Color; val refund: Long?
     when (action) {
@@ -192,10 +201,34 @@ private fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner: 
             title = stringResource(R.string.sheet_close_title); what = stringResource(R.string.sheet_close_what, action.accounts.size)
             hold = stringResource(R.string.hold_close); icon = HIcon.TRASH; tint = Halo.cyan; refund = action.accounts.sumOf { it.lamports }
         }
+        is HygieneAction.Burn -> {
+            title = stringResource(R.string.burn_title); what = stringResource(R.string.burn_what, fmtUi(action.holding.ui), action.holding.symbol)
+            hold = stringResource(R.string.burn_hold); icon = HIcon.TRASH; tint = Halo.red; refund = action.accounts.sumOf { it.lamports }
+        }
+    }
+    val frozen = action is HygieneAction.Burn && action.accounts.any { it.isFrozen }
+    val valuable = action is HygieneAction.Burn && (action.holding.fiat ?: 0.0) >= 0.5
+    LaunchedEffect(action) {
+        preview = null; previewError = null
+        try {
+            preview = withContext(Dispatchers.IO) {
+                val (ixs, _) = hygienePlan(ctx, action, owner, refund)
+                val rpc = SolanaRpc.urlFor(null)
+                val bh = SolanaRpc.latestBlockhash(rpc) ?: throw IllegalStateException(ctx.getString(R.string.wa_no_blockhash))
+                val payload = WalletTx.build(Base58.decode(owner), Base58.decode(bh.hash), ixs)
+                ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), payload, owner, null, requireSim = true)
+            }
+        } catch (e: Exception) { previewError = e.message ?: ctx.getString(R.string.wa_sim_failed, "?") }
     }
 
     ModalBottomSheet(onDismissRequest = { onDismiss(done) }, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+      // The receipt can be tall, so the body scrolls and the action stays pinned
+      // at the bottom: the confirm gesture must never be somewhere you can't reach.
+      Column(Modifier.fillMaxWidth().fillMaxHeight(0.94f).navigationBarsPadding()) {
+        Column(
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(44.dp).clip(rs(12)).background(tint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) { HaloIcon(icon, tint, 22.dp) }
                 Spacer(Modifier.width(12.dp))
@@ -206,37 +239,39 @@ private fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner: 
             }
             when (val s = state) {
                 SheetState.Ready -> {
+                    // Same rule as everywhere else in the app: you see the simulated receipt before you sign.
+                    val pv = preview
+                    when {
+                        previewError != null -> Banner(previewError!!, Halo.red, HIcon.WARNING)
+                        pv == null -> Working(stringResource(R.string.w_analyzing))
+                        else -> SignReceiptBody(pv.receipt, null)
+                    }
                     Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
                         if (action is HygieneAction.Revoke) StatRow(stringResource(R.string.deleg_delegate), shorten(action.account.delegate ?: "", 6))
+                        if (action is HygieneAction.Burn) {
+                            StatRow(stringResource(R.string.burn_amount), "−" + fmtUi(action.holding.ui) + " " + action.holding.symbol)
+                            StatRow(stringResource(R.string.burn_value), action.holding.fiat?.let { fmtFiat(it, Settings.currency.value) } ?: stringResource(R.string.burn_value_none))
+                            StatRow(stringResource(R.string.burn_accounts), action.accounts.size.toString())
+                        }
                         if (refund != null) StatRow(stringResource(R.string.sheet_refund), "+" + fmtSol(refund, 5) + " SOL", accent = true)
                         StatRow(stringResource(R.string.theme_unlock_fee), "≈ 0.00001 SOL")
                         StatRow(stringResource(R.string.theme_unlock_signer), stringResource(R.string.seed_vault))
                     }
-                    HoldToConfirm(hold) {
-                        state = SheetState.Signing
-                        scope.launch {
-                            val ownerKey = Base58.decode(owner)
-                            val (ixs, log) = when (action) {
-                                is HygieneAction.Revoke -> {
-                                    val a = action.account
-                                    listOf(WalletTx.tokenRevoke(Base58.decode(a.pubkey), ownerKey, WalletTx.tokenProgramFor(a.program))) to
-                                        WalletActions.LogInfo(kind = "revoke", recipient = a.delegate, recipientLabel = ctx.getString(R.string.wa_log_revoke, TokenSymbols.symbol(a.mint)))
-                                }
-                                is HygieneAction.Close -> {
-                                    action.accounts.map { a -> WalletTx.tokenCloseAccount(Base58.decode(a.pubkey), ownerKey, ownerKey, WalletTx.tokenProgramFor(a.program)) } to
-                                        WalletActions.LogInfo(kind = "close", inflows = listOf("+" + fmtSol(refund ?: 0L, 5) + " SOL"), recipientLabel = ctx.getString(R.string.wa_log_close, action.accounts.size))
-                                }
-                            }
-                            state = when (val r = WalletActions.signAndSend(ctx, signer, owner, ixs, log)) {
-                                is WalletActions.Result.Sent -> SheetState.Done(r.signature)
-                                is WalletActions.Result.Failed -> SheetState.Error(r.message)
-                            }
-                        }
-                    }
+                    if (action is HygieneAction.Burn) Text(stringResource(R.string.burn_explain), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                    if (valuable) Banner(stringResource(R.string.burn_value_warn, fmtFiat(action.holding.fiat ?: 0.0, Settings.currency.value)), Halo.red, HIcon.WARNING)
+                    if (frozen) Banner(stringResource(R.string.burn_frozen), Halo.amber, HIcon.LOCK)
+                    if (pv != null && pv.receipt.blocksApproval) Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
                 }
                 SheetState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
                 is SheetState.Done -> {
-                    Banner(if (action is HygieneAction.Revoke) stringResource(R.string.sheet_done_revoke) else stringResource(R.string.sheet_done_close), Halo.mint, HIcon.CHECK)
+                    Banner(
+                        when (action) {
+                            is HygieneAction.Revoke -> stringResource(R.string.sheet_done_revoke)
+                            is HygieneAction.Close -> stringResource(R.string.sheet_done_close)
+                            is HygieneAction.Burn -> stringResource(R.string.burn_done, "+" + fmtSol(refund ?: 0L, 5))
+                        },
+                        Halo.mint, HIcon.CHECK,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY) {
                             (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("signature", s.signature))
@@ -253,6 +288,60 @@ private fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner: 
                 }
             }
             Spacer(Modifier.height(4.dp))
+        }
+        // Fixed footer: only the confirm gesture, always on screen.
+        val pv = preview
+        if (state is SheetState.Ready && !frozen && pv != null && !pv.receipt.blocksApproval) {
+            Column(Modifier.fillMaxWidth().background(Halo.ground2).padding(horizontal = 20.dp).padding(top = 10.dp, bottom = 14.dp)) {
+                HoldToConfirm(hold) {
+                    state = SheetState.Signing
+                    scope.launch {
+                        val (ixs, plan) = hygienePlan(ctx, action, owner, refund)
+                        val log = WalletActions.LogInfo(plan.kind, plan.outflows, plan.inflows, plan.recipient, plan.recipientLabel, receipt = pv.receipt)
+                        state = when (val r = WalletActions.signAndSend(ctx, signer, owner, ixs, log)) {
+                            is WalletActions.Result.Sent -> SheetState.Done(r.signature)
+                            is WalletActions.Result.Failed -> SheetState.Error(r.message)
+                        }
+                    }
+                }
+            }
+        }
+      }
+    }
+}
+
+/** The instructions behind a hygiene action and what the ledger should say about it. */
+private class HygienePlan(val kind: String, val outflows: List<String>, val inflows: List<String>, val recipient: String?, val recipientLabel: String?)
+
+private fun hygienePlan(ctx: android.content.Context, action: HygieneAction, owner: String, refund: Long?): Pair<List<WalletTx.Instruction>, HygienePlan> {
+    val ownerKey = Base58.decode(owner)
+    return when (action) {
+        is HygieneAction.Revoke -> {
+            val a = action.account
+            listOf(WalletTx.tokenRevoke(Base58.decode(a.pubkey), ownerKey, WalletTx.tokenProgramFor(a.program))) to
+                HygienePlan("revoke", emptyList(), emptyList(), a.delegate, ctx.getString(R.string.wa_log_revoke, TokenSymbols.symbol(a.mint)))
+        }
+        is HygieneAction.Close -> {
+            action.accounts.map { a -> WalletTx.tokenCloseAccount(Base58.decode(a.pubkey), ownerKey, ownerKey, WalletTx.tokenProgramFor(a.program)) } to
+                HygienePlan("close", emptyList(), listOf("+" + fmtSol(refund ?: 0L, 5) + " SOL"), null, ctx.getString(R.string.wa_log_close, action.accounts.size))
+        }
+        is HygieneAction.Burn -> {
+            val mintKey = Base58.decode(action.holding.mint)
+            // Burn first (an account must be empty to close), then close each account back to the owner.
+            action.accounts.flatMap { a ->
+                val prog = WalletTx.tokenProgramFor(a.program)
+                val acct = Base58.decode(a.pubkey)
+                listOfNotNull(
+                    if (a.amount > 0) WalletTx.tokenBurnChecked(acct, mintKey, ownerKey, a.amount, a.decimals, prog) else null,
+                    WalletTx.tokenCloseAccount(acct, ownerKey, ownerKey, prog),
+                )
+            } to HygienePlan(
+                "burn",
+                listOf("−" + fmtUi(action.holding.ui) + " " + action.holding.symbol),
+                listOf("+" + fmtSol(refund ?: 0L, 5) + " SOL"),
+                null,
+                ctx.getString(R.string.wa_log_burn, fmtUi(action.holding.ui), action.holding.symbol),
+            )
         }
     }
 }

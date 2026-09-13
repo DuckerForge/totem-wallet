@@ -36,6 +36,33 @@ object WalletActions {
         val receipt: com.clearsign.core.Receipt? = null,   // when the caller already analysed the tx (Send)
     )
 
+    /**
+     * Build the transaction and read it back, **before** anyone signs anything.
+     *
+     * `signAndSend` already analyses the bytes — but only after signing and
+     * sending, to write the ledger row. That is backwards for the two flows that
+     * hand money to a key: funding the agent's budget and making a gift link both
+     * asked for a fingerprint without ever showing where the money went. The
+     * promise this app is built on is that you see the receipt first, so these
+     * flows get the same preview Send and Swap have always had.
+     *
+     * Returns null when the transaction cannot even be built or simulated.
+     */
+    suspend fun preview(
+        ctx: Context,
+        owner: String,
+        instructions: List<WalletTx.Instruction>,
+        cluster: String? = null,
+    ): ReceiptEngine.Analyzed? {
+        val rpc = SolanaRpc.urlFor(cluster)
+        val bh = withContext(Dispatchers.IO) { SolanaRpc.latestBlockhash(rpc) } ?: return null
+        val ownerKey = Base58.decodePubkey(owner) ?: return null
+        val tx = WalletTx.build(ownerKey, Base58.decode(bh.hash), instructions)
+        return withContext(Dispatchers.IO) {
+            runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, owner, cluster, requireSim = true) }.getOrNull()
+        }
+    }
+
     suspend fun signAndSend(
         ctx: Context,
         signer: SeedVaultSigner,
@@ -54,7 +81,9 @@ object WalletActions {
         val sim = withContext(Dispatchers.IO) { SolanaRpc.simulate(rpc, tx) }
         if (sim != null && !sim.ok) {
             Log.w(TAG, "simulation failed: ${sim.err} logs=${sim.logs.takeLast(3)}")
-            return Result.Failed(ctx.getString(R.string.wa_sim_failed, humanError(sim)))
+            val need = instructions.sumOf { i -> i.lamportsMoved }.takeIf { it > 0L }
+            val have = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() }
+            return Result.Failed(ctx.getString(R.string.wa_sim_failed, humanError(ctx, sim, need, have)))
         }
         val signature = try { signer.signSuspend(tx) } catch (e: Exception) {
             return Result.Failed(e.message ?: ctx.getString(R.string.sign_error))
@@ -143,10 +172,29 @@ object WalletActions {
         return signAndSend(ctx, signer, owner, ixs, LogInfo(kind = "setup", recipientLabel = ctx.getString(R.string.swapfees_log)))
     }
 
-    private fun humanError(sim: SolanaRpc.SimResult): String {
+    /**
+     * The two failures a person actually meets, said in their own words.
+     *
+     * The System Program reports "not enough lamports" as `custom program error:
+     * 0x1`, which tells a human nothing. Everything else falls back to the raw
+     * text, because a wrong guess is worse than an honest dump.
+     */
+    private fun humanError(ctx: Context, sim: SolanaRpc.SimResult, needLamports: Long? = null, haveLamports: Long? = null): String {
+        val raw = (sim.logs + listOfNotNull(sim.err)).joinToString(" ")
+        val systemProgram = raw.contains(SYSTEM_PROGRAM)
+        if (raw.contains("insufficient lamports", true) || (systemProgram && raw.contains("custom program error: 0x1"))) {
+            return if (needLamports != null && haveLamports != null) {
+                ctx.getString(R.string.wa_not_enough_sol, fmtSol(needLamports, 4), fmtSol(haveLamports, 4))
+            } else {
+                ctx.getString(R.string.wa_not_enough_sol_short)
+            }
+        }
+        if (systemProgram && raw.contains("custom program error: 0x0")) return ctx.getString(R.string.wa_account_exists)
         val log = sim.logs.lastOrNull { it.contains("Error", true) || it.contains("insufficient", true) || it.contains("failed", true) }
         return log?.substringAfter("Program log: ")?.take(120) ?: sim.err?.take(120) ?: "?"
     }
+
+    private const val SYSTEM_PROGRAM = "11111111111111111111111111111111"
 
     // ---- premium themes in SKR -------------------------------------------------
 

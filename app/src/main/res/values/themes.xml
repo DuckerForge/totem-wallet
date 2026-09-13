@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="halo_ground">#070B12</color>
+    <color name="apex_paper">#C9CCDA</color>
     <color name="halo_mint">#4DFFD0</color>
 
     <!-- Dependency-free base theme; the Compose Halo theme paints the UI.
@@ -14,8 +15,8 @@
 
     <!-- Branded cold start: the gem on Halo ground, then hands over to Theme.ClearSign. -->
     <style name="Theme.ClearSign.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/halo_ground</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenBackground">@color/apex_paper</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_bird</item>
         <item name="postSplashScreenTheme">@style/Theme.ClearSign</item>
     </style>
 </resources>

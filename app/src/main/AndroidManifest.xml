@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- So a running trade loop comes back after a reboot instead of silently
+         leaving open positions unwatched. It only restarts what was already on. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="com.solanamobile.seedvault.ACCESS_SEED_VAULT" />
 
@@ -28,8 +37,13 @@
         </intent>
     </queries>
 
-    <application
+        <!-- Floating companion: an overlay bubble over other apps (user-granted, toggleable). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+<application
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
@@ -49,13 +63,37 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="ClearSign"
+            android:label="@string/app_name"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             android:theme="@style/Theme.ClearSign.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- A payment request: read off a tag, tapped in a chat, or opened as the
+                 web link Apex now hands out. It only fills the send form in. -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="solana" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="solana" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="duckerforge.github.io" android:pathPrefix="/apex/p" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="https" android:host="duckerforge.github.io" android:pathPrefix="/apex/p" />
             </intent-filter>
         </activity>
 
@@ -69,12 +107,126 @@
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|locale|layoutDirection"
             android:theme="@style/Theme.ClearSign.Splash">
-            <intent-filter android:label="ClearSign">
+            <intent-filter android:label="@string/app_name">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="solana-wallet" />
             </intent-filter>
         </activity>
+
+        <!-- Agent Gate: AI agents / scripts hand a transaction + a declared intent to
+             apex://agent/sign; Apex simulates it, checks the claim against the effect
+             (IntentGuard) and only then lets the user sign with the Seed Vault. -->
+        <activity
+            android:name=".AgentGateActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|locale|layoutDirection"
+            android:theme="@style/Theme.ClearSign.Splash">
+            <intent-filter android:label="@string/app_name">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="apex" android:host="agent" />
+                <!-- Kept so requests generated before the rename still open. -->
+                <data android:scheme="omni" android:host="agent" />
+            </intent-filter>
+        </activity>
+
+        <!-- Floating companion bubble. specialUse: an always-available wallet surface
+             the user switches on; it draws an overlay and reads nothing in the background. -->
+        <service
+            android:name=".CompanionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating wallet companion overlay" />
+        </service>
+
+        <!-- The QR scanner, pinned upright: zxing's own activity follows the
+             sensor and opens sideways otherwise. -->
+        <activity
+            android:name=".ScanPortraitActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:stateNotNeeded="true"
+            android:theme="@style/Theme.ClearSign" />
+
+        <!-- Tap to pay: this phone emulates an NFC tag holding a payment request.
+             It answers only while the tap screen has armed it, and it holds no key. -->
+        <service
+            android:name=".TapService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/apduservice" />
+        </service>
+
+        <!-- A gift link. The key rides in the URL, so this activity is the only
+             thing that needs to open it: it sweeps the gift into your wallet. -->
+        <activity
+            android:name=".ClaimActivity"
+            android:exported="true"
+            android:label="@string/claim_title"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.ClearSign">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="duckerforge.github.io" android:pathPrefix="/apex/g" />
+            </intent-filter>
+            <!-- Kept so links handed out before the web page still open. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="apex" android:host="claim" />
+                <data android:scheme="omni" android:host="claim" />
+            </intent-filter>
+        </activity>
+
+        <!-- The agent link: polls the bridge on your own machine and runs the collar.
+             specialUse: it must keep working while the screen is off; it opens no port. -->
+        <service
+            android:name=".AgentLinkService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="agent envelope link: policy-gated signing" />
+        </service>
+
+        <!-- Home-screen "Wallet health" widget (Jetpack Glance). -->
+        <receiver
+            android:name=".HealthWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/health_widget_info" />
+        </receiver>
+        <!-- Not direct-boot aware on purpose: the trading settings live in
+             credential-encrypted storage, so before the first unlock this would
+             read "off" and quietly do nothing. BOOT_COMPLETED arrives after the
+             unlock, which is the first moment the answer is true. -->
+        <receiver
+            android:name=".TraderKeeper$BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

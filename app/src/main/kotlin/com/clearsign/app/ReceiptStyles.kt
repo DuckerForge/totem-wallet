@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -43,13 +44,13 @@ import com.clearsign.core.Severity
 // ---- shared pieces ------------------------------------------------------------
 
 @Composable
-private fun SplitMapBox(dests: List<NodeDest>, danger: Boolean, onTap: (NodeDest) -> Unit) {
+private fun SplitMapBox(dests: List<NodeDest>, danger: Boolean, coin: ImageBitmap? = null, onTap: (NodeDest) -> Unit) {
     Box(
         Modifier.fillMaxWidth().height(if (dests.size > 2) 250.dp else 200.dp).clip(rs(18)).background(Halo.cardSoft)
             .background(Brush.radialGradient(colors = listOf((if (danger) Halo.red else Halo.cyan).copy(alpha = 0.10f), Color.Transparent), radius = 520f))
             .border(1.dp, Halo.stroke, rs(18)),
     ) {
-        NodeMap(dests = dests, danger = danger) { d -> if (d.address != null) onTap(d) }
+        NodeMap(dests = dests, danger = danger, coin = coin) { d -> if (d.address != null) onTap(d) }
         Text(stringResource(R.string.tap_node), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
     }
 }
@@ -143,9 +144,8 @@ internal fun PaperReceipt(r: Receipt, dests: List<NodeDest>, danger: Boolean, on
         ZigzagEdge(paper)
     }
     Spacer(Modifier.height(14.dp))
-    Box(Modifier.staggeredEntrance(1, r)) { SplitMapBox(dests, danger, onTap) }
+    Box(Modifier.staggeredEntrance(1, r)) { SplitMapBox(dests, danger, rememberCoinBitmap(r.outflows.firstOrNull()?.mint), onTap) }
     if (r.calls.isNotEmpty()) { Spacer(Modifier.height(12.dp)); CallsCard(r.calls) }
-    r.stats?.let { Spacer(Modifier.height(12.dp)); StatsCard(it) }
 }
 
 // ---- TERMINAL (Phosphor) ---------------------------------------------------------
@@ -187,7 +187,7 @@ internal fun TerminalReceipt(r: Receipt, dests: List<NodeDest>, danger: Boolean,
             dests.forEach { d -> add(TermLine("> " + ctx.getString(R.string.to_label).lowercase().padEnd(9) + d.label + " [" + (d.trust?.name ?: "NEW") + "]" + (if (d.isFee) " fee" else "") + "  " + d.deltaText, Halo.ink, d)) }
             add(TermLine("> fee      " + fmtSol(r.feeLamports, 6) + " SOL", Halo.muted))
             r.risks.forEach { add(TermLine("> " + it.severity.name.lowercase().padEnd(9) + ctx.getString(riskTitle(it.flag)) + " — " + it.detail, sevColor(it.severity))) }
-            add(TermLine("> " + ctx.getString(R.string.verdict).lowercase().padEnd(9) + vTxt.uppercase(), vCol))
+            add(TermLine("> " + (ctx.getString(R.string.verdict).lowercase() + " ").padEnd(10) + vTxt.uppercase(), vCol))
         }
     }
     Column(
@@ -200,7 +200,6 @@ internal fun TerminalReceipt(r: Receipt, dests: List<NodeDest>, danger: Boolean,
         Text("+" + "-".repeat(80), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted.copy(alpha = 0.6f), maxLines = 1, modifier = Modifier.fillMaxWidth().clipToBounds())
     }
     Spacer(Modifier.height(14.dp))
-    Box(Modifier.staggeredEntrance(1, r)) { SplitMapBox(dests, danger, onTap) }
+    Box(Modifier.staggeredEntrance(1, r)) { SplitMapBox(dests, danger, rememberCoinBitmap(r.outflows.firstOrNull()?.mint), onTap) }
     if (r.calls.isNotEmpty()) { Spacer(Modifier.height(12.dp)); CallsCard(r.calls) }
-    r.stats?.let { Spacer(Modifier.height(12.dp)); StatsCard(it) }
 }

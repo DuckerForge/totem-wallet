@@ -75,6 +75,15 @@ class WatchWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
                 unlimited != null -> Watchtower.notify(ctx, ctx.getString(R.string.watch_appr_title), ctx.getString(R.string.watch_appr_body, unlimited.count))
             }
         }
+        // The agent envelope: take the winnings home when they reach the threshold.
+        runCatching {
+            val took = SessionActions.harvest(ctx, owner)
+            if (took != null && took > 0L) {
+                Watchtower.notify(ctx, ctx.getString(R.string.env_title), ctx.getString(R.string.env_harvest_done, fmtSol(took, 5)))
+            }
+        }
+        // Keep the home-screen widget fresh on the same schedule.
+        runCatching { HealthWidgetData.refresh(ctx) }
         Result.success()
     }
 }

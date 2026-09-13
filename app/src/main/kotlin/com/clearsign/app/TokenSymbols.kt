@@ -33,20 +33,60 @@ object TokenSymbols {
         "MoNKeYcTnTJWuFTeVK2oHSt5C4UxgZCpFC4LhTkRfJi" to "MONKEY",
     )
 
+    private const val TOKEN_LIST = "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet"
+
+    /** Logos for the mints DAS can't describe (native SOL) or that deserve a stable image. */
+    private val knownImages: Map<String, String> = mapOf(
+        com.clearsign.core.NATIVE_SOL_MINT to "$TOKEN_LIST/So11111111111111111111111111111111111111112/logo.png",
+        "So11111111111111111111111111111111111111112" to "$TOKEN_LIST/So11111111111111111111111111111111111111112/logo.png",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" to "$TOKEN_LIST/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
+    )
+
     /** Symbols learned at runtime from the token metadata (Helius DAS), process-lifetime. */
     private val learned = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val names = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val images = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val nfts = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    /** Mints we already asked DAS about (so unknown ones aren't re-fetched on every refresh). */
+    private val asked = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     fun symbol(mint: String): String = known[mint] ?: learned[mint] ?: "${mint.take(4)}…${mint.takeLast(4)}"
     fun isKnown(mint: String): Boolean = known.containsKey(mint) || learned.containsKey(mint)
+    fun name(mint: String): String? = names[mint]
+    fun image(mint: String): String? = knownImages[mint] ?: images[mint]
+    fun isNft(mint: String): Boolean = mint in nfts
 
     /**
-     * Resolve unknown mints through the RPC's DAS `getAssetBatch` (one call, best
-     * effort). Call off-main before rendering a receipt or a token list; symbols
-     * become available to [symbol] immediately after.
+     * Record metadata we learned somewhere better than DAS (today: Jupiter's token
+     * registry, see [JupiterTokens]). Marking the mint as asked keeps the DAS pass
+     * from spending a round trip on something we already name correctly.
+     */
+    fun seed(mint: String, symbol: String?, name: String?, image: String?) {
+        symbol?.takeIf { it.isNotBlank() && !known.containsKey(mint) }?.let { learned[mint] = it }
+        name?.takeIf { it.isNotBlank() }?.let { names[mint] = it }
+        image?.takeIf { it.isNotBlank() }?.let { images[mint] = it }
+        if (image != null) asked.add(mint)
+    }
+
+    /**
+     * Resolve mints through the RPC's DAS `getAssetBatch` (one call, best effort):
+     * symbol, name, logo and NFT-ness. Call off-main before rendering a receipt or a
+     * token list; results become available to the getters immediately after.
      */
     fun resolve(mints: Collection<String>) {
-        val todo = mints.filter { !isKnown(it) }.distinct()
+        val todo = mints.filter { it != com.clearsign.core.NATIVE_SOL_MINT && (it !in asked) && (!isKnown(it) || image(it) == null) }.distinct()
         if (todo.isEmpty()) return
-        runCatching { SolanaRpc.dasSymbols(todo) }.getOrNull()?.forEach { (mint, sym) -> learned[mint] = sym }
+        val got = runCatching { SolanaRpc.dasAssets(todo) }.getOrNull() ?: return
+        // An empty answer means DAS itself was unavailable (no Helius URL, or a failed
+        // call) — not that these mints are nameless. Blacklisting then would keep every
+        // token in the wallet shortened to "abcd…wxyz" for the rest of the process.
+        if (got.isEmpty()) return
+        asked.addAll(todo)
+        got.forEach { (mint, a) ->
+            a.symbol?.let { if (!known.containsKey(mint)) learned[mint] = it }
+            a.name?.let { names[mint] = it }
+            a.image?.let { images[mint] = it }
+            if (a.isNft) nfts.add(mint)
+        }
     }
 }

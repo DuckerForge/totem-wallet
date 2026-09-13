@@ -28,11 +28,13 @@ enum class HIcon {
     DRAIN, FLAG, HOURGLASS, GIFT, SEEDLING, UNLOCK,
     // states / actions
     BLOCK, SHIELD_LOCK, CHECK, WARNING, PEN, SEND, SIGN, LOGIN, COPY, EXTERNAL,
-    CHEVRON_RIGHT, CHEVRON_DOWN, HOLD, GEM, WALLET, HISTORY, CONTACTS, INFO, FINGERPRINT,
+    CHEVRON_RIGHT, CHEVRON_DOWN, CHEVRON_LEFT, CLOSE, SEARCH, NFC, MORE, HOLD, GEM, WALLET, HISTORY, CONTACTS, INFO, FINGERPRINT,
     // wallet actions / themes
     LOCK, COINS, QR, PALETTE, RECEIVE, PASTE, SCAN, SHARE,
     // brand: a shield sealed with a signature check
     SEAL,
+    // brand: the carrier pigeon in a shield
+    PIGEON,
     // swap: two arrows
     SWAP,
     // navigation / ledger
@@ -142,6 +144,19 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 s.drawPath(eye, tint, style = Stroke(width = 1.1f * u, join = StrokeJoin.Round))
                 s.drawCircle(tint, 2.2f * u, p(12f, 12f))
             }
+            HIcon.PIGEON -> {
+                // A carrier pigeon inside a shield: it delivers exactly what it
+                // was handed, and the shield is what checks it first.
+                path(close = true) {
+                    moveTo(4f, 10.2f); quadTo(12f, 8.2f, 20f, 10.2f)
+                    cubicTo(20.4f, 15.4f, 17f, 19.6f, 12f, 21.6f)
+                    cubicTo(7f, 19.6f, 3.6f, 15.4f, 4f, 10.2f)
+                }
+                circle(13.2f, 6.3f, 3.4f)
+                poly(16.4f, 5.4f, 20.6f, 6.6f, 16.4f, 7.8f, close = true, fill = true)
+                dot(13.6f, 5.8f, 0.75f)
+                path { moveTo(6.9f, 12.8f); quadTo(10.5f, 11.4f, 12.7f, 15.6f) }
+            }
             HIcon.SWAP -> {
                 path { moveTo(7f, 8f); lineTo(19f, 8f) }; poly(15.5f, 4.5f, 19f, 8f, 15.5f, 11.5f)
                 path { moveTo(17f, 16f); lineTo(5f, 16f) }; poly(8.5f, 12.5f, 5f, 16f, 8.5f, 19.5f)
@@ -221,6 +236,17 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.EXTERNAL -> { path { moveTo(18f, 13.5f); lineTo(18f, 19f); quadTo(18f, 20f, 17f, 20f); lineTo(5f, 20f); quadTo(4f, 20f, 4f, 19f); lineTo(4f, 7f); quadTo(4f, 6f, 5f, 6f); lineTo(10.5f, 6f) }; line(10.5f, 13.5f, 20f, 4f); poly(14f, 4f, 20f, 4f, 20f, 10f) }
             HIcon.CHEVRON_RIGHT -> poly(9f, 6f, 15f, 12f, 9f, 18f)
             HIcon.CHEVRON_DOWN -> poly(6f, 9f, 12f, 15f, 18f, 9f)
+            HIcon.CHEVRON_LEFT -> poly(15f, 6f, 9f, 12f, 15f, 18f)
+            HIcon.MORE -> { dot(6f, 12f, 1.6f); dot(12f, 12f, 1.6f); dot(18f, 12f, 1.6f) }
+            HIcon.CLOSE -> { line(6.5f, 6.5f, 17.5f, 17.5f); line(17.5f, 6.5f, 6.5f, 17.5f) }
+            HIcon.SEARCH -> { circle(10.5f, 10.5f, 6.2f); line(15.1f, 15.1f, 20.5f, 20.5f) }
+            // Contactless: the waves everyone already reads as "hold it here".
+            HIcon.NFC -> {
+                dot(6.4f, 12f, 1.5f)
+                arc(6.4f, 12f, 4.2f, -60f, 120f)
+                arc(6.4f, 12f, 8.0f, -60f, 120f)
+                arc(6.4f, 12f, 11.8f, -60f, 120f)
+            }
             HIcon.HOLD -> { circle(12f, 12f, 8f); circle(12f, 12f, 3.2f, fill = true) }
             HIcon.GEM -> {
                 path(fill = true) { moveTo(12f, 2.5f); lineTo(21.5f, 12f); lineTo(12f, 21.5f); lineTo(2.5f, 12f); close() }

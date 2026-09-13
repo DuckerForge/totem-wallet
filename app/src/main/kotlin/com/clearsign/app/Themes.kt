@@ -16,11 +16,13 @@ object Themes {
 
     /** Apply the saved selection. Call before `setContent` in every activity. */
     fun load(ctx: Context) {
+        CustomTheme.palette(ctx) // prime the custom palette so byId() can return it
         val id = prefs(ctx).getString(KEY_SELECTED, Palettes.halo.id)
         Halo.palette = if (isUnlocked(ctx, id)) Palettes.byId(id) else Palettes.halo
     }
 
     fun select(ctx: Context, id: String) {
+        if (id == CustomTheme.ID) CustomTheme.palette(ctx)
         val p = Palettes.byId(id)
         if (!isUnlocked(ctx, p.id)) return
         prefs(ctx).edit().putString(KEY_SELECTED, p.id).apply()
@@ -29,6 +31,7 @@ object Themes {
 
     /** A theme is available if it's the free Halo, or ClearSign Pro is unlocked. */
     fun isUnlocked(ctx: Context, id: String?): Boolean {
+        if (id == CustomTheme.ID) return Pro.isPro.value
         val p = Palettes.byId(id)
         return p.isFree || Pro.isPro.value
     }

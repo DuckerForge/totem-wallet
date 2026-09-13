@@ -55,18 +55,29 @@ internal fun ThemesCard(signer: SeedVaultSigner, owner: String?, onNeedPro: () -
     val pro by Pro.isPro
     val current = Halo.palette
 
+    var showEditor by remember { mutableStateOf(false) }
+    // Built-ins first, then a "Custom" tile that opens the editor.
+    val tiles = Palettes.all + CustomTheme.palette(ctx)
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SectionTitle(stringResource(R.string.home_themes_hdr), stringResource(R.string.home_themes_sub), HIcon.PALETTE)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Palettes.all.forEach { p ->
-                    val isUnlocked = p.isFree || pro
-                    ThemeTile(
-                        p = p, active = p.id == current.id, locked = !isUnlocked,
-                        modifier = Modifier.weight(1f),
-                        onTap = { if (isUnlocked) { Themes.select(ctx, p.id); Haptics.tick(ctx) } else onNeedPro() },
-                        onDevUnlock = if (BuildConfig.DEBUG && !isUnlocked) ({ Pro.set(ctx, null); Themes.select(ctx, p.id); Haptics.success(ctx) }) else null,
-                    )
+            tiles.chunked(3).forEach { rowTiles ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowTiles.forEach { p ->
+                        val custom = p.id == CustomTheme.ID
+                        val isUnlocked = p.isFree || pro
+                        ThemeTile(
+                            p = p, active = p.id == current.id, locked = !isUnlocked, custom = custom,
+                            modifier = Modifier.weight(1f),
+                            onTap = {
+                                if (!isUnlocked) onNeedPro()
+                                else if (custom) showEditor = true
+                                else { Themes.select(ctx, p.id); Haptics.tick(ctx) }
+                            },
+                            onDevUnlock = if (BuildConfig.DEBUG && !isUnlocked) ({ Pro.set(ctx, null); if (custom) showEditor = true else Themes.select(ctx, p.id); Haptics.success(ctx) }) else null,
+                        )
+                    }
+                    repeat(3 - rowTiles.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
             Text(
@@ -75,10 +86,11 @@ internal fun ThemesCard(signer: SeedVaultSigner, owner: String?, onNeedPro: () -
             )
         }
     }
+    if (showEditor) ThemeEditorSheet { showEditor = false }
 }
 
 @Composable
-private fun ThemeTile(p: HaloPalette, active: Boolean, locked: Boolean, modifier: Modifier, onTap: () -> Unit, onDevUnlock: (() -> Unit)?) {
+private fun ThemeTile(p: HaloPalette, active: Boolean, locked: Boolean, modifier: Modifier, onTap: () -> Unit, onDevUnlock: (() -> Unit)?, custom: Boolean = false) {
     val scope = rememberCoroutineScope()
     var pressed by remember { mutableStateOf(false) }
     val border by animateColorAsState(if (active) Halo.mint else Halo.stroke, tween(260), label = "border")
@@ -131,6 +143,12 @@ private fun ThemeTile(p: HaloPalette, active: Boolean, locked: Boolean, modifier
                     Modifier.align(Alignment.BottomEnd).padding(6.dp).size(18.dp).clip(CircleShape).background(Halo.mint),
                     contentAlignment = Alignment.Center,
                 ) { HaloIcon(HIcon.CHECK, Halo.ground, 11.dp, strokeScale = 1.3f) }
+            }
+            if (custom && !locked) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp).clip(CircleShape).background(p.accent.copy(alpha = 0.9f)),
+                    contentAlignment = Alignment.Center,
+                ) { HaloIcon(HIcon.PALETTE, p.ground, 11.dp) }
             }
         }
         Text(stringResource(p.nameRes), fontFamily = Sora, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = if (active) Halo.ink else Halo.muted, maxLines = 1)

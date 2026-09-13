@@ -66,6 +66,8 @@ enum class Scenario(val title: String, val expected: String) {
     DRAIN_ALL("🪣 Svuota il wallet", "DANGER: il 95% del saldo a un wallet senza storico"),
     ASSIGN_WALLET("🏴‍☠️ Cede il tuo wallet", "DANGER: System Assign del tuo account a un programma"),
     GASLESS("🎁 Fee pagate da altri", "WARN: fee payer estraneo, tu firmi il trasferimento"),
+    AGENT_HONEST("🤖 Agent Gate · agente onesto", "Un agente AI dichiara un micro-invio; Omni verifica intento vs effetto: coerente ✓ (solo firma)"),
+    AGENT_LIAR("🤖 Agent Gate · agente bugiardo", "DANGER: l'agente dichiara uno swap SOL→USDC ma la tx è un invio → bloccato"),
 }
 
 class MainActivity : ComponentActivity() {
@@ -115,6 +117,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun run(scenario: Scenario, setStatus: (String) -> Unit) {
+        if (scenario == Scenario.AGENT_HONEST || scenario == Scenario.AGENT_LIAR) { runAgent(scenario, setStatus); return }
         setStatus("${scenario.title}\nAtteso: ${scenario.expected}\n\nApro ClearSign… (solo firma, non invio)")
         lifecycleScope.launch {
             val result = mwa.transact(sender) { auth ->
@@ -133,6 +136,44 @@ class MainActivity : ComponentActivity() {
                         "❌ ${scenario.title}\nRifiutata/errore: ${result.e.message}"
                 },
             )
+        }
+    }
+
+    /**
+     * Agent Gate demo: this app plays the "AI agent". It never holds a key — it only
+     * asks Omni (via MWA authorize) which wallet to use, builds a transaction, and
+     * hands it to apex://agent/sign together with a *declared intent*. Apex simulates
+     * the bytes and compares them with the claim. send=0: signature only, no spend.
+     */
+    private fun runAgent(scenario: Scenario, setStatus: (String) -> Unit) {
+        setStatus("${scenario.title}\nAtteso: ${scenario.expected}\n\n1/2 chiedo a Apex quale wallet usare…")
+        lifecycleScope.launch {
+            val auth = mwa.transact(sender) { a -> a.publicKey }
+            val feePayer = (auth as? TransactionResult.Success)?.payload ?: run { setStatus("❌ Connessione a Omni rifiutata o wallet assente."); return@launch }
+            val ownerB58 = Base58.encode(feePayer)
+            val tx = withContext(Dispatchers.IO) {
+                val bh = MainnetRpc.latestBlockhash() ?: ByteArray(32)
+                SolTxBuilder.build(feePayer, bh, listOf(SolTxBuilder.systemTransfer(feePayer, RECIPIENT, 1_000L)))
+            }
+            val intent = org.json.JSONObject().apply {
+                put("agent", "Tester Agent")
+                if (scenario == Scenario.AGENT_HONEST) {
+                    put("action", "transfer"); put("outMint", "SOL"); put("outAmount", 0.000001); put("to", Base58.encode(RECIPIENT))
+                    put("reason", "Demo: micro-invio di prova dichiarato correttamente")
+                } else {
+                    put("action", "swap"); put("outMint", "SOL"); put("outAmount", 0.000001); put("inMint", "USDC"); put("inAmount", 0.0001)
+                    put("reason", "Demo: l'agente MENTE — dichiara uno swap, la transazione è un invio")
+                }
+            }
+            val uri = Uri.Builder().scheme("apex").authority("agent").path("/sign")
+                .appendQueryParameter("tx", android.util.Base64.encodeToString(tx, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP))
+                .appendQueryParameter("intent", intent.toString())
+                .appendQueryParameter("account", ownerB58)
+                .appendQueryParameter("send", "0")
+                .build()
+            setStatus("${scenario.title}\n2/2 apro Apex Agent Gate con l'intento dichiarato:\n${intent.getString("action")} ${intent.optString("outAmount")} ${intent.optString("outMint")}" + (if (scenario == Scenario.AGENT_LIAR) " → USDC (falso)" else " → ${Base58.encode(RECIPIENT).take(6)}…"))
+            runCatching { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
+                .onFailure { setStatus("❌ Apex non installato o Agent Gate non disponibile: ${it.message}") }
         }
     }
 
@@ -203,7 +244,7 @@ class MainActivity : ComponentActivity() {
                 Scenario.BURN_ADDRESS -> listOf(
                     SolTxBuilder.systemTransfer(feePayer, INCINERATOR, 1_000L),
                 )
-                Scenario.SWAP, Scenario.BUNDLE_3TX, Scenario.GASLESS -> emptyList() // handled above
+                Scenario.SWAP, Scenario.BUNDLE_3TX, Scenario.GASLESS, Scenario.AGENT_HONEST, Scenario.AGENT_LIAR -> emptyList() // handled above
             }
             listOf(SolTxBuilder.build(feePayer, blockhash, ixs))
         }

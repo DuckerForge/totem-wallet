@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.clearsign.app",
+      "sha256_cert_fingerprints": [
+        "B4:20:9A:51:57:93:80:B9:F0:D3:06:5D:70:87:63:51:56:26:82:3A:19:28:F5:4B:D1:F7:AE:0A:72:C6:0E:E2"
+      ]
+    }
+  }
+]

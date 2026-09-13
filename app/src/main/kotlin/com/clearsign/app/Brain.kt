@@ -1,0 +1,250 @@
+package com.clearsign.app
+
+import android.content.Context
+import android.util.Log
+import com.clearsign.core.AgentMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * The model, talking to the wallet through five tools it cannot abuse.
+ *
+ * Two shapes are supported: the Anthropic Messages API, and any endpoint that
+ * speaks the OpenAI chat format (OpenRouter, DeepSeek, a model on your own
+ * machine). No SDK — both are a POST with a JSON body, and a wallet should not
+ * grow a dependency tree to send one.
+ *
+ * What leaves the phone: the conversation, the balances and the addresses the
+ * model needs to reason about. What never leaves: any key. The model proposes;
+ * [AgentBroker] decides; the Seed Vault is untouchable either way.
+ */
+object Brain {
+    private const val TAG = "Apex-Brain"
+    private const val MAX_TOOL_ROUNDS = 6
+
+    /** One line in the transcript. [tool] rows are the receipts of what was done. */
+    data class Turn(val role: String, val text: String, val tool: String? = null, val verdict: String? = null)
+
+    sealed class Reply {
+        data class Ok(val turns: List<Turn>) : Reply()
+        data class Failed(val message: String) : Reply()
+    }
+
+    fun configured(ctx: Context) = Secrets.model(ctx).ready
+
+    /**
+     * Send [history] plus the new user message and run the tool loop to the end.
+     * Returns every turn produced, so the screen can show the tool results too.
+     */
+    suspend fun ask(ctx: Context, history: List<Turn>, agentName: String): Reply = withContext(Dispatchers.IO) {
+        val cfg = Secrets.model(ctx)
+        if (!cfg.ready) return@withContext Reply.Failed(ctx.getString(R.string.brain_no_key))
+        val produced = ArrayList<Turn>()
+        val messages = JSONArray()
+        history.forEach { t ->
+            if (t.role == "user" || t.role == "assistant") {
+                messages.put(JSONObject().put("role", t.role).put("content", t.text))
+            }
+        }
+        val system = systemPrompt(ctx)
+
+        try {
+            var rounds = 0
+            while (rounds++ <= MAX_TOOL_ROUNDS) {
+                val body = if (cfg.anthropic) anthropicBody(cfg, system, messages) else openAiBody(cfg, system, messages)
+                val url = if (cfg.anthropic) "https://api.anthropic.com/v1/messages" else cfg.baseUrl.trimEnd('/') + "/chat/completions"
+                val response = post(url, body, cfg) ?: return@withContext Reply.Failed(ctx.getString(R.string.brain_unreachable))
+                response.optJSONObject("error")?.let { e ->
+                    return@withContext Reply.Failed(e.optString("message").ifBlank { ctx.getString(R.string.brain_unreachable) })
+                }
+
+                val calls = ArrayList<Triple<String, String, JSONObject>>()   // id, name, args
+                var text = ""
+                if (cfg.anthropic) {
+                    val content = response.optJSONArray("content") ?: JSONArray()
+                    for (i in 0 until content.length()) {
+                        val block = content.getJSONObject(i)
+                        when (block.optString("type")) {
+                            "text" -> text += block.optString("text")
+                            "tool_use" -> calls += Triple(block.optString("id"), block.optString("name"), block.optJSONObject("input") ?: JSONObject())
+                        }
+                    }
+                    messages.put(JSONObject().put("role", "assistant").put("content", content))
+                } else {
+                    val msg = response.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message") ?: JSONObject()
+                    text = msg.optString("content").takeIf { it != "null" } ?: ""
+                    val tc = msg.optJSONArray("tool_calls") ?: JSONArray()
+                    for (i in 0 until tc.length()) {
+                        val c = tc.getJSONObject(i)
+                        val fn = c.optJSONObject("function") ?: continue
+                        val args = runCatching { JSONObject(fn.optString("arguments", "{}")) }.getOrDefault(JSONObject())
+                        calls += Triple(c.optString("id"), fn.optString("name"), args)
+                    }
+                    messages.put(msg)
+                }
+
+                if (text.isNotBlank()) produced += Turn("assistant", text.trim())
+                if (calls.isEmpty()) return@withContext Reply.Ok(produced)
+
+                for ((id, name, args) in calls) {
+                    val result = runCatching { BrainTools.run(ctx, name, args, agentName) }
+                        .getOrElse { e -> JSONObject().put("error", e.message ?: "tool failed") }
+                    produced += Turn("tool", result.toString(), tool = name, verdict = result.optString("decision").ifBlank { null })
+                    messages.put(
+                        if (cfg.anthropic) {
+                            JSONObject().put("role", "user").put(
+                                "content",
+                                JSONArray().put(
+                                    JSONObject().put("type", "tool_result").put("tool_use_id", id).put("content", result.toString()),
+                                ),
+                            )
+                        } else {
+                            JSONObject().put("role", "tool").put("tool_call_id", id).put("content", result.toString())
+                        },
+                    )
+                }
+            }
+            Reply.Ok(produced + Turn("assistant", ctx.getString(R.string.brain_too_many_steps)))
+        } catch (e: Exception) {
+            Log.w(TAG, "ask failed", e)
+            Reply.Failed(e.message ?: ctx.getString(R.string.brain_unreachable))
+        }
+    }
+
+    // ---- the prompt ------------------------------------------------------------
+
+    /**
+     * Built from the live policy, so there is only ever one knob: change the
+     * rules in the app and the model's brief changes with them. It is told the
+     * truth about its position — it cannot sign, and a refusal is final.
+     */
+    fun systemPrompt(ctx: Context): String {
+        val s = SessionWallet.current(ctx)
+        val p = SessionWallet.policy(ctx)
+        val h = SessionWallet.history(ctx)
+        val contacts = Contacts.allowlist(ctx)
+        val italian = deviceLocaleTag() == "it"
+        val sb = StringBuilder()
+        sb.append(
+            if (italian) {
+                "Sei l'assistente dentro Apex, un portafoglio Solana sul telefono Seeker. Parli italiano, in modo diretto e breve.\n\n"
+            } else {
+                "You are the assistant inside Apex, a Solana wallet on the Seeker phone. Be direct and brief.\n\n"
+            },
+        )
+        sb.append(
+            if (italian) {
+                "Tu non firmi niente. Proponi, e Apex decide sul telefono: può firmare in silenzio, chiedere l'impronta alla persona, o rifiutare. Un rifiuto è definitivo: spiegalo con parole semplici e non cercare un'altra strada per fare la stessa cosa.\n\n"
+            } else {
+                "You never sign anything. You propose, and Apex decides on the phone: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final: explain it plainly and do not look for another route to the same thing.\n\n"
+            },
+        )
+        if (s == null || p == null) {
+            sb.append(if (italian) "Non hai ancora una paghetta, quindi non puoi spendere niente. Se serve, di' alla persona di creartene una dalla linguetta Agente." else "You have no budget yet, so you cannot spend anything. If needed, tell the person to give you one in the Agent tab.")
+            return sb.toString()
+        }
+        val mode = when (p.mode) {
+            AgentMode.OFF -> if (italian) "spento: non passerà niente" else "off: nothing will go through"
+            AgentMode.READ_ONLY -> if (italian) "sola lettura" else "read-only"
+            AgentMode.ASK_ALWAYS -> if (italian) "chiede sempre conferma" else "always asks for confirmation"
+            AgentMode.AUTONOMOUS -> if (italian) "autonomo sotto le soglie" else "autonomous below the thresholds"
+        }
+        sb.append(if (italian) "Stato: $mode.\n" else "State: $mode.\n")
+        sb.append(
+            if (italian) {
+                "Puoi spendere solo dalla paghetta (${fmtSol(p.perTxLamports, 4)} SOL per operazione, ${fmtSol(p.dailyLamports, 4)} SOL al giorno, già spesi oggi ${fmtSol(h.spentLast24hLamports, 4)} SOL). Sotto ${fmtSol(p.askAboveLamports, 4)} SOL firma da sola; sopra, chiede alla persona.\n"
+            } else {
+                "You may only spend from the envelope (${fmtSol(p.perTxLamports, 4)} SOL per move, ${fmtSol(p.dailyLamports, 4)} SOL a day, ${fmtSol(h.spentLast24hLamports, 4)} SOL spent today). Below ${fmtSol(p.askAboveLamports, 4)} SOL it signs on its own; above that it asks.\n"
+            },
+        )
+        val whom = p.allowedDestinations.mapNotNull { a -> contacts[a]?.let { "$it ($a)" } }
+        sb.append(
+            if (whom.isEmpty()) {
+                if (italian) "Nessun contatto è ammesso come destinatario: puoi solo mandare al conto principale della persona.\n" else "No contact is an allowed recipient: you can only send to the person's own account.\n"
+            } else {
+                (if (italian) "Destinatari ammessi: " else "Allowed recipients: ") + whom.joinToString("; ") + "\n"
+            },
+        )
+        sb.append(
+            if (italian) {
+                "Il conto principale è nel Seed Vault e non lo tocchi mai: puoi solo mandarci i guadagni con harvest.\nCi sono due borselli e non vanno mai confusi: la paghetta, che è l'unica cosa che puoi spendere, e il conto principale, che puoi solo guardare. Quando rispondi di' sempre di quale dei due stai parlando. Prima di proporre una spesa chiama wallet_status. Prima di proporre uno scambio guarda il mercato: market_scan per trovare cosa vale la pena guardare adesso, market_search per sapere cos'è una moneta, quanto vale e se è una trappola, quote_swap per sapere quanto ti darebbe davvero, portfolio per sapere cosa ha in mano. Non scegliere mai una moneta a memoria: quello che ricordi è vecchio di un anno e quel simbolo oggi può essere di un altro. Se cerchi qualcosa di nuovo, parti sempre da market_scan e di' anche cosa è stato scartato e perché.\nSe la persona ti chiede di lavorare da sola, di cercare occasioni o di operare mentre chiude l'app, quello è start_trading. Prima chiedile quale corsia vuole, blue chip o degen, e aspetta la risposta: non sceglierla tu. Usa proprio quelle due parole, sono quelle che conosce chi sta nel giro. Quando l'hai acceso, dille i numeri veri che ti ha restituito lo strumento, quanto mette per posizione, quante posizioni, a che punto vende in guadagno e a che punto in perdita, e che può chiudere l'app. Di' anche i limiti che lo strumento ti riporta, senza addolcirli. Per sapere come sta andando usa positions, non la memoria. Di' i numeri veri che hai trovato, non impressioni. Dopo ogni operazione di' com'è andata, con l'importo vero.\nScrivi in frasi brevi, come parleresti. Niente tabelle, niente barre verticali, niente asterischi e niente markdown: il telefono mostra il testo grezzo e una tabella diventa illeggibile. Per un elenco usa una riga per voce, con il trattino."
+            } else {
+                "The main account lives in the Seed Vault and you never touch it: you can only send gains to it with harvest.\nThere are two pots and you must never blur them: the budget, which is the only money you can spend, and the main account, which you can only look at. Always say which one you are talking about. Call wallet_status before proposing a spend. Before proposing a swap, look at the market: market_scan to find what is worth looking at right now, market_search to learn what a coin is, what it costs and whether it is a trap, quote_swap to learn what it would really return, portfolio to know what they hold. Never pick a coin from memory: what you remember is a year old and that ticker may belong to somebody else today. When you are looking for something new, always start from market_scan, and say what it threw out as well as what it kept.\nIf the person asks you to work on your own, to look for opportunities, or to keep going while they close the app, that is start_trading. Ask them which lane first, blue chip or degen, and wait for the answer: do not choose it for them. Use those two words exactly; they are the ones people in crypto actually use. Once it is on, tell them the real numbers the tool gave back, the slice per position, how many positions, where it sells in profit and where in loss, and that they can close the app. Say the limits the tool reports too, without softening them. To know how it is going use positions, not memory. Quote the real numbers you found, not impressions. After each operation say how it went, with the real amount.\nWrite in short sentences, the way you would say it out loud. No tables, no pipes, no asterisks, no markdown: the phone shows raw text and a table turns into noise. For a list, one line per item with a dash."
+            },
+        )
+        return sb.toString()
+    }
+
+    // ---- wire ------------------------------------------------------------------
+
+    private fun anthropicBody(cfg: Secrets.Model, system: String, messages: JSONArray) = JSONObject()
+        .put("model", cfg.model).put("max_tokens", 1024).put("system", system)
+        .put("messages", messages).put("tools", BrainTools.schema)
+
+    private fun openAiBody(cfg: Secrets.Model, system: String, messages: JSONArray): JSONObject {
+        val withSystem = JSONArray().put(JSONObject().put("role", "system").put("content", system))
+        for (i in 0 until messages.length()) withSystem.put(messages.get(i))
+        val tools = JSONArray()
+        for (i in 0 until BrainTools.schema.length()) {
+            val t = BrainTools.schema.getJSONObject(i)
+            tools.put(
+                JSONObject().put("type", "function").put(
+                    "function",
+                    JSONObject().put("name", t.getString("name")).put("description", t.getString("description"))
+                        .put("parameters", t.getJSONObject("input_schema")),
+                ),
+            )
+        }
+        return JSONObject().put("model", cfg.model).put("messages", withSystem).put("tools", tools).put("max_tokens", 1024)
+    }
+
+    /**
+     * One tiny real call, so a wrong key is caught here instead of in the middle
+     * of a conversation. Returns null when it worked, or the provider's own
+     * complaint — which is more useful than anything we could invent.
+     */
+    suspend fun test(ctx: Context): String? = withContext(Dispatchers.IO) {
+        val cfg = Secrets.model(ctx)
+        if (!cfg.ready) return@withContext ctx.getString(R.string.brain_no_key)
+        val body = if (cfg.anthropic) {
+            JSONObject().put("model", cfg.model).put("max_tokens", 8)
+                .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", "ping")))
+        } else {
+            JSONObject().put("model", cfg.model).put("max_tokens", 8)
+                .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", "ping")))
+        }
+        val url = if (cfg.anthropic) "https://api.anthropic.com/v1/messages" else cfg.baseUrl.trimEnd('/') + "/chat/completions"
+        val response = post(url, body, cfg) ?: return@withContext ctx.getString(R.string.brain_unreachable)
+        response.optJSONObject("error")?.let { e ->
+            return@withContext e.optString("message").ifBlank { ctx.getString(R.string.brain_unreachable) }
+        }
+        val ok = response.has("content") || response.optJSONArray("choices") != null
+        if (ok) null else ctx.getString(R.string.brain_unreachable)
+    }
+
+    private fun post(url: String, body: JSONObject, cfg: Secrets.Model): JSONObject? = try {
+        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"; doOutput = true; connectTimeout = 10_000; readTimeout = 90_000
+            setRequestProperty("Content-Type", "application/json")
+            if (cfg.anthropic) {
+                setRequestProperty("x-api-key", cfg.key)
+                setRequestProperty("anthropic-version", "2023-06-01")
+            } else {
+                setRequestProperty("Authorization", "Bearer " + cfg.key)
+            }
+        }
+        c.outputStream.use { it.write(body.toString().toByteArray()) }
+        val code = c.responseCode
+        val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }
+        c.disconnect()
+        text?.let { JSONObject(it) }
+    } catch (e: Exception) {
+        // Never log the body: it carries the key's neighbourhood and the user's words.
+        Log.w(TAG, "POST failed: ${e.javaClass.simpleName}")
+        null
+    }
+}

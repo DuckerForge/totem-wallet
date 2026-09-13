@@ -71,6 +71,8 @@ enum class RiskFlag {
     LIMITED_APPROVAL,      // a (bounded) delegate is granted over your tokens
     FEE_EXCESSIVE,         // priority fee far above what the network is paying right now
     EXTRA_SIGNERS,         // the transaction needs signatures from keys other than yours
+    AGENT_INTENT_MISMATCH, // an AI agent declared one thing; the simulated effect is another (Agent Gate)
+    AGENT_INTENT_OK,       // the agent's declared intent matches the simulated effect (informational)
 }
 
 /**

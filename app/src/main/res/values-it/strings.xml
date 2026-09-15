@@ -1366,6 +1366,16 @@
     <string name="eyes_since_entry">comprata con %1$s SOL</string>
     <string name="eyes_thoughts">Cosa sta pensando</string>
     <string name="eyes_quiet">Silenzio. Il primo giro scrive qui.</string>
+    <string name="trace_more">Ne compro ancora: %1$s</string>
+    <string name="trader_why_more">Un\'altra fetta di %1$s, chiesta da te</string>
+    <string name="trader_sold_you">Venduta %1$s, come hai chiesto</string>
+    <string name="eyes_sell">Vendi</string>
+    <string name="eyes_more">Ancora</string>
+    <string name="eyes_next">Vendi e cerca altro</string>
+    <string name="eyes_sell_all">Vendi tutto</string>
+    <string name="eyes_buying">Compro…</string>
+    <string name="eyes_loop_off_hunt">Venduta. Il ciclo è spento, quindi non cerca: accendilo da Agente.</string>
+    <string name="eyes_hunting">Venduta. Cerco altro…</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

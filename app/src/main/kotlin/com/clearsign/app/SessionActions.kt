@@ -65,6 +65,30 @@ object SessionActions {
     }
 
     /**
+     * A sale asked by a person, with the answer already in words: true when
+     * the coins are gone and the row removed, false with the reason otherwise.
+     * The card, the notification button and the eyes all say the same thing.
+     */
+    suspend fun sellSaid(ctx: Context, pos: Positions.Position, source: AgentBroker.Job.Source): Pair<Boolean, String> {
+        val why = ctx.getString(R.string.trader_why_you, pos.symbol)
+        val sale = runCatching { sellNow(ctx, pos, why, source) }.getOrNull()
+        val v = (sale as? Sale.Judged)?.verdict
+        return when {
+            v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
+                Positions.remove(ctx, pos.mint)
+                val m = ctx.getString(R.string.trader_sold_you, pos.symbol)
+                AgentTrace.say(m, AgentTrace.Kind.ACTED)
+                true to m
+            }
+            v is AgentBroker.Verdict.Timeout -> false to ctx.getString(R.string.trader_needed_you)
+            v != null -> false to (v.reason ?: ctx.getString(R.string.trader_net_down))
+            sale is Sale.Nothing -> false to ctx.getString(R.string.trader_no_coins)
+            sale is Sale.NoRoute -> false to ctx.getString(R.string.trader_no_route)
+            else -> false to ctx.getString(R.string.trader_net_down)
+        }
+    }
+
+    /**
      * Sell one holding back to SOL, now, and let the collar judge it.
      *
      * The one door out, used by the loop on a target or a stop and by the button

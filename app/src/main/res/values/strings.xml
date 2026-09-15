@@ -1366,6 +1366,16 @@
     <string name="eyes_since_entry">bought with %1$s SOL</string>
     <string name="eyes_thoughts">What it is thinking</string>
     <string name="eyes_quiet">Quiet. The first tick writes here.</string>
+    <string name="trace_more">Buying more: %1$s</string>
+    <string name="trader_why_more">One more slice of %1$s, asked by you</string>
+    <string name="trader_sold_you">Sold %1$s, as you asked</string>
+    <string name="eyes_sell">Sell</string>
+    <string name="eyes_more">More</string>
+    <string name="eyes_next">Sell and look for another</string>
+    <string name="eyes_sell_all">Sell everything</string>
+    <string name="eyes_buying">Buying…</string>
+    <string name="eyes_loop_off_hunt">Sold. The loop is off, so it is not looking: switch it on from Agent.</string>
+    <string name="eyes_hunting">Sold. Looking for another…</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

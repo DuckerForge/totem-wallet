@@ -28,6 +28,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,6 +52,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -90,6 +93,44 @@ internal fun EyesScreen(onClose: () -> Unit) {
     var tickAt by remember { mutableStateOf(TraderLoop.lastTickAt(ctx)) }
     var solUsd by remember { mutableStateOf<Double?>(null) }
     var spot by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
+    var busy by remember { mutableStateOf<String?>(null) }
+    var said by remember { mutableStateOf<String?>(null) }
+    var voice by remember { mutableStateOf(Settings.eyesVoice(ctx)) }
+    val scope = rememberCoroutineScope()
+
+    // The voice: on while this screen is open and the switch is on. It reads
+    // the lines worth hearing as they land, and nothing that was already there.
+    DisposableEffect(voice) {
+        if (voice) Voice.warm(ctx)
+        onDispose { Voice.stop() }
+    }
+    val scanning = stringResource(R.string.trace_scanning)
+    LaunchedEffect(voice) {
+        if (!voice) return@LaunchedEffect
+        var seen = AgentTrace.lines.size
+        while (true) {
+            val lines = AgentTrace.lines
+            if (lines.size < seen) seen = 0
+            lines.drop(seen).forEach { l ->
+                if (l.kind == AgentTrace.Kind.ACTED || l.kind == AgentTrace.Kind.FOUND || l.text == scanning) Voice.add(ctx, l.text)
+            }
+            seen = lines.size
+            delay(500)
+        }
+    }
+
+    fun run(label: String, block: suspend () -> String) {
+        if (busy != null) return
+        busy = label; said = null
+        scope.launch {
+            said = runCatching { block() }.getOrElse { ctx.getString(R.string.trader_net_down) }
+            busy = null; refresh++
+        }
+    }
+    val sellingLabel = stringResource(R.string.trader_selling)
+    val buyingLabel = stringResource(R.string.eyes_buying)
+    val loopOff = stringResource(R.string.eyes_loop_off_hunt)
+    val hunting = stringResource(R.string.eyes_hunting)
 
     // One clock for the page: the book and the tick every two seconds, the
     // prices every fifteen. The loop's own reads are its own business.
@@ -147,7 +188,23 @@ internal fun EyesScreen(onClose: () -> Unit) {
                         fontFamily = Inter, fontSize = 12.sp, color = if (cfg.on) Halo.ink else Halo.amber,
                     )
                 }
+                // The voice switch: a speaker that lights when it talks.
+                Box(Modifier.clip(rs(999)).clickable { voice = !voice; Settings.setEyesVoice(ctx, voice); Haptics.tick(ctx) }.padding(8.dp)) {
+                    Text(if (voice) "\uD83D\uDD0A" else "\uD83D\uDD07", fontSize = 15.sp)
+                }
                 Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp) }
+            }
+            busy?.let { Working(it) }
+            said?.let { Banner(it, Halo.amber, HIcon.INFO) }
+            if (open.size > 1 && busy == null) {
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
+                    SmallChip(stringResource(R.string.eyes_sell_all), HIcon.SWAP, tint = Halo.amber) {
+                        run(sellingLabel) {
+                            val stuck = SessionActions.sellAll(ctx)
+                            if (stuck.isEmpty()) ctx.getString(R.string.env_sell_all_done) else ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
+                        }
+                    }
+                }
             }
 
             Spacer(Modifier.height(10.dp))
@@ -176,6 +233,25 @@ internal fun EyesScreen(onClose: () -> Unit) {
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.eyes_since_entry, fmtSol(pos.costLamports, 4)), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+                            }
+                            // Three things a person can do while watching. No more.
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SmallChip(stringResource(R.string.eyes_sell), HIcon.SWAP, tint = Halo.red) {
+                                    run(sellingLabel) { SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP).second }
+                                }
+                                SmallChip(stringResource(R.string.eyes_more), HIcon.DOWNLOAD, tint = Halo.mint) {
+                                    run(buyingLabel) { TraderLoop.buyMore(ctx, pos.mint) }
+                                }
+                                SmallChip(stringResource(R.string.eyes_next), HIcon.SEARCH, tint = Halo.cyan) {
+                                    run(sellingLabel) {
+                                        val (ok, m) = SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP)
+                                        when {
+                                            !ok -> m
+                                            !TraderLoop.config(ctx).on -> loopOff
+                                            else -> { busy = hunting; TraderLoop.tick(ctx, mayHunt = true).summary }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

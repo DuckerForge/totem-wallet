@@ -115,4 +115,10 @@ object Settings {
 
     private fun defaultCurrency(): String =
         runCatching { Currency.getInstance(Locale.getDefault()).currencyCode }.getOrNull()?.takeIf { it in FiatRates.SUPPORTED } ?: "USD"
+
+    /** The eyes' voice: the phone reads the loop's lines aloud while that screen is open. Off by default. */
+    fun eyesVoice(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("eyes_voice", false)
+    fun setEyesVoice(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("eyes_voice", on).apply()
+    }
 }

@@ -7,6 +7,7 @@ import com.clearsign.core.NATIVE_SOL_MINT
 import com.clearsign.core.ScanGate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -167,7 +168,50 @@ object TraderLoop {
      * One round. Safe to call as often as you like: it does its own checks and
      * returns without touching the network when there is nothing to do.
      */
-    suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = AgentTrace.working { tickInner(ctx, mayHunt) }
+    /** One tick at a time, whoever asks: the service on its clock, or a person from the screen. */
+    private val gate = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = gate.withLock { AgentTrace.working { tickInner(ctx, mayHunt) } }
+
+    /**
+     * One more slice of a coin already in play, asked by a person looking at
+     * the screen. The hunt's own road minus the search: the collar judges it,
+     * the receipt records it, and the row merges into the one already open.
+     * Returns what to tell the person.
+     */
+    suspend fun buyMore(ctx: Context, mint: String): String = gate.withLock {
+        AgentTrace.working {
+            val cfg = config(ctx)
+            val s = SessionWallet.current(ctx) ?: return@working ctx.getString(R.string.trader_stop_nobudget)
+            val p = SessionWallet.policy(ctx) ?: return@working ctx.getString(R.string.trader_stop_nobudget)
+            val ceiling = minOf(p.perTxLamports, p.askAboveLamports.takeIf { it > 0 } ?: p.perTxLamports)
+            val slice = (ceiling * cfg.slicePercent / 100).coerceAtLeast(0L)
+            if (slice <= FEE * 4) return@working ctx.getString(R.string.trader_stop_toosmall)
+            val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.candidateOf(mint) }.getOrNull() }
+                ?: return@working ctx.getString(R.string.trader_net_down)
+            AgentTrace.say(ctx.getString(R.string.trace_more, t.symbol), AgentTrace.Kind.FOUND)
+            val quote = withContext(Dispatchers.IO) { runCatching { Jupiter.quote(Jupiter.SOL_MINT, t.mint, slice, feeBps = 0) }.getOrNull() }
+                ?: return@working ctx.getString(R.string.trader_no_route)
+            val tx = withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull() }
+                ?: return@working ctx.getString(R.string.trader_no_route)
+            val reason = ctx.getString(R.string.trader_why_more, t.symbol)
+            val intent = JSONObject().put("action", "swap").put("outMint", "SOL").put("outAmount", slice / 1e9)
+                .put("inMint", t.symbol).put("inAmount", quote.outAmount / Math.pow(10.0, t.decimals.toDouble()))
+                .put("expectMint", t.mint)
+                .put("agent", AGENT).put("reason", reason)
+            when (val v = handle(ctx, tx, intent, AgentBroker.Job.Source.IN_APP)) {
+                is AgentBroker.Verdict.SignedSilently, is AgentBroker.Verdict.Confirmed -> {
+                    val m = ctx.getString(R.string.trader_bought, t.symbol, fmtSol(slice, 4))
+                    AgentTrace.say(m, AgentTrace.Kind.ACTED)
+                    armOnChainExit(ctx, s.pubkey, t.mint)
+                    note(ctx, m)
+                    m
+                }
+                is AgentBroker.Verdict.Timeout -> ctx.getString(R.string.trader_needed_you)
+                else -> v.reason ?: ctx.getString(R.string.trader_net_down)
+            }
+        }
+    }
 
     private suspend fun tickInner(ctx: Context, mayHunt: Boolean): Tick {
         val cfg = config(ctx)
@@ -751,12 +795,12 @@ object TraderLoop {
      * posts no notification when the collar wants a person, so a background
      * move would wait ninety seconds against a screen that never appeared.
      */
-    private suspend fun handle(ctx: Context, tx: ByteArray, intent: JSONObject): AgentBroker.Verdict =
+    private suspend fun handle(ctx: Context, tx: ByteArray, intent: JSONObject, source: AgentBroker.Job.Source = AgentBroker.Job.Source.LINK): AgentBroker.Verdict =
         AgentBroker.handle(
             ctx,
             AgentBroker.Job(
                 id = LedgerRecorder.newId(), tx = tx, intentJson = intent.toString(),
-                cluster = null, agent = AGENT, source = AgentBroker.Job.Source.LINK,
+                cluster = null, agent = AGENT, source = source,
             ),
         )
 }

@@ -317,9 +317,13 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                 if (!ok) status = ctx.getString(R.string.lock_failed)
                             }
                         }
-                        // The print asks itself, the moment the door appears. The
-                        // button underneath is only there for after you dismiss it.
-                        LaunchedEffect(saved) { if (saved != null) ask() }
+                        // The print does NOT ask itself any more. It used to, the
+                        // moment the door appeared, and on a phone whose sensor is
+                        // the power button a finger resting there answers the
+                        // prompt before the person has decided anything: the app
+                        // opened "by itself" on any launch, from a widget tap, a
+                        // notification, or a cable. A wallet's door opens when you
+                        // press the button, and the button is one tap away.
                         ConnectDoor(busy, status, returning = saved != null) {
                             if (saved == null) connect() else ask()
                         }

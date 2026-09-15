@@ -1419,6 +1419,12 @@
     <string name="market_bridged_note">Official bridged versions, verified by Jupiter with real liquidity: the same asset, held by the bridge or by Coinbase. Everything else with that name in the search is a copy.</string>
     <string name="whatif_row_open">at %1$s\'s market cap (%2$s)</string>
     <string name="whatif_open_sub">from %1$s today, %2$s</string>
+    <string name="market_confirm_unfollow">Stop following %1$s?</string>
+    <string name="market_confirm_unfollow_body">The amount you typed for it goes too.</string>
+    <string name="market_unfollow">Stop following</string>
+    <string name="market_total_followed">Followed coins</string>
+    <string name="market_total_wallet">In the wallet</string>
+    <string name="market_total_all">Total</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

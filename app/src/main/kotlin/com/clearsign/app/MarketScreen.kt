@@ -74,7 +74,16 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     var followed by remember { mutableStateOf<List<Market.Coin>>(emptyList()) }
     var editing by remember { mutableStateOf<Market.Coin?>(null) }
 
-    val keys = remember(refresh) { Watchlist.all(ctx) }
+    val keys = remember(refresh) { Watchlist.reconcile(ctx); Watchlist.all(ctx) }
+    var unfollow by remember { mutableStateOf<Market.Coin?>(null) }
+    val currency by Settings.currency
+    // USD to the person's currency, for one total across favourites and wallet.
+    var rate by remember { mutableStateOf<Double?>(null) }
+    LaunchedEffect(currency) {
+        rate = if (currency == "USD") 1.0 else withContext(Dispatchers.IO) {
+            runCatching { FiatRates.spot(listOf("USD", currency)) }.getOrNull()?.let { m -> m[currency]?.div(m["USD"] ?: return@let null) }
+        }
+    }
 
     LaunchedEffect(refresh) {
         ranked = withContext(Dispatchers.IO) { runCatching { Market.top() }.getOrDefault(emptyList()) }
@@ -88,9 +97,19 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         val byId = if (ids.isEmpty()) emptyMap() else withContext(Dispatchers.IO) {
             runCatching { Market.pricesFor(ids) }.getOrDefault(emptyMap())
         }
-        followed = keys.mapNotNull { key ->
-            if (key.startsWith("cg:")) byId[key.removePrefix("cg:")] ?: ranked.firstOrNull { it.key == key }
-            else ranked.firstOrNull { it.mint == key } ?: solanaCoin(key)
+        // A followed coin never disappears from its own list. When nobody can
+        // price it right now it is shown thin, with its name, and priced later.
+        val mintsToAsk = keys.filter { !it.startsWith("cg:") && ranked.none { r -> r.mint == it } && JupiterTokens.cached(it) == null }
+        if (mintsToAsk.isNotEmpty()) withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(mintsToAsk) } }
+        followed = keys.map { key ->
+            if (key.startsWith("cg:")) {
+                val id = key.removePrefix("cg:")
+                byId[id] ?: ranked.firstOrNull { it.key == key }
+                    ?: Market.Coin(id = id, symbol = id.uppercase().take(10), name = id.replaceFirstChar { it.uppercase() }, image = null, priceUsd = null, marketCap = null, rank = null, change24h = null)
+            } else {
+                ranked.firstOrNull { it.mint == key } ?: solanaCoin(key)
+                    ?: Market.Coin(id = key, symbol = shorten(key, 4), name = shorten(key, 4), image = null, priceUsd = null, marketCap = null, rank = null, change24h = null, mint = key)
+            }
         }
     }
 
@@ -139,17 +158,28 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         if (followed.isNotEmpty()) {
             item { SectionLabel(stringResource(R.string.market_watching)) }
             items(followed, key = { "w-" + it.key }) { c ->
-                CoinRow(c, followed = true, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) {
-                    Watchlist.remove(ctx, c.key); refresh++
-                }
+                // Following is one tap; unfollowing asks, because it takes the amount with it.
+                CoinRow(c, followed = true, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) { unfollow = c }
             }
             item {
-                val total = followed.sumOf { c -> Watchlist.amount(ctx, c.key) * (c.priceUsd ?: 0.0) }
-                if (total > 0) {
-                    Text(
-                        stringResource(R.string.market_your_total, fmtFiat(total, "USD")),
-                        style = HaloType.small, color = Halo.mint, modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
-                    )
+                // What the favourites are worth, what the wallet is worth, and the two together.
+                val favUsd = followed.sumOf { c -> Watchlist.amount(ctx, c.key) * (c.priceUsd ?: 0.0) }
+                val wallet = remember(refresh, currency) { Portfolio.cached(owner, currency)?.total }
+                if (favUsd > 0 || (wallet ?: 0.0) > 0) {
+                    GlassCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row { Text(stringResource(R.string.market_total_followed), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fmtFiat(favUsd, "USD"), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) }
+                            wallet?.let { w -> Row { Text(stringResource(R.string.market_total_wallet), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fmtFiat(w, currency), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) } }
+                            val r = rate
+                            if (r != null) {
+                                val all = favUsd * r + (wallet ?: 0.0)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(stringResource(R.string.market_total_all), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, modifier = Modifier.weight(1f))
+                                    Text(fmtFiat(all, currency), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Halo.mint)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -190,6 +220,17 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             item { Text(stringResource(R.string.tok_none), style = HaloType.small, color = Halo.muted, modifier = Modifier.padding(vertical = 10.dp)) }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+
+    unfollow?.let { c ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { unfollow = null },
+            containerColor = Halo.ground2, titleContentColor = Halo.ink, textContentColor = Halo.muted,
+            title = { Text(stringResource(R.string.market_confirm_unfollow, c.name), style = HaloType.title, color = Halo.ink) },
+            text = { Text(stringResource(R.string.market_confirm_unfollow_body), style = HaloType.small, color = Halo.muted) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { Watchlist.remove(ctx, c.key); unfollow = null; refresh++ }) { Text(stringResource(R.string.market_unfollow), color = Halo.red) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { unfollow = null }) { Text(stringResource(R.string.cancel), color = Halo.muted) } },
+        )
     }
 
     editing?.let { coin ->

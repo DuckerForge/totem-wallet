@@ -39,6 +39,23 @@ object Watchlist {
         val p = prefs(ctx).edit()
         if (qty > 0) p.putString("qty_" + key, qty.toString()) else p.remove("qty_" + key)
         p.apply()
+        // An amount is a coin you hold: it belongs in the list, whatever the star says.
+        if (qty > 0 && !has(ctx, key)) add(ctx, key)
+    }
+
+    /**
+     * Amounts that lost their coin. It happened: a quantity typed and saved,
+     * the coin gone from the list, the total short of it and nobody knowing
+     * why. Every amount above zero brings its coin back into the list.
+     */
+    fun reconcile(ctx: Context) {
+        val all = prefs(ctx).all
+        val listed = all(ctx)
+        all.keys.filter { it.startsWith("qty_") }.forEach { k ->
+            val key = k.removePrefix("qty_")
+            val qty = (all[k] as? String)?.toDoubleOrNull() ?: 0.0
+            if (qty > 0 && key !in listed) add(ctx, key)
+        }
     }
 
     fun all(ctx: Context): List<String> = runCatching {
@@ -53,7 +70,11 @@ object Watchlist {
         save(ctx, (listOf(mint) + all(ctx).filter { it != mint }).take(MAX))
     }
 
-    fun remove(ctx: Context, mint: String) = save(ctx, all(ctx).filter { it != mint })
+    fun remove(ctx: Context, mint: String) {
+        save(ctx, all(ctx).filter { it != mint })
+        // Unfollowed on purpose: the amount goes with it, or it would come straight back.
+        prefs(ctx).edit().remove("qty_" + mint).apply()
+    }
 
     /** Returns whether it is followed now. */
     fun toggle(ctx: Context, mint: String): Boolean {

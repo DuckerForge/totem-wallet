@@ -1419,6 +1419,12 @@
     <string name="market_bridged_note">Versioni ufficiali via ponte, verificate da Jupiter e con liquidità vera: lo stesso asset, custodito dal ponte o da Coinbase. Tutto il resto con quel nome nella ricerca è una copia.</string>
     <string name="whatif_row_open">con la capitalizzazione di %1$s (%2$s)</string>
     <string name="whatif_open_sub">da %1$s di oggi, %2$s</string>
+    <string name="market_confirm_unfollow">Togliere %1$s dalle seguite?</string>
+    <string name="market_confirm_unfollow_body">Se ne va anche la quantità che hai scritto.</string>
+    <string name="market_unfollow">Togli</string>
+    <string name="market_total_followed">Le seguite</string>
+    <string name="market_total_wallet">Nel portafoglio</string>
+    <string name="market_total_all">Totale</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

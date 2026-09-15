@@ -59,6 +59,8 @@ object Prices {
     /** How many units of [currency] one USD buys (1.0 for USD); null when no source answers. */
     fun usdTo(currency: String): Double? {
         if (currency == "USD") return 1.0
+        // Counting in SOL: one dollar is 1/price SOL. No FX service knows that; the price feed does.
+        if (currency == "SOL") return usd(listOf(com.clearsign.core.NATIVE_SOL_MINT))[com.clearsign.core.NATIVE_SOL_MINT]?.takeIf { it > 0 }?.let { 1.0 / it }
         fxCache?.let { (c, v, at) -> if (c == currency && System.currentTimeMillis() - at < FX_TTL_MS) return v }
         val v = frankfurter(currency) ?: viaCoinGecko(currency) ?: return null
         fxCache = Triple(currency, v, System.currentTimeMillis())

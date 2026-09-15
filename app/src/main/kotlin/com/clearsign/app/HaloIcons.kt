@@ -39,6 +39,8 @@ enum class HIcon {
     SWAP,
     /** Following a coin. Outline while you are not, filled once you are. */
     STAR, STAR_FILLED,
+    /** The market: a line that has been going up. */
+    CHART,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
 }
@@ -254,6 +256,10 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             // Drawn rather than borrowed: the whole icon set is one hand.
             HIcon.STAR -> poly(12.0f, 2.8f, 14.3f, 8.8f, 20.7f, 9.2f, 15.7f, 13.2f, 17.4f, 19.4f, 12.0f, 15.9f, 6.6f, 19.4f, 8.3f, 13.2f, 3.3f, 9.2f, 9.7f, 8.8f, close = true)
             HIcon.STAR_FILLED -> poly(12.0f, 2.8f, 14.3f, 8.8f, 20.7f, 9.2f, 15.7f, 13.2f, 17.4f, 19.4f, 12.0f, 15.9f, 6.6f, 19.4f, 8.3f, 13.2f, 3.3f, 9.2f, 9.7f, 8.8f, close = true, fill = true)
+            HIcon.CHART -> {
+                path { moveTo(3f, 18f); lineTo(8.5f, 11.5f); lineTo(12.5f, 15f); lineTo(21f, 6f) }
+                path { moveTo(16f, 6f); lineTo(21f, 6f); lineTo(21f, 11f) }
+            }
             HIcon.GEM -> {
                 path(fill = true) { moveTo(12f, 2.5f); lineTo(21.5f, 12f); lineTo(12f, 21.5f); lineTo(2.5f, 12f); close() }
                 s.drawLine(Halo.ground.copy(alpha = 0.55f), p(12f, 2.5f), p(12f, 21.5f), 0.9f * u)

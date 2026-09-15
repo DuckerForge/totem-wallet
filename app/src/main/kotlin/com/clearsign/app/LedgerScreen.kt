@@ -240,7 +240,9 @@ internal fun monthLabel(ym: String): String = runCatching {
 private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(at))
 
 internal fun fmtUi(v: Double): String = String.format(Locale.ROOT, "%,.6f", v).replace(',', ' ').trimEnd('0').trimEnd('.')
-internal fun fmtFiat(v: Double, cur: String): String = String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
+internal fun fmtFiat(v: Double, cur: String): String =
+    if (cur == "SOL") String.format(Locale.getDefault(), if (kotlin.math.abs(v) < 1) "%,.4f" else "%,.3f", v) + " SOL"
+    else String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
 
 /**
  * The price of one coin, which is not the same kind of number as a total.

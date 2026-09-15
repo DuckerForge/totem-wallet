@@ -179,8 +179,11 @@ async function sweep(env) {
   }
   cursor = (cursor + DOLPHIN_CHUNKS_PER_RUN) % Math.max(rw.nd, 1);
 
-  // I saldi: un array di numeri, letto come buffer. Niente da parsare.
-  const buf = await env.SEEKER.get("bal", "arrayBuffer");
+  // I saldi: un array di numeri, dentro lo stato come base64. Prima stavano in
+  // una chiave a parte, letta e scritta a ogni giro: due scritture per giro,
+  // 288 giri al giorno, e il piano gratuito (mille scritture) era a metà alle
+  // dieci di sera. Una chiave sola, una scrittura sola.
+  let buf = state.bal ? b64ToBuf(state.bal) : await env.SEEKER.get("bal", "arrayBuffer");
   const bal = buf && buf.byteLength === rw.n * 8 ? new Float64Array(buf) : new Float64Array(rw.n);
 
   // Una sola riserva, spesa da tutti. Quando finisce si smette e si salva quello
@@ -240,14 +243,30 @@ async function sweep(env) {
   const out = JSON.stringify(rank(buys, now, rw.n));
   const fp = fingerprint(out);
 
-  // I saldi sempre, lo stato sempre, il pubblicato solo se è cambiato: le
+  // Lo stato (con i saldi dentro) sempre, il pubblicato solo se è cambiato: le
   // scritture del piano gratuito sono mille al giorno e questo le tiene sotto.
-  await env.SEEKER.put("bal", bal.buffer);
   if (fp !== state.crowd) await env.SEEKER.put("crowd", out);
   await env.SEEKER.put(
     "state2",
-    JSON.stringify({ buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length, crowd: fp, at: now }),
+    JSON.stringify({
+      buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length, crowd: fp, at: now,
+      bal: bufToB64(bal.buffer),
+    }),
   );
+}
+
+function bufToB64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return btoa(bin);
+}
+
+function b64ToBuf(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
 }
 
 export default {

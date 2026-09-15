@@ -429,7 +429,7 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
         if (!SeekerFeed.available) return@LaunchedEffect
         while (true) {
             withContext(Dispatchers.IO) { SeekerFeed.refresh(ctx) }?.let { feed = it }
-            kotlinx.coroutines.delay(60_000)
+            kotlinx.coroutines.delay(150_000)
         }
     }
     Column(

@@ -294,33 +294,59 @@ private fun WhatIf(coin: Market.Coin, amount: Double) {
         }
     }
 
+    // The row you touch opens and says the price big: that is the number the
+    // whole comparison exists for.
+    var openId by remember(coin.id) { mutableStateOf<String?>(null) }
+
     @Composable
     fun row(t: Market.Coin, label: String?, removable: Boolean) {
         val cap = t.marketCap ?: return
         val mult = cap / mine
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        val open = openId == t.id
+        val multText = "×" + (if (mult >= 100) mult.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", mult))
+        Column(
+            Modifier.fillMaxWidth().clip(rs(12)).background(if (open) Halo.cardSoft else androidx.compose.ui.graphics.Color.Transparent)
+                .clickable { openId = if (open) null else t.id }.padding(horizontal = if (open) 10.dp else 0.dp, vertical = 6.dp),
+        ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TokenLogo(t.mint ?: t.id, t.symbol, t.image, 22.dp)
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 label?.let { Text(it, fontFamily = Mono, fontSize = 10.sp, color = Halo.cyan) }
                 Text(
-                    stringResource(R.string.whatif_row_mc, t.symbol, fmtCap(cap), fmtPrice(price * mult, "USD")),
+                    if (open) stringResource(R.string.whatif_row_open, t.symbol, fmtCap(cap))
+                    else stringResource(R.string.whatif_row_mc, t.symbol, fmtCap(cap), fmtPrice(price * mult, "USD")),
                     fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, maxLines = 2,
                 )
-                if (amount > 0) {
+                if (amount > 0 && !open) {
                     Text(stringResource(R.string.whatif_yours, fmtFiat(amount * price * mult, "USD")), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint)
                 }
             }
-            Text(
-                "×" + (if (mult >= 100) mult.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", mult)),
-                fontFamily = Mono, fontSize = 13.sp, color = if (mult >= 1) Halo.cyan else Halo.red,
-            )
+            Text(multText, fontFamily = Mono, fontSize = 13.sp, color = if (mult >= 1) Halo.cyan else Halo.red)
             if (removable) {
                 Spacer(Modifier.width(6.dp))
                 Box(Modifier.size(26.dp).clip(rs(999)).clickable { picked = picked.filter { it.id != t.id } }, contentAlignment = Alignment.Center) {
                     HaloIcon(HIcon.CLOSE, Halo.muted, 13.dp)
                 }
             }
+        }
+        if (open) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                fmtPrice(price * mult, "USD"),
+                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 30.sp, color = Halo.ink,
+            )
+            Text(
+                stringResource(R.string.whatif_open_sub, fmtPrice(price, "USD"), multText),
+                fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted,
+            )
+            if (amount > 0) {
+                Text(
+                    stringResource(R.string.whatif_yours, fmtFiat(amount * price * mult, "USD")),
+                    fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Halo.mint,
+                )
+            }
+        }
         }
     }
 

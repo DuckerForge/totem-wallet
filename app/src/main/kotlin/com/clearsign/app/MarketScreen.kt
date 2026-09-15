@@ -99,16 +99,21 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         }
         // A followed coin never disappears from its own list. When nobody can
         // price it right now it is shown thin, with its name, and priced later.
-        val mintsToAsk = keys.filter { !it.startsWith("cg:") && ranked.none { r -> r.mint == it } && JupiterTokens.cached(it) == null }
-        if (mintsToAsk.isNotEmpty()) withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(mintsToAsk) } }
+        val mintsToAsk = keys.filter { !it.startsWith("cg:") && ranked.none { r -> r.mint == it } }
+        val jup = if (mintsToAsk.isEmpty()) emptyMap() else withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(mintsToAsk) }.getOrDefault(emptyMap()) }
         followed = keys.map { key ->
-            if (key.startsWith("cg:")) {
-                val id = key.removePrefix("cg:")
-                byId[id] ?: ranked.firstOrNull { it.key == key }
-                    ?: Market.Coin(id = id, symbol = id.uppercase().take(10), name = id.replaceFirstChar { it.uppercase() }, image = null, priceUsd = null, marketCap = null, rank = null, change24h = null)
+            val fresh: Market.Coin? = if (key.startsWith("cg:")) {
+                byId[key.removePrefix("cg:")] ?: ranked.firstOrNull { it.key == key }
             } else {
-                ranked.firstOrNull { it.mint == key } ?: solanaCoin(key)
-                    ?: Market.Coin(id = key, symbol = shorten(key, 4), name = shorten(key, 4), image = null, priceUsd = null, marketCap = null, rank = null, change24h = null, mint = key)
+                ranked.firstOrNull { it.mint == key } ?: jup[key]?.let { t ->
+                    Market.Coin(id = key, symbol = t.symbol, name = t.name, image = t.icon, priceUsd = t.usd, marketCap = null, rank = null, change24h = t.change24h, mint = key)
+                } ?: solanaCoin(key)
+            }
+            // Priced now: remember it. Not priced now: show it as it was last time.
+            if (fresh?.priceUsd != null) Watchlist.rememberCoin(ctx, key, Market.toJson(fresh))
+            fresh ?: Watchlist.recallCoin(ctx, key)?.let { Market.fromJson(it) } ?: run {
+                val id = key.removePrefix("cg:")
+                Market.Coin(id = id, symbol = if (key.startsWith("cg:")) id.uppercase().take(10) else shorten(key, 4), name = id.replaceFirstChar { it.uppercase() }, image = null, priceUsd = null, marketCap = null, rank = null, change24h = null, mint = key.takeIf { !it.startsWith("cg:") })
             }
         }
     }
@@ -212,8 +217,10 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             )
         }
         items(shown, key = { "r-" + it.id }) { c ->
-            CoinRow(c, followed = false, amount = 0.0, onOpen = { editing = c }) {
-                Watchlist.add(ctx, c.key); refresh++
+            // The star says the truth here too: lit when the coin is already followed.
+            val isFollowed = c.key in keys
+            CoinRow(c, followed = isFollowed, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) {
+                if (isFollowed) unfollow = c else { Watchlist.add(ctx, c.key); Haptics.tick(ctx); refresh++ }
             }
         }
         if (shown.isEmpty() && q.length >= 2 && !searching) {
@@ -529,6 +536,24 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 Watchlist.add(ctx, coin.key)
                 Watchlist.setAmount(ctx, coin.key, qty.toDoubleOrNull() ?: 0.0)
                 onSaved(); onDismiss()
+            }
+
+            // The bell: a notification when it moves five percent, either way,
+            // measured from the last time it rang. Like CoinGecko's, without the account.
+            var moves by remember(coin.key) { mutableStateOf(Watchlist.moves(ctx, coin.key)) }
+            Row(
+                Modifier.fillMaxWidth().clip(rs(12)).clickable {
+                    moves = !moves; Watchlist.setMoves(ctx, coin.key, moves); OrdersKeeper.sync(ctx); Haptics.tick(ctx); onSaved()
+                }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HaloIcon(HIcon.WARNING, if (moves) Halo.amber else Halo.muted, 16.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.market_moves_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                    Text(stringResource(if (moves) R.string.market_moves_on else R.string.market_moves_off), style = HaloType.small, color = Halo.muted)
+                }
+                androidx.compose.material3.Switch(checked = moves, onCheckedChange = { on -> moves = on; Watchlist.setMoves(ctx, coin.key, on); OrdersKeeper.sync(ctx); onSaved() })
             }
 
             // The shape of the price, when the coin lives on Solana.

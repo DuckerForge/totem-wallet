@@ -1432,6 +1432,11 @@
     <string name="hero_stake_activating">activating</string>
     <string name="hero_stake_deactivating">unstaking</string>
     <string name="hero_stake_inactive">not staked</string>
+    <string name="market_moves_title">Tell me when it moves</string>
+    <string name="market_moves_on">On: a notification at every 5% move, up or down, checked every 15 minutes.</string>
+    <string name="market_moves_off">Off. Turn on for a notification at every 5% move.</string>
+    <string name="move_title">%1$s %2$s</string>
+    <string name="move_body">From %1$s to %2$s since the last notice.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

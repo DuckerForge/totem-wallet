@@ -58,6 +58,27 @@ object Watchlist {
         }
     }
 
+    // ---- "tell me when it moves", per coin, like CoinGecko's bell -------------
+
+    fun moves(ctx: Context, key: String): Boolean = prefs(ctx).getBoolean("mv_" + key, false)
+
+    fun setMoves(ctx: Context, key: String, on: Boolean) {
+        prefs(ctx).edit().putBoolean("mv_" + key, on).remove("mvp_" + key).apply()
+        if (on && !has(ctx, key)) add(ctx, key)
+    }
+
+    fun movesKeys(ctx: Context): List<String> =
+        prefs(ctx).all.keys.filter { it.startsWith("mv_") && prefs(ctx).getBoolean(it, false) }.map { it.removePrefix("mv_") }
+
+    /** The price the last notification was measured from; null until the first look. */
+    fun moveBase(ctx: Context, key: String): Double? = prefs(ctx).getString("mvp_" + key, null)?.toDoubleOrNull()
+    fun setMoveBase(ctx: Context, key: String, price: Double) = prefs(ctx).edit().putString("mvp_" + key, price.toString()).apply()
+
+    // ---- what a followed coin looked like the last time anybody priced it ------
+
+    fun rememberCoin(ctx: Context, key: String, json: String) = prefs(ctx).edit().putString("seen_" + key, json).apply()
+    fun recallCoin(ctx: Context, key: String): String? = prefs(ctx).getString("seen_" + key, null)
+
     fun all(ctx: Context): List<String> = runCatching {
         val a = JSONArray(prefs(ctx).getString(KEY, "[]") ?: "[]")
         (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotEmpty() } }

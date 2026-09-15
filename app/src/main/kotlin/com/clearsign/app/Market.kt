@@ -67,6 +67,18 @@ object Market {
         return top
     }
 
+    fun toJson(c: Coin): String = org.json.JSONObject().put("id", c.id).put("symbol", c.symbol).put("name", c.name).put("image", c.image)
+        .put("price", c.priceUsd).put("mcap", c.marketCap).put("rank", c.rank).put("ch", c.change24h).put("mint", c.mint).toString()
+
+    fun fromJson(s: String): Coin? = runCatching {
+        val o = org.json.JSONObject(s)
+        Coin(
+            o.getString("id"), o.getString("symbol"), o.getString("name"), o.optString("image").takeIf { it.isNotEmpty() },
+            o.optDouble("price").takeIf { !it.isNaN() }, o.optDouble("mcap").takeIf { !it.isNaN() },
+            o.optInt("rank").takeIf { it > 0 }, o.optDouble("ch").takeIf { !it.isNaN() }, o.optString("mint").takeIf { it.isNotEmpty() },
+        )
+    }.getOrNull()
+
     /** One coin with its price and market cap, whether or not the ranked page carries it. */
     fun byId(id: String): Coin? {
         top.firstOrNull { it.id == id && it.marketCap != null }?.let { return it }

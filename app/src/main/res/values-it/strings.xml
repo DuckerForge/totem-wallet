@@ -1408,6 +1408,7 @@
     <string name="env_review_hint">Questo è quello che firmerai: il tuo wallet manda la paghetta alla chiave dell\'agente. Tieni premuto il bottone qui sotto, poi l\'impronta.</string>
     <string name="size_each">Ogni acquisto</string>
     <string name="env_duration_note">Dopo smette di comprare e restituisce i soldi.</string>
+    <string name="env_pay_title">Paga %1$s SOL</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

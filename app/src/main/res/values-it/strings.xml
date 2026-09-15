@@ -1417,6 +1417,8 @@
     <string name="whatif_yours_pick">scelta tua</string>
     <string name="market_bridged_title">Su Solana, %1$s esiste come</string>
     <string name="market_bridged_note">Versioni ufficiali via ponte, verificate da Jupiter e con liquidità vera: lo stesso asset, custodito dal ponte o da Coinbase. Tutto il resto con quel nome nella ricerca è una copia.</string>
+    <string name="whatif_row_open">con la capitalizzazione di %1$s (%2$s)</string>
+    <string name="whatif_open_sub">da %1$s di oggi, %2$s</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

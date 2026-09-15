@@ -1439,6 +1439,16 @@
     <string name="move_body">From %1$s to %2$s since the last notice.</string>
     <string name="swap_ultra">Jupiter Ultra: MEV protection, slippage %1$s, Jupiter lands it.</string>
     <string name="swap_gasless">Gasless: no network fee for you.</string>
+    <string name="shield_title">What Jupiter says about %1$s</string>
+    <string name="shield_note">Jupiter\'s own warnings, on top of ours. They do not block: they inform.</string>
+    <string name="trace_shield_stop">Jupiter\'s shield stops %1$s: %2$s</string>
+    <string name="trace_shield_warn">Jupiter warns about %1$s: %2$s</string>
+    <string name="send_poison_title">This address looks like %1$s, and is not</string>
+    <string name="send_poison_body">Same first and last four characters, a different middle. This is how address poisoning works: dust from a lookalike, so the next copy from your history is theirs. Check the middle before going on.</string>
+    <string name="send_poison_known">Known:</string>
+    <string name="send_poison_this">This one:</string>
+    <string name="send_poison_ack">I checked, it is a different address</string>
+    <string name="send_poison_acked">Noted. You can go on.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

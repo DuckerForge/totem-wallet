@@ -600,6 +600,13 @@ object TraderLoop {
                 )
                 RugCheck.Verdict.Unknown -> AgentTrace.say(ctx.getString(R.string.trace_rug_unknown, t.symbol))
             }
+            // Jupiter's own shield: critical stops, a warning is said, info is nothing.
+            val shield = withContext(Dispatchers.IO) { runCatching { TokenShield.warnings(t.mint) }.getOrNull() }
+            shield?.firstOrNull { it.critical }?.let { w ->
+                AgentTrace.say(ctx.getString(R.string.trace_shield_stop, t.symbol, w.message), AgentTrace.Kind.REFUSED)
+                continue
+            }
+            shield?.firstOrNull { it.warning }?.let { w -> AgentTrace.say(ctx.getString(R.string.trace_shield_warn, t.symbol, w.message)) }
 
             val s = SessionWallet.current(ctx) ?: return Tick("no budget", acted = false)
             val built = SessionActions.buildSwap(Jupiter.SOL_MINT, t.mint, slice, s.pubkey) ?: continue

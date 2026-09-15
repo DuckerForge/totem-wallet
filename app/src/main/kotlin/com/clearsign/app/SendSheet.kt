@@ -175,6 +175,18 @@ internal fun SendSheet(
         }
     }
     val destValid = Base58.decodePubkey(to.trim()) != null
+    // Address poisoning: the same ends as somebody you know, a different middle.
+    // Known is what this wallet has a reason to trust: contacts, its own
+    // accounts, the budget, and everyone it has already paid.
+    val known = remember(contacts) {
+        buildSet {
+            addAll(contacts.keys); add(owner)
+            SessionWallet.current(ctx)?.pubkey?.let { add(it) }
+            runCatching { Ledger.all(ctx) }.getOrDefault(emptyList()).filter { it.sent }.mapNotNull { it.primaryRecipient }.forEach { add(it) }
+        }
+    }
+    val lookalike = remember(to, known) { com.clearsign.core.AddressPoison.lookalike(to, known) }
+    var poisonAck by remember(to) { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.94f).imePadding()) {
@@ -198,6 +210,23 @@ internal fun SendSheet(
                             colors = fieldColors(if (to.isBlank()) Halo.stroke else if (destValid) Halo.mint else Halo.red),
                             shape = rs(14),
                         )
+                        lookalike?.let { l ->
+                            Column(
+                                Modifier.fillMaxWidth().clip(rs(14)).background(Halo.red.copy(alpha = 0.10f)).border(1.dp, Halo.red.copy(alpha = 0.45f), rs(14)).padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    HaloIcon(HIcon.WARNING, Halo.red, 18.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.send_poison_title, contacts[l.of] ?: shorten(l.of)), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = Halo.red)
+                                }
+                                Text(stringResource(R.string.send_poison_body), style = HaloType.small, color = Halo.ink, lineHeight = 16.sp)
+                                Text(stringResource(R.string.send_poison_known) + " " + l.of, fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint)
+                                Text(stringResource(R.string.send_poison_this) + " " + l.candidate, fontFamily = Mono, fontSize = 10.5.sp, color = Halo.red)
+                                if (!poisonAck) GhostButton(stringResource(R.string.send_poison_ack), Modifier.fillMaxWidth(), HIcon.CHECK, tint = Halo.muted) { poisonAck = true }
+                                else Text(stringResource(R.string.send_poison_acked), style = HaloType.small, color = Halo.amber)
+                            }
+                        }
                         // Four ways to fill the address in, all the same size, all one tap.
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SmallChip(stringResource(R.string.send_paste), HIcon.PASTE) { to = clipboardText(ctx)?.trim().orEmpty() }
@@ -305,7 +334,7 @@ internal fun SendSheet(
             // ---- fixed action bar --------------------------------------------
             Column(Modifier.fillMaxWidth().background(Halo.ground2).padding(horizontal = 20.dp, vertical = 12.dp).navigationBarsPadding()) {
                 when (val s = state) {
-                    SendState.Form -> PrimaryButton(stringResource(R.string.send_continue), danger = false, enabled = destValid && amount.isNotBlank() && asset != null) {
+                    SendState.Form -> PrimaryButton(stringResource(R.string.send_continue), danger = false, enabled = destValid && amount.isNotBlank() && asset != null && (lookalike == null || poisonAck)) {
                         val a = asset ?: return@PrimaryButton
                         val raw = parseAmount(amount, a.decimals)
                         val dest = to.trim()

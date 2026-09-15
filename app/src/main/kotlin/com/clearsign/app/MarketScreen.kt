@@ -557,7 +557,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
             }
 
             // The shape of the price, when the coin lives on Solana.
-            mint?.let { PriceChart(it, coin.symbol) }
+            mint?.let { PriceChart(it, coin.symbol); ShieldCard(it, coin.symbol) }
 
             // What if it were as big as something else. Arithmetic, not a forecast.
             WhatIf(coin, qty.toDoubleOrNull() ?: 0.0)

@@ -1439,6 +1439,16 @@
     <string name="move_body">Da %1$s a %2$s dall\'ultimo avviso.</string>
     <string name="swap_ultra">Jupiter Ultra: protezione MEV, slippage %1$s, la fa atterrare Jupiter.</string>
     <string name="swap_gasless">Gasless: nessuna commissione di rete per te.</string>
+    <string name="shield_title">Cosa dice Jupiter di %1$s</string>
+    <string name="shield_note">Gli avvisi di Jupiter, sopra i nostri. Non bloccano: informano.</string>
+    <string name="trace_shield_stop">Lo scudo di Jupiter ferma %1$s: %2$s</string>
+    <string name="trace_shield_warn">Jupiter avvisa su %1$s: %2$s</string>
+    <string name="send_poison_title">Questo indirizzo somiglia a %1$s, e non è lui</string>
+    <string name="send_poison_body">Stessi primi e ultimi quattro caratteri, il mezzo diverso. È l\'address poisoning: polvere da un sosia, così la prossima copia dalla cronologia è la sua. Controlla il mezzo prima di andare avanti.</string>
+    <string name="send_poison_known">Conosciuto:</string>
+    <string name="send_poison_this">Questo:</string>
+    <string name="send_poison_ack">Ho controllato, è un altro indirizzo</string>
+    <string name="send_poison_acked">Preso nota. Puoi andare avanti.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

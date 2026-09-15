@@ -1356,6 +1356,16 @@
     <string name="agent_copy_how">Quando un portafoglio che segui compra, o due balene comprano la stessa moneta nell\'ora, quella moneta va in cima alla lista. Passa gli stessi controlli delle altre.</string>
     <string name="agent_copy_last">ha comprato %1$s %2$d min fa</string>
     <string name="agent_copy_quiet">nessun acquisto nelle ultime ore</string>
+    <string name="eyes_open">Guardalo lavorare</string>
+    <string name="eyes_title">I suoi occhi</string>
+    <string name="eyes_off">Il ciclo è spento. Vedi l\'ultima cosa che ha visto.</string>
+    <string name="eyes_working">Sto lavorando…</string>
+    <string name="eyes_watching">Guardo %1$d monete, ogni 90 secondi</string>
+    <string name="eyes_none">Niente in gioco. Quando compra, il grafico compare qui con le sue tre linee.</string>
+    <string name="eyes_entry">entrata</string>
+    <string name="eyes_since_entry">comprata con %1$s SOL</string>
+    <string name="eyes_thoughts">Cosa sta pensando</string>
+    <string name="eyes_quiet">Silenzio. Il primo giro scrive qui.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

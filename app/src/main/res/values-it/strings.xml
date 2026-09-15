@@ -1340,4 +1340,7 @@
     <string name="alert_hit_body">%1$s è %2$s %3$s</string>
     <string name="order_notif_perm">Senza il permesso alle notifiche l\'avviso non arriva.</string>
     <string name="order_notif_ask">Permetti le notifiche</string>
+    <string name="trader_unwatched_tag">non guardata</string>
+    <string name="trader_unwatched">Il ciclo è spento e %1$d posizione non ha nessuno che la guarda. Lo stop non scatta a ciclo spento, e l\'obiettivo sulla catena non c\'è. Vendi a mano o riaccendi.</string>
+    <string name="trader_no_onchain_small">Troppo piccola per un ordine su Jupiter, che ne vuole almeno 5$. La guarda solo il ciclo, mentre gira.</string>
 </resources>

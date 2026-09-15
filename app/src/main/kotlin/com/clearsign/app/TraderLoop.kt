@@ -592,7 +592,12 @@ object TraderLoop {
         when (val r = runCatching { JupiterTrigger.placeTakeProfit(ctx, envelope, pos) }.getOrNull()) {
             is JupiterTrigger.Placed.Ok -> Positions.setTrigger(ctx, mint, r.order)
             // Under about five dollars Jupiter takes no order at all. Nothing to
-            // fix and nothing to warn about every tick: the loop keeps the target.
+            // fix and nothing to retry, but it is not nothing: it means the only
+            // exit that outlives the app is not there, and the position is watched
+            // by the loop or by nobody. Said on the row rather than swallowed.
+            // Measured on 2026-09-15: a 0.036 SOL position with SOL at 99 dollars
+            // is 3.60 dollars, and its target 4.68, both under the floor.
+            JupiterTrigger.Placed.TooSmall -> Positions.note(ctx, mint, ctx.getString(R.string.trader_no_onchain_small))
             else -> Unit
         }
     }

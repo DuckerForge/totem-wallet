@@ -37,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap
 object AgentBroker {
     private const val TAG = "Apex-Broker"
     private const val CHANNEL = "agent"
+    private const val QUIET = "agent_quiet"
+    private const val PROGRESS_ID = 5100
     private const val ASK_TIMEOUT_MS = 90_000L   // a blockhash lives about that long
 
     /**
@@ -259,6 +261,33 @@ object AgentBroker {
      * stuck agent must be loud exactly once rather than quiet eighty-four times.
      */
     fun warn(ctx: Context, title: String, body: String) = notify(ctx, title, body, null)
+
+    /**
+     * The quiet card: one notification, rewritten in place, that never makes a
+     * sound. It is the loop's pulse for somebody who wants to glance at the
+     * shade, not be interrupted by it.
+     */
+    fun progress(ctx: Context, title: String, body: String) {
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(QUIET) == null) {
+            nm.createNotificationChannel(NotificationChannel(QUIET, ctx.getString(R.string.agent_channel_quiet), NotificationManager.IMPORTANCE_LOW))
+        }
+        val open = PendingIntent.getActivity(
+            ctx, 0, Intent(ctx, MainActivity::class.java).putExtra("open", "agent").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val n = Notification.Builder(ctx, QUIET)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title).setContentText(body)
+            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setContentIntent(open).setOnlyAlertOnce(true).setAutoCancel(false)
+            .build()
+        nm.notify(PROGRESS_ID, n)
+    }
+
+    fun progressClear(ctx: Context) {
+        ctx.getSystemService(NotificationManager::class.java).cancel(PROGRESS_ID)
+    }
 
     fun channel(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)

@@ -1,6 +1,5 @@
 package com.clearsign.app
 
-import android.util.Base64
 import android.util.Log
 import org.json.JSONObject
 import java.io.OutputStreamWriter
@@ -56,7 +55,7 @@ object JupiterUltra {
     fun parse(o: JSONObject): Order? {
         if (o.has("errorMessage") || o.has("error")) { Log.w(TAG, "order: " + (o.optString("errorMessage").ifEmpty { o.optString("error") })); return null }
         val b64 = o.optString("transaction").takeIf { it.isNotEmpty() } ?: return null
-        val tx = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull() ?: return null
+        val tx = runCatching { java.util.Base64.getDecoder().decode(b64) }.getOrNull() ?: return null
         val requestId = o.optString("requestId").takeIf { it.isNotEmpty() } ?: return null
         val labels = o.optJSONArray("routePlan")?.let { rp ->
             (0 until rp.length()).mapNotNull { rp.optJSONObject(it)?.optJSONObject("swapInfo")?.optString("label")?.takeIf { l -> l.isNotEmpty() } }
@@ -80,7 +79,7 @@ object JupiterUltra {
      * chain. "Success" here means confirmed; anything else is not landed.
      */
     fun execute(signedTx: ByteArray, requestId: String): Exec {
-        val body = JSONObject().put("signedTransaction", Base64.encodeToString(signedTx, Base64.NO_WRAP)).put("requestId", requestId)
+        val body = JSONObject().put("signedTransaction", java.util.Base64.getEncoder().encodeToString(signedTx)).put("requestId", requestId)
         val o = HOSTS.firstNotNullOfOrNull { postJson("$it/execute", body) } ?: return Exec(null, "unreachable", "Jupiter non raggiungibile")
         val status = o.optString("status")
         val sig = o.optString("signature").takeIf { it.isNotEmpty() }

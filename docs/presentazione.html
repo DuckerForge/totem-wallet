@@ -95,7 +95,7 @@
     <p class="lede">Ogni firma passa da uno <b>scontrino vero</b>, simulato sulla rete, prima dell'impronta. Sopra questo strato c'è un <b>agente</b> con una paghetta separata, un collare che non può allargare, e una pagina dove lo <b>guardi lavorare</b>.</p>
     <div class="stats">
       <div class="stat"><b>31k</b><span>righe Kotlin</span></div>
-      <div class="stat"><b>247</b><span>test verdi</span></div>
+      <div class="stat"><b>256</b><span>test verdi</span></div>
       <div class="stat"><b>120k</b><span>Seeker censiti</span></div>
       <div class="stat"><b>0</b><span>server nostri con chiavi</span></div>
     </div>
@@ -122,7 +122,7 @@
     <div class="panel good reveal">
       <h3>Con Apex</h3>
       <ul>
-        <li>I byte veri della transazione, <b>simulati dalla rete</b>, diventano uno scontrino in italiano.</li>
+        <li>I byte veri della transazione, <b>simulati dalla rete</b>, diventano uno scontrino nella lingua del telefono: inglese di base, italiano se il telefono è in italiano.</li>
         <li>Ricontrollo un istante prima della firma: se il risultato cambia, rifiuta.</li>
         <li>L'agente ha una chiave sua e una paghetta piccola. La tua seed non la vede mai.</li>
         <li>Tutto quello che decide, lo scrive. Tu lo leggi, o lo ascolti.</li>
@@ -143,8 +143,10 @@
   <p class="sub">Tutto quello che c'è nell'app installata sul Seeker adesso. Le etichette dicono se è provato sul telefono o solo nel codice.</p>
   <div class="grid">
     <div class="card reveal"><h3><span class="dot"></span>Scontrino prima della firma</h3><p>Decodifica, simulazione, flussi per ogni token, etichetta di fiducia sul destinatario, rischi in chiaro. Vale per le dApp via <b>Mobile Wallet Adapter</b> e per le azioni dell'app.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Portafoglio e DeFi</h3><p>Saldo totale che conta e prende luce, tira giù per aggiornare, e la sezione <b>In DeFi</b>: SOL in staking (con il validatore per nome) e depositi su Jupiter Lend, letti dalla catena senza chiave, dentro il totale.</p><span class="tag ok">provato</span></div>
     <div class="card reveal"><h3><span class="dot"></span>Invia · Ricevi · Swap</h3><p>Swap con Jupiter e impatto sul prezzo, invio con contatti fidati e blocco anti prosciugamento, <b>Solana Pay</b> da QR con importo e moneta, <b>tocco NFC</b> fra telefoni.</p><span class="tag ok">provato</span><span class="tag warn">NFC senza secondo telefono</span></div>
     <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Porta biometrica</h3><p>La scena della porta: stelle, il pianeta, il telefono che fa da scudo alle richieste in arrivo. Chiede l'impronta da sola. Solo "Apex Wallet", nessun'altra scritta.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Mercato</h3><p>Classifica per capitalizzazione, ricerca su tutte le monete con prezzo, seguite con la quantità che hai altrove e il <b>totale seguite + portafoglio</b>. "E se fosse grande come…" con la scala ×2 ×10 ×100 e la moneta che scegli tu. BTC ed ETH via ponte ufficiale. <b>Campanella</b>: una notifica a ogni 5% di movimento.</p><span class="tag ok">provato</span></div>
     <div class="card reveal"><h3><span class="dot"></span>Scontrini e fisco</h3><p>Registro di tutto il firmato, prova firmata per ogni voce, <b>CSV per Koinly e CoinTracker</b>, PDF, profitti e perdite realizzati per moneta (FIFO).</p><span class="tag ok">provato</span></div>
     <div class="card reveal" style="--tint:var(--amber)"><h3><span class="dot"></span>Salute del portafoglio</h3><p>Deleghe da revocare, account vuoti con rent da recuperare, spazzatura da bruciare, lista nera. Un <b>widget</b> sulla home e il <b>Watchtower</b> che avvisa in sottofondo.</p><span class="tag ok">provato</span></div>
     <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Ordini e avvisi sul conto principale</h3><p><b>Vendi in guadagno</b>, <b>compra sotto</b>, <b>DCA</b> con Jupiter Trigger e Recurring, senza chiave. <b>Avvisami a</b> con un prezzo. Le linee scendono sul grafico.</p><span class="tag ok">modulo verificato</span><span class="tag warn">firma da provare a schermo</span></div>
@@ -188,6 +190,8 @@
   <table>
     <tr><th>Cosa</th><th>Perché</th><th>Peso</th></tr>
     <tr><td>Stop loss sulla catena</td><td>Jupiter lo dà solo su Trigger v2 con chiave e JWT. Oggi lo stop è del ciclo: serve il telefono acceso.</td><td><span class="pill c">alto</span></td></tr>
+    <tr><td>Altre lingue</td><td>Oggi inglese e italiano. Le altre sono una traduzione dei due file di stringhe, da fare con un modello e rileggere a mano.</td><td><span class="pill a">medio</span></td></tr>
+    <tr><td>DeFi oltre stake e Lend</td><td>LP, Kamino, marginfi, JUP bloccato: Jupiter li vede con la sua API "portfolio", che senza chiave risponde vuota. Serve una chiave gratuita da portal.jup.ag.</td><td><span class="pill a">medio</span></td></tr>
     <tr><td>Staking, nascondi spam, ribilancio, nomi .sol, fiat</td><td>Nella lista di Grok, dopo ordini e avvisi. Non iniziati.</td><td><span class="pill a">medio</span></td></tr>
     <tr><td>Sniper</td><td>Scelto di no: una gara di latenza che un telefono su Wi‑Fi perde sempre, e i tre repository visti chiedono la seed o vendono la versione a pagamento.</td><td><span class="pill d">per scelta</span></td></tr>
     <tr><td>Prove mai fatte sul telefono</td><td>Firma dei tre ordini e un avviso; riavvio col ciclo acceso; tocco NFC fra due apparecchi; ritiro di un regalo da un altro telefono.</td><td><span class="pill a">medio</span></td></tr>
@@ -232,11 +236,11 @@
   <h2>Com'è fatto</h2>
   <p class="sub">Niente server nostri che tengono chiavi. La sola cosa che gira fuori dal telefono è un worker gratuito che conta cosa comprano i Seeker.</p>
   <div class="stack">
-    <span>Kotlin · Jetpack Compose</span><span>Seed Vault (firma hardware)</span><span>Mobile Wallet Adapter</span><span>modulo :core puro, testabile</span><span>Jupiter swap · trigger · recurring · price · tokens</span><span>GeckoTerminal (storico prezzi)</span><span>Helius / RPC pubblici</span><span>Cloudflare Worker + KV (Scout)</span><span>WorkManager (keeper 15 min)</span><span>Glance widget · NFC HCE · Solana Pay</span><span>Anthropic · OpenAI‑compatible (streaming SSE)</span><span>TextToSpeech offline</span>
+    <span>Kotlin · Jetpack Compose</span><span>Seed Vault (firma hardware)</span><span>Mobile Wallet Adapter</span><span>modulo :core puro, testabile</span><span>Jupiter swap · trigger · recurring · price · tokens</span><span>GeckoTerminal (storico prezzi)</span><span>Helius / RPC pubblici</span><span>Cloudflare Worker + KV (Scout)</span><span>WorkManager (keeper 15 min)</span><span>Glance widget · NFC HCE · Solana Pay</span><span>Anthropic · OpenAI‑compatible (streaming SSE)</span><span>TextToSpeech offline</span><span>Inglese di base + italiano, segue la lingua del telefono</span><span>Rugcheck (senza chiave)</span>
   </div>
 </div></section>
 
-<footer><div class="wrap">Pagina locale, 15 settembre 2026. Fatta per Oliver, da leggere prima di decidere il nome.</div></footer>
+<footer><div class="wrap">Pagina locale, notte del 15 settembre 2026. Fatta per Oliver, da leggere prima di decidere il nome.</div></footer>
 
 <script>
   // Stars in the hero, like the door.

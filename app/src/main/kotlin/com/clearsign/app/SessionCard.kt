@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -110,10 +111,7 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
     var prepared by remember { mutableStateOf<Pair<ByteArray, String>?>(null) }
     val scope = rememberCoroutineScope()
 
-    // The receipt appears under the sliders; the sheet goes there by itself,
-    // because a receipt you have to find is a receipt you think is missing.
     val scroll = rememberScrollState()
-    LaunchedEffect(review) { if (review != null) scroll.animateScrollTo(scroll.maxValue) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(scroll).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
@@ -160,11 +158,6 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
             state?.let { Working(it) }
             error?.let { Banner(it, Halo.red, HIcon.WARNING) }
 
-            review?.let { r ->
-                Text(stringResource(R.string.env_review_hint), style = HaloType.small, color = Halo.mint, lineHeight = 17.sp)
-                SignReceiptBody(r.receipt, null)
-            }
-
             if (state == null && review == null) {
                 PrimaryButton(stringResource(R.string.env_review), danger = false, icon = HIcon.RECEIPT) {
                     state = ctx.getString(R.string.w_analyzing)
@@ -182,7 +175,27 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                 }
             }
 
-            if (state == null && review != null) {
+            }
+            GhostButton(stringResource(R.string.cancel)) { onDismiss() }
+        }
+    }
+
+    // The receipt, in a window of its own over the sheet: what you are about
+    // to sign, the hold, then the print. A receipt under the sliders was a
+    // receipt people scrolled past, or never found.
+    review?.let { r ->
+        Dialog(onDismissRequest = { if (state == null) { review = null; prepared = null } }) {
+            Column(
+                Modifier.fillMaxWidth().clip(rs(22)).background(Halo.ground2).border(1.dp, Halo.stroke, rs(22))
+                    .padding(horizontal = 18.dp, vertical = 16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(stringResource(R.string.env_pay_title, "%.3f".format(cap)), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
+                Text(stringResource(R.string.env_review_hint), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
+                SignReceiptBody(r.receipt, null)
+                state?.let { Working(it) }
+                error?.let { Banner(it, Halo.red, HIcon.WARNING) }
+                if (state == null) {
                 HoldToConfirm(stringResource(R.string.env_hold, "%.3f".format(cap))) {
                     state = ctx.getString(R.string.env_funding)
                     scope.launch {
@@ -205,10 +218,9 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                         if (out == null) { SessionWallet.addFunded(ctx, lamports); onDone() } else { error = out; state = null; SessionWallet.forget(ctx) }
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+                }
+                GhostButton(stringResource(R.string.cancel), Modifier.fillMaxWidth()) { if (state == null) { review = null; prepared = null } }
             }
-            }
-            GhostButton(stringResource(R.string.cancel)) { onDismiss() }
         }
     }
 }

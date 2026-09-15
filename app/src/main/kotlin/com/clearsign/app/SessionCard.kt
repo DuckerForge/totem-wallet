@@ -148,6 +148,11 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                 stringResource(R.string.env_limits_note, "%.4f".format(perTx), "%.4f".format(daily)),
                 style = HaloType.small, color = Halo.muted,
             )
+            // The slice this makes, and whether the chain can guard it, before signing.
+            run {
+                val t = TraderLoop.config(ctx)
+                SizingNote((cap * 1e9).toLong(), (perTx * 1e9).toLong(), (perTx * 1e9).toLong(), t.slicePercent, t.maxPositions)
+            }
 
             Text(stringResource(R.string.env_harvest_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
             Text(stringResource(R.string.env_harvest_body), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp)
@@ -670,6 +675,7 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 SliderRow(stringResource(R.string.trader_slots), trade.maxPositions.toString(), trade.maxPositions.toFloat(), 1f..5f, Halo.cyan, steps = 3) {
                     trade = trade.copy(maxPositions = it.toInt())
                 }
+                SizingNote(session.capLamports, (perTx * cap).toLong(), (askAbove * cap).toLong(), trade.slicePercent, trade.maxPositions)
                 Text(stringResource(R.string.trader_truth), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
             }
 

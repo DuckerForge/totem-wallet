@@ -586,6 +586,10 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
             StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
             StatRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString())
+            run {
+                val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
+                if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)
+            }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.PIGEON) {
                 TraderLoop.start(ctx, cfg)

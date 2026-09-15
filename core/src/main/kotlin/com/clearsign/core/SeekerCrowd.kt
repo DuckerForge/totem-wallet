@@ -50,7 +50,40 @@ data class CrowdRank(
     val score: Double,
 )
 
+/** Why a coin from the live feed is worth a look: somebody you follow bought it, or the whales did. */
+sealed class CrowdSignal(val mint: String, val at: Long) {
+    /** A wallet the person follows bought it. */
+    class Followed(mint: String, at: Long, val wallet: String, val solSpent: Double) : CrowdSignal(mint, at)
+    /** Several whales bought it inside the window, independently of each other. */
+    class Crowd(mint: String, at: Long, val whales: Int) : CrowdSignal(mint, at)
+}
+
 object SeekerCrowd {
+    /**
+     * What the live feed is saying right now, in the order worth acting on.
+     *
+     * Two signals and no third. A wallet the person chose to follow bought
+     * something inside the window: that is the closest this app gets to copy
+     * trading, and it is deliberately one step short of it, because the coin
+     * still has to pass every gate. And two or more different whales bought the
+     * same coin inside the window, which is the crowd noticing something before
+     * the registry's numbers do. Money-mints never signal, and one wallet
+     * buying ten times is still one wallet.
+     */
+    fun signals(buys: List<CrowdBuy>, follows: Set<String>, now: Long, windowMs: Long = 60 * 60_000L, minWhales: Int = 2): List<CrowdSignal> {
+        val recent = buys.filter { it.at > now - windowMs && it.mint !in MONEY && it.solSpent >= MIN_SPEND_SOL }
+        val out = ArrayList<CrowdSignal>()
+        val seen = HashSet<String>()
+        for (b in recent.sortedByDescending { it.at }) {
+            if (b.wallet in follows && seen.add(b.mint)) out += CrowdSignal.Followed(b.mint, b.at, b.wallet, b.solSpent)
+        }
+        recent.filter { it.tier == SeekerTier.WHALE }.groupBy { it.mint }.forEach { (mint, list) ->
+            val whales = list.map { it.wallet }.toSet().size
+            if (whales >= minWhales && seen.add(mint)) out += CrowdSignal.Crowd(mint, list.maxOf { it.at }, whales)
+        }
+        return out
+    }
+
     /** Buying money is not a pick. Nobody "chose" USDC. */
     val MONEY = setOf(
         NATIVE_SOL_MINT,

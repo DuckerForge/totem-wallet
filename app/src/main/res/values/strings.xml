@@ -1349,4 +1349,11 @@
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>
     <string name="send_blocked_drain">Blocked: this sends almost the whole balance to an address this phone has never seen. If it is your own account, save it as a contact and try again.</string>
     <string name="send_save_contact">Save as a contact</string>
+    <string name="follow_btn">Follow</string>
+    <string name="follow_on">Following</string>
+    <string name="feed_follow_note">The star follows a wallet: what it buys goes to the agent as a candidate, through the same gates.</string>
+    <string name="trace_scout">Scout: %1$d signals from the live feed</string>
+    <string name="scout_signal_follow">Scout: %1$s, whom you follow, bought %2$s %3$d min ago</string>
+    <string name="scout_signal_crowd">Scout: %1$d whales on %2$s in the last hour</string>
+    <string name="trace_scout_rejected">%1$s from the live feed, rejected: %2$s</string>
 </resources>

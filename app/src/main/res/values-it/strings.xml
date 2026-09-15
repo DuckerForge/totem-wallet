@@ -1349,4 +1349,11 @@
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>
     <string name="send_blocked_drain">Bloccato: manda via quasi tutto il saldo a un indirizzo che questo telefono non ha mai visto. Se è un tuo conto, salvalo fra i contatti e riprova.</string>
     <string name="send_save_contact">Salva fra i contatti</string>
+    <string name="follow_btn">Segui</string>
+    <string name="follow_on">Seguita</string>
+    <string name="feed_follow_note">La stella segue un portafoglio: quello che compra passa all\'agente come candidata, con gli stessi cancelli.</string>
+    <string name="trace_scout">Scout: %1$d segnali dalla diretta</string>
+    <string name="scout_signal_follow">Scout: %1$s, che segui, ha comprato %2$s %3$d min fa</string>
+    <string name="scout_signal_crowd">Scout: %1$d balene su %2$s nell\'ultima ora</string>
+    <string name="trace_scout_rejected">%1$s dalla diretta, scartata: %2$s</string>
 </resources>

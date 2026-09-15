@@ -27,8 +27,9 @@ wrangler login
 wrangler kv namespace create SEEKER          # copia l'id in wrangler.toml
 wrangler secret put HELIUS_URL               # l'URL Helius completo, con la chiave
 wrangler deploy
-# l'elenco dei portafogli, una volta sola:
-wrangler kv key put --binding=SEEKER roster --path=../../app/src/main/assets/seekers.txt
+# l'elenco dei portafogli, una volta sola, spezzato nei pezzi che il worker legge:
+python3 roster.py > /tmp/kv_roster.json
+npx wrangler kv bulk put --binding=SEEKER --remote /tmp/kv_roster.json
 ```
 
 Poi in `local.properties`:
@@ -46,3 +47,17 @@ clearsign.crowdUrl=https://seeker-crowd.<tuo-sottodominio>.workers.dev/
 
 Solo monete comprate da almeno tre portafogli diversi. Sotto tre è una persona,
 non una tendenza.
+
+## Perché lo stato è in tre pezzi (15/09/2026)
+
+Il worker moriva di **CPU** (`exceededCpu` a 10 ms, il limite del piano gratuito) mentre
+leggeva e riscriveva lo stato: un JSON da 612 KB con 10.527 saldi come chiavi. Ora:
+
+- `bal`: i saldi come `Float64Array` grezzo (84 KB), letto come buffer, indice = posizione nel
+  censimento. Niente parse, niente stringify.
+- `rw` e `rd:<k>`: il censimento a pezzi (balene con indice; blocchi di cento delfini). Ogni giro
+  legge solo i blocchi che tocca.
+- `state2`: acquisti, cursore, e un'impronta del pubblicato, così `crowd` si scrive solo quando
+  cambia. Tre scritture per giro al massimo, un giro ogni cinque minuti: sotto le mille al giorno.
+
+Le chiavi vecchie `state` e `roster` non servono più.

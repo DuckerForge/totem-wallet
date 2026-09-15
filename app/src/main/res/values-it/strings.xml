@@ -1209,8 +1209,8 @@
     <string name="crowd_note">Solo monete comprate davvero, mai monete solo possedute: quelle arrivate col telefono non valgono niente e ce le hanno tutti.</string>
     <string name="crowd_looking">Sto guardando…</string>
     <string name="theme_flow">Solana Flow</string>
-    <string name="hold_title">Cosa tengono %1$,d Seeker</string>
-    <string name="hold_note">%1$d delle %2$d cose più diffuse valgono zero: sono arrivate col telefono. Campione di %3$d portafogli sul censimento.</string>
+    <string name="hold_title">Cosa tengono i %1$,d Seeker attivi</string>
+    <string name="hold_note">%1$d delle %2$d cose più diffuse valgono zero: sono arrivate col telefono. Campione di %3$d portafogli fra i seguiti, quelli con almeno 1 SOL.</string>
     <string name="home_act_crowd">Scout</string>
     <string name="whales_title">Le balene Seeker</string>
     <string name="whales_count">%1$d portafogli</string>
@@ -1278,8 +1278,8 @@
     <string name="pro_trading">Corsia e obiettivi</string>
     <string name="pro_trace">Traccia in diretta</string>
     <string name="pro_pc">Agente sul computer</string>
-    <string name="lane_title">Che corsia?</string>
-    <string name="lane_body">Blue chip guarda monete grandi e liquide. Degen accetta monete piccole e nuove, con più rischio. I limiti del collare valgono in tutte e due.</string>
+    <string name="lane_title">Avvio</string>
+    <string name="lane_body">Una corsia sola, quella sicura: liquidità dai 50.000 $, autorità di mint e freeze revocate, rivendibile, pochi grandi detentori. Sono le soglie dei bot che vincono. I limiti del collare valgono sempre.</string>
     <string name="lane_start">Avvia</string>
     <string name="chat_group_look">Guarda</string>
     <string name="chat_group_do">Fai</string>
@@ -1356,4 +1356,5 @@
     <string name="scout_signal_follow">Scout: %1$s, che segui, ha comprato %2$s %3$d min fa</string>
     <string name="scout_signal_crowd">Scout: %1$d balene su %2$s nell\'ultima ora</string>
     <string name="trace_scout_rejected">%1$s dalla diretta, scartata: %2$s</string>
+    <string name="trader_lane_one">Una corsia sola: la sicura</string>
 </resources>

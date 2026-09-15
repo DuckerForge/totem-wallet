@@ -17,6 +17,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -104,16 +106,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
             val p = Offset(s.x * w + sin(slow * 0.35f + s.phase) * par, s.y * h + cos(slow * 0.25f + s.phase) * par * 0.4f)
             val rr = s.r * unit / 1000f * 2.2f
             if (s.depth == 2) {
-                // The bright few: a halo, and a four-point flare that opens on
-                // the peak of the twinkle and is gone a moment later.
-                drawCircle(Color.White.copy(alpha = 0.10f * twinkle), rr * 3.2f, p)
-                val flare = ((tw - 0.82f) / 0.18f).coerceIn(0f, 1f)
-                if (flare > 0f) {
-                    val len = rr * (3f + 7f * flare)
-                    val a = Color.White.copy(alpha = 0.55f * flare)
-                    drawLine(a, Offset(p.x - len, p.y), Offset(p.x + len, p.y), strokeWidth = 1.1f * density)
-                    drawLine(a, Offset(p.x, p.y - len), Offset(p.x, p.y + len), strokeWidth = 1.1f * density)
-                }
+                // The bright few breathe: a soft halo that swells on the peak of
+                // the twinkle. No spikes; a cross of light reads as a symbol, and
+                // a symbol in a sky is a thing the eye stops on.
+                val swell = ((tw - 0.6f) / 0.4f).coerceIn(0f, 1f)
+                drawCircle(
+                    Brush.radialGradient(listOf(Color.White.copy(alpha = 0.22f + 0.30f * swell), Color.Transparent), center = p, radius = rr * (3f + 3f * swell)),
+                    rr * (3f + 3f * swell), p,
+                )
             }
             drawCircle(Color.White.copy(alpha = 0.9f * twinkle), rr, p)
         }
@@ -255,17 +255,49 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
             }
         }
 
-        // The phone last: every streak passes behind it, nothing crosses the glass.
+        // The phone is not there until something comes. Between arrivals it is
+        // a ghost of an outline in the dark; as a streak closes in it takes
+        // shape, and by the time the streak reaches the glass it is solid. Then
+        // it fades again. So the eye learns the scene's one rule by watching it:
+        // the thing that decides appears when there is something to decide.
+        val o = open.value
+        var wake = o
+        lanes.forEach { lane ->
+            val local = (t - lane.start) / 0.30f
+            if (local <= 0f || local > 1.35f) return@forEach
+            val rise = ((local - 0.25f) / 0.45f).coerceIn(0f, 1f)
+            val fall = 1f - ((local - 1.0f) / 0.35f).coerceIn(0f, 1f)
+            wake = max(wake, rise * rise * (3f - 2f * rise) * fall)
+        }
+        val presence = 0.10f + 0.90f * wake
+        drawIntoCanvas { c ->
+            c.saveLayer(
+                androidx.compose.ui.geometry.Rect(phone.x - phoneW, phone.y - phoneH, phone.x + phoneW, phone.y + phoneH),
+                androidx.compose.ui.graphics.Paint().apply { alpha = presence },
+            )
+        }
         drawPhone(
             phone.x - phoneW / 2f, phone.y - phoneH / 2f, phoneW, phoneH,
             back = false, body = Halo.cardSoft, edge = Halo.stroke, ink = Halo.ink, glass = Halo.ground,
         )
-        val breath = 0.5f + 0.5f * sin(slow * 1.9f)
-        val o = open.value
-        drawCircle(mint.copy(alpha = 0.08f + 0.08f * breath + 0.25f * o), phoneW * (0.5f + 0.6f * o), phone)
-        drawCircle(mint.copy(alpha = 0.6f + 0.3f * breath), phoneW * (0.12f + 0.10f * o), phone)
-        // The station light: a thin ring that says the thing is awake and watching.
-        drawCircle(mint.copy(alpha = 0.10f + 0.06f * breath), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
+        // The glass lights from the bottom as it wakes, and a thin line of light
+        // near the foot says "on". No dot, no ring in the middle: a symbol on the
+        // screen was a thing to read, and there is nothing to read here.
+        val glassL = phone.x - phoneW * 0.40f
+        val glassT = phone.y - phoneH * 0.42f
+        val glassW = phoneW * 0.80f
+        val glassH = phoneH * 0.84f
+        drawRect(
+            Brush.verticalGradient(listOf(Color.Transparent, mint.copy(alpha = 0.22f + 0.35f * o)), startY = glassT, endY = glassT + glassH),
+            Offset(glassL, glassT), androidx.compose.ui.geometry.Size(glassW, glassH),
+        )
+        drawLine(
+            mint.copy(alpha = 0.85f), Offset(phone.x - phoneW * 0.18f, glassT + glassH - phoneH * 0.06f),
+            Offset(phone.x + phoneW * 0.18f, glassT + glassH - phoneH * 0.06f), strokeWidth = 2f * density, cap = StrokeCap.Round,
+        )
+        drawIntoCanvas { it.restore() }
+        // The station light, only while it is awake: a thin ring that says watching.
+        drawCircle(mint.copy(alpha = 0.16f * wake), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
         if (o > 0f) {
             // Opening: two rings leaving the phone for the edge, thinning as they go.
             for (k in 0 until 2) {

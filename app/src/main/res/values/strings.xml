@@ -1209,8 +1209,8 @@
     <string name="crowd_note">Only coins actually bought, never coins merely held: the ones that shipped with the phone are worth nothing and everybody has them.</string>
     <string name="crowd_looking">Looking…</string>
     <string name="theme_flow">Solana Flow</string>
-    <string name="hold_title">What %1$,d Seekers hold</string>
-    <string name="hold_note">%1$d of the %2$d most widely held things are worth nothing: they came with the phone. Sample of %3$d wallets from the census.</string>
+    <string name="hold_title">What the %1$,d active Seekers hold</string>
+    <string name="hold_note">%1$d of the %2$d most widely held things are worth nothing: they came with the phone. Sample of %3$d of the followed wallets, the ones holding at least 1 SOL.</string>
     <string name="home_act_crowd">Scout</string>
     <string name="whales_title">Seeker whales</string>
     <string name="whales_count">%1$d wallets</string>
@@ -1278,8 +1278,8 @@
     <string name="pro_trading">Lane and targets</string>
     <string name="pro_trace">Live trace</string>
     <string name="pro_pc">Agent on a computer</string>
-    <string name="lane_title">Which lane?</string>
-    <string name="lane_body">Blue chip looks at big, liquid coins. Degen accepts small, new coins, with more risk. The collar\'s limits hold in both.</string>
+    <string name="lane_title">Start</string>
+    <string name="lane_body">One lane, the safe one: liquidity from $50,000, mint and freeze authority revoked, sellable, few large holders. The floors the winning bots use. The collar\'s limits always hold.</string>
     <string name="lane_start">Start</string>
     <string name="chat_group_look">Look</string>
     <string name="chat_group_do">Do</string>
@@ -1356,4 +1356,5 @@
     <string name="scout_signal_follow">Scout: %1$s, whom you follow, bought %2$s %3$d min ago</string>
     <string name="scout_signal_crowd">Scout: %1$d whales on %2$s in the last hour</string>
     <string name="trace_scout_rejected">%1$s from the live feed, rejected: %2$s</string>
+    <string name="trader_lane_one">One lane: the safe one</string>
 </resources>

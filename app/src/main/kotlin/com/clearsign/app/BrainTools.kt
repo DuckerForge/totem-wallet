@@ -122,7 +122,7 @@ object BrainTools {
      */
     private suspend fun marketScan(ctx: Context, risk: String, limit: Int): JSONObject {
         val r = risk.trim().lowercase().replace(" ", "")
-        val gate = if (r == "degen" || r == "bold") com.clearsign.core.ScanGate.BOLD else com.clearsign.core.ScanGate.CAREFUL
+        val gate = com.clearsign.core.ScanGate.CAREFUL
         val pool = withContext(Dispatchers.IO) { runCatching { JupiterTokens.pool() }.getOrDefault(emptyList()) }
         if (pool.isEmpty()) return JSONObject().put("error", "Could not read the market right now.")
         val res = com.clearsign.core.scanMarket(pool, gate, limit.coerceIn(1, 8))

@@ -662,8 +662,7 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
             Text(stringResource(R.string.trader_setup_title), style = HaloType.label, color = Halo.muted)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ModeChip(stringResource(R.string.trader_off), !trade.on, Halo.muted, Modifier.weight(1f)) { trade = trade.copy(on = false) }
-                ModeChip(stringResource(R.string.trader_careful), trade.on && !trade.bold, Halo.mint, Modifier.weight(1f)) { trade = trade.copy(on = true, bold = false) }
-                ModeChip(stringResource(R.string.trader_bold), trade.on && trade.bold, Halo.amber, Modifier.weight(1f)) { trade = trade.copy(on = true, bold = true) }
+                ModeChip(stringResource(R.string.rules_state_on), trade.on, Halo.mint, Modifier.weight(1f)) { trade = trade.copy(on = true, bold = false) }
             }
             // Said here, while you are choosing, instead of six minutes later.
             val blocked = remember(trade.on) { if (trade.on) TraderLoop.cannotStart(ctx) else null }

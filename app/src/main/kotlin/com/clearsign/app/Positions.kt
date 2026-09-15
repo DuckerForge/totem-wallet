@@ -187,6 +187,16 @@ object Positions {
      * row this one has failed, so the caller can say something once instead of
      * every ninety seconds.
      */
+    /**
+     * Say something about a position without calling it a failed sale.
+     *
+     * [noteFailure] bumps the retry counter and pushes the row into the slow
+     * lane, which is right for a sale that did not work and wrong for "Jupiter
+     * will not take an order this small". That one is a fact about the position
+     * that the person has to be able to read, and nothing to retry.
+     */
+    fun note(ctx: Context, mint: String, why: String?) = edit(ctx, mint) { it.copy(lastError = why) }
+
     fun noteFailure(ctx: Context, mint: String, why: String?): Int {
         var n = 0
         edit(ctx, mint) { n = it.fails + 1; it.copy(fails = n, lastTryAt = System.currentTimeMillis(), lastError = why) }

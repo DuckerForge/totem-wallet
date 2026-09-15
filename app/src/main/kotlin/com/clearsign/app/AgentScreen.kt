@@ -205,7 +205,16 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(stringResource(R.string.agent_positions).uppercase(), style = HaloType.label, color = Halo.muted)
-                        open.forEach { pos -> PositionRow(pos) { refresh++ } }
+                        // A stopped loop with coins still open is the state nobody
+                        // should have to work out for themselves. The stop loss
+                        // lives in the loop and nowhere else, so while it is off a
+                        // position with no on-chain order has nothing watching it
+                        // in either direction. Said here, in red, above the rows.
+                        val unwatched = open.count { !it.parked && it.triggerOrder == null }
+                        if (!cfg.on && unwatched > 0) {
+                            Banner(stringResource(R.string.trader_unwatched, unwatched), Halo.red, HIcon.WARNING)
+                        }
+                        open.forEach { pos -> PositionRow(pos, refresh) { refresh++ } }
                     }
                 }
             }

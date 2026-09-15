@@ -284,7 +284,7 @@ internal fun AgentPulse(refresh: Int) {
  * phone to answer anything it asks.
  */
 @Composable
-internal fun PositionRow(pos: Positions.Position, onChange: () -> Unit) {
+internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var value by remember(pos.mint) { mutableStateOf<Long?>(null) }
@@ -301,11 +301,22 @@ internal fun PositionRow(pos: Positions.Position, onChange: () -> Unit) {
             // The on-chain exit is the one that survives the app dying, so it is
             // worth a mark of its own rather than a footnote. Parked means the
             // coins are inside that order and not in the wallet.
+            // Who is watching this, said on the row. Three answers and no fourth,
+            // and the third one is the one that matters: an on-chain order fires
+            // with the app dead, the loop fires only while it runs, and when
+            // neither is there **nobody is watching**, in either direction. The
+            // row used to show the first two and stay silent about the third, so
+            // a position left unguarded by a loop that stopped itself looked
+            // exactly like a healthy one.
+            val watching = remember(refresh) { TraderLoop.config(ctx).on }
             if (pos.parked) {
                 Text(stringResource(R.string.trader_parked_tag), fontFamily = Mono, fontSize = 10.sp, color = Halo.amber)
                 Spacer(Modifier.width(8.dp))
             } else if (pos.triggerOrder != null) {
                 Text(stringResource(R.string.trader_onchain), fontFamily = Mono, fontSize = 10.sp, color = Halo.mint)
+                Spacer(Modifier.width(8.dp))
+            } else if (!watching) {
+                Text(stringResource(R.string.trader_unwatched_tag), fontFamily = Mono, fontSize = 10.sp, color = Halo.red)
                 Spacer(Modifier.width(8.dp))
             }
             value?.let { v ->

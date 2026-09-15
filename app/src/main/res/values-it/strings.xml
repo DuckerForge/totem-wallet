@@ -727,7 +727,7 @@
     <string name="env_closing">Sto recuperando…</string>
     <string name="env_truth">Cosa regge anche se il computer dell\'agente viene bucato: non può spendere più di quello che c\'è nella paghetta, e chiudendola gli togli tutto all\'istante. Le regole le applica questo telefono e ti proteggono dall\'agente, non da un telefono compromesso. Niente di tutto questo è imposto dalla rete.</string>
     <string name="env_new_title">La paghetta dell\'agente</string>
-    <string name="env_new_body">La carichi una volta con l\'impronta. Da lì in poi l\'agente spende da quella cifra senza chiederti niente, finché resta dentro le regole. Sopra le regole ti chiede l\'impronta.</string>
+    <string name="env_new_body">Soldi separati dal tuo wallet. L\'agente spende solo questi. Sopra i suoi limiti ti chiede l\'impronta.</string>
     <string name="env_duration">Durata</string>
     <string name="env_warn">Quello che ci metti è quello che puoi perdere se l\'agente viene compromesso. Parti piccolo.</string>
     <string name="env_hold">Tieni premuto per dargli %1$s SOL</string>
@@ -1400,12 +1400,14 @@
     <string name="trace_rug_ok">Rugcheck %1$s: punteggio %2$d, LP bloccata %3$s</string>
     <string name="trace_rug_unknown">Rugcheck non risponde per %1$s, vado avanti</string>
     <string name="size_slice">Ogni acquisto: %1$s SOL (%2$s $).</string>
-    <string name="size_onchain_ok">Sopra i 5 $ per acquisto Jupiter può tenere lui l\'ordine di vendita: la moneta si vende all\'obiettivo anche a telefono spento.</string>
-    <string name="size_onchain_no">Jupiter accetta un ordine di vendita automatica solo da 5 $ per acquisto. Sotto, la vendita all\'obiettivo la fa l\'app dal telefono, che deve restare acceso e col ciclo attivo. Per avere l\'ordine sulla catena porta "per mossa" ad almeno %1$s SOL.</string>
-    <string name="size_noprice">Prezzo del SOL non disponibile: non so dire se un acquisto supera i 5 $ che Jupiter chiede per l\'ordine automatico.</string>
-    <string name="size_fits">Con questa cifra entrano %1$d posizioni su %2$d.</string>
+    <string name="size_onchain_ok">Sopra i 5 $: Jupiter vende da solo all\'obiettivo, anche a telefono spento.</string>
+    <string name="size_onchain_no">Sotto i 5 $: vende l\'app, solo a telefono acceso. Meno monete insieme, o più paghetta.</string>
+    <string name="size_noprice">Prezzo del SOL non disponibile: non so dire se un acquisto supera i 5 $.</string>
+    <string name="size_fits">Con questa cifra ci stanno solo %1$d monete su %2$d.</string>
     <string name="env_slots_note">Quante monete alla volta. Con 1, tutti i soldi vanno su un\'idea sola, e cerca la prossima solo dopo aver venduto.</string>
     <string name="env_review_hint">Questo è quello che firmerai: il tuo wallet manda la paghetta alla chiave dell\'agente. Tieni premuto il bottone qui sotto, poi l\'impronta.</string>
+    <string name="size_each">Ogni acquisto</string>
+    <string name="env_duration_note">Dopo smette di comprare e restituisce i soldi.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

@@ -107,6 +107,7 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
         }
     }
     var days by remember { mutableFloatStateOf(7f) }
+    var slots by remember { mutableFloatStateOf(TraderLoop.config(ctx).maxPositions.toFloat()) }
     var harvest by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(ceiling) { if (harvest <= 0f && ceiling > 0f) harvest = (ceiling / 5f).coerceIn(0f, ceiling) }
     var state by remember { mutableStateOf<String?>(null) }
@@ -153,11 +154,12 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                 stringResource(R.string.env_limits_note, "%.4f".format(perTxV), "%.4f".format(dailyV)),
                 style = HaloType.small, color = Halo.muted,
             )
+            // How many coins at once. One is a fine answer: all the money on one
+            // idea at a time, and the loop looks for the next only after it sells.
+            SliderRow(stringResource(R.string.trader_slots), slots.toInt().toString(), slots, 1f..5f, Halo.cyan, steps = 3) { slots = it }
+            Text(stringResource(R.string.env_slots_note), style = HaloType.small, color = Halo.muted)
             // The slice this makes, and whether the chain can guard it, before signing.
-            run {
-                val t = TraderLoop.config(ctx)
-                SizingNote((cap * 1e9).toLong(), (perTxV * 1e9).toLong(), (perTxV * 1e9).toLong(), t.slicePercent, t.maxPositions)
-            }
+            SizingNote((cap * 1e9).toLong(), (perTxV * 1e9).toLong(), (perTxV * 1e9).toLong(), TraderLoop.config(ctx).slicePercent, slots.toInt())
 
             Text(stringResource(R.string.env_harvest_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
             Text(stringResource(R.string.env_harvest_body), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp)
@@ -197,6 +199,7 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                     scope.launch {
                         val lamports = (cap * 1e9).toLong()
                         val s = SessionWallet.create(ctx, lamports, days.toInt(), "", prepared)
+                        TraderLoop.setConfig(ctx, TraderLoop.config(ctx).copy(maxPositions = slots.toInt().coerceIn(1, 5)))
                         if (harvest >= 0.0005f) SessionWallet.setHarvest(ctx, (harvest * 1e9).toLong())
                         val contacts = Contacts.allowlist(ctx).keys
                         // The two sliders are the policy now; `prudent` is only the

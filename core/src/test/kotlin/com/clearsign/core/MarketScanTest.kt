@@ -33,6 +33,101 @@ class MarketScanTest {
         s24h = ScanWindow(priceChange = 9.0, volume = 900_000.0),
     )
 
+    // ---- the entries that were costing money ---------------------------------
+    //
+    // Every number below was read off the live lists on 2026-09-14, from coins
+    // that passed every other gate that day. The scan's own momentum term is what
+    // ranked them highest, which is the point: without these two vetoes the
+    // ranking hands back exactly these.
+
+    /** NINA: +57% in an hour, +10664% on the day. A hundred-bagger, mid-candle. */
+    @Test fun aVerticalHourIsRefused() {
+        val nina = healthy(symbol = "NINA").copy(
+            s1h = ScanWindow(priceChange = 57.0, numBuys = 900, numTraders = 700),
+            s24h = ScanWindow(priceChange = 10_664.0, volume = 900_000.0),
+        )
+        val why = passesGate(nina, ScanGate.CAREFUL)
+        assertNotNull(why, "a coin up 57% in an hour must not be an entry")
+        assertTrue(why.contains("hour"), why)
+        // The wild lane is allowed to chase harder, not to chase this.
+        assertNull(passesGate(nina.copy(s1h = ScanWindow(priceChange = 40.0), s24h = ScanWindow(priceChange = 12.0)), ScanGate.BOLD))
+        assertNotNull(passesGate(nina.copy(s1h = ScanWindow(priceChange = 85.4)), ScanGate.BOLD), "STONK10 was +85%")
+    }
+
+    /** EMBER: down 46% on the day, green for an hour. That is not a turn. */
+    @Test fun aBounceOnACollapsedDayIsRefused() {
+        val ember = healthy(symbol = "EMBER").copy(
+            s1h = ScanWindow(priceChange = 5.1, numBuys = 900, numTraders = 700),
+            s24h = ScanWindow(priceChange = -46.6, volume = 900_000.0),
+        )
+        val why = passesGate(ember, ScanGate.CAREFUL)
+        assertNotNull(why, "a 46% down day with a green hour is people getting out")
+        assertTrue(why.contains("bounce"), why)
+        assertNotNull(passesGate(ember, ScanGate.BOLD), "the wild lane does not want it either")
+    }
+
+    /** A red day on its own is a penalty, not a veto: that was already true. */
+    @Test fun aRedDayWithoutABounceIsStillAllowedThrough() {
+        val soft = healthy().copy(
+            s1h = ScanWindow(priceChange = -2.0, numBuys = 900, numTraders = 700),
+            s24h = ScanWindow(priceChange = -40.0, volume = 900_000.0),
+        )
+        assertNull(passesGate(soft, ScanGate.CAREFUL), "falling quietly is a low score, not a refusal")
+    }
+
+    /** Mid-candle costs a quarter of the score, without ever vetoing. */
+    @Test fun stillRunningScoresLowerThanConsolidating() {
+        val running = healthy().copy(
+            s5m = ScanWindow(priceChange = 12.0),
+            s1h = ScanWindow(priceChange = 20.0, volume = 200_000.0, buyVolume = 120_000.0, sellVolume = 80_000.0, buyOrganicVolume = 90_000.0, numBuys = 900, numTraders = 700, numOrganicBuyers = 450, holderChange = 0.05),
+        )
+        val calm = running.copy(s5m = ScanWindow(priceChange = 0.5))
+        val (runScore, notes) = runnerScore(running, ScanGate.CAREFUL)
+        val (calmScore, _) = runnerScore(calm, ScanGate.CAREFUL)
+        assertTrue(calmScore > runScore, "consolidating should outrank mid-candle: $calmScore vs $runScore")
+        assertTrue(notes.any { it.contains("still running") }, notes.toString())
+    }
+
+    // ---- the safest of the day ----------------------------------------------
+
+    /** The whole point: the runner and the solid coin are not the same coin. */
+    @Test fun safestIgnoresMomentum() {
+        val solid = healthy(mint = "Sol11111111111111111111111111111111111111111", symbol = "SOLID").copy(
+            liquidity = 900_000.0, mcap = 6_000_000.0, holders = 40_000, topHoldersPct = 6.0,
+            ageMinutes = 40_000.0, organicScore = 85.0,
+            s1h = ScanWindow(priceChange = 0.2, numBuys = 300, numTraders = 250),
+            s24h = ScanWindow(priceChange = 1.0, volume = 400_000.0),
+        )
+        val runner = healthy(mint = "Run11111111111111111111111111111111111111111", symbol = "RUNNER").copy(
+            liquidity = 60_000.0, mcap = 2_000_000.0, holders = 600, topHoldersPct = 24.0,
+            ageMinutes = 900.0, organicScore = 40.0,
+            s1h = ScanWindow(priceChange = 28.0, numBuys = 900, numTraders = 700),
+            s24h = ScanWindow(priceChange = 120.0, volume = 900_000.0),
+        )
+        val pool = listOf(runner, solid)
+
+        val safest = safestPicks(pool, ScanGate.CAREFUL, limit = 2)
+        assertEquals("SOLID", safest.first().c.symbol, "depth, holders and age come first when the question is safety")
+
+        // Momentum is absent, not merely outweighed: the same coin flying and the
+        // same coin flat score identically here. (The first version of this test
+        // asserted that the ordinary scan would rank the runner first instead —
+        // an assumption, and a false one: with 40k holders and an organic score of
+        // 85, the solid coin wins that ranking too.)
+        val flying = solid.copy(
+            s1h = ScanWindow(priceChange = 30.0, numBuys = 300, numTraders = 250),
+            s24h = ScanWindow(priceChange = 140.0, volume = 400_000.0),
+        )
+        val a = safestPicks(listOf(solid), ScanGate.CAREFUL).first().score
+        val b = safestPicks(listOf(flying), ScanGate.CAREFUL).first().score
+        assertEquals(a, b, 0.0000001, "the safety ranking must not notice the price at all")
+    }
+
+    @Test fun safestStillRespectsTheGate() {
+        val frozenable = healthy(symbol = "FREEZE").copy(canFreeze = true, liquidity = 5_000_000.0, holders = 90_000)
+        assertTrue(safestPicks(listOf(frozenable), ScanGate.CAREFUL).isEmpty(), "no ranking may let a coin past the vetoes")
+    }
+
     @Test fun aHealthyCoinPasses() {
         assertNull(passesGate(healthy(), ScanGate.CAREFUL))
         assertNull(passesGate(healthy(), ScanGate.BOLD))

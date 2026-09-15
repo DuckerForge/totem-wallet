@@ -55,6 +55,8 @@ data class HaloPalette(
     val radiusScale: Float, // 1 = rounded as designed, 0.15 = nearly square
     val iconStroke: Float,  // multiplier on the hand-drawn icon stroke
     val receiptStyle: ReceiptStyle,
+    /** Card hairlines flow instead of sitting still — Solana's two colours, moving. */
+    val livingStroke: Boolean = false,
 ) {
     val isFree: Boolean get() = !premium
 }
@@ -66,6 +68,7 @@ object Palettes {
         accent: Long, accent2: Long, ink: Long, muted: Long, amber: Long, red: Long,
         premium: Boolean, grain: Float, scanlines: Boolean = false, fillSoft: Boolean = false,
         fonts: HaloFonts, radiusScale: Float = 1f, iconStroke: Float = 1f, receiptStyle: ReceiptStyle = ReceiptStyle.CARDS,
+        livingStroke: Boolean = false,
     ) = HaloPalette(
         id = id, nameRes = nameRes,
         ground = Color(ground), ground2 = Color(ground2), card = Color(card), cardSoft = Color(cardSoft), cardHi = Color(cardHi), stroke = Color(stroke),
@@ -77,12 +80,13 @@ object Palettes {
         redSoft = Color(red).copy(alpha = 0.133f), accentSoft = Color(accent2).copy(alpha = 0.133f),
         premium = premium, grainAlpha = grain, scanlines = scanlines,
         fonts = fonts, radiusScale = radiusScale, iconStroke = iconStroke, receiptStyle = receiptStyle,
+        livingStroke = livingStroke,
     )
 
     /** Dark premium, glass panels, mint + cyan on a blue-black ground. Free. */
     val halo = p(
         "halo", R.string.theme_halo,
-        ground = 0xFF070B12, ground2 = 0xFF0E131A, card = 0xFF222B33, cardSoft = 0xFF171D25, cardHi = 0xFF313B44, stroke = 0xFF1E4C63,
+        ground = 0xFF070B12, ground2 = 0xFF0E131A, card = 0xFF222B33, cardSoft = 0xFF171D25, cardHi = 0xFF313B44, stroke = 0xFF1F5E4C,
         accent = 0xFF4DFFD0, accent2 = 0xFF4CC9FF, ink = 0xFFE6EEFB, muted = 0xFF9BAEC6, amber = 0xFFFFC24B, red = 0xFFFF5A6A,
         premium = false, grain = 0f,
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
@@ -116,12 +120,36 @@ object Palettes {
     )
 
     /** Solana brand: signature purple + mint green on a violet-black ground. */
+    /**
+     * Solana as a whole palette: violet ground, its green and its purple.
+     *
+     * Free, and it was not: a theme nobody can select is a theme nobody can judge,
+     * and this one turned out to be the one that suits the link and mint screens.
+     * [flow] is the other half of the same idea — Halo's colours with only the
+     * hairline moving — and both exist because they answer different moods.
+     */
     val solana = p(
         "solana", R.string.theme_solana,
         ground = 0xFF0B0518, ground2 = 0xFF130C20, card = 0xFF2A2338, cardSoft = 0xFF1D162A, cardHi = 0xFF3A3349, stroke = 0xFF463367,
         accent = 0xFF14F195, accent2 = 0xFFB98CFF, ink = 0xFFF3EEFF, muted = 0xFFB3A7D4, amber = 0xFFFFC24B, red = 0xFFFF5A6A,
-        premium = true, grain = 0.03f,
+        premium = false, grain = 0.03f,
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
+    )
+
+    /**
+     * Home, with a living edge.
+     *
+     * Every colour is Halo's, unchanged — the point was never a new palette. The
+     * only difference is the hairline around each card, where Solana's purple and
+     * green slide past each other instead of sitting still. A theme is allowed to
+     * change one thing.
+     */
+    val flow = p(
+        "flow", R.string.theme_flow,
+        ground = 0xFF070B12, ground2 = 0xFF0E131A, card = 0xFF222B33, cardSoft = 0xFF171D25, cardHi = 0xFF313B44, stroke = 0xFF1F5E4C,
+        accent = 0xFF4DFFD0, accent2 = 0xFF4CC9FF, ink = 0xFFE6EEFB, muted = 0xFF9BAEC6, amber = 0xFFFFC24B, red = 0xFFFF5A6A,
+        premium = false, grain = 0f,
+        fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily), livingStroke = true,
     )
 
     /** Seeker (SKR): black, near-mono, one green accent — the device's own look. */
@@ -183,13 +211,22 @@ object Palettes {
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
-    val all: List<HaloPalette> = listOf(halo, mintSoft, mintNeon, cyanAct, gold, solana, skr, aurora, ember, phosphor)
+    val all: List<HaloPalette> = listOf(halo, mintSoft, mintNeon, cyanAct, gold, flow, solana, skr, aurora, ember, phosphor)
 
     /** The built-ins plus the user's custom palette (always last). */
     fun withCustom(ctx: android.content.Context): List<HaloPalette> = all + CustomTheme.palette(ctx)
 
+    /**
+     * The theme a phone starts with, and what an unknown id falls back to.
+     *
+     * Not [halo] any more. Menta is the same palette with the accent mixed back
+     * towards the card on large filled surfaces, and on a big button that is the
+     * difference between a colour and a glare.
+     */
+    val default: HaloPalette get() = mintSoft
+
     fun byId(id: String?): HaloPalette =
-        if (id == CustomTheme.ID) CustomThemeHolder else all.firstOrNull { it.id == id } ?: halo
+        if (id == CustomTheme.ID) CustomThemeHolder else all.firstOrNull { it.id == id } ?: default
 
     /** A process-lifetime cache of the custom palette so `byId` stays cheap and non-Context. */
     internal var CustomThemeHolder: HaloPalette = halo
@@ -294,7 +331,7 @@ object CustomTheme {
  * is the only writer (main thread).
  */
 object Halo {
-    var palette: HaloPalette by mutableStateOf(Palettes.halo)
+    var palette: HaloPalette by mutableStateOf(Palettes.default)
 
     val ground: Color get() = palette.ground
     val ground2: Color get() = palette.ground2

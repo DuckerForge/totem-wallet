@@ -69,6 +69,15 @@ object ReceiptEngine {
         requireSim: Boolean,
         /** Mints the caller expects to receive; see [SolanaRpc.simulateEffects]. */
         expectMints: List<String> = emptyList(),
+        /**
+         * This payload comes after another one in the same batch.
+         *
+         * A transaction that needs an account the previous transaction creates
+         * fails when simulated on its own, and that failure is honest: it is not
+         * evidence of anything wrong. Only the first of a batch can be judged by
+         * its own simulation.
+         */
+        dependent: Boolean = false,
     ): Analyzed = coroutineScope {
         val rpc = SolanaRpc.urlFor(cluster)
         // Trust from the local address book: enables trusted/known badges and
@@ -161,13 +170,25 @@ object ReceiptEngine {
 
         val simRisk = when (outcome) {
             is SolanaRpc.SimOutcome.Ok -> null
+            // The node ran it and it errored. That is not a doubt, it is an answer:
+            // this transaction fails on chain, and signing it burns a fee to
+            // achieve nothing. It used to be graded by [requireSim], which meant
+            // the swap screen showed the error in amber and left "hold to swap"
+            // perfectly pressable underneath it. "It ran and failed" and "I could
+            // not ask" are opposites, and only the second one is a maybe.
             is SolanaRpc.SimOutcome.Failed -> Risk(
                 RiskFlag.SIMULATION_FAILED,
-                if (requireSim) Severity.DANGER else Severity.WARN,
-                ctx.getString(R.string.risk_sim_failed, outcome.err),
+                if (dependent) Severity.WARN else Severity.DANGER,
+                // In words when we know them, and the node's own text when we do
+                // not. Never only the JSON: nobody can act on an instruction index.
+                com.clearsign.core.SimError.explain(outcome.err, deviceLocaleTag() == "it")
+                    ?: ctx.getString(R.string.risk_sim_failed, outcome.err),
             )
+            // Not the same flag as a failure on purpose: "I could not ask" is a
+            // maybe and a retry, "it ran and failed" is an answer. Downstream the
+            // agent's collar refuses both, and the loop needs to tell them apart.
             SolanaRpc.SimOutcome.Unavailable -> Risk(
-                RiskFlag.SIMULATION_FAILED,
+                RiskFlag.SIMULATION_UNAVAILABLE,
                 Severity.WARN,
                 ctx.getString(R.string.risk_sim_unavailable),
             )
@@ -210,7 +231,9 @@ object ReceiptEngine {
 
     /** Analyze every payload concurrently (bounds latency to ~1 analysis). */
     suspend fun analyzeAll(ctx: Context, scanner: TransactionScanner, payloads: List<ByteArray>, myWallet: String, cluster: String?, requireSim: Boolean): List<Analyzed> =
-        coroutineScope { payloads.map { p -> async { analyze(ctx, scanner, p, myWallet, cluster, requireSim) } }.map { it.await() } }
+        coroutineScope {
+            payloads.mapIndexed { i, p -> async { analyze(ctx, scanner, p, myWallet, cluster, requireSim, dependent = i > 0) } }.map { it.await() }
+        }
 
     /**
      * Anti-TOCTOU: re-simulate each payload in the instant before signing and abort

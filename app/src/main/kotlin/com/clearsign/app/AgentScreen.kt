@@ -1,169 +1,510 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.clearsign.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clearsign.core.AgentMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * The Agent Gate, given a home of its own.
+ * The Agent tab, in two depths.
  *
- * It used to hide behind a scan icon, which made the one feature nobody else has
- * the hardest to find. Here it explains itself, hands over the address an agent
- * needs, opens the scanner, and lists what has already been signed for an agent.
+ * Simple answers the three questions a person actually has, in order: is it
+ * working, what does it hold, what did it do. One line of state, one block of
+ * money, two buttons, the open coins, the last moves, and a row of small chips
+ * for the rest. No paragraphs: the guarantees live behind one link.
+ *
+ * Pro, a switch at the top that is remembered, adds everything else underneath:
+ * the model, the collar's numbers, lane and targets with the shadow book, the
+ * live trace, and the bridge to an agent on a computer. The tab used to show
+ * all of it to everyone, seven paragraphs and twenty buttons on one scroll, and
+ * half of it about a bridge to a PC that most people will never run.
  */
 @Composable
 internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> Unit = {}) {
     val ctx = LocalContext.current
-    val clip = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    var refresh by remember { mutableIntStateOf(0) }
+    val session = remember(refresh) { SessionWallet.current(ctx) }
+    val policy = remember(refresh) { SessionWallet.policy(ctx) }
+    val history = remember(refresh) { SessionWallet.history(ctx) }
+    val cfg = remember(refresh) { TraderLoop.config(ctx) }
+    val link by AgentLink.state.collectAsState()
+    val pro by Settings.agentPro
+    /** The account we pay from: the live connection, or the one this phone watches. */
+    val account = owner ?: Settings.watchWallet(ctx)
+
+    var balance by remember(refresh, session?.pubkey) { mutableStateOf<Long?>(null) }
+    var invested by remember(refresh, session?.pubkey) { mutableStateOf<Long?>(null) }
+    var busy by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var showNew by remember { mutableStateOf(false) }
+    var showRules by remember { mutableStateOf(false) }
+    var showTopUp by remember { mutableStateOf(false) }
+    var showLane by remember { mutableStateOf(false) }
+    var showTruth by remember { mutableStateOf(false) }
+    var showLinkHelp by remember { mutableStateOf(false) }
+    var lucky by remember { mutableStateOf(false) }
+    var coins by remember { mutableStateOf<List<SolanaRpc.TokenAccountInfo>>(emptyList()) }
     var scanError by remember { mutableStateOf<String?>(null) }
     val scan = rememberAgentScan { scanError = it }
-    val signed = remember(owner) { runCatching { Ledger.all(ctx).filter { it.kind == "agent" } }.getOrDefault(emptyList()).sortedByDescending { it.at }.take(6) }
+
+    LaunchedEffect(Unit) { AgentLink.restoreState(ctx) }
+    LaunchedEffect(session?.pubkey, refresh) {
+        val pub = session?.pubkey ?: return@LaunchedEffect
+        balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() }
+        // What the coins it bought are worth right now. Without this the SOL left
+        // over would be called the result, and the minute the agent bought
+        // anything it would look like it had lost the money.
+        invested = Positions.open(ctx).sumOf { p -> runCatching { SessionActions.quoteValue(ctx, p) }.getOrNull() ?: 0L }
+    }
+
+    fun closeNow() {
+        val pub = SessionWallet.current(ctx)?.pubkey ?: return
+        busy = ctx.getString(R.string.env_closing)
+        scope.launch {
+            AgentLinkService.revoke(ctx)
+            val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() } ?: 0L
+            val fee = 5_000L
+            if (account != null && left > fee) SessionActions.sweep(ctx, account, left - fee)?.let { note = it }
+            SessionWallet.forget(ctx)
+            busy = null; coins = emptyList(); refresh++
+        }
+    }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Name, one line of context, and the one switch this page has.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(38.dp).clip(rs(12)).background(Halo.mint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                HaloIcon(HIcon.PIGEON, Halo.mint, 22.dp)
+            Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(38.dp).clip(rs(12)).background(Halo.mint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    HaloIcon(HIcon.PIGEON, Halo.mint, 22.dp)
+                }
+                SweepHalo(Halo.mint, Modifier.size(38.dp), key = FirstRun.at)
             }
             Spacer(Modifier.width(12.dp))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.tab_agent), style = HaloType.screen, color = Halo.ink)
-                Text(stringResource(R.string.agent_tab_sub), style = HaloType.small, color = Halo.muted)
+                Text(
+                    when (val l = link) {
+                        is AgentLink.State.On -> stringResource(R.string.agent_link_to, l.name)
+                        else -> stringResource(R.string.agent_tab_sub)
+                    },
+                    style = HaloType.small, color = Halo.muted, maxLines = 2,
+                )
             }
+            ProSwitch(pro) { Settings.setAgentPro(ctx, it); Haptics.tick(ctx) }
         }
 
-        // Pocket one: the envelope, with its collar. This is where autonomy lives.
-        AgentCard(owner, signer, onLink = { scan() }, onChat = onChat)
-
-        // Pocket two: the Seed Vault account. Nothing here is ever pre-authorised.
-        GlassCard {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 16.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.agent_state_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Halo.mint)
-                }
-                Text(stringResource(R.string.agent_state_body), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted, lineHeight = 18.sp)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Counted, not asserted. Autonomous signings are recorded against
-                    // the budget key, so the old `wallet == owner` test never saw them.
-                    AgentStat(signed.size.toString(), stringResource(R.string.agent_stat_signed), Modifier.weight(1f))
-                    AgentStat(
-                        signed.firstOrNull()?.let { e ->
-                            android.text.format.DateUtils.getRelativeTimeSpanString(e.at, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString()
-                        } ?: "—",
-                        stringResource(R.string.agent_stat_last), Modifier.weight(1f),
-                    )
-                    // The screen used to swear "never" in a hardcoded string while the
-                    // budget above it signed on its own. Say the real number.
-                    val alone = signed.count { it.host == "auto" }
-                    AgentStat(
-                        if (alone == 0) stringResource(R.string.agent_stat_auto_value) else alone.toString(),
-                        stringResource(R.string.agent_stat_auto), Modifier.weight(1f),
-                        if (alone == 0) Halo.mint else Halo.amber,
-                    )
+        if (session == null || policy == null) {
+            // No budget: one card, one sentence, two ways in. The chat needs no
+            // budget, because it can only ever propose.
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.agent_nobudget_title), style = HaloType.title, color = Halo.ink)
+                    Text(stringResource(R.string.env_none), style = HaloType.small, color = Halo.muted)
+                    PrimaryButton(stringResource(R.string.env_create), danger = false, enabled = owner != null, icon = HIcon.HOURGLASS) { showNew = true }
+                    GhostButton(stringResource(R.string.chat_open), Modifier.fillMaxWidth(), HIcon.PIGEON, tint = Halo.cyan) { onChat() }
+                    if (owner == null) Text(stringResource(R.string.agent_tab_none), style = HaloType.small, color = Halo.amber)
                 }
             }
-        }
+        } else {
+            AgentPulse(refresh)
 
-        GlassCard {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.agent_tab_how), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted, lineHeight = 18.sp)
-                PrimaryButton(stringResource(R.string.gate_scan), danger = false, icon = HIcon.SCAN) { scan() }
-                scanError?.let { Banner(it, Halo.amber, HIcon.WARNING) }
+            // The money, in the order a person asks: how much is here, how did
+            // it go, and the three numbers behind that.
+            val inCoins = invested ?: 0L
+            val total = (balance ?: 0L) + inCoins
+            val diff = if (balance == null) null else total - session.fundedLamports + session.harvestedLamports
+            val openCount = Positions.open(ctx).size
+            Column(
+                Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.panel)).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(if (balance == null) "…" else fmtSol(total, 4), style = HaloType.amount, color = Halo.ink)
+                    Spacer(Modifier.width(6.dp))
+                    Text("SOL", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.muted, modifier = Modifier.padding(bottom = 6.dp))
+                    Spacer(Modifier.weight(1f))
+                    if (diff != null && diff != 0L) {
+                        val pct = if (session.fundedLamports > 0) diff * 100.0 / session.fundedLamports else 0.0
+                        Text(
+                            (if (diff > 0) "+" else "−") + fmtSol(kotlin.math.abs(diff), 4) + String.format(" (%+.1f%%)", pct),
+                            fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, style = Tabular,
+                            color = if (diff > 0) Halo.mint else Halo.red, modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                }
+                Text(
+                    if (openCount > 0) stringResource(R.string.agent_hero_line, fmtSol(balance ?: 0L, 3), openCount, fmtSol(inCoins, 3), fmtSol(history.spentLast24hLamports, 3), fmtSol(policy.dailyLamports, 3))
+                    else stringResource(R.string.agent_hero_line_flat, fmtSol(balance ?: 0L, 3), fmtSol(history.spentLast24hLamports, 3), fmtSol(policy.dailyLamports, 3)),
+                    fontFamily = Mono, fontSize = 11.5.sp, color = Halo.muted, style = Tabular,
+                )
+                if (session.expired) Banner(stringResource(R.string.env_expired_note), Halo.amber, HIcon.HOURGLASS)
             }
-        }
 
-        // The one thing the agent needs from you, ready to copy.
-        GlassCard {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.agent_tab_wallet), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
-                if (owner == null) {
-                    Text(stringResource(R.string.agent_tab_none), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.amber)
+            // The two things you do here. Starting is a choice of lane, so it
+            // opens a small sheet rather than flipping a switch.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (cfg.on) {
+                    GhostButton(stringResource(R.string.trader_stop_action), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber) {
+                        TraderLoop.stop(ctx, ctx.getString(R.string.trader_stopped_by_you)); TraderKeeper.sync(ctx); refresh++
+                    }
                 } else {
-                    Text(owner, fontFamily = Mono, fontSize = 12.sp, color = Halo.ink, lineHeight = 18.sp)
-                    GhostButton(stringResource(R.string.copy), Modifier.fillMaxWidth(), HIcon.COPY, tint = Halo.cyan) {
-                        clip.setText(AnnotatedString(owner)); Haptics.tick(ctx)
+                    GhostButton(stringResource(R.string.agent_start), Modifier.weight(1f), HIcon.PIGEON, tint = Halo.mint) { showLane = true }
+                }
+                Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.PIGEON) { onChat() } }
+            }
+
+            val open = remember(refresh) { Positions.open(ctx) }
+            if (open.isNotEmpty()) {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(stringResource(R.string.agent_positions).uppercase(), style = HaloType.label, color = Halo.muted)
+                        open.forEach { pos -> PositionRow(pos) { refresh++ } }
                     }
                 }
             }
-        }
 
-        GlassCard {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.agent_tab_recent), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
-                if (signed.isEmpty()) {
-                    Text(stringResource(R.string.agent_tab_empty), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted)
-                } else {
-                    signed.forEach { e ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val refused = e.host == "refused"
-                            HaloIcon(if (refused) HIcon.BLOCK else if (e.sent) HIcon.CHECK else HIcon.PEN, if (refused) Halo.red else Halo.mint, 15.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(e.dApp + agentHow(ctx, e.host), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, maxLines = 1)
-                                if (refused && e.note.isNotBlank()) Text(e.note, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.red, maxLines = 2, lineHeight = 14.sp)
-                                Text(
-                                    android.text.format.DateUtils.getRelativeTimeSpanString(e.at, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString(),
-                                    fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted,
-                                )
-                            }
-                            val out = e.outflows.firstOrNull()
-                            if (out != null) {
-                                Text(
-                                    "−" + fmtUi(kotlin.math.abs(out.uiAmount)) + " " + out.symbol,
-                                    fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.ink, style = Tabular, maxLines = 1,
-                                )
-                            }
+            RecentMoves(refresh)
+
+            // Everything else, small. Each opens the same sheet it always did.
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (account != null) SmallChip(stringResource(R.string.env_add), HIcon.DOWNLOAD, tint = Halo.cyan) { showTopUp = true }
+                val gain = ((balance ?: 0L) - session.fundedLamports).coerceAtLeast(0L)
+                if (gain > 5_000L && account != null) {
+                    SmallChip(stringResource(R.string.env_harvest_now), HIcon.DOWNLOAD, tint = Halo.mint) {
+                        busy = ctx.getString(R.string.env_harvest_now)
+                        scope.launch {
+                            val took = SessionActions.harvest(ctx, account, force = true)
+                            busy = null
+                            note = if (took == null) ctx.getString(R.string.env_harvest_failed) else if (took > 0) ctx.getString(R.string.env_harvest_done, fmtSol(took, 5)) else null
+                            refresh++
                         }
                     }
                 }
+                SmallChip(stringResource(R.string.agent_rules), HIcon.SHIELD_LOCK, tint = Halo.cyan) { showRules = true }
+                if (inCoins > 0) {
+                    SmallChip(stringResource(R.string.env_sell_all), HIcon.SWAP, tint = Halo.amber) {
+                        busy = ctx.getString(R.string.env_sell_all_busy)
+                        scope.launch {
+                            val stuck = runCatching { SessionActions.sellAll(ctx) }.getOrDefault(listOf("?"))
+                            busy = null
+                            note = if (stuck.isEmpty()) ctx.getString(R.string.env_sell_all_done) else ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
+                            refresh++
+                        }
+                    }
+                }
+                SmallChip(stringResource(R.string.env_close), HIcon.BLOCK, tint = Halo.red) {
+                    // Look inside before the key disappears: a coin left in a
+                    // closed budget is a coin nobody can ever reach again.
+                    busy = ctx.getString(R.string.env_closing)
+                    scope.launch {
+                        val inside = runCatching { SessionActions.holdings(ctx) }.getOrDefault(emptyList())
+                        busy = null
+                        if (inside.isEmpty()) closeNow() else coins = inside
+                    }
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth().clip(rs(Radius.row)).clickable { showTruth = true }.padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HaloIcon(HIcon.INFO, Halo.muted, 14.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.agent_truth_link), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f))
+                HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 14.dp)
             }
         }
 
-        Text(stringResource(R.string.agent_tab_setup), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 16.sp)
+        busy?.let { Working(it) }
+        note?.let { Banner(it, Halo.amber, HIcon.WARNING) }
+
+        if (pro) {
+            Spacer(Modifier.height(4.dp))
+            Text(stringResource(R.string.agent_pro).uppercase(), style = HaloType.label, color = Halo.amber)
+
+            ProSection(stringResource(R.string.pro_model), HIcon.KEY, openAtFirst = !Brain.configured(ctx)) { BrainFields() }
+
+            if (session != null && policy != null) {
+                ProSection(stringResource(R.string.pro_collar), HIcon.SHIELD_LOCK) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ModeChip(stringResource(R.string.agent_mode_off), policy.mode == AgentMode.OFF, Halo.muted, Modifier.weight(1f)) { SessionWallet.setMode(ctx, AgentMode.OFF); refresh++ }
+                        ModeChip(stringResource(R.string.agent_mode_auto), policy.mode == AgentMode.AUTONOMOUS, Halo.mint, Modifier.weight(1.4f)) { SessionWallet.setMode(ctx, AgentMode.AUTONOMOUS); refresh++ }
+                        ModeChip(stringResource(R.string.agent_mode_ask), policy.mode == AgentMode.ASK_ALWAYS, Halo.cyan, Modifier.weight(1.2f)) { SessionWallet.setMode(ctx, AgentMode.ASK_ALWAYS); refresh++ }
+                    }
+                    StatRow(stringResource(R.string.agent_per_tx), fmtSol(policy.perTxLamports, 4) + " SOL")
+                    StatRow(stringResource(R.string.agent_daily), fmtSol(policy.dailyLamports, 4) + " SOL")
+                    StatRow(stringResource(R.string.agent_ask_above), fmtSol(policy.askAboveLamports, 4) + " SOL")
+                    StatRow(stringResource(R.string.agent_per_hour), policy.maxTxPerHour.toString())
+                    StatRow(stringResource(R.string.env_put_in), fmtSol(session.fundedLamports, 4) + " SOL")
+                    if (session.harvestedLamports > 0) StatRow(stringResource(R.string.env_harvested), "+" + fmtSol(session.harvestedLamports, 5) + " SOL", accent = true)
+                    StatRow(stringResource(R.string.env_expiry), if (session.expired) stringResource(R.string.env_expired) else stringResource(R.string.env_days, session.daysLeft))
+                    GhostButton(stringResource(R.string.agent_rules), Modifier.fillMaxWidth(), HIcon.SHIELD_LOCK, tint = Halo.cyan) { showRules = true }
+                }
+
+                ProSection(stringResource(R.string.pro_trading), HIcon.GEM) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(if (cfg.bold) R.string.trader_lane_bold else R.string.trader_lane_careful),
+                            fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f),
+                        )
+                        Text(stringResource(R.string.trader_targets, cfg.takeProfitPct, cfg.stopLossPct), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
+                    }
+                    TraderLoop.lastNote(ctx)?.let { Text(it, style = HaloType.small, color = Halo.muted, lineHeight = 16.sp) }
+                    Text(stringResource(R.string.trader_truth), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+                    GhostButton(stringResource(R.string.lucky_title), Modifier.fillMaxWidth(), HIcon.GEM, tint = Halo.cyan) { lucky = true }
+                    PaperCard(refresh) { refresh++ }
+                }
+            }
+
+            ProSection(stringResource(R.string.pro_trace), HIcon.PIGEON) { AgentConsole() }
+
+            // The bridge to an agent on a computer: the four cards the tab used
+            // to open with, folded into one section for the people who run one.
+            ProSection(stringResource(R.string.pro_pc), HIcon.SCAN) {
+                Text(stringResource(R.string.agent_tab_how), style = HaloType.small, color = Halo.muted, lineHeight = 18.sp)
+                if (owner != null) {
+                    val clip = LocalClipboardManager.current
+                    Text(stringResource(R.string.agent_tab_wallet), style = HaloType.label, color = Halo.muted)
+                    Text(owner, fontFamily = Mono, fontSize = 11.5.sp, color = Halo.ink, lineHeight = 17.sp)
+                    GhostButton(stringResource(R.string.copy), Modifier.fillMaxWidth(), HIcon.COPY, tint = Halo.cyan) { clip.setText(AnnotatedString(owner)); Haptics.tick(ctx) }
+                } else {
+                    Text(stringResource(R.string.agent_tab_none), style = HaloType.small, color = Halo.amber)
+                }
+                PrimaryButton(stringResource(R.string.gate_scan), danger = false, icon = HIcon.SCAN) { scan() }
+                if (session != null) {
+                    if (link is AgentLink.State.On) {
+                        GhostButton(stringResource(R.string.agent_unlink), Modifier.fillMaxWidth(), HIcon.BLOCK, tint = Halo.amber) { AgentLinkService.revoke(ctx); refresh++ }
+                    } else {
+                        GhostButton(stringResource(R.string.agent_link_btn), Modifier.fillMaxWidth(), HIcon.SCAN, tint = Halo.muted) { showLinkHelp = true }
+                    }
+                }
+                scanError?.let { Banner(it, Halo.amber, HIcon.WARNING) }
+                Text(stringResource(R.string.agent_tab_setup), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+            }
+        }
         Spacer(Modifier.height(8.dp))
+    }
+
+    if (showNew && owner != null) NewEnvelopeSheet(owner, signer, onDone = { showNew = false; refresh++ }, onDismiss = { showNew = false })
+    if (showLinkHelp) LinkHelpSheet(onScan = { showLinkHelp = false; scan() }) { showLinkHelp = false }
+    if (lucky) LuckySheet(onDone = { refresh++ }) { lucky = false }
+    if (showTruth) TruthSheet { showTruth = false }
+    if (showLane) LaneSheet(onStarted = { showLane = false; refresh++ }) { showLane = false }
+    if (coins.isNotEmpty()) {
+        ClosingCoinsSheet(
+            coins = coins,
+            onSell = {
+                busy = ctx.getString(R.string.env_closing)
+                scope.launch {
+                    val stuck = runCatching { SessionActions.sellAll(ctx) }.getOrDefault(emptyList())
+                    if (stuck.isEmpty()) closeNow() else { busy = null; note = ctx.getString(R.string.env_stuck, stuck.joinToString(", ")) }
+                }
+            },
+            onMove = {
+                val to = account
+                if (to == null) note = ctx.getString(R.string.sv_not_connected) else {
+                    busy = ctx.getString(R.string.env_closing)
+                    scope.launch {
+                        val stuck = runCatching { SessionActions.moveTokensTo(ctx, to) }.getOrDefault(emptyList())
+                        if (stuck.isEmpty()) closeNow() else { busy = null; note = ctx.getString(R.string.env_stuck, stuck.joinToString(", ")) }
+                    }
+                }
+            },
+            onDismiss = { coins = emptyList() },
+        )
+    }
+    if (showTopUp && account != null) {
+        SessionWallet.current(ctx)?.let { s -> TopUpSheet(account, signer, s, onDone = { showTopUp = false; refresh++ }, onDismiss = { showTopUp = false }) }
+    }
+    if (showRules && session != null && policy != null && owner != null) {
+        RulesSheet(policy, session, owner, onDone = { showRules = false; refresh++ }, onDismiss = { showRules = false })
+    }
+}
+
+/** The one switch: Simple or Pro, as a small pill that reads as a toggle. */
+@Composable
+private fun ProSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
+    val tint = if (on) Halo.amber else Halo.muted
+    Row(
+        Modifier.clip(rs(Radius.pill)).background(tint.copy(alpha = if (on) 0.16f else 0.08f)).border(1.dp, tint.copy(alpha = 0.6f), rs(Radius.pill))
+            .clickable { onChange(!on) }.padding(horizontal = 11.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(rs(Radius.pill)).background(tint))
+        Spacer(Modifier.width(6.dp))
+        Text(stringResource(R.string.agent_pro), fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = tint)
+    }
+}
+
+/** A Pro section: a title you tap, and its content when open. Closed by default, so the page stays a page. */
+@Composable
+private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false, content: @Composable () -> Unit) {
+    var open by remember(title) { mutableStateOf(openAtFirst) }
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
+                HaloIcon(icon, Halo.amber, 15.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(title, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Halo.ink, modifier = Modifier.weight(1f))
+                HaloIcon(HIcon.CHEVRON_DOWN, Halo.muted, 14.dp, Modifier.rotate(if (open) 180f else 0f))
+            }
+            if (open) content()
+        }
+    }
+}
+
+/**
+ * What the agent did last, five lines. Each is a ledger row, so the receipt
+ * behind it is one tab away; here it is the sentence, the sum, and when.
+ */
+@Composable
+private fun RecentMoves(refresh: Int) {
+    val ctx = LocalContext.current
+    val recent = remember(refresh) {
+        runCatching { Ledger.all(ctx).filter { it.kind == "agent" } }.getOrDefault(emptyList()).sortedByDescending { it.at }.take(5)
+    }
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(stringResource(R.string.agent_recent).uppercase(), style = HaloType.label, color = Halo.muted)
+            if (recent.isEmpty()) {
+                Text(stringResource(R.string.agent_recent_none), style = HaloType.small, color = Halo.muted)
+            }
+            recent.forEach { e ->
+                val refused = e.host == "refused" || e.host == "expired"
+                val tint = if (refused) Halo.red else if (e.host == "asked") Halo.cyan else Halo.mint
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HaloIcon(if (refused) HIcon.BLOCK else if (e.sent) HIcon.CHECK else HIcon.PEN, tint, 14.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        val out = e.outflows.firstOrNull()
+                        val inn = e.inflows.firstOrNull()
+                        Text(
+                            when {
+                                out != null && inn != null -> fmtUi(kotlin.math.abs(out.uiAmount)) + " " + out.symbol + " → " + inn.symbol
+                                out != null -> "−" + fmtUi(kotlin.math.abs(out.uiAmount)) + " " + out.symbol
+                                else -> e.dApp
+                            } + agentHow(ctx, e.host),
+                            fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, maxLines = 1,
+                        )
+                        if (refused && e.note.isNotBlank()) Text(e.note, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.red, maxLines = 2, lineHeight = 14.sp)
+                    }
+                    Text(
+                        android.text.format.DateUtils.getRelativeTimeSpanString(e.at, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString(),
+                        fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Starting is a choice of lane, said in the two words people in crypto use.
+ * The reason it cannot start, when there is one, is here before the button,
+ * not six minutes later in a note.
+ */
+@Composable
+private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var bold by remember { mutableStateOf(TraderLoop.config(ctx).bold) }
+    val blocked = remember { TraderLoop.cannotStart(ctx) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(R.string.lane_title), style = HaloType.title, color = Halo.ink)
+            Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModeChip(stringResource(R.string.trader_careful), !bold, Halo.mint, Modifier.weight(1f)) { bold = false }
+                ModeChip(stringResource(R.string.trader_bold), bold, Halo.amber, Modifier.weight(1f)) { bold = true }
+            }
+            blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
+            PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.PIGEON) {
+                TraderLoop.setConfig(ctx, TraderLoop.config(ctx).copy(on = true, bold = bold))
+                TraderKeeper.sync(ctx)
+                Haptics.tick(ctx)
+                onStarted()
+            }
+            GhostButton(stringResource(R.string.cancel), Modifier.fillMaxWidth()) { onDismiss() }
+        }
+    }
+}
+
+/** The guarantees, all of them, in one place, for whoever asks. Off the page, because the page is for what is happening. */
+@Composable
+private fun TruthSheet(onDismiss: () -> Unit) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(stringResource(R.string.agent_truth_link), style = HaloType.title, color = Halo.ink)
+            TruthBlock(HIcon.SHIELD_LOCK, stringResource(R.string.agent_state_title), stringResource(R.string.agent_state_body))
+            TruthBlock(HIcon.HOURGLASS, stringResource(R.string.agent_card_title), stringResource(R.string.env_truth))
+            TruthBlock(HIcon.PIGEON, stringResource(R.string.chat_title), stringResource(R.string.brain_truth))
+            GhostButton(stringResource(R.string.close), Modifier.fillMaxWidth()) { onDismiss() }
+        }
     }
 }
 
 @Composable
-private fun AgentStat(value: String, label: String, modifier: Modifier, tint: androidx.compose.ui.graphics.Color = Halo.ink) {
-    Column(
-        modifier.clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)).padding(horizontal = 9.dp, vertical = 9.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Text(value, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = tint, style = Tabular, maxLines = 1)
-        Text(label, fontFamily = Inter, fontSize = 9.sp, color = Halo.muted, maxLines = 2, lineHeight = 10.sp)
+private fun TruthBlock(icon: HIcon, title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloIcon(icon, Halo.mint, 15.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(title, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Halo.ink)
+        }
+        Text(body, style = HaloType.small, color = Halo.muted)
     }
 }

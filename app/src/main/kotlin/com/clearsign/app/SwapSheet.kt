@@ -22,6 +22,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -65,14 +67,21 @@ private val POPULAR = listOf(
 private sealed interface SwapState {
     data object Form : SwapState
     data object Building : SwapState
-    data class Review(val tx: ByteArray, val analyzed: ReceiptEngine.Analyzed, val outUi: String, val outSym: String, val quote: Jupiter.Quote) : SwapState
+    data class Review(
+        val tx: ByteArray, val analyzed: ReceiptEngine.Analyzed, val outUi: String, val outSym: String,
+        val quote: Jupiter.Quote,
+        /** The trade as the quote describes it, so the picture survives a failed simulation. */
+        val pair: SwapPair,
+        /** When this price was fetched, so the screen can say how fresh it is. */
+        val at: Long = 0L,
+    ) : SwapState
     data object Signing : SwapState
     data class Done(val signature: String) : SwapState
     data class Error(val message: String) : SwapState
 }
 
 @Composable
-internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> Unit) {
+internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? = null, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -83,12 +92,25 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
     var picking by remember { mutableStateOf<Side?>(null) }
     var from by remember { mutableStateOf(POPULAR[0]) }              // SOL by default
     var to by remember { mutableStateOf(POPULAR[1]) }                // USDC by default
+
+    // Opened from the market tab with a coin in mind: that coin is what we are
+    // buying, and SOL is what we are buying it with. The registry has to answer
+    // first, because a token with no decimals cannot be swapped into.
+    LaunchedEffect(buyMint) {
+        val mint = buyMint ?: return@LaunchedEffect
+        val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(mint)) }.getOrNull()?.get(mint) } ?: return@LaunchedEffect
+        to = PickToken.of(t)
+        from = POPULAR[0]
+    }
     var amount by remember { mutableStateOf("") }
     var quote by remember { mutableStateOf<Jupiter.Quote?>(null) }
     var safety by remember { mutableStateOf<com.clearsign.core.TokenSafety?>(null) }
     var checking by remember { mutableStateOf(false) }
     var quoting by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
+    var editingPct by remember { mutableStateOf(false) }
+    // A fresher quote that goes somewhere else. Offered, never applied behind your back.
+    var newRoute by remember { mutableStateOf<SwapState.Review?>(null) }
 
     val currency = Settings.currency.value
     LaunchedEffect(owner, currency) {
@@ -112,13 +134,75 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
         safety = withContext(Dispatchers.IO) {
             val tok = JupiterTokens.cached(to.mint) ?: JupiterTokens.byMints(listOf(to.mint))[to.mint]
             val out = runCatching { Jupiter.sellableBack(to.mint, tok?.decimals ?: to.decimals, tok?.usd ?: to.usd) }.getOrNull()
-            tok?.facts(out)?.let { com.clearsign.core.assessToken(it) }
+            // Read the mint itself before the money moves. The registry cannot see
+            // a permanent delegate, and a permanent delegate is somebody who can
+            // take this coin back out of your wallet afterwards.
+            val ext = tok?.let { TokenExtensions.of(to.mint, it.token2022) }
+            tok?.facts(out, ext)?.let { com.clearsign.core.assessToken(it) }
         }
         checking = false
     }
 
     val fromBalance = owned.firstOrNull { it.mint == from.mint }?.balance ?: 0L
     val rawIn = parseRaw(amount, from.decimals)
+
+    /**
+     * Quote → transaction → receipt, in one place.
+     *
+     * Written once because it happens twice: when you press Review, and every
+     * fifteen seconds afterwards while you are still looking at it. A quote goes
+     * stale, and so does the blockhash inside the transaction it built, so a
+     * review screen left open for a minute was showing a price that no longer
+     * existed on a transaction that would no longer land.
+     */
+    suspend fun buildReview(q: Jupiter.Quote, raw: Long): SwapState = try {
+        // Decided before anything is built: a quote that carries a platform fee
+        // can only be built with the account that fee is paid into, so the two
+        // have to agree. No account, no fee, and the swap works.
+        val feeAccount = withContext(Dispatchers.IO) { Jupiter.feeAccountIfUsable(to.mint) }
+        val priced = if (feeAccount != null) q else withContext(Dispatchers.IO) {
+            Jupiter.quote(from.mint, to.mint, raw, feeBps = 0) ?: q
+        }
+        val tx = withContext(Dispatchers.IO) {
+            Jupiter.swapTransaction(priced, owner, feeAccount) ?: Jupiter.swapTransaction(priced, owner, null)
+        }
+        if (tx == null) SwapState.Error(ctx.getString(R.string.swap_build_failed)) else {
+            val analyzed = withContext(Dispatchers.IO) { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, owner, null, requireSim = false) }
+            SwapState.Review(
+                tx, swapReceipt(ctx, analyzed, owner, priced),
+                fmtUnits(priced.outAmount, to.decimals), to.symbol, priced,
+                SwapPair(
+                    outMint = from.mint, outSymbol = from.symbol, outUi = fmtUnits(priced.inAmount, from.decimals),
+                    inMint = to.mint, inSymbol = to.symbol, inUi = fmtUnits(priced.outAmount, to.decimals),
+                ),
+                at = System.currentTimeMillis(),
+            )
+        }
+    } catch (e: Exception) {
+        SwapState.Error(e.message ?: ctx.getString(R.string.swap_build_failed))
+    }
+
+    /**
+     * While the review is open the price keeps moving, so the review keeps up.
+     *
+     * With one hard limit. A new quote can come back with a **different route**:
+     * other pools, other accounts, a different number of destinations. Swapping
+     * that in silently means the picture you were reading became a picture of
+     * another transaction while you read it, and on this screen of all screens
+     * that is not allowed. Prices move on their own; the shape of the thing you
+     * are about to sign does not change without you saying so.
+     */
+    LaunchedEffect(state) {
+        val s = state as? SwapState.Review ?: return@LaunchedEffect
+        val raw = rawIn ?: return@LaunchedEffect
+        delay(15_000)
+        val fresh = withContext(Dispatchers.IO) { runCatching { Jupiter.quote(from.mint, to.mint, raw) }.getOrNull() }
+        if (fresh == null || state !== s) return@LaunchedEffect
+        val next = buildReview(fresh, raw) as? SwapState.Review ?: return@LaunchedEffect
+        val sameShape = next.quote.routeLabels == s.quote.routeLabels &&
+            next.analyzed.receipt.distributions.size == s.analyzed.receipt.distributions.size
+        if (sameShape) state = next else newRoute = next
+    }
 
     // Debounced quote whenever the inputs change.
     LaunchedEffect(from.mint, to.mint, amount) {
@@ -129,6 +213,13 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
         quote = withContext(Dispatchers.IO) { runCatching { Jupiter.quote(from.mint, to.mint, rawIn) }.getOrNull() }
         quoting = false
         if (quote == null) formError = ctx.getString(R.string.swap_quote_failed)
+    }
+
+    if (editingPct) {
+        CustomPercentSheet(
+            current = Settings.swapCustomPct.value,
+            onSave = { Settings.setSwapCustomPct(ctx, it); editingPct = false },
+        ) { editingPct = false }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
@@ -163,7 +254,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 // A full-height sheet has to say how to leave it: swiping it down is
                 // not something a person should have to discover.
                 Box(
-                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(1.dp, Halo.stroke, rs(999))
+                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999))
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
                 ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
@@ -173,7 +264,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 when (val s = state) {
                     SwapState.Form, SwapState.Building -> {
                         // FROM
-                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(18)).padding(14.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(14.dp)) {
                             Text(stringResource(R.string.swap_you_pay), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 OutlinedTextField(
@@ -187,16 +278,29 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                                 Spacer(Modifier.width(8.dp))
                                 TokenChip(from) { picking = Side.FROM }
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.send_available, fmtUnits(fromBalance, from.decimals) + " " + from.symbol), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular)
-                                Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.send_available, fmtUnits(fromBalance, from.decimals) + " " + from.symbol), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular)
+                            // Their own row: five of these next to the balance ran
+                            // off the side of the phone.
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 // Leave enough SOL behind to pay for the transaction itself.
                                 val spendable = if (from.mint == Jupiter.SOL_MINT) (fromBalance - 2_000_000L).coerceAtLeast(0) else fromBalance
-                                SmallChip("50%", null) { amount = fmtUnits(spendable / 2, from.decimals) }
-                                Spacer(Modifier.width(6.dp))
-                                SmallChip("75%", null) { amount = fmtUnits(spendable / 4 * 3, from.decimals) }
-                                Spacer(Modifier.width(6.dp))
+                                fun slice(pct: Int) { amount = fmtUnits(spendable / 100L * pct, from.decimals) }
+                                SmallChip("25%", null) { slice(25) }
+                                SmallChip("50%", null) { slice(50) }
+                                SmallChip("75%", null) { slice(75) }
                                 SmallChip(stringResource(R.string.send_max), null) { amount = fmtUnits(spendable, from.decimals) }
+                                // Yours. Tap to use it, hold to change it, and it is
+                                // still here tomorrow.
+                                val custom by Settings.swapCustomPct
+                                if (custom in 1..100) {
+                                    SmallChip("$custom%", null, tint = Halo.mint, onLongClick = { editingPct = true }, pulse = true) { slice(custom) }
+                                } else {
+                                    SmallChip(stringResource(R.string.swap_pct_custom), HIcon.PEN, tint = Halo.muted, pulse = true) { editingPct = true }
+                                }
                             }
                             Text(stringResource(R.string.swap_from_hint), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
                         }
@@ -205,7 +309,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                         // the two coins in the wrong order.
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Box(
-                                Modifier.size(38.dp).clip(rs(999)).background(Halo.card).border(1.dp, Halo.stroke, rs(999))
+                                Modifier.size(38.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999))
                                     .clickable {
                                         val q = quote
                                         val next = if (q != null) fmtUnits(q.outAmount, to.decimals) else ""
@@ -219,7 +323,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                             ) { HaloIcon(HIcon.SWAP, Halo.mint, 18.dp) }
                         }
                         // TO
-                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(18)).padding(14.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(14.dp)) {
                             Text(stringResource(R.string.swap_you_get), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -230,10 +334,17 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                             }
                         }
                         if (checking) Text(stringResource(R.string.safe_checking), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
+                        // What the thing you are buying has been doing. A name and a
+                        // number with no shape behind them is the part of a swap that
+                        // feels like a coin toss, and a line fixes it for nothing.
+                        Box(
+                            Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f))
+                                .border(cardBorder(), rs(16)).padding(14.dp),
+                        ) { PriceChart(to.mint, to.symbol) }
                         safety?.let { SafetyCard(it, to.symbol) }
                         // Quote details
                         quote?.let { q ->
-                            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f)).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
+                            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f)).border(cardBorder(), rs(16)).padding(14.dp)) {
                                 StatRow(stringResource(R.string.swap_rate), "1 ${from.symbol} ≈ " + rate(q, from.decimals, to.decimals) + " ${to.symbol}")
                                 StatRow(stringResource(R.string.swap_route), if (q.routeLabels.isEmpty()) "Jupiter" else "Jupiter · " + q.routeLabels.joinToString(", "))
                                 StatRow(stringResource(R.string.swap_impact), "%.2f%%".format(q.priceImpactPct * 100))
@@ -242,10 +353,25 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                         formError?.let { Banner(it, Halo.red, HIcon.WARNING) }
                         if (s is SwapState.Building) Working(stringResource(R.string.swap_building))
                     }
+                    // The coin was graded on the form, where you picked it. Saying
+                    // it again here is the same sentence twice on one screen.
                     is SwapState.Review -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        newRoute?.let { n ->
+                            Column(
+                                Modifier.fillMaxWidth().clip(rs(14)).background(Halo.amber.copy(alpha = 0.10f))
+                                    .border(1.dp, Halo.amber.copy(alpha = 0.45f), rs(14)).padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.swap_route_changed, fmtUnits(n.quote.outAmount, to.decimals), to.symbol),
+                                    fontFamily = Inter, fontSize = 12.5.sp, color = Halo.amber, lineHeight = 17.sp,
+                                )
+                                GhostButton(stringResource(R.string.swap_route_take), tint = Halo.amber) { state = n; newRoute = null }
+                            }
+                        }
                         SwapSummary(from, to, s.quote)
-                        safety?.let { SafetyCard(it, to.symbol) }
-                        SignReceiptBody(s.analyzed.receipt, null)
+                        Text(stringResource(R.string.swap_live), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+                        SignReceiptBody(s.analyzed.receipt, null, s.pair, plain = true)
                     }
                     SwapState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
                     is SwapState.Done -> {
@@ -266,20 +392,34 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                         val q = quote ?: return@PrimaryButton
                         if (rawIn == null || rawIn > fromBalance) { formError = ctx.getString(R.string.send_insufficient, from.symbol); return@PrimaryButton }
                         state = SwapState.Building
-                        scope.launch {
-                            state = try {
-                                val tx = withContext(Dispatchers.IO) {
-                                    Jupiter.swapTransaction(q, owner, Jupiter.feeAccountFor(to.mint))
-                                        ?: Jupiter.swapTransaction(q, owner, null)   // retry without the fee account if it can't be used
-                                } ?: return@launch run { state = SwapState.Error(ctx.getString(R.string.swap_build_failed)) }
-                                val analyzed = withContext(Dispatchers.IO) { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, owner, null, requireSim = false) }
-                                SwapState.Review(tx, swapReceipt(ctx, analyzed, owner, q), fmtUnits(q.outAmount, to.decimals), to.symbol, q)
-                            } catch (e: Exception) { SwapState.Error(e.message ?: ctx.getString(R.string.swap_build_failed)) }
-                        }
+                        scope.launch { state = buildReview(q, rawIn) }
                         }
                     }
                     is SwapState.Review -> {
-                        if (s.analyzed.receipt.blocksApproval) { Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK); Spacer(Modifier.height(8.dp)); GhostButton(stringResource(R.string.back)) { state = SwapState.Form } }
+                        // A route that the node says will fail is nearly always a
+                        // stale price, and the fix is a new quote rather than a
+                        // shrug. The hold gesture is gone in that case: signing it
+                        // pays a fee for a transaction that does nothing.
+                        val willFail = s.analyzed.receipt.risks.any {
+                            it.flag == com.clearsign.core.RiskFlag.SIMULATION_FAILED && it.severity == com.clearsign.core.Severity.DANGER
+                        }
+                        if (willFail) {
+                            Banner(stringResource(R.string.swap_would_fail), Halo.red, HIcon.BLOCK)
+                            Spacer(Modifier.height(8.dp))
+                            PrimaryButton(stringResource(R.string.swap_retry), danger = false) { state = SwapState.Form }
+                            Spacer(Modifier.height(8.dp))
+                            // Kept, small and last: a simulation can be wrong about
+                            // state that is about to change, and it is your money.
+                            GhostButton(stringResource(R.string.swap_anyway), tint = Halo.muted) {
+                                state = SwapState.Signing
+                                scope.launch {
+                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap")) {
+                                        is WalletActions.Result.Sent -> SwapState.Done(r.signature)
+                                        is WalletActions.Result.Failed -> SwapState.Error(r.message)
+                                    }
+                                }
+                            }
+                        } else if (s.analyzed.receipt.blocksApproval) { Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK); Spacer(Modifier.height(8.dp)); GhostButton(stringResource(R.string.back)) { state = SwapState.Form } }
                         else {
                             HoldToConfirm(stringResource(R.string.swap_hold, s.outUi, s.outSym)) {
                                 state = SwapState.Signing
@@ -316,21 +456,72 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
  */
 private fun swapReceipt(ctx: android.content.Context, analyzed: ReceiptEngine.Analyzed, owner: String, q: Jupiter.Quote): ReceiptEngine.Analyzed {
     val r = analyzed.receipt
-    val pool = ctx.getString(R.string.swap_pool_label, q.routeLabels.distinct().ifEmpty { listOf("AMM") }.joinToString(" · "))
+    // Short, because this name is read under a circle on a map and at the head of
+    // a row. The full route ("Jupiter · HumidiFi · Meteora DLMM") is one line up,
+    // in the summary, where it has a whole row to itself.
+    val pool = ctx.getString(R.string.swap_pool_short)
     val drop = setOf(com.clearsign.core.RiskFlag.NEW_UNKNOWN_RECIPIENT, com.clearsign.core.RiskFlag.ACCOUNT_CLOSE)
     return analyzed.copy(
         receipt = r.copy(
             risks = r.risks.filter { it.flag !in drop },
             recipientLabel = r.recipientLabel ?: r.primaryRecipient?.takeIf { it != owner }?.let { pool },
-            distributions = r.distributions.map { d -> if (d.address == owner || d.label != null) d else d.copy(label = pool) },
+            distributions = r.distributions.map { d ->
+                when {
+                    d.label != null -> d
+                    // An account this transaction opens. **Not** your token
+                    // account for the coin: that one belongs to you, so it never
+                    // reaches this list. These belong to the route, and naming
+                    // them "Account for CATE" was a guess that put the same wrong
+                    // name on two different accounts at once.
+                    d.isNewAccount -> d.copy(label = ctx.getString(R.string.swap_new_account))
+                    d.address == owner -> d
+                    else -> d.copy(label = pool)
+                }
+            },
         ),
     )
+}
+
+/**
+ * Pick your own slice, once.
+ *
+ * A slider rather than a number field: this is a phone, the useful values are
+ * round, and nobody wants a keyboard for "a third of it".
+ */
+@Composable
+private fun CustomPercentSheet(current: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit) {
+    var pct by remember { mutableStateOf((if (current in 1..100) current else 10).toFloat()) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp).navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(stringResource(R.string.swap_pct_title), style = HaloType.title, color = Halo.ink)
+            Text(stringResource(R.string.swap_pct_sub), style = HaloType.small, color = Halo.muted)
+            Text(
+                pct.toInt().toString() + "%",
+                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 34.sp, color = Halo.mint, style = Tabular,
+            )
+            Slider(
+                value = pct, onValueChange = { pct = it }, valueRange = 1f..100f,
+                colors = SliderDefaults.colors(thumbColor = Halo.mint, activeTrackColor = Halo.mint, inactiveTrackColor = Halo.stroke),
+            )
+            PrimaryButton(stringResource(R.string.swap_pct_save), danger = false) { onSave(pct.toInt()) }
+            if (current in 1..100) {
+                GhostButton(stringResource(R.string.swap_pct_clear), tint = Halo.muted) { onSave(0) }
+            }
+        }
+    }
 }
 
 /** What the swap does, in trade terms: logos, rate, route, our fee, price impact. */
 @Composable
 private fun SwapSummary(from: PickToken, to: PickToken, q: Jupiter.Quote) {
-    Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(18)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TokenLogo(from.mint, from.symbol, from.icon, 34.dp)
             Column(Modifier.weight(1f)) {
@@ -355,7 +546,7 @@ private fun SwapSummary(from: PickToken, to: PickToken, q: Jupiter.Quote) {
 @Composable
 private fun TokenChip(t: PickToken, onClick: () -> Unit) {
     Row(
-        Modifier.clip(rs(999)).background(Halo.card).border(1.dp, Halo.stroke, rs(999)).clickable { onClick() }.padding(start = 6.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+        Modifier.clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onClick() }.padding(start = 6.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TokenLogo(t.mint, t.symbol, t.icon, 24.dp)

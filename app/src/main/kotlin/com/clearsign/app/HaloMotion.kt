@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -100,3 +101,79 @@ fun rememberReveal(key: Any?, durationMs: Int = 700): Float {
 
 /** Home cards fade in one after another: each `GlassCard` takes the next slot. */
 val LocalEntrance = androidx.compose.runtime.compositionLocalOf<java.util.concurrent.atomic.AtomicInteger?> { null }
+
+/**
+ * One slow ring of light around a badge, once, then gone.
+ *
+ * The house version of the "something is alive in here" sweep: a 270 degree arc
+ * with a conic gradient whose head is bright and whose tail fades to nothing, so
+ * the ring reads as a single travelling point of light rather than a spinner.
+ * Two turns over two and a half seconds, easing out, then it fades and stops
+ * drawing entirely. Nothing loops: a permanent spinner on a screen that is not
+ * loading anything is noise, and this is a greeting.
+ *
+ * The glow is two arcs and not a blur. A blur costs a render node per frame for
+ * an effect nobody can name, and a wide arc at low alpha under a thin bright one
+ * reads the same at this size.
+ *
+ * [key] restarts it. Pass something that changes once per app launch, not per
+ * recomposition, or the greeting becomes a tic.
+ */
+@Composable
+fun SweepHalo(
+    color: Color,
+    modifier: Modifier = Modifier,
+    key: Any? = Unit,
+    turns: Float = 2f,
+    durationMs: Int = 2500,
+    stroke: Dp = 1.6.dp,
+) {
+    val spin = remember(key) { Animatable(0f) }
+    val fade = remember(key) { Animatable(0f) }
+    LaunchedEffect(key) {
+        fade.snapTo(1f)
+        spin.snapTo(0f)
+        spin.animateTo(turns * 360f, tween(durationMs, easing = FastOutSlowInEasing))
+        fade.animateTo(0f, tween(450, easing = LinearEasing))
+    }
+    if (fade.value <= 0.01f) return
+    val px = with(LocalDensity.current) { stroke.toPx() }
+    androidx.compose.foundation.Canvas(modifier) {
+        val inset = px * 1.5f
+        val rect = androidx.compose.ui.geometry.Rect(
+            inset, inset, size.width - inset, size.height - inset,
+        )
+        // The tail is transparent and the head is not, all the way round, so the
+        // brightness travels with the rotation instead of the whole ring pulsing.
+        val brush = androidx.compose.ui.graphics.Brush.sweepGradient(
+            0f to color.copy(alpha = 0f),
+            0.55f to color.copy(alpha = 0.10f * fade.value),
+            0.92f to color.copy(alpha = 0.85f * fade.value),
+            1f to color.copy(alpha = 0f),
+            center = rect.center,
+        )
+        rotate(spin.value, rect.center) {
+            drawArc(
+                brush = brush, startAngle = 0f, sweepAngle = 270f, useCenter = false,
+                topLeft = rect.topLeft, size = rect.size,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(px * 2.6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                alpha = 0.28f,
+            )
+            drawArc(
+                brush = brush, startAngle = 0f, sweepAngle = 270f, useCenter = false,
+                topLeft = rect.topLeft, size = rect.size,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(px, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            )
+        }
+    }
+}
+
+/**
+ * Something that changes once per app launch.
+ *
+ * A greeting keyed on a composable's lifetime plays again every time you leave
+ * the tab and come back, which is how a nice touch turns into a nervous one.
+ */
+object FirstRun {
+    val at: Long = System.currentTimeMillis()
+}

@@ -45,6 +45,36 @@ object IntentGuard {
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         val action = intent.action.lowercase()
 
+        // Nothing moved because nothing was simulated.
+        //
+        // This check compares a claim against what the network says will happen.
+        // When the network did not answer there is no "what will happen", and
+        // comparing a claim against an empty list finds every field missing and
+        // reports it as a lie. That is how a dropped connection became "the agent
+        // is not telling the truth", and the loop stopped itself over it. An
+        // unverifiable claim is unverifiable, and saying so is the honest answer.
+        //
+        // Two different silences. When the node ran the transaction and it
+        // failed, the receipt already carries the reason (slippage, funds, a fee
+        // account) and that risk is the honest answer: repeating "did not answer"
+        // on top of it hid the real cause and made the loop retry the same broken
+        // swap every round as if the network had blinked. When the node could not
+        // be asked at all, there is nothing to pass on, and the claim is simply
+        // unverifiable.
+        if (outs.isEmpty() && ins.isEmpty()) {
+            receipt.risks.firstOrNull { r -> r.flag == RiskFlag.SIMULATION_FAILED }?.let { r ->
+                return Risk(RiskFlag.SIMULATION_FAILED, Severity.DANGER, r.detail)
+            }
+            if (receipt.risks.any { r -> r.flag == RiskFlag.SIMULATION_UNAVAILABLE }) {
+                return Risk(
+                    RiskFlag.SIMULATION_UNAVAILABLE,
+                    Severity.DANGER,
+                    if (it) "non posso verificare quello che dice l'agente: la simulazione non ha risposto"
+                    else "cannot check what the agent says: the simulation did not answer",
+                )
+            }
+        }
+
         fun fmt(d: BalanceDelta) = trim(abs(d.uiAmount)) + " " + d.symbol
         fun same(claim: String?, d: BalanceDelta): Boolean {
             if (claim == null) return false
@@ -53,9 +83,29 @@ object IntentGuard {
             val dSol = d.mint == NATIVE_SOL_MINT || d.mint == WSOL || d.symbol.equals("SOL", true)
             return claimSol && dSol
         }
+        /**
+         * How much more SOL than declared may leave before it counts as a lie.
+         *
+         * An agent says "swap 0.031 SOL"; the transaction spends 0.036, and every
+         * lamport of the difference is something the agent could not have known
+         * when it wrote the sentence: the network fee, the priority fee, and the
+         * **rent for the accounts this transaction opens**. Buying a coin you have
+         * never held costs about 0.002 SOL of rent per account, and a swap through
+         * a wrapped-SOL account opens two.
+         *
+         * This used to be a flat 0.003, which is less than two accounts. So every
+         * purchase of a brand new coin was refused as a lie, the loop read that
+         * refusal as "the person said no", and stopped. The numbers now come from
+         * the simulation itself: what the network says the fee will be, and what
+         * it says the new accounts will cost. A transfer to a stranger is still
+         * caught to the lamport, because no new account explains it.
+         */
         fun slackFor(d: BalanceDelta, amount: Double): Double {
             val isSol = d.mint == NATIVE_SOL_MINT || d.mint == WSOL
-            return amount * tolerance + if (isSol) receipt.feeLamports / 1e9 + 0.003 else 0.0
+            if (!isSol) return amount * tolerance
+            val fee = maxOf(receipt.feeLamports, receipt.stats?.totalFeeLamports ?: 0L)
+            val rent = receipt.distributions.filter { s -> s.isNewAccount }.sumOf { s -> abs(s.delta.rawAmount) }
+            return amount * tolerance + (fee + rent) / 1e9 + 0.0005
         }
 
         // 1. Every outflow must be the declared one (amount within slack); anything else is undeclared.

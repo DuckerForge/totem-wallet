@@ -354,7 +354,7 @@ private fun DappIcon(dApp: DappId, size: androidx.compose.ui.unit.Dp) {
         }
     }
     Box(
-        Modifier.size(size).clip(CircleShape).background(Halo.cardSoft).border(1.dp, Halo.stroke, CircleShape),
+        Modifier.size(size).clip(CircleShape).background(Halo.cardSoft).border(cardBorder(), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         val b = bmp
@@ -367,7 +367,7 @@ private fun DappIcon(dApp: DappId, size: androidx.compose.ui.unit.Dp) {
 @Composable
 private fun DappPill(dApp: DappId) {
     Row(
-        Modifier.clip(rs(999)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(999))
+        Modifier.clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999))
             .padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -396,6 +396,38 @@ private fun DappHero(dApp: DappId, subtitle: String) {
 
 // ---- building blocks --------------------------------------------------------
 
+/**
+ * The hairline around a card.
+ *
+ * Normally a flat colour. On a theme that asks for it, the same hairline becomes
+ * Solana's purple and green sliding along the edge — one gradient translated by
+ * exactly its own width per cycle, so it flows without ever showing a seam.
+ */
+@Composable
+internal fun cardBorder(width: androidx.compose.ui.unit.Dp = 1.dp): androidx.compose.foundation.BorderStroke {
+    if (!Halo.palette.livingStroke) return androidx.compose.foundation.BorderStroke(width, Halo.stroke)
+    // The gradient repeats along its own axis, so to loop without a seam the
+    // animation has to travel exactly one axis vector per cycle — not one
+    // horizontal span. It used to slide (span, 0) along an axis of (span, 0.7·span):
+    // 0.82 of a period each time round, and the missing 0.18 was the visible snap,
+    // in position and in colour both.
+    val dx = 520f
+    val dy = 520f * 0.7f
+    val t by rememberInfiniteTransition(label = "livingStroke").animateFloat(
+        0f, 1f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "slide",
+    )
+    return androidx.compose.foundation.BorderStroke(
+        width + 0.2.dp,
+        androidx.compose.ui.graphics.Brush.linearGradient(
+            // Purple at both ends of the tile, so the seam meets its own colour.
+            listOf(Color(0xFF9945FF), Color(0xFF14F195), Color(0xFF9945FF)),
+            start = androidx.compose.ui.geometry.Offset(t * dx, t * dy),
+            end = androidx.compose.ui.geometry.Offset(t * dx + dx, t * dy + dy),
+            tileMode = androidx.compose.ui.graphics.TileMode.Repeated,
+        ),
+    )
+}
+
 @Composable
 internal fun GlassCard(content: @Composable () -> Unit) {
     val slot = LocalEntrance.current?.let { c -> remember { c.getAndIncrement() } }
@@ -403,8 +435,12 @@ internal fun GlassCard(content: @Composable () -> Unit) {
         (if (slot != null) Modifier.staggeredEntrance(slot.coerceAtMost(7)) else Modifier).fillMaxWidth()
             .clip(rs(22))
             .background(Halo.card)
-            .border(1.dp, Halo.stroke, rs(22))
-            .padding(20.dp),
+            .border(cardBorder(), rs(22))
+            // 16 and not 20. The screen already keeps its own margin outside this
+            // card, so every line of text was starting 40dp in from the edge on a
+            // phone that is 411dp wide — a tenth of the screen on each side, spent
+            // on nothing, and it reads as cramped rather than as roomy.
+            .padding(16.dp),
     ) { content() }
 }
 
@@ -471,7 +507,7 @@ internal fun GhostButton(label: String, modifier: Modifier = Modifier, icon: HIc
     val shape = rs(16)
     val src = remember { MutableInteractionSource() }
     Row(
-        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(48.dp).clip(shape).border(1.dp, Halo.stroke, shape).clickable(interactionSource = src, indication = null) { onClick() },
+        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(48.dp).clip(shape).border(cardBorder(), shape).clickable(interactionSource = src, indication = null) { onClick() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { HaloIcon(icon, tint, 17.dp); Spacer(Modifier.width(8.dp)) }
@@ -545,23 +581,62 @@ internal fun Avatar(pubkey: String, size: androidx.compose.ui.unit.Dp) {
     val c1 = Color.hsl(((h and 0xFFFF) % 360).toFloat(), 0.7f, 0.6f)
     val c2 = Color.hsl(((h ushr 16 and 0xFFFF) % 360).toFloat(), 0.8f, 0.45f)
     Box(
-        Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(c1, c2))).border(1.dp, Halo.stroke, CircleShape),
+        Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(c1, c2))).border(cardBorder(), CircleShape),
         contentAlignment = Alignment.Center,
     ) { Text(pubkey.take(2), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.34f).sp, color = Halo.ground.copy(alpha = 0.85f)) }
 }
 
 /** Amount with a lighter unit: "0.5 SOL" reads as a number, not a code. */
+/** The same one-line rule for a number that comes from a quote, not from a delta. */
 @Composable
-internal fun AmountText(prefix: String, d: BalanceDelta, size: androidx.compose.ui.unit.TextUnit, color: Color, weight: FontWeight = FontWeight.Bold, countUp: Boolean = false) {
+private fun FitAmount(number: String, symbol: String, size: androidx.compose.ui.unit.TextUnit, color: Color, weight: FontWeight) {
+    var actual by remember(number, symbol) { mutableStateOf(size) }
+    Text(
+        buildAnnotatedString {
+            append(number)
+            withStyle(SpanStyle(fontSize = actual * 0.55f, color = color.copy(alpha = 0.75f), fontWeight = FontWeight.SemiBold)) { append("  " + symbol) }
+        },
+        fontFamily = Sora, fontWeight = weight, fontSize = actual, color = color, style = Tabular,
+        maxLines = 1, softWrap = false,
+        onTextLayout = { r -> if (r.hasVisualOverflow && actual.value > 11f) actual = actual * 0.88f },
+    )
+}
+
+@Composable
+internal fun AmountText(
+    prefix: String,
+    d: BalanceDelta,
+    size: androidx.compose.ui.unit.TextUnit,
+    color: Color,
+    weight: FontWeight = FontWeight.Bold,
+    countUp: Boolean = false,
+    /**
+     * Shrink until it fits on one line.
+     *
+     * An amount is not a sentence and must never wrap: "−0.303824 SOL" broken
+     * after the fifth decimal put a lonely "4 SOL" on the next line, which reads
+     * as a second number. Where the room is fixed and the number is not, the type
+     * gives way, not the value.
+     */
+    fit: Boolean = false,
+) {
     // Count-up on reveal: the progress scales the raw amount, and the final frame is the exact value.
     val p = if (countUp) rememberReveal(d.rawAmount) else 1f
     val shown = if (p >= 1f) d else d.copy(rawAmount = (d.rawAmount * p.toDouble()).toLong())
+    var actual by remember(d.rawAmount, d.symbol, size) { mutableStateOf(size) }
     Text(
         buildAnnotatedString {
             append(prefix + fmtNumber(shown))
-            withStyle(SpanStyle(fontSize = size * 0.55f, color = color.copy(alpha = 0.75f), fontWeight = FontWeight.SemiBold)) { append("  " + d.symbol) }
+            withStyle(SpanStyle(fontSize = actual * 0.55f, color = color.copy(alpha = 0.75f), fontWeight = FontWeight.SemiBold)) { append("  " + d.symbol) }
         },
-        fontFamily = Sora, fontWeight = weight, fontSize = size, color = color, style = Tabular,
+        fontFamily = Sora, fontWeight = weight, fontSize = actual, color = color, style = Tabular,
+        maxLines = if (fit) 1 else Int.MAX_VALUE,
+        softWrap = !fit,
+        onTextLayout = { r ->
+            // A couple of frames of stepping down, then it settles. The floor stops
+            // it turning into something nobody can read.
+            if (fit && r.hasVisualOverflow && actual.value > 11f) actual = actual * 0.88f
+        },
     )
 }
 
@@ -648,7 +723,7 @@ private fun AccountPickPrompt(ui: MwaUi.AccountPick) {
             val hasFunds = (lamports ?: 0L) > 0L || tokenCount > 0
             Box(
                 Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card)
-                    .border(1.dp, Halo.stroke, rs(16))
+                    .border(cardBorder(), rs(16))
                     .clickable { ui.onPick(acc) }.padding(14.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -682,9 +757,12 @@ internal data class NodeDest(
 )
 
 internal fun destsFor(r: Receipt, danger: Boolean): List<NodeDest> =
-    r.distributions.map { s ->
+    // A share with neither a name nor an address is not a destination. One of
+    // those was drawing an empty row inside "where the funds go", which reads as
+    // a missing piece of the answer rather than as nothing at all.
+    r.distributions.filter { it.label != null || it.address.isNotBlank() }.map { s ->
         NodeDest(
-            label = s.label ?: shorten(s.address),
+            label = s.label?.takeIf { it.isNotBlank() } ?: shorten(s.address),
             address = s.address,
             amountText = "+" + fmtAmt(s.delta),
             color = when {
@@ -715,11 +793,33 @@ private fun SignPrompt(ui: MwaUi.SignRequest) {
     val ctx = LocalContext.current
     LaunchedEffect(danger) { if (danger) Haptics.warn(ctx) }
 
+    // Without the name: the card directly below is the dApp, with its name in
+    // bold and its badges. Saying it here too made the same word appear three
+    // times in the first four lines of the screen.
     Text(
-        (if (ui.count > 1) stringResource(R.string.requests_many, ui.dApp.name, ui.count) else stringResource(R.string.requests_one, ui.dApp.name)) + (if (ui.willSend) stringResource(R.string.and_send) else ""),
+        (if (ui.count > 1) stringResource(R.string.requests_many, ui.count) else stringResource(R.string.requests_one)) + (if (ui.willSend) stringResource(R.string.and_send) else ""),
         fontFamily = Inter, fontSize = 13.sp, color = Halo.muted,
     )
     Spacer(Modifier.height(4.dp))
+
+    // The answer to the only question this screen raises: why me, why now. The
+    // agent signs on its own under the rules you set; when it cannot, the rule
+    // that stopped it belongs at the top, not inside a risk row further down.
+    ui.askedWhy?.let { why ->
+        Column(
+            Modifier.fillMaxWidth().clip(rs(14)).background(Halo.amber.copy(alpha = 0.10f))
+                .border(1.dp, Halo.amber.copy(alpha = 0.45f), rs(14)).padding(14.dp),
+        ) {
+            Text(
+                stringResource(R.string.gate_why_title),
+                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.amber,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(why, fontFamily = Inter, fontSize = 13.sp, color = Halo.ink, lineHeight = 18.sp)
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+
     DappMemory(ui.dApp)
     AgentOrigin(ui.dApp)
     ui.dApp.store?.let { Spacer(Modifier.height(3.dp)); DappStoreLine(it) }
@@ -728,18 +828,26 @@ private fun SignPrompt(ui: MwaUi.SignRequest) {
     // Bundle of >1 tx: show the aggregate first, then a per-tx selector, so the
     // user reviews every transaction — not just the first — before approving all.
     if (ui.count > 1) {
-        // The bundle total lives in the fixed bar below; up here only the per-tx browser.
-        Banner(stringResource(R.string.bundle_notice, ui.count), Halo.amber, HIcon.INFO)
-        Spacer(Modifier.height(10.dp))
-        BundleStrip(receipts, danger)
-        Spacer(Modifier.height(10.dp))
+        // Everything a bundle needs to say, said once each. It used to open with a
+        // banner ("this request signs 3 transactions at once"), then a card with
+        // the total, then the chips, then "Transaction 1 of 3" — four ways of
+        // saying three, before a single amount appeared. The chips are the
+        // browser, the fixed bar below is the total, and the only fact neither of
+        // them carries is the fee across all three, which rides with the hint.
         TxSelector(receipts, selIdx, viewed.toSet()) { sel = it; if (it !in viewed) viewed.add(it) }
         Spacer(Modifier.height(6.dp))
         val allSeen = viewed.size >= receipts.size
-        Text(
-            if (allSeen) stringResource(R.string.bundle_all_seen) else stringResource(R.string.bundle_tap_hint),
-            fontFamily = Inter, fontSize = 11.sp, color = if (allSeen) Halo.mint else Halo.amber,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (allSeen) stringResource(R.string.bundle_all_seen) else stringResource(R.string.bundle_tap_hint),
+                fontFamily = Inter, fontSize = 11.sp, color = if (allSeen) Halo.mint else Halo.amber,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                stringResource(R.string.bundle_fees_all, fmtSol(receipts.sumOf { it.feeLamports }, 6)),
+                fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular,
+            )
+        }
         Spacer(Modifier.height(10.dp))
         Text(
             stringResource(R.string.tx_n_of, selIdx + 1, ui.count),
@@ -770,9 +878,38 @@ private fun BlockedNotice(text: String) {
     }
 }
 
+/**
+ * The two legs of a swap as the *quote* knows them.
+ *
+ * Only for drawing, and only when the simulation could not tell us: a route that
+ * fails on chain returns a receipt with no legs at all, and the screen then had
+ * nothing to show but "no funds transferred" over an empty picture. What you
+ * were trying to do is still worth drawing. What will actually happen is the
+ * risks' job, and they sit right underneath.
+ */
+internal data class SwapPair(
+    val outMint: String, val outSymbol: String, val outUi: String,
+    val inMint: String, val inSymbol: String, val inUi: String,
+)
+
 /** The full single-receipt view: hero, risks, flow map, split breakdown, details, stats. */
 @Composable
-internal fun SignReceiptBody(r: Receipt, cluster: String?) {
+internal fun SignReceiptBody(
+    r: Receipt,
+    cluster: String?,
+    pair: SwapPair? = null,
+    /**
+     * The plain version, for a screen that has already explained the trade.
+     *
+     * The swap sheet grades the coin on the form and names the route in its
+     * summary, so repeating both here is the same sentence twice. It also drops
+     * the parts written for somebody debugging a transaction: the decoded program
+     * calls, and percentages of a total that does not mean anything in a swap
+     * (the pool receives more SOL than you paid, because the route passes through
+     * it more than once, and "129% of the total" is not a fact anybody can use).
+     */
+    plain: Boolean = false,
+) {
     val danger = r.blocksApproval
     var sheetAddr by remember { mutableStateOf<NodeDest?>(null) }
 
@@ -789,12 +926,41 @@ internal fun SignReceiptBody(r: Receipt, cluster: String?) {
         )
     }
 
+    // An exchange is not a payment: the coin leaves and another one comes back to
+    // the same wallet. That round trip is the thing worth looking at, so for a
+    // swap the map *is* the headline instead of a picture half a screen below it.
+    //
+    // "A different coin comes back" is the whole test. It used to also demand that
+    // the receiving account already existed, which is false for every first
+    // purchase of a coin: that account is created by this very transaction, and
+    // so the one leg that mattered was the one being filtered out.
+    val outLeg = r.outflows.firstOrNull { it.rawAmount < 0 }
+    val back = r.inflows.firstOrNull { it.rawAmount > 0 && it.mint != outLeg?.mint }
+    val isSwap = (outLeg != null && back != null) || pair != null
+    val outCoin = rememberCoinBitmap(outLeg?.mint ?: pair?.outMint)
+    val backCoin = rememberCoinBitmap(back?.mint ?: pair?.inMint)
+    val backSymbol = back?.symbol ?: pair?.inSymbol.orEmpty()
+
+    // What the entrance animations key on. Not the receipt: a refreshed quote is
+    // a new Receipt object every fifteen seconds, and keying on it replayed the
+    // whole screen each time — cards sliding in, the map fading from nothing —
+    // while you were reading it. The trade is the same trade; only the numbers
+    // moved.
+    val animKey = pair?.let { it.outMint + it.inMint }
+        ?: (r.outflows.firstOrNull()?.mint.orEmpty() + (r.primaryRecipient ?: ""))
+
     val style = Halo.palette.receiptStyle
-    if (style == ReceiptStyle.PAPER) { PaperReceipt(r, dests, danger) { sheetAddr = it } }
-    else if (style == ReceiptStyle.TERMINAL) { TerminalReceipt(r, dests, danger) { sheetAddr = it } }
+    if (style == ReceiptStyle.PAPER) { PaperReceipt(r, dests, danger, backCoin) { sheetAddr = it } }
+    else if (style == ReceiptStyle.TERMINAL) { TerminalReceipt(r, dests, danger, backCoin) { sheetAddr = it } }
     else {
-    Box(Modifier.staggeredEntrance(0, r)) { HeroPay(r, danger) }
-    if (r.isSplit) {
+    Box(Modifier.staggeredEntrance(0, animKey)) {
+        if (isSwap) SwapFlowHero(r, danger, dests, outCoin, backCoin, backSymbol, pair) { d -> if (d.address != null) sheetAddr = d }
+        else HeroPay(r, danger)
+    }
+    // "split across 2 destinations · 1 new account (rent)" is a warning shape for
+    // a payment that fans out unexpectedly. Every swap does this by construction,
+    // so on a swap it is an alarm about nothing.
+    if (r.isSplit && !plain) {
         val fees = dests.count { it.isFee }
         val news = dests.count { it.isNewAccount }
         val parts = buildList {
@@ -810,46 +976,62 @@ internal fun SignReceiptBody(r: Receipt, cluster: String?) {
 
     // What is arriving, judged on its own. Right under the amount, because a coin
     // that cannot be sold back is a reason to stop and belongs above the fold
-    // just as much as a risk in the transaction itself.
-    Spacer(Modifier.height(12.dp))
-    IncomingCoinCard(r, null)
+    // just as much as a risk in the transaction itself. On a swap the risks go
+    // first: the headline is now a picture, and the reason to stop must be the
+    // first words under it.
+    if (!isSwap && !plain) {
+        Spacer(Modifier.height(12.dp))
+        IncomingCoinCard(r, null)
+    }
 
     // Risks right under the headline: the reason to stop must never be below the fold.
     if (r.risks.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
-        Box(Modifier.staggeredEntrance(1, r)) { RisksCard(r.risks) }
+        Box(Modifier.staggeredEntrance(1, animKey)) { RisksCard(r.risks) }
     }
-    Spacer(Modifier.height(12.dp))
 
-    Box(
-        Modifier.staggeredEntrance(2, r).fillMaxWidth().height(if (dests.size > 2) 250.dp else 200.dp).clip(rs(18))
-            .background(Halo.cardSoft)
-            .background(
-                Brush.radialGradient(
-                    colors = listOf((if (danger) Halo.red else Halo.cyan).copy(alpha = 0.10f), Color.Transparent),
-                    radius = 520f,
-                ),
+    if (isSwap) {
+        if (!plain) {
+            Spacer(Modifier.height(12.dp))
+            IncomingCoinCard(r, null)
+        }
+    } else {
+        // Already drawn, at the top, with the way home in it.
+        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier.staggeredEntrance(2, animKey).fillMaxWidth().height(if (dests.size > 2) 250.dp else 200.dp).clip(rs(18))
+                .background(Halo.cardSoft)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf((if (danger) Halo.red else Halo.cyan).copy(alpha = 0.10f), Color.Transparent),
+                        radius = 520f,
+                    ),
+                )
+                .border(cardBorder(), rs(18)),
+        ) {
+            NodeMap(dests = dests, danger = danger, coin = outCoin) { d -> if (d.address != null) sheetAddr = d }
+            Text(
+                stringResource(R.string.tap_node),
+                fontFamily = Inter, fontSize = 11.sp, color = Halo.muted,
+                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
             )
-            .border(1.dp, Halo.stroke, rs(18)),
-    ) {
-        NodeMap(dests = dests, danger = danger, coin = rememberCoinBitmap(r.outflows.firstOrNull()?.mint)) { d -> if (d.address != null) sheetAddr = d }
-        Text(
-            stringResource(R.string.tap_node),
-            fontFamily = Inter, fontSize = 11.sp, color = Halo.muted,
-            modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
-        )
+        }
     }
 
     Spacer(Modifier.height(14.dp))
     if (dests.size > 1) {
-        SplitBreakdown(dests) { d -> if (d.address != null) sheetAddr = d }
+        SplitBreakdown(dests, plain) { d -> if (d.address != null) sheetAddr = d }
         Spacer(Modifier.height(12.dp))
     }
     ReceiptDetails(r, dests.firstOrNull()?.label ?: stringResource(R.string.recipient_lower), showRecipient = dests.size <= 1) {
         dests.firstOrNull { it.address != null }?.let { sheetAddr = it }
     }
 
-    if (r.calls.isNotEmpty()) {
+    // "CALLS · decoded from the program's published IDL · jupiter · route" is a
+    // good answer to a question a normal person never asks. It stays where the
+    // transaction came from somewhere else and needs auditing; on our own swap,
+    // where the screen above already says what happens, it is noise.
+    if (r.calls.isNotEmpty() && !plain) {
         Spacer(Modifier.height(12.dp))
         CallsCard(r.calls)
     }
@@ -916,7 +1098,7 @@ private fun rememberPkgIcon(pkg: String): androidx.compose.ui.graphics.ImageBitm
 @Composable
 private fun StatTile(modifier: Modifier, icon: HIcon, value: String, label: String, tint: Color = Halo.cyan) {
     Column(
-        modifier.clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)).padding(horizontal = 8.dp, vertical = 9.dp),
+        modifier.clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).padding(horizontal = 8.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -954,11 +1136,11 @@ private fun DappStoreCard(store: StoreInfo) {
     var open by remember(store.packageName) { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(14.dp),
+        Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(44.dp).clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)), contentAlignment = Alignment.Center) {
                 if (icon != null) androidx.compose.foundation.Image(icon, contentDescription = null, modifier = Modifier.size(38.dp).clip(rs(10)))
                 else HaloIcon(HIcon.WALLET, Halo.muted, 20.dp)
             }
@@ -979,7 +1161,7 @@ private fun DappStoreCard(store: StoreInfo) {
                 }
             }
             Box(
-                Modifier.size(26.dp).clip(rs(999)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(999)).clickable { open = !open },
+                Modifier.size(26.dp).clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999)).clickable { open = !open },
                 contentAlignment = Alignment.Center,
             ) { HaloIcon(HIcon.INFO, if (open) Halo.cyan else Halo.muted, 14.dp) }
         }
@@ -1077,7 +1259,20 @@ internal fun RisksCard(risks: List<Risk>) {
             Spacer(Modifier.weight(1f))
             Text("${risks.size}", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = col)
         }
-        risks.forEach { RiskRow(it) }
+        // Six alerts at once used to draw six alerts at once, and the card grew
+        // until the amount, the map and the button were all below the fold. The
+        // ones that stop you stay visible; the tail is one tap away. Risks arrive
+        // sorted by severity, so "the first three" is "the three worst".
+        var all by remember(risks) { mutableStateOf(false) }
+        val keep = if (all) risks else risks.take(3)
+        keep.forEach { RiskRow(it) }
+        if (risks.size > keep.size) {
+            Text(
+                stringResource(R.string.risk_more, risks.size - keep.size),
+                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = col,
+                modifier = Modifier.clickable { all = true },
+            )
+        }
     }
 }
 
@@ -1099,7 +1294,7 @@ internal fun sevColor(s: Severity) = when (s) { Severity.DANGER -> Halo.red; Sev
 internal fun riskIcon(f: RiskFlag): HIcon = when (f) {
     RiskFlag.BLOCKED_MALICIOUS -> HIcon.SKULL; RiskFlag.SANCTIONED -> HIcon.BAN; RiskFlag.UNLIMITED_APPROVAL -> HIcon.INFINITY
     RiskFlag.AUTHORITY_CHANGE -> HIcon.KEY; RiskFlag.ACCOUNT_CLOSE -> HIcon.TRASH; RiskFlag.NEW_UNKNOWN_RECIPIENT -> HIcon.SPARK
-    RiskFlag.LOOKALIKE_ADDRESS -> HIcon.MASK; RiskFlag.SIMULATION_FAILED -> HIcon.FLASK; RiskFlag.STATE_DRIFT -> HIcon.DRIFT
+    RiskFlag.LOOKALIKE_ADDRESS -> HIcon.MASK; RiskFlag.SIMULATION_FAILED -> HIcon.FLASK; RiskFlag.SIMULATION_UNAVAILABLE -> HIcon.FLASK; RiskFlag.STATE_DRIFT -> HIcon.DRIFT
     RiskFlag.AGENT_INTENT_MISMATCH -> HIcon.MASK; RiskFlag.AGENT_INTENT_OK -> HIcon.CHECK
     RiskFlag.COMMUNITY_FLAGGED -> HIcon.MEGAPHONE; RiskFlag.DRAINS_BALANCE -> HIcon.DRAIN; RiskFlag.WALLET_OWNER_CHANGE -> HIcon.FLAG
     RiskFlag.DURABLE_NONCE -> HIcon.HOURGLASS; RiskFlag.FOREIGN_FEE_PAYER -> HIcon.GIFT; RiskFlag.BRAND_NEW_RECIPIENT -> HIcon.SEEDLING; RiskFlag.LIMITED_APPROVAL -> HIcon.UNLOCK
@@ -1111,7 +1306,7 @@ internal fun riskTitle(f: RiskFlag): Int = when (f) {
     RiskFlag.BLOCKED_MALICIOUS -> R.string.rt_malicious; RiskFlag.SANCTIONED -> R.string.rt_sanctioned
     RiskFlag.UNLIMITED_APPROVAL -> R.string.rt_unlimited; RiskFlag.AUTHORITY_CHANGE -> R.string.rt_authority
     RiskFlag.ACCOUNT_CLOSE -> R.string.rt_close; RiskFlag.NEW_UNKNOWN_RECIPIENT -> R.string.rt_new_recipient
-    RiskFlag.LOOKALIKE_ADDRESS -> R.string.rt_lookalike; RiskFlag.SIMULATION_FAILED -> R.string.rt_simulation
+    RiskFlag.LOOKALIKE_ADDRESS -> R.string.rt_lookalike; RiskFlag.SIMULATION_FAILED -> R.string.rt_simulation; RiskFlag.SIMULATION_UNAVAILABLE -> R.string.rt_simulation
     RiskFlag.STATE_DRIFT -> R.string.rt_drift; RiskFlag.COMMUNITY_FLAGGED -> R.string.rt_community
     RiskFlag.AGENT_INTENT_MISMATCH -> R.string.rt_agent_mismatch; RiskFlag.AGENT_INTENT_OK -> R.string.rt_agent_ok
     RiskFlag.DRAINS_BALANCE -> R.string.rt_drain; RiskFlag.WALLET_OWNER_CHANGE -> R.string.rt_owner_change
@@ -1119,31 +1314,6 @@ internal fun riskTitle(f: RiskFlag): Int = when (f) {
     RiskFlag.BRAND_NEW_RECIPIENT -> R.string.rt_brand_new; RiskFlag.LIMITED_APPROVAL -> R.string.rt_limited
     RiskFlag.FEE_EXCESSIVE -> R.string.rt_fee_excessive
     RiskFlag.EXTRA_SIGNERS -> R.string.rt_extra_signers
-}
-
-/** One line for a bundle: how many tx, the total, the fees — the big number is in the action bar. */
-@Composable
-private fun BundleStrip(receipts: List<Receipt>, danger: Boolean) {
-    val accent = if (danger) Halo.red else Halo.mint
-    val totals = aggregateOutflows(receipts)
-    val totalFee = receipts.sumOf { it.feeLamports }
-    Row(
-        Modifier.fillMaxWidth().clip(rs(14)).background(accent.copy(alpha = 0.07f)).border(1.dp, accent.copy(alpha = 0.28f), rs(14)).padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.bundle_strip_title, receipts.size), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
-            Text(
-                if (totals.isEmpty()) stringResource(R.string.no_transfer) else totals.joinToString(" · ") { "−" + fmtAmt(it) },
-                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = accent, style = Tabular, maxLines = 2,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(stringResource(R.string.bundle_strip_fees), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
-            Text(fmtSol(totalFee, 6) + " SOL", fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.ink, style = Tabular)
-        }
-    }
 }
 
 /** Chip row to browse each transaction in the bundle; red chip = that tx is DANGER. */
@@ -1189,7 +1359,7 @@ private fun aggregateOutflows(receipts: List<Receipt>): List<BalanceDelta> =
         .filter { it.rawAmount != 0L }
 
 @Composable
-internal fun SplitBreakdown(dests: List<NodeDest>, onTap: (NodeDest) -> Unit) {
+internal fun SplitBreakdown(dests: List<NodeDest>, plain: Boolean = false, onTap: (NodeDest) -> Unit) {
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.where_funds), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
@@ -1203,6 +1373,13 @@ internal fun SplitBreakdown(dests: List<NodeDest>, onTap: (NodeDest) -> Unit) {
                 }
             }
             dests.forEach { d ->
+                // A share over 100% is arithmetic about a total that does not
+                // exist, and saying nothing beats saying "129%".
+                val sub = when {
+                    d.isNewAccount -> stringResource(R.string.rent_to_create)
+                    plain || d.sharePct !in 1..100 -> null
+                    else -> stringResource(R.string.share_of_total, d.sharePct)
+                }
                 Row(
                     Modifier.fillMaxWidth().clickable { onTap(d) },
                     verticalAlignment = Alignment.CenterVertically,
@@ -1213,7 +1390,7 @@ internal fun SplitBreakdown(dests: List<NodeDest>, onTap: (NodeDest) -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(d.label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Halo.ink)
                             val badge = when {
-                                d.isNewAccount -> stringResource(R.string.badge_new_rent) to Halo.cyan
+                                d.isNewAccount -> stringResource(R.string.badge_deposit) to Halo.cyan
                                 d.isFee -> stringResource(R.string.badge_fee) to Halo.amber
                                 else -> null
                             }
@@ -1221,15 +1398,107 @@ internal fun SplitBreakdown(dests: List<NodeDest>, onTap: (NodeDest) -> Unit) {
                                 Spacer(Modifier.width(6.dp))
                                 Box(
                                     Modifier.clip(rs(999)).border(1.dp, col, rs(999)).padding(horizontal = 7.dp, vertical = 1.dp),
-                                ) { Text(txt, color = col, fontFamily = Inter, fontSize = 11.sp, fontWeight = FontWeight.Medium) }
+                                ) {
+                                    // One word, one line. "new account · rent" in a
+                                    // pill this wide wrapped onto three.
+                                    Text(txt, color = col, fontFamily = Inter, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                                }
                             }
                         }
-                        Text(
-                            if (d.isNewAccount) stringResource(R.string.rent_to_create) else stringResource(R.string.share_of_total, d.sharePct),
-                            fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted,
-                        )
                     }
-                    Text(d.amountText, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = d.color, style = Tabular)
+                    Text(d.amountText, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = d.color, style = Tabular, maxLines = 1)
+                }
+                // Underneath, across the whole card. Beside the amount it had a
+                // third of the width and broke into four ragged lines.
+                sub?.let {
+                    Text(
+                        it, fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
+                        modifier = Modifier.padding(start = 17.dp, bottom = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The swap headline: the round trip, with the two numbers under it.
+ *
+ * The map used to sit below the amounts, the incoming coin card and the risks,
+ * which in the swap sheet put it under the fold: you had to scroll to find the
+ * one picture that explains what you are about to do. Here it is the first thing
+ * on the screen and the amounts hang off it, so the shape and the numbers are
+ * read in one glance.
+ *
+ * The receiving node is relabelled with the symbol of the coin coming back. A
+ * shortened pool address under a USDC logo tells nobody anything.
+ */
+@Composable
+private fun SwapFlowHero(
+    r: Receipt,
+    danger: Boolean,
+    dests: List<NodeDest>,
+    coin: ImageBitmap?,
+    backCoin: ImageBitmap?,
+    backSymbol: String,
+    pair: SwapPair?,
+    onTap: (NodeDest) -> Unit,
+) {
+    val accent = if (danger) Halo.red else Halo.mint
+    val labelled = remember(dests, backSymbol, pair) {
+        // The route's own name is "Jupiter pool · PancakeSwap · Meteora DLMM",
+        // which is true, useless under a circle, and three times wider than the
+        // canvas. Under the node goes the coin you are getting; the route is in
+        // the details card, where there is room to read it.
+        val i = dests.indexOfFirst { !it.isFee }
+        when {
+            i >= 0 -> dests.mapIndexed { k, d -> if (k == i) d.copy(label = backSymbol) else d }
+            // No destinations at all: the simulation failed and there is nothing
+            // to itemise. Draw what the quote says we were trying to do.
+            pair != null -> listOf(
+                NodeDest(
+                    label = pair.inSymbol, address = null, amountText = "+" + pair.inUi + " " + pair.inSymbol,
+                    color = Halo.mint, isFee = false, isNewAccount = false, sharePct = 100, share = 1.0,
+                    trust = null, deltaText = "",
+                ),
+            )
+            else -> dests
+        }
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(rs(20))
+            .background(accent.copy(alpha = 0.08f))
+            .background(Brush.radialGradient(colors = listOf(Halo.cyan.copy(alpha = 0.10f), Color.Transparent), radius = 520f))
+            .border(1.dp, accent.copy(alpha = 0.32f), rs(20)),
+    ) {
+        Box(Modifier.fillMaxWidth().height(170.dp)) {
+            NodeMap(dests = labelled, danger = danger, coin = coin, backCoin = backCoin, onTap = onTap)
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            // Half the row each, so neither number can starve the other: the pay
+            // side used to get whatever the receive side left over, which on a
+            // six-decimal amount was not enough for one line.
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.pay), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+                Spacer(Modifier.height(4.dp))
+                if (r.outflows.isEmpty() && pair != null) {
+                    FitAmount("−" + pair.outUi, pair.outSymbol, 20.sp, accent, FontWeight.Bold)
+                } else {
+                    r.outflows.forEachIndexed { i, d -> AmountText("−", d, 20.sp, accent, countUp = i == 0, fit = true) }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text(stringResource(R.string.receive), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+                Spacer(Modifier.height(4.dp))
+                val ins = r.inflows.filter { it.rawAmount > 0 }
+                if (ins.isEmpty() && pair != null) {
+                    FitAmount("+" + pair.inUi, pair.inSymbol, 20.sp, Halo.cyan, FontWeight.SemiBold)
+                } else {
+                    ins.forEach { AmountText("+", it, 20.sp, Halo.cyan, FontWeight.SemiBold, fit = true) }
                 }
             }
         }
@@ -1514,7 +1783,7 @@ private fun AddressSheet(
 @Composable
 private fun TraceBlock(t: AddressTrace.Trace?, running: Boolean, ran: Boolean, isPro: Boolean, onRun: () -> Unit) {
     val ctx = LocalContext.current
-    Column(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(14)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).border(cardBorder(), rs(14)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HaloIcon(HIcon.SCAN, Halo.cyan, 14.dp); Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.trace_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
@@ -1689,8 +1958,27 @@ internal fun rememberCoinBitmap(mint: String?): ImageBitmap? {
 
 // ---- node map (all geometry in dp → px, so it looks the same on every density) ----
 
+/**
+ * Where the money goes, and — for a swap — where it comes back from.
+ *
+ * One direction was right for a payment and half a story for an exchange. In a
+ * swap the coin leaves, the route turns it into another coin, and that other
+ * coin lands back in the same wallet it left. Drawing only the outbound leg made
+ * a swap look like giving money away.
+ *
+ * [backCoin] is what turns it into a circuit: pass the logo of the coin that
+ * arrives and the map grows a second arc under the first, running the other way,
+ * carrying that logo home. Pass null and nothing changes at all, which is what a
+ * plain send wants.
+ */
 @Composable
-internal fun NodeMap(dests: List<NodeDest>, danger: Boolean, coin: ImageBitmap? = null, onTap: (NodeDest) -> Unit) {
+internal fun NodeMap(
+    dests: List<NodeDest>,
+    danger: Boolean,
+    coin: ImageBitmap? = null,
+    backCoin: ImageBitmap? = null,
+    onTap: (NodeDest) -> Unit,
+) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
     val sora = remember { runCatching { ResourcesCompat.getFont(ctx, R.font.sora) }.getOrNull() ?: Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
@@ -1702,12 +1990,35 @@ internal fun NodeMap(dests: List<NodeDest>, danger: Boolean, coin: ImageBitmap? 
     val t by flow.animateFloat(0f, 1f, infiniteRepeatable(tween(2000, easing = LinearEasing)), label = "t")
     val pulse by flow.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "p")
     val reveal = remember { Animatable(0f) }
-    LaunchedEffect(dests) { reveal.snapTo(0f); reveal.animateTo(1f, tween(700)) }
+    // The shape of the map, not its numbers. A new quote every fifteen seconds
+    // changes every amount and no destination, and redrawing the whole thing from
+    // zero each time is how a live price turned into a flicker.
+    val shape = remember(dests) { dests.map { it.label } }
+    LaunchedEffect(shape) { reveal.snapTo(0f); reveal.animateTo(1f, tween(700)) }
     val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; typeface = sora } }
     val amtPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.RIGHT; typeface = sora } }
     val youLabel = stringResource(R.string.you)
-    val shown = dests.take(5) // keep the canvas legible; the full list is in the breakdown
+    // Three, and then a count. A route can fan out to six accounts and the canvas
+    // cannot: at five the circles touch and the names print on top of each other,
+    // which turns the one picture meant to be counted into a smear. The full list
+    // is right underneath, in words, where length costs nothing.
+    val extra = (dests.size - 3).coerceAtLeast(0)
+    val shown = if (extra > 0) {
+        dests.take(3) + NodeDest(
+            label = "+$extra", address = null, amountText = "", color = Halo.muted,
+            isFee = false, isNewAccount = false, sharePct = 0, share = 0.0, trust = null, deltaText = "",
+        )
+    } else {
+        dests
+    }
     val n = shown.size.coerceAtLeast(1)
+    // The one wire that carries the trade. Rent for a new account and a fee are
+    // real destinations but they are not where your coin goes, and giving all of
+    // them a coin logo put four glowing discs on the canvas that read as four
+    // more accounts appearing and disappearing.
+    val mainWire = shown.indexOfFirst { !it.isFee && !it.isNewAccount }
+        .takeIf { it >= 0 } ?: shown.indexOfFirst { !it.isFee }.coerceAtLeast(0)
+    val backFrom = if (backCoin == null) -1 else mainWire
     val dp = { v: Float -> with(density) { v.dp.toPx() } }
     val nodeR = dp(if (n > 3) 14f else 17f)
     val tapR = dp(28f)
@@ -1732,55 +2043,113 @@ internal fun NodeMap(dests: List<NodeDest>, danger: Boolean, coin: ImageBitmap? 
             val edge = Path().apply { moveTo(you.x, you.y); quadraticBezierTo(ctrl.x, ctrl.y, dest.x, dest.y) }
             val alpha = reveal.value
             drawPath(edge, color = d.color.copy(alpha = 0.4f * alpha), style = if (d.isFee) Stroke(width = stroke, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(dp(5f), dp(5f)))) else Stroke(width = stroke))
-            for (k in 0..2) {
-                val p = ((t + k / 3f) % 1f) * alpha; val mt = 1 - p
+            val coinSize = dp(if (n > 3) 13f else 16f)
+            // One thing per wire. Three made a row of dots that, on a picture whose
+            // job is to be counted, looked like more destinations.
+            run {
+                val p = (t % 1f) * alpha; val mt = 1 - p
                 val px = mt * mt * you.x + 2 * mt * p * ctrl.x + p * p * dest.x
                 val py = mt * mt * you.y + 2 * mt * p * ctrl.y + p * p * dest.y
-                // The leading particle carries the coin's own logo, so what you
-                // watch crossing to the address is the thing you are sending, not
-                // an abstract dot. The two behind stay dots: a trail of three
-                // logos reads as three payments.
-                if (k == 0 && coin != null) {
-                    val cs = dp(if (n > 3) 13f else 16f)
-                    val at = Offset(px, py)
-                    drawCircle(d.color.copy(alpha = 0.30f * alpha), cs * 0.85f, at)
-                    // A square logo on a wire looks like a sticker. Clipped to a
-                    // circle with a rim around it, it reads as a coin going
-                    // somewhere, which is the whole point of the animation.
-                    clipPath(Path().apply { addOval(Rect(at.x - cs / 2f, at.y - cs / 2f, at.x + cs / 2f, at.y + cs / 2f)) }) {
-                        drawImage(
-                            image = coin,
-                            dstOffset = androidx.compose.ui.unit.IntOffset((px - cs / 2f).toInt(), (py - cs / 2f).toInt()),
-                            dstSize = androidx.compose.ui.unit.IntSize(cs.toInt(), cs.toInt()),
-                            alpha = alpha,
-                        )
-                    }
-                    drawCircle(d.color.copy(alpha = 0.85f * alpha), cs / 2f, at, style = Stroke(width = dp(1.2f)))
-                } else {
-                    drawCircle(d.color.copy(alpha = 0.22f * alpha), dp(4f), Offset(px, py))
-                    drawCircle(d.color, dp(1.6f), Offset(px, py))
+                // The coin's own face rides the wire that actually carries it, so
+                // what you watch crossing is the thing you are sending.
+                drawWireParticle(Offset(px, py), d.color, if (i == mainWire) coin else null, coinSize, alpha, dp)
+            }
+
+            // The way home. Same arc mirrored below, running the other way, half a
+            // turn out of phase so the two read as one circuit instead of two
+            // streams crossing.
+            if (i == backFrom && backCoin != null) {
+                val ctrlBack = Offset((you.x + dest.x) / 2f, (you.y + dest.y) / 2f + dp(22f))
+                val back = Path().apply { moveTo(dest.x, dest.y); quadraticBezierTo(ctrlBack.x, ctrlBack.y, you.x, you.y) }
+                drawPath(back, color = Halo.cyan.copy(alpha = 0.4f * alpha), style = Stroke(width = stroke))
+                run {
+                    val p = ((t + 0.5f) % 1f) * alpha; val mt = 1 - p
+                    val px = mt * mt * dest.x + 2 * mt * p * ctrlBack.x + p * p * you.x
+                    val py = mt * mt * dest.y + 2 * mt * p * ctrlBack.y + p * p * you.y
+                    drawWireParticle(Offset(px, py), Halo.cyan, backCoin, coinSize, alpha, dp)
                 }
             }
             // Amount sits just left of its node, so five edges never pile up mid-canvas.
-            amtPaint.color = d.color.copy(alpha = alpha).toArgb(); amtPaint.textSize = dp(if (n > 3) 11f else 13f)
-            drawContext.canvas.nativeCanvas.drawText(d.amountText, dest.x - nodeR - dp(10f), dest.y + dp(4f), amtPaint)
-            drawMapNode(dest, d.color, d.label, labelPaint, pulse, i, nodeR, dp, alpha)
+            // An em dash is what [heroLine] returns when there is no amount to
+            // show. On a wire, between two circles, it reads as a thing rather
+            // than as an absence, so nothing is drawn instead.
+            val amount = d.amountText.takeIf { it.isNotBlank() && it.trim() != "—" && it.trim() != "-" }
+            if (amount != null) {
+                amtPaint.color = d.color.copy(alpha = alpha).toArgb(); amtPaint.textSize = dp(if (n > 3) 11f else 13f)
+                drawContext.canvas.nativeCanvas.drawText(amount, dest.x - nodeR - dp(10f), dest.y + dp(4f), amtPaint)
+            }
+            // The node that hands the coin back wears it, so the picture answers
+            // "what am I getting" without a word of text.
+            drawMapNode(dest, d.color, d.label, labelPaint, pulse, i, nodeR, dp, alpha, if (i == backFrom) backCoin else null)
         }
         drawMapNode(you, Halo.mint, youLabel, labelPaint, pulse, 9, dp(17f), dp, 1f)
     }
 }
 
+/**
+ * Something crossing a wire. Never something standing on one.
+ *
+ * This is the line between decoration and a lie. A node on this map is a real
+ * destination and can be counted; a particle is the money moving. They used to
+ * be drawn the same way — a disc, a halo, a ring around it — so a person reading
+ * the picture counted two accounts one second and six the next and asked, fairly,
+ * which one was true.
+ *
+ * So the moving things lost the halo and the ring. What is left is a small
+ * bright mark, and on one wire the coin's own face, small enough that it never
+ * reads as a coin parked somewhere.
+ */
+private fun DrawScope.drawWireParticle(at: Offset, color: Color, coin: ImageBitmap?, size: Float, alpha: Float, dp: (Float) -> Float) {
+    if (coin == null) {
+        drawCircle(color.copy(alpha = 0.85f * alpha), dp(2.2f), at)
+        return
+    }
+    val s = size * 0.72f
+    clipPath(Path().apply { addOval(Rect(at.x - s / 2f, at.y - s / 2f, at.x + s / 2f, at.y + s / 2f)) }) {
+        drawImage(
+            image = coin,
+            dstOffset = androidx.compose.ui.unit.IntOffset((at.x - s / 2f).toInt(), (at.y - s / 2f).toInt()),
+            dstSize = androidx.compose.ui.unit.IntSize(s.toInt(), s.toInt()),
+            alpha = 0.92f * alpha,
+        )
+    }
+}
+
 private fun DrawScope.drawMapNode(
     c: Offset, color: Color, label: String, paint: Paint, pulse: Float, seed: Int, r: Float, dp: (Float) -> Float, alpha: Float,
+    badge: ImageBitmap? = null,
 ) {
     val p = sin(pulse + seed) * dp(1.5f)
     drawCircle(color.copy(alpha = 0.06f * alpha), r + dp(12f) + p, c)
     drawCircle(color.copy(alpha = 0.10f * alpha), r + dp(7f) + p, c)
     drawCircle(color.copy(alpha = 0.16f * alpha), r + dp(3f) + p, c)
     drawCircle(Halo.ground.copy(alpha = 0.92f), r, c)
+    if (badge != null) {
+        val s = r * 1.7f
+        clipPath(Path().apply { addOval(Rect(c.x - s / 2f, c.y - s / 2f, c.x + s / 2f, c.y + s / 2f)) }) {
+            drawImage(
+                image = badge,
+                dstOffset = androidx.compose.ui.unit.IntOffset((c.x - s / 2f).toInt(), (c.y - s / 2f).toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(s.toInt(), s.toInt()),
+                alpha = alpha,
+            )
+        }
+    }
     drawCircle(color.copy(alpha = alpha), r, c, style = Stroke(width = dp(2f)))
     paint.color = color.copy(alpha = alpha).toArgb(); paint.textSize = dp(11.5f)
-    drawContext.canvas.nativeCanvas.drawText(label, c.x, c.y + r + dp(15f), paint)
+    // Centred on the node, so the room it has is twice the distance to the nearer
+    // edge. "Jupiter pool · PancakeSwap · Meteora DLMM" used to be drawn in full
+    // and simply left the screen on the right.
+    val room = 2f * minOf(c.x, size.width - c.x) - dp(8f)
+    drawContext.canvas.nativeCanvas.drawText(ellipsize(label, paint, room), c.x, c.y + r + dp(15f), paint)
+}
+
+/** [text] shortened with a tail ellipsis until it fits [room] pixels. */
+private fun ellipsize(text: String, paint: Paint, room: Float): String {
+    if (room <= 0f || paint.measureText(text) <= room) return text
+    var cut = text.length
+    while (cut > 1 && paint.measureText(text.take(cut) + "…") > room) cut--
+    return text.take(cut).trimEnd() + "…"
 }
 
 // ---- done / error ------------------------------------------------------------------
@@ -1822,7 +2191,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
         PrimaryButton(stringResource(R.string.back_to_dapp, left), danger = false, icon = HIcon.CHEVRON_RIGHT) { activity?.backToDapp(explicit = true) }
         ui.signedTx?.let { raw ->
             Column(
-                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(14.dp),
+                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -1834,7 +2203,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
         }
         ui.signature?.let { sig ->
             Box(
-                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(14.dp),
+                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.signature_hdr), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
@@ -1852,7 +2221,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
         // never from software — the whole point of signing on this device.
         Box(
             Modifier.fillMaxWidth().clip(rs(16))
-                .background(Halo.card).border(1.dp, Halo.stroke, rs(16)).padding(16.dp),
+                .background(Halo.card).border(cardBorder(), rs(16)).padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 26.dp)

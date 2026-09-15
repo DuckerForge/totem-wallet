@@ -98,6 +98,31 @@ object Jupiter {
         return runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
     }
 
+    /**
+     * The fee account, **only when it is actually there**.
+     *
+     * Jupiter does not create the platform fee account for you: hand it an
+     * address that does not exist and its own program aborts the swap with
+     * `Custom 6025`. The derived address always looks fine, so this was invisible
+     * from the code and fatal in practice — every swap into a coin whose treasury
+     * account had never been opened failed, verified coins included, while the one
+     * coin whose account did exist (USDC) worked and hid the pattern.
+     *
+     * One `getAccountInfo` per mint, remembered for the life of the process. Null
+     * means "take no fee on this trade", which is the difference between earning
+     * nothing and breaking the trade.
+     */
+    fun feeAccountIfUsable(outputMint: String): String? {
+        val ata = feeAccountFor(outputMint) ?: return null
+        feeAccountExists[ata]?.let { return if (it) ata else null }
+        val exists = runCatching { SolanaRpc.getAccountInfoRaw(SolanaRpc.urlFor(null), ata) != null }.getOrNull()
+            ?: return null   // could not ask: do not risk a swap that cannot land
+        feeAccountExists[ata] = exists
+        return if (exists) ata else null
+    }
+
+    private val feeAccountExists = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
     /** The platform fee wallet's ATA for [outputMint], where our cut lands. Null when no fee wallet is set. */
     fun feeAccountFor(outputMint: String): String? {
         val fee = Base58.decodePubkey(BuildConfig.SKR_TREASURY) ?: return null

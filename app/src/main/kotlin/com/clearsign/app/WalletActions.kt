@@ -158,13 +158,38 @@ object WalletActions {
     )
 
     /** One-time: create the fee wallet's ATAs for the main mints so the swap fee lands. Idempotent. */
+    /**
+     * The mints worth opening a fee account for: the usual suspects, plus the
+     * coins this person actually trades.
+     *
+     * A hand-written list of six was the whole reason the fee earned nothing:
+     * every other coin had no account, and a swap into a coin with no account
+     * does not merely skip the fee, it **fails** ([Jupiter.feeAccountIfUsable]).
+     * Blocking, so call it on IO.
+     */
+    fun feeMintsToOpen(ctx: Context, owner: String): List<String> {
+        val held = runCatching { SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner) }
+            .getOrDefault(emptyList()).filter { it.amount > 0 }.map { it.mint }
+        val watched = runCatching { Watchlist.all(ctx) }.getOrDefault(emptyList())
+        // Bounded before the questions, not after: each candidate costs one call
+        // to the chain, and a long watchlist would turn opening this card into a
+        // minute of waiting.
+        return (FEE_MINTS + watched + held).distinct().take(20)
+            // Already open is nothing to do, and one transaction can only carry
+            // so many accounts before it stops fitting.
+            .filter { Jupiter.feeAccountIfUsable(it) == null && Jupiter.feeAccountFor(it) != null }
+            .take(8)
+    }
+
     suspend fun activateSwapFees(ctx: Context, signer: SeedVaultSigner, owner: String): Result {
         val treasury = Base58.decodePubkey(BuildConfig.SKR_TREASURY) ?: return Result.Failed(ctx.getString(R.string.theme_unlock_no_treasury))
         val ownerKey = Base58.decodePubkey(owner) ?: return Result.Failed(ctx.getString(R.string.wa_bad_address))
         val program = Base58.decode(SolanaTx.TOKEN_PROGRAM)
+        val mints = withContext(Dispatchers.IO) { feeMintsToOpen(ctx, owner) }
+        if (mints.isEmpty()) return Result.Failed(ctx.getString(R.string.swapfees_nothing))
         val ixs = buildList {
-            add(WalletTx.setComputeUnitLimit(120_000))
-            for (m in FEE_MINTS) {
+            add(WalletTx.setComputeUnitLimit(30_000 + 25_000 * mints.size))
+            for (m in mints) {
                 val mint = Base58.decode(m)
                 add(WalletTx.createAtaIdempotent(ownerKey, Pda.associatedTokenAddress(treasury, mint, program), treasury, mint, program))
             }

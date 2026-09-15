@@ -38,6 +38,18 @@ object Positions {
         val symbol: String,
         val decimals: Int,
         val units: Double,
+        /**
+         * The budget that bought it.
+         *
+         * Without this the book outlived the key. A budget was closed with coins
+         * inside, a new one was made, and its first tick tried to sell 1214
+         * LEVERCAT that the new key had never held: the simulation moved nothing,
+         * the collar read that as the agent lying, and the loop repeated the same
+         * refusal eighty-four times over sixteen hours without buying anything
+         * either, because a position with an exit due stops the tick before the
+         * hunt. A holding belongs to the key that can sign for it.
+         */
+        val owner: String = "",
         /** What left the budget to buy it, fees included. The denominator of every exit. */
         val costLamports: Long,
         val openedAt: Long,
@@ -49,7 +61,26 @@ object Positions {
         val triggerOrder: String? = null,
         /** Set once the loop has sold it, so a slow confirmation cannot sell twice. */
         val closing: Boolean = false,
+        /**
+         * The coins are inside a Trigger order on chain, not in the wallet.
+         * Jupiter escrows them when the order is placed, so the loop must take
+         * the order back before it can sell anything itself.
+         */
+        val parked: Boolean = false,
+        /** Sales attempted and failed in a row. Reset by any sale that lands. */
+        val fails: Int = 0,
+        val lastTryAt: Long = 0L,
+        /** Why the last attempt failed, in the words the person will read. */
+        val lastError: String? = null,
     ) {
+        /**
+         * When it is worth trying again.
+         *
+         * Three tries at the normal pace, then a doubling wait up to six hours.
+         * A coin that cannot be sold is usually a coin that cannot be sold for a
+         * while, and retrying it every ninety seconds only buries the reason.
+         */
+        val readyAt: Long get() = if (fails < 3) 0L else lastTryAt + retryDelay(fails)
         /** Price per whole token, in lamports. Null when the position is empty. */
         val entryLamports: Double? get() = if (units > 0) costLamports / units else null
 
@@ -74,7 +105,8 @@ object Positions {
         enum class Why { TARGET, STOP }
     }
 
-    fun all(ctx: Context): List<Position> {
+    /** Everything on disk, whoever it belonged to. */
+    private fun stored(ctx: Context): List<Position> {
         val raw = prefs(ctx).getString(KEY, null) ?: return emptyList()
         return runCatching {
             val arr = JSONArray(raw)
@@ -82,7 +114,23 @@ object Positions {
         }.getOrDefault(emptyList())
     }
 
+    private fun ownerNow(ctx: Context): String? = SessionWallet.current(ctx)?.pubkey
+
+    /**
+     * A row is this agent's business when the budget that bought it is the budget
+     * that exists now. A row written before positions carried an owner has no
+     * claim either way, so it is shown and left for [reconcile] to adopt or drop
+     * against the chain.
+     */
+    private fun mine(p: Position, owner: String?) = p.owner.isEmpty() || p.owner == owner
+
+    fun all(ctx: Context): List<Position> = ownerNow(ctx).let { o -> stored(ctx).filter { mine(it, o) } }
+
     fun open(ctx: Context): List<Position> = all(ctx).filter { !it.closing }
+
+    /** Retry wait after [fails] failures in a row: none, then five minutes doubling to six hours. */
+    fun retryDelay(fails: Int): Long =
+        if (fails < 3) 0L else (5 * 60_000L shl (fails - 3).coerceAtMost(7)).coerceAtMost(6 * 3_600_000L)
 
     private fun save(ctx: Context, list: List<Position>) {
         val arr = JSONArray()
@@ -97,8 +145,8 @@ object Positions {
      * with ourselves about what we paid.
      */
     fun add(ctx: Context, p: Position) {
-        val list = all(ctx).toMutableList()
-        val i = list.indexOfFirst { it.mint == p.mint && !it.closing }
+        val list = stored(ctx).toMutableList()
+        val i = list.indexOfFirst { it.mint == p.mint && it.owner == p.owner && !it.closing }
         if (i >= 0) {
             val old = list[i]
             list[i] = old.copy(
@@ -106,6 +154,8 @@ object Positions {
                 costLamports = old.costLamports + p.costLamports,
                 takeProfitPct = p.takeProfitPct, stopLossPct = p.stopLossPct,
                 triggerOrder = p.triggerOrder ?: old.triggerOrder,
+                // Money went in again, so whatever went wrong last time is history.
+                fails = 0, lastError = null,
             )
         } else {
             list += p
@@ -113,20 +163,34 @@ object Positions {
         save(ctx, list)
     }
 
-    /** Mark it as on its way out, so a second tick cannot sell it again. */
-    fun markClosing(ctx: Context, mint: String) {
-        save(ctx, all(ctx).map { if (it.mint == mint) it.copy(closing = true) else it })
+    /** Change the one row for [mint] that belongs to the budget in use. */
+    private fun edit(ctx: Context, mint: String, f: (Position) -> Position) {
+        val o = ownerNow(ctx)
+        save(ctx, stored(ctx).map { if (it.mint == mint && mine(it, o)) f(it) else it })
     }
+
+    /** Mark it as on its way out, so a second tick cannot sell it again. */
+    fun markClosing(ctx: Context, mint: String) = edit(ctx, mint) { it.copy(closing = true) }
 
     /** The sale failed: put it back in play rather than stranding it half closed. */
-    fun reopen(ctx: Context, mint: String) {
-        save(ctx, all(ctx).map { if (it.mint == mint) it.copy(closing = false) else it })
+    fun reopen(ctx: Context, mint: String) = edit(ctx, mint) { it.copy(closing = false) }
+
+    fun remove(ctx: Context, mint: String) {
+        val o = ownerNow(ctx)
+        save(ctx, stored(ctx).filter { !(it.mint == mint && mine(it, o)) })
     }
 
-    fun remove(ctx: Context, mint: String) = save(ctx, all(ctx).filter { it.mint != mint })
+    fun setTrigger(ctx: Context, mint: String, order: String?) = edit(ctx, mint) { it.copy(triggerOrder = order) }
 
-    fun setTrigger(ctx: Context, mint: String, order: String?) {
-        save(ctx, all(ctx).map { if (it.mint == mint) it.copy(triggerOrder = order) else it })
+    /**
+     * Write down that a sale did not happen, and why. Returns how many times in a
+     * row this one has failed, so the caller can say something once instead of
+     * every ninety seconds.
+     */
+    fun noteFailure(ctx: Context, mint: String, why: String?): Int {
+        var n = 0
+        edit(ctx, mint) { n = it.fails + 1; it.copy(fails = n, lastTryAt = System.currentTimeMillis(), lastError = why) }
+        return n
     }
 
     fun clear(ctx: Context) = prefs(ctx).edit().remove(KEY).apply()
@@ -148,7 +212,7 @@ object Positions {
         val units = leg.rawAmount / Math.pow(10.0, leg.decimals.toDouble())
         if (units <= 0) return null
         return Position(
-            mint = leg.mint, symbol = leg.symbol, decimals = leg.decimals, units = units,
+            mint = leg.mint, symbol = leg.symbol, decimals = leg.decimals, units = units, owner = owner,
             // The network fee came out of the budget too, so it is part of what
             // this position has to earn back before it is actually in profit.
             costLamports = paid + receipt.feeLamports,
@@ -177,13 +241,86 @@ object Positions {
             // A hair left over is dust from rounding, not a position.
             if (left <= pos.units * 0.02) { remove(ctx, leg.mint); continue }
             val share = left / pos.units
-            save(
-                ctx,
-                all(ctx).map {
-                    if (it.mint == leg.mint) it.copy(units = left, costLamports = (it.costLamports * share).toLong(), closing = false) else it
-                },
-            )
+            edit(ctx, leg.mint) {
+                it.copy(units = left, costLamports = (it.costLamports * share).toLong(), closing = false, fails = 0, lastError = null)
+            }
         }
+    }
+
+    // ---- keeping the book honest --------------------------------------------
+
+    /** What [reconcile] decided: what stays, and what was never really there. */
+    data class Reconciled(val keep: List<Position>, val gone: List<Position>, val changed: Boolean)
+
+    /**
+     * Put the book next to the chain and believe the chain.
+     *
+     * The book is written from simulations, and a simulation is a promise about
+     * one moment. Between then and now a budget can be closed, an order can fill,
+     * a coin can be sold from the chat or moved by hand. Everything the loop does
+     * afterwards is priced off this list, so a row that is no longer true is not a
+     * cosmetic problem: it is an agent trying to sell something it does not have,
+     * failing, and blocking every other thing it was going to do that minute.
+     *
+     * [onChain] is raw units per mint held by [owner], [parkedMints] are the coins
+     * sitting in a live Trigger order, which have left the wallet without being
+     * sold. [liveByMint] is what Jupiter lists as active, coin to order key, or
+     * null when Jupiter was not asked: an order key is only dropped when Jupiter
+     * says the order is gone, never on a guess, and a parked row that lost its
+     * key takes the one Jupiter has. Four outcomes and no fifth:
+     *
+     *  * a row from another budget is not this agent's business, at all;
+     *  * coins on chain: the row is adopted, and the amount is taken from the
+     *    chain rather than from what we remember;
+     *  * no coins but a live order: parked, not lost, and not sellable until the
+     *    order is taken back;
+     *  * no coins and no order: it is not there. Off the list, with the reason.
+     */
+    fun reconcile(book: List<Position>, owner: String, onChain: Map<String, Long>, parkedMints: Set<String>, liveByMint: Map<String, String>? = null): Reconciled {
+        val keep = ArrayList<Position>()
+        val gone = ArrayList<Position>()
+        for (p in book) {
+            if (p.owner.isNotEmpty() && p.owner != owner) { gone += p; continue }
+            val raw = onChain[p.mint] ?: 0L
+            if (raw > 0L) {
+                val held = raw / Math.pow(10.0, p.decimals.toDouble())
+                // Never grow a position from a balance: a bigger holding with the
+                // same cost reads as a lower entry price, which would sell a coin
+                // at a target it never reached. Only shrink, and take the cost
+                // down with it so the entry price stays what we actually paid.
+                val units = minOf(p.units, held)
+                val shrunk = units < p.units * 0.999
+                // The coins are in the wallet, so no order is holding them. But
+                // the key only goes once Jupiter confirms the order is not there:
+                // a cancel that was accepted and never landed left the coins in
+                // escrow and the row without a key, and nothing could reach it.
+                val stale = liveByMint != null && p.triggerOrder != null && p.triggerOrder !in liveByMint.values
+                val fixed = p.copy(
+                    owner = owner, parked = false,
+                    units = if (shrunk) units else p.units,
+                    costLamports = if (shrunk && p.units > 0) (p.costLamports * (units / p.units)).toLong() else p.costLamports,
+                    // The coins are still here, so nothing was sold, so a row left
+                    // half closed by a tick that died is just a row.
+                    closing = false,
+                    triggerOrder = if (stale) null else p.triggerOrder,
+                )
+                keep += fixed
+                continue
+            }
+            if (p.mint in parkedMints) {
+                keep += p.copy(owner = owner, parked = true, closing = false, triggerOrder = p.triggerOrder ?: liveByMint?.get(p.mint))
+                continue
+            }
+            gone += p
+        }
+        return Reconciled(keep, gone, changed = gone.isNotEmpty() || keep != book)
+    }
+
+    /** [reconcile] against the store. Returns the rows that were not real. */
+    fun reconcile(ctx: Context, owner: String, onChain: Map<String, Long>, parkedMints: Set<String>, liveByMint: Map<String, String>? = null): List<Position> {
+        val r = reconcile(stored(ctx), owner, onChain, parkedMints, liveByMint)
+        if (r.changed) save(ctx, r.keep)
+        return r.gone
     }
 
     private fun toJson(p: Position) = JSONObject()
@@ -191,6 +328,8 @@ object Positions {
         .put("units", p.units).put("cost", p.costLamports).put("at", p.openedAt)
         .put("tp", p.takeProfitPct).put("sl", p.stopLossPct)
         .put("order", p.triggerOrder ?: JSONObject.NULL).put("closing", p.closing)
+        .put("owner", p.owner).put("parked", p.parked)
+        .put("fails", p.fails).put("tryAt", p.lastTryAt).put("err", p.lastError ?: JSONObject.NULL)
 
     private fun fromJson(o: JSONObject): Position? {
         val mint = o.optString("mint").takeIf { it.isNotEmpty() } ?: return null
@@ -205,6 +344,11 @@ object Positions {
             stopLossPct = o.optInt("sl", 0),
             triggerOrder = o.optString("order").takeIf { it.isNotEmpty() && it != "null" },
             closing = o.optBoolean("closing", false),
+            owner = o.optString("owner"),
+            parked = o.optBoolean("parked", false),
+            fails = o.optInt("fails", 0),
+            lastTryAt = o.optLong("tryAt", 0L),
+            lastError = o.optString("err").takeIf { it.isNotEmpty() && it != "null" },
         )
     }
 }

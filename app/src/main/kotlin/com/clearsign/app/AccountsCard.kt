@@ -246,7 +246,7 @@ internal fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner:
                         pv == null -> Working(stringResource(R.string.w_analyzing))
                         else -> SignReceiptBody(pv.receipt, null)
                     }
-                    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
+                    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(14.dp)) {
                         if (action is HygieneAction.Revoke) StatRow(stringResource(R.string.deleg_delegate), shorten(action.account.delegate ?: "", 6))
                         if (action is HygieneAction.Burn) {
                             StatRow(stringResource(R.string.burn_amount), "−" + fmtUi(action.holding.ui) + " " + action.holding.symbol)

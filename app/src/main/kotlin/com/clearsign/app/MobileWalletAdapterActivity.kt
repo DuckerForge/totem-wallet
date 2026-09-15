@@ -367,6 +367,17 @@ class MobileWalletAdapterActivity : ComponentActivity() {
                     val label = acc.label ?: "Apex"
                     if (signIn == null) request.completeWithAuthorize(acc.pubkeyBytes, label, null, null)
                     else request.completeWithAuthorize(AuthorizedAccount(acc.pubkeyBytes, label, null, null, null), null, null, signIn)
+                    // The other half of the auth token bargain. The dApp keeps the
+                    // token; from here on the wallet keeps a record of who holds
+                    // one, so it can be taken back.
+                    val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
+                    runCatching {
+                        Connections.remember(
+                            this@MobileWalletAdapterActivity,
+                            Connections.idOf(dApp.host, callerPackage, dApp.name),
+                            dApp.name, dApp.host, dApp.iconUrl, Base58.encode(acc.pubkeyBytes),
+                        )
+                    }
                     ui = MwaUi.Working(getString(R.string.w_waiting_dapp))
                     armWaitWatchdog()
                 } catch (e: Exception) {
@@ -380,6 +391,18 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         override fun onReauthorizeRequest(request: ReauthorizeRequest) {
             onMain { bringToFront() }
             Log.i(TAG, "onReauthorizeRequest from ${request.identityName}")
+            val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
+            val id = Connections.idOf(dApp.host, callerPackage, dApp.name)
+            // Coming back on an old token. This used to be answered yes without
+            // looking at anything, which made "disconnect" a word with nothing
+            // behind it. Revoked means it asks you again, in front of you.
+            if (!Connections.allowed(this@MobileWalletAdapterActivity, id)) {
+                Log.i(TAG, "reauthorize declined: $id was revoked")
+                request.completeWithDecline()
+                onMain { finishAndRemoveTask() }
+                return
+            }
+            Connections.touch(this@MobileWalletAdapterActivity, id)
             request.completeWithReauthorize()
         }
 
@@ -593,6 +616,16 @@ sealed interface MwaUi {
         val cluster: String?,
         val onApprove: () -> Unit,
         val onDecline: () -> Unit,
+        /**
+         * Why the agent could not do this on its own.
+         *
+         * The collar's own words — "it would exceed the daily cap of 0.047 SOL" —
+         * and the first thing a person needs on this screen. It used to be
+         * appended to a risk row's detail text, which is the right information in
+         * the one place nobody reads first: you were handed a signature request
+         * for money with no answer to "why are you asking me".
+         */
+        val askedWhy: String? = null,
     ) : MwaUi {
         val count: Int get() = receipts.size
     }

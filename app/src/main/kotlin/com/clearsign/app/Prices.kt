@@ -21,7 +21,17 @@ object Prices {
     /** A spot quote: USD per whole token and the 24h move in percent (when Jupiter has it). */
     data class Px(val usd: Double, val change24h: Double?)
 
-    /** Quotes for [mints] (native SOL priced as wSOL). Missing = unknown. */
+    /**
+     * Quotes for [mints] (native SOL priced as wSOL). Missing = unknown.
+     *
+     * Two sources, in order. The price endpoint answers for anything with real
+     * liquidity and is the cheapest call there is. What it does not answer for is
+     * exactly the kind of coin the agent buys: young, thin, and absent from the
+     * price index. Those used to show a dash in the portfolio, which reads as "we
+     * lost it" rather than "nobody publishes a price", and they were the only
+     * holdings the person actually wanted to watch. The token registry prices
+     * them, and it is the same call the swap screen already makes.
+     */
     fun quotes(mints: Collection<String>): Map<String, Px> {
         val ids = mints.map { if (it == NATIVE_SOL_MINT) WSOL else it }.distinct()
         val out = HashMap<String, Px>()
@@ -31,6 +41,12 @@ object Prices {
                 val q = o.optJSONObject(id) ?: continue
                 val p = q.optDouble("usdPrice").takeIf { !it.isNaN() && it > 0 } ?: continue
                 out[id] = Px(p, q.optDouble("priceChange24h").takeIf { !it.isNaN() })
+            }
+        }
+        val missing = ids.filter { it !in out }
+        if (missing.isNotEmpty()) {
+            runCatching { JupiterTokens.byMints(missing) }.getOrDefault(emptyMap()).forEach { (mint, t) ->
+                t.usd?.let { out[mint] = Px(it, t.change24h) }
             }
         }
         out[WSOL]?.let { out[NATIVE_SOL_MINT] = it }

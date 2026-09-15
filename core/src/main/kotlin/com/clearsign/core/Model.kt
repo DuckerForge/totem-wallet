@@ -60,7 +60,8 @@ enum class RiskFlag {
     ACCOUNT_CLOSE,         // closeAccount to a non-owned/unknown destination
     NEW_UNKNOWN_RECIPIENT, // never transacted with, not in allowlist
     LOOKALIKE_ADDRESS,     // resembles a known address (address-poisoning)
-    SIMULATION_FAILED,     // could not simulate → never blind-sign
+    SIMULATION_FAILED,     // the node ran it and it failed → never blind-sign
+    SIMULATION_UNAVAILABLE, // could not ask the node → never blind-sign, but worth asking again
     STATE_DRIFT,           // re-simulation at approval differs from preview (TOCTOU)
     COMMUNITY_FLAGGED,     // on-chain community reputation voted this address down
     DRAINS_BALANCE,        // an outflow empties (≥90%) one of your balances

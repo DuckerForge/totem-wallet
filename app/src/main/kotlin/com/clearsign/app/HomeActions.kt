@@ -22,13 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 
 /** The eight things you can start from the wallet home. */
-internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, TAP, LINK, AGENT, MORE }
+internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AGENT, MORE }
 
 /**
  * The action grid: eight round, **neutral** buttons.
@@ -50,7 +51,10 @@ internal fun HomeActions(enabled: Boolean, onAction: (HomeAction) -> Unit) {
             Triple(HomeAction.SCAN, HIcon.SCAN, R.string.send_scan),
         ),
         listOf(
-            Triple(HomeAction.TAP, HIcon.NFC, R.string.home_act_tap),
+            // The tap-to-pay button used to live here. It is a fine feature and
+            // almost nobody opens it twice, while what the rest of the Seeker crowd
+            // is buying is worth a look every day. Tap moved into "Altro", intact.
+            Triple(HomeAction.CROWD, HIcon.NFC, R.string.home_act_crowd),
             Triple(HomeAction.LINK, HIcon.SHARE, R.string.home_act_link),
             Triple(HomeAction.AGENT, HIcon.PIGEON, R.string.home_act_agent),
             Triple(HomeAction.MORE, HIcon.MORE, R.string.home_act_more),
@@ -80,14 +84,69 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         Box(
-            Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(Radius.pill)),
+            // The same living hairline as the cards, so a theme that moves moves
+            // everywhere rather than in one place.
+            Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.pill)),
             contentAlignment = Alignment.Center,
         ) {
-            // The tap button wears the Seeker itself rather than a generic glyph:
-            // it is our own drawing, and it says which object is doing the tapping.
-            if (icon == HIcon.NFC) SeekerGlyph(tint) else HaloIcon(icon, tint, 23.dp)
+            // This button wears the Seeker itself rather than a generic glyph: it
+            // is our own drawing, and the thing behind it is the crowd of people
+            // holding that exact object.
+            if (icon == HIcon.NFC) CrowdGlyph(tint) else HaloIcon(icon, tint, 23.dp)
         }
         Text(label, style = HaloType.label, color = tint, textAlign = TextAlign.Center, maxLines = 1)
+    }
+}
+
+/**
+ * The scout's lens.
+ *
+ * It had a phone inside it, four ticks around it and a handle, at twenty-six
+ * density-independent pixels. All of it was true and none of it was legible:
+ * past a certain point an icon stops being a drawing and becomes a smudge.
+ *
+ * So it lost everything except what it is for. A ring, a line rising inside it,
+ * a handle. Looking at a market, in three strokes.
+ */
+@Composable
+private fun CrowdGlyph(tint: androidx.compose.ui.graphics.Color) {
+    Canvas(Modifier.size(26.dp)) {
+        val r = size.minDimension * 0.355f
+        val cx = size.width * 0.42f
+        val cy = size.height * 0.40f
+        val c = androidx.compose.ui.geometry.Offset(cx, cy)
+
+        // The glass, faintly filled so the ring reads as a lens and not as a circle.
+        drawCircle(tint.copy(alpha = 0.10f), r, c)
+        drawCircle(tint, r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(1.9f * density))
+
+        // What is inside the glass: a line going somewhere. Clipped to the lens, so
+        // it belongs to the glass rather than sitting on top of it.
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(cx - r * 0.58f, cy + r * 0.34f)
+            lineTo(cx - r * 0.12f, cy - r * 0.16f)
+            lineTo(cx + r * 0.20f, cy + r * 0.12f)
+            lineTo(cx + r * 0.60f, cy - r * 0.46f)
+        }
+        clipPath(androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(c, r - 1f * density)) }) {
+            drawPath(
+                path, tint,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 1.8f * density,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                ),
+            )
+        }
+
+        // The handle, thicker than the rim, which is what makes it read as held.
+        drawLine(
+            tint,
+            androidx.compose.ui.geometry.Offset(cx + r * 0.70f, cy + r * 0.70f),
+            androidx.compose.ui.geometry.Offset(cx + r * 0.70f + r * 0.80f, cy + r * 0.70f + r * 0.80f),
+            strokeWidth = 2.4f * density,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+        )
     }
 }
 
@@ -195,7 +254,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -207,6 +266,7 @@ internal fun MoreSheet(onHealth: () -> Unit, onContacts: () -> Unit, onSettings:
             verticalArrangement = Arrangement.spacedBy(Space.md),
         ) {
             Text(stringResource(R.string.home_act_more), style = HaloType.title, color = Halo.ink)
+            MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)
             MoreRow(HIcon.WALLET, stringResource(R.string.widget_card_title), onSettings)
@@ -219,7 +279,7 @@ internal fun MoreSheet(onHealth: () -> Unit, onContacts: () -> Unit, onSettings:
 @Composable
 private fun MoreRow(icon: HIcon, label: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(Radius.panel))
+        Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.panel))
             .clickable(onClick = onClick).padding(Space.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -296,7 +356,7 @@ internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(rs(Radius.panel)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(Radius.panel)),
+            Modifier.size(40.dp).clip(rs(Radius.panel)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.panel)),
             contentAlignment = Alignment.Center,
         ) { HaloIcon(icon, Halo.ink, 20.dp) }
         androidx.compose.foundation.layout.Spacer(Modifier.size(Space.md))
@@ -305,7 +365,7 @@ internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -
             if (sub != null) Text(sub, style = HaloType.small, color = Halo.muted)
         }
         Box(
-            Modifier.size(34.dp).clip(rs(Radius.pill)).background(Halo.card).border(1.dp, Halo.stroke, rs(Radius.pill))
+            Modifier.size(34.dp).clip(rs(Radius.pill)).background(Halo.card).border(cardBorder(), rs(Radius.pill))
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
         ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }

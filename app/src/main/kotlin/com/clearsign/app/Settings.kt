@@ -14,6 +14,9 @@ object Settings {
     private const val KEY_WATCH_WALLET = "watch_wallet"
     private const val KEY_CRT = "crt_effect"
     private const val KEY_TEXT_SCALE = "text_scale"
+    private const val KEY_SWAP_PCT = "swap_custom_pct"
+    private const val KEY_WEB_CHECK = "web_check"
+    private const val KEY_AGENT_PRO = "agent_pro"
 
     val currency = mutableStateOf("USD")
     val onboarded = mutableStateOf(true)
@@ -23,6 +26,35 @@ object Settings {
     /** Global text-size multiplier (0.85–1.30). Applied via LocalDensity.fontScale. */
     val textScale = mutableStateOf(1f)
 
+    /**
+     * Your own slice of the balance, kept between trades.
+     *
+     * A quarter, a half and three quarters are somebody else's idea of how you
+     * trade. This is the one you set once and then press, and it is worth storing
+     * because the whole point of it is not typing the number again.
+     * Zero means you have not set one.
+     */
+    val swapCustomPct = mutableStateOf(0)
+
+    /**
+     * Let the model read the web about a coin before the agent buys it.
+     *
+     * Off by default because it spends money that is not the trade: about a cent
+     * per search on your own Anthropic key, on the one coin per purchase. See
+     * [CoinCheck].
+     */
+    val webCheck = mutableStateOf(false)
+
+    /**
+     * The Agent tab, with everything on it.
+     *
+     * Off, the tab answers three questions and stops: is it working, what does it
+     * hold, what did it do. On, it also shows the model, the collar's numbers,
+     * the lane and targets, the shadow book, the live trace, and the bridge to an
+     * agent on a computer. Same page, one switch, remembered.
+     */
+    val agentPro = mutableStateOf(false)
+
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
@@ -30,6 +62,25 @@ object Settings {
         watchtower.value = p.getBoolean(KEY_WATCH, false)
         crt.value = p.getBoolean(KEY_CRT, true)
         textScale.value = p.getFloat(KEY_TEXT_SCALE, 1f)
+        swapCustomPct.value = p.getInt(KEY_SWAP_PCT, 0)
+        webCheck.value = p.getBoolean(KEY_WEB_CHECK, false)
+        agentPro.value = p.getBoolean(KEY_AGENT_PRO, false)
+    }
+
+    fun setAgentPro(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_AGENT_PRO, on).apply()
+        agentPro.value = on
+    }
+
+    fun setWebCheck(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_WEB_CHECK, on).apply()
+        webCheck.value = on
+    }
+
+    fun setSwapCustomPct(ctx: Context, pct: Int) {
+        val v = pct.coerceIn(0, 100)
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(KEY_SWAP_PCT, v).apply()
+        swapCustomPct.value = v
     }
 
     fun watchWallet(ctx: Context): String? = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_WATCH_WALLET, null)

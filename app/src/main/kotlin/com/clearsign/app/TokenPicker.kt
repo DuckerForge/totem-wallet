@@ -113,7 +113,7 @@ internal fun TokenPicker(
 
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(1.dp, Halo.stroke, rs(999)).clickable { onClose() }, contentAlignment = Alignment.Center) {
+            Box(Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onClose() }, contentAlignment = Alignment.Center) {
                 HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp)
             }
             Spacer(Modifier.width(12.dp))
@@ -210,7 +210,7 @@ private fun TokenLine(t: PickToken, currency: String, onPick: (PickToken) -> Uni
 }
 
 @Composable
-private fun pickerField() = OutlinedTextFieldDefaults.colors(
+internal fun pickerField() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = Halo.stroke, unfocusedBorderColor = Halo.stroke.copy(alpha = 0.7f),
     focusedContainerColor = Halo.cardSoft, unfocusedContainerColor = Halo.cardSoft,
     cursorColor = Halo.mint, focusedTextColor = Halo.ink, unfocusedTextColor = Halo.ink,

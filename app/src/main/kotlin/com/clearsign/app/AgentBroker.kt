@@ -69,7 +69,20 @@ object AgentBroker {
 
         class SignedSilently(signature: String) : Verdict("signed_silently", null, signature)
         class Confirmed(signature: String?) : Verdict("confirmed_by_user", null, signature)
-        class Refused(reason: String) : Verdict("refused", reason, null)
+        /**
+         * [by] says who said no, because three things arrive here and mean
+         * opposite things. The collar is a bug report about the proposal. A
+         * person is an answer, and asking again in six minutes is how an agent
+         * becomes a nuisance. Everything else is the system: a send that failed,
+         * a key that could not be read, a blockhash that expired. That one is
+         * worth a retry and never a stop. The loop used to call all three "you
+         * turned it down", which blamed the person for a refusal they never made
+         * and switched the agent off over a node that answered 429.
+         */
+        class Refused(reason: String, val by: By = By.SYSTEM) : Verdict("refused", reason, null) {
+            enum class By { PERSON, COLLAR, SYSTEM }
+            val byCollar: Boolean get() = by == By.COLLAR
+        }
         class Timeout(reason: String) : Verdict("timeout", reason, null)
 
         fun describe(rule: String?, said: String?, simulated: String?) = apply {
@@ -123,15 +136,25 @@ object AgentBroker {
                 record(ctx, receipt, session.pubkey, job, "refused", null, false, decision.reason)
                 AgentLink.noteAction(ctx, ctx.getString(R.string.agent_last_refused, what))
                 notify(ctx, ctx.getString(R.string.agent_notif_refused), decision.reason, null)
-                Verdict.Refused(decision.reason).explained()
+                Verdict.Refused(decision.reason, Verdict.Refused.By.COLLAR).explained()
             }
             is Decision.Ask -> {
                 Log.i(TAG, "asking: ${decision.reason}")
                 AgentLink.noteAction(ctx, ctx.getString(R.string.agent_last_asked, what))
-                ask(ctx, job, session.pubkey, decision.reason, what).explained()
+                val v = ask(ctx, job, session.pubkey, decision.reason, what)
+                // A question nobody answered used to leave no trace at all: the
+                // refusals were in the Receipts tab and the expiries were nowhere,
+                // so a loop stuck on a timeout looked like a loop doing nothing.
+                if (v is Verdict.Timeout) record(ctx, receipt, session.pubkey, job, "expired", null, false, v.reason)
+                v.explained()
             }
             Decision.Auto -> {
-                val value = receipt.outflows.filter { it.rawAmount < 0 }.sumOf { prices(it) ?: 0L }
+                // What the budget actually loses, which is what the rolling caps
+                // are counting. A sale loses nothing: the coin becomes SOL in the
+                // same pocket. Counting it as spending used to burn the daily cap
+                // twice per round trip and then refuse the next sale.
+                val value = if (PolicyEngine.isUnwind(policy, receipt)) 0L
+                else receipt.outflows.filter { it.rawAmount < 0 }.sumOf { prices(it) ?: 0L }
                 signAndSend(ctx, job, session.pubkey, receipt, value, what).explained()
             }
         }
@@ -227,6 +250,15 @@ object AgentBroker {
         )
         LedgerRecorder.record(ctx, if (note != null) entry.copy(note = note) else entry)
     }
+
+    /**
+     * Say something went wrong, once, where a person will see it.
+     *
+     * For the loop, which runs with the app closed: a note nobody reads is the
+     * same as no note at all, and the whole point of this round of work is that a
+     * stuck agent must be loud exactly once rather than quiet eighty-four times.
+     */
+    fun warn(ctx: Context, title: String, body: String) = notify(ctx, title, body, null)
 
     fun channel(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)

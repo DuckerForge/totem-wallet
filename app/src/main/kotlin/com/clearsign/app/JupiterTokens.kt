@@ -33,6 +33,8 @@ object JupiterTokens {
         val icon: String?,
         val decimals: Int,
         val usd: Double? = null,
+        /** The 24h move in percent, when the registry has one. */
+        val change24h: Double? = null,
         val verified: Boolean = false,
         val liquidity: Double = 0.0,
         // What the registry knows about the coin itself, for TokenSafety. All of it
@@ -46,11 +48,17 @@ object JupiterTokens {
         val devMints: Int = 0,
         val holders: Int = 0,
     ) {
-        /** [sellable] comes from an actual quote back to SOL; null when nobody asked. */
-        fun facts(sellable: Boolean? = null) = com.clearsign.core.TokenFacts(
+        /**
+         * [sellable] comes from an actual quote back to SOL; null when nobody asked.
+         * [ext] is what the mint account says it can still do to you after the
+         * purchase; left out, it comes from whatever has already been read, so a
+         * list can show the flag without every row making its own call.
+         */
+        fun facts(sellable: Boolean? = null, ext: com.clearsign.core.MintExtensions? = null) = com.clearsign.core.TokenFacts(
             verified = verified, organic = organic, canMint = canMint, canFreeze = canFreeze,
             token2022 = token2022, topHoldersPct = topHoldersPct, devPct = devPct, devMints = devMints,
             holders = holders, liquidityUsd = liquidity, sellable = sellable,
+            ext = ext ?: TokenExtensions.cached(mint) ?: com.clearsign.core.MintExtensions.NONE,
         )
     }
 
@@ -113,16 +121,54 @@ object JupiterTokens {
      */
     fun pool(): List<com.clearsign.core.Candidate> {
         val seen = LinkedHashMap<String, com.clearsign.core.Candidate>()
-        listOf("/toptraded/24h?limit=100", "/toporganicscore/1h?limit=100").forEach { path ->
-            val arr = HOSTS.firstNotNullOfOrNull { getArray(it + path) } ?: return@forEach
+        fun take(arr: JSONArray?) {
+            if (arr == null) return
             parse(arr) // seeds the name and icon cache for everything we are about to rank
             for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                val c = candidate(o) ?: continue
+                val c = arr.optJSONObject(i)?.let(::candidate) ?: continue
                 seen.getOrPut(c.mint) { c }
             }
         }
+        // Four of Jupiter's own lists, because they disagree in useful ways: traded
+        // is where the money is, organic is where the people are, trending is what
+        // is being talked about, and the same question over an hour and over a day
+        // returns different coins.
+        listOf(
+            "/toptraded/24h?limit=100",
+            "/toporganicscore/1h?limit=100",
+            "/toporganicscore/24h?limit=100",
+            "/toptrending/24h?limit=100",
+        ).forEach { path -> take(HOSTS.firstNotNullOfOrNull { getArray(it + path) }) }
+
+        // And one source that is not Jupiter at all. See [Gecko]: its mints come
+        // back through the same lookup, so they reach the gates in the same shape
+        // as everything above, with the same trading windows attached.
+        val outside = runCatching { Gecko.mints() }.getOrDefault(emptyList()).filter { it !in seen }
+        if (outside.isNotEmpty()) {
+            outside.chunked(100).forEach { chunk ->
+                take(HOSTS.firstNotNullOfOrNull { getArray(it + "/search?query=" + chunk.joinToString(",")) })
+            }
+        }
         return seen.values.toList()
+    }
+
+    /**
+     * Put names on a pile of mints in as few calls as possible.
+     *
+     * The crowd feed arrives as addresses, and an address is not something anybody
+     * reads: "Vesper bought 25zrhp…pump" says nothing, "Vesper bought KITTY" says
+     * the whole thing. One search per fifty mints, and whatever the registry has
+     * never heard of simply keeps its address, which is honest.
+     *
+     * Blocking: call on IO.
+     */
+    fun warm(mints: Collection<String>) {
+        val missing = mints.filter { it.isNotEmpty() && cache[it] == null }.distinct()
+        if (missing.isEmpty()) return
+        for (chunk in missing.chunked(50)) {
+            val q = URLEncoder.encode(chunk.joinToString(","), "UTF-8")
+            HOSTS.firstNotNullOfOrNull { getArray("$it/search?query=$q") }?.let { parse(it) }
+        }
     }
 
     /**
@@ -165,6 +211,7 @@ object JupiterTokens {
             verified = o.optBoolean("isVerified"),
             canMint = !o.isNull("mintAuthority") || audit?.optBoolean("mintAuthorityDisabled", true) == false,
             canFreeze = !o.isNull("freezeAuthority") || audit?.optBoolean("freezeAuthorityDisabled", true) == false,
+            token2022 = o.optString("tokenProgram").let { it.isNotEmpty() && it != SolanaTx.TOKEN_PROGRAM },
             topHoldersPct = audit?.optDouble("topHoldersPercentage")?.takeIf { !it.isNaN() },
             devMints = audit?.optInt("devMints") ?: 0,
             ageMinutes = age,
@@ -207,6 +254,7 @@ object JupiterTokens {
                 icon = o.optString("icon").takeIf { it.isNotEmpty() },
                 decimals = o.optInt("decimals"),
                 usd = o.optDouble("usdPrice").takeIf { !it.isNaN() && it > 0 },
+                change24h = o.optJSONObject("stats24h")?.optDouble("priceChange")?.takeIf { !it.isNaN() },
                 verified = o.optBoolean("isVerified"),
                 liquidity = o.optDouble("liquidity").takeIf { !it.isNaN() } ?: 0.0,
                 organic = o.optString("organicScoreLabel").takeIf { it.isNotEmpty() },

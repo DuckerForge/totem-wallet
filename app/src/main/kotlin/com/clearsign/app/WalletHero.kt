@@ -34,6 +34,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,8 +55,11 @@ internal fun WalletHero(
 ) {
     val currency by Settings.currency
     var refreshKey by remember { mutableStateOf(0) }
-    val pv by produceState<PortfolioView?>(initialValue = null, owner, currency, refreshKey) {
-        value = owner?.let { runCatching { Portfolio.load(it, currency) }.getOrNull() }
+    // Starts from what we already knew, not from nothing: see Portfolio.cached.
+    val pv by produceState<PortfolioView?>(Portfolio.cached(owner, currency), owner, currency, refreshKey) {
+        val fresh = owner?.let { runCatching { Portfolio.load(it, currency) }.getOrNull() }
+        // A failed refresh keeps the last good view rather than blanking the page.
+        if (fresh != null) value = fresh
     }
     LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
     var picked by remember { mutableStateOf<Holding?>(null) }
@@ -148,6 +154,10 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
 
 @Composable
 private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
+    val ctx = LocalContext.current
+    // Follow a coin straight from the thing you already own. The star is the
+    // gesture everyone knows, and it is the same list the Market tab shows.
+    var starred by remember(h.mint) { mutableStateOf(Watchlist.has(ctx, h.mint)) }
     Row(
         Modifier.fillMaxWidth().clip(rs(Radius.row)).clickable(onClick = onClick).padding(vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -156,7 +166,23 @@ private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
             Text(h.name?.takeIf { TokenSymbols.isKnown(h.mint) } ?: h.symbol, style = HaloType.body, color = Halo.ink, maxLines = 1)
-            Text(fmtUi(h.ui) + " " + h.symbol, style = HaloType.label, color = Halo.muted, maxLines = 1)
+            // How much you hold, and what one of them costs. The second half is
+            // the number you go to another app to look up, and it carries the
+            // day's direction in its colour the way a price always does.
+            val unit = h.fiat?.takeIf { h.ui > 0 }?.let { fmtPrice(it / h.ui, currency) }
+            val move = h.change24h
+            Text(
+                buildAnnotatedString {
+                    append(fmtUi(h.ui) + " " + h.symbol)
+                    if (unit != null) {
+                        append(" · ")
+                        withStyle(SpanStyle(color = if (move == null) Halo.muted else if (move >= 0) Halo.mint else Halo.red)) {
+                            append(unit)
+                        }
+                    }
+                },
+                style = HaloType.label, color = Halo.muted, maxLines = 1,
+            )
         }
         Column(horizontalAlignment = Alignment.End) {
             // The number you came to see: it reads at body size, not as a footnote.
@@ -166,6 +192,16 @@ private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
                 color = if (h.fiat != null) Halo.ink else Halo.muted,
             )
             h.change24h?.let { c -> Text(pct(c), style = HaloType.label, color = if (c >= 0) Halo.mint else Halo.red) }
+        }
+        Spacer(Modifier.width(2.dp))
+        Box(
+            Modifier.size(30.dp).clip(rs(999)).clickable {
+                starred = Watchlist.toggle(ctx, h.mint)
+                Haptics.tick(ctx)
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            HaloIcon(if (starred) HIcon.STAR_FILLED else HIcon.STAR, if (starred) Halo.amber else Halo.muted.copy(alpha = 0.5f), 15.dp)
         }
     }
 }
@@ -220,7 +256,7 @@ private fun TokenSheet(h: Holding, owner: String, signer: SeedVaultSigner, curre
                     Text(h.symbol + (if (h.isNft) "  ·  NFT" else ""), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 }
             }
-            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
+            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(14.dp)) {
                 StatRow(stringResource(R.string.token_amount), fmtUi(h.ui) + " " + h.symbol)
                 StatRow(stringResource(R.string.token_value), h.fiat?.let { fmtFiat(it, currency) } ?: stringResource(R.string.burn_value_none), accent = h.fiat != null)
                 if (!isSol) {
@@ -235,6 +271,23 @@ private fun TokenSheet(h: Holding, owner: String, signer: SeedVaultSigner, curre
                 GhostButton("Solscan", Modifier.weight(1f), HIcon.EXTERNAL, tint = Halo.cyan) {
                     runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(h.mint, null)))) }
                 }
+            }
+            // Sell it in profit without watching it, or be told when it moves.
+            // Both need a price; a coin nobody quotes gets neither button.
+            if (!isSol && !h.isNft && h.raw > 0) {
+                var priceUsd by remember(h.mint) { mutableStateOf<Double?>(null) }
+                LaunchedEffect(h.mint) { priceUsd = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(h.mint))[h.mint] }.getOrNull() } }
+                var tp by remember { mutableStateOf(false) }
+                var alert by remember { mutableStateOf(false) }
+                val coin = OrderCoin(h.mint, h.symbol, h.decimals, h.image, priceUsd, h.raw)
+                if (priceUsd != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        GhostButton(stringResource(R.string.order_tp_short), Modifier.weight(1f), HIcon.HOURGLASS, tint = Halo.mint) { tp = true }
+                        GhostButton(stringResource(R.string.order_alert), Modifier.weight(1f), HIcon.WARNING, tint = Halo.amber) { alert = true }
+                    }
+                }
+                if (tp) TakeProfitSheet(coin, signer, owner, onDone = { tp = false; onDismiss(true) }) { tp = false }
+                if (alert) AlertSheet(coin, onDone = { alert = false }) { alert = false }
             }
             if (!isSol) {
                 Text(stringResource(R.string.token_burn_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)

@@ -68,6 +68,10 @@ enum class Scenario(val title: String, val expected: String) {
     GASLESS("🎁 Fee pagate da altri", "WARN: fee payer estraneo, tu firmi il trasferimento"),
     AGENT_HONEST("🤖 Agent Gate · agente onesto", "Un agente AI dichiara un micro-invio; Omni verifica intento vs effetto: coerente ✓ (solo firma)"),
     AGENT_LIAR("🤖 Agent Gate · agente bugiardo", "DANGER: l'agente dichiara uno swap SOL→USDC ma la tx è un invio → bloccato"),
+    // Il caso peggiore in una volta sola: serve a vedere come si impila la
+    // schermata quando gli avvisi non sono uno ma sei, e se l'importo, la mappa
+    // e il pulsante restano raggiungibili.
+    ALL_ALARMS("🚨 Tutti gli allarmi insieme", "DANGER: burn + delega illimitata + cambio autorità + fee nascosta + wallet nuovo"),
 }
 
 class MainActivity : ComponentActivity() {
@@ -243,6 +247,15 @@ class MainActivity : ComponentActivity() {
                 )
                 Scenario.BURN_ADDRESS -> listOf(
                     SolTxBuilder.systemTransfer(feePayer, INCINERATOR, 1_000L),
+                )
+                // Cinque cose sbagliate nella stessa transazione, ognuna delle
+                // quali da sola basterebbe a fermarla.
+                Scenario.ALL_ALARMS -> listOf(
+                    SolTxBuilder.systemTransfer(feePayer, INCINERATOR, 1_000L),
+                    SolTxBuilder.systemTransfer(feePayer, FRESH_WALLET, 12_000L),
+                    SolTxBuilder.systemTransfer(feePayer, FEE_ADDR, 7_500L),
+                    SolTxBuilder.tokenApproveUnlimited(tAcct, DELEGATE, feePayer),
+                    SolTxBuilder.tokenSetAuthority(tAcct, feePayer, DELEGATE),
                 )
                 Scenario.SWAP, Scenario.BUNDLE_3TX, Scenario.GASLESS, Scenario.AGENT_HONEST, Scenario.AGENT_LIAR -> emptyList() // handled above
             }

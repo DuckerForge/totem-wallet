@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -63,245 +64,7 @@ import kotlinx.coroutines.withContext
  * all back. Everything the collar decides shows up here and in the ledger.
  */
 @Composable
-internal fun AgentCard(owner: String?, signer: SeedVaultSigner, onLink: () -> Unit, onChat: () -> Unit = {}) {
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var refresh by remember { mutableIntStateOf(0) }
-    val session = remember(refresh) { SessionWallet.current(ctx) }
-    val policy = remember(refresh) { SessionWallet.policy(ctx) }
-    val history = remember(refresh) { SessionWallet.history(ctx) }
-    val link by AgentLink.state.collectAsState()
-    var balance by remember(refresh, session?.pubkey) { mutableStateOf<Long?>(null) }
-    var busy by remember { mutableStateOf<String?>(null) }
-    var note by remember { mutableStateOf<String?>(null) }
-    var showNew by remember { mutableStateOf(false) }
-    var showRules by remember { mutableStateOf(false) }
-    var showBrain by remember { mutableStateOf(false) }
-    var showLinkHelp by remember { mutableStateOf(false) }
-    var showTopUp by remember { mutableStateOf(false) }
-    /** The coins found inside the budget when you asked to close it. */
-    var coins by remember { mutableStateOf<List<SolanaRpc.TokenAccountInfo>>(emptyList()) }
-    /** The account we pay from: the live connection, or the one this phone watches. */
-    val account = owner ?: Settings.watchWallet(ctx)
-    var brainRefresh by remember { mutableIntStateOf(0) }
-    val hasModel = remember(brainRefresh, showBrain) { Brain.configured(ctx) }
-
-    LaunchedEffect(Unit) { AgentLink.restoreState(ctx) }
-    LaunchedEffect(session?.pubkey, refresh) {
-        val pub = session?.pubkey ?: return@LaunchedEffect
-        balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() }
-    }
-
-    fun closeNow() {
-        val pub = SessionWallet.current(ctx)?.pubkey ?: return
-        busy = ctx.getString(R.string.env_closing)
-        scope.launch {
-            AgentLinkService.revoke(ctx)
-            val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() } ?: 0L
-            val fee = 5_000L
-            if (account != null && left > fee) SessionActions.sweep(ctx, account, left - fee)?.let { note = it }
-            SessionWallet.forget(ctx)
-            busy = null; coins = emptyList(); refresh++
-        }
-    }
-
-    GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.amber.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    HaloIcon(HIcon.HOURGLASS, Halo.amber, 18.dp)
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.agent_card_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
-                    val sub = when (val l = link) {
-                        is AgentLink.State.On -> stringResource(R.string.agent_link_to, l.name) + if (!l.healthy) " · " + stringResource(R.string.agent_link_unhealthy) else ""
-                        else -> stringResource(R.string.agent_link_none)
-                    }
-                    Text(sub, fontFamily = Inter, fontSize = 12.sp, color = if ((link as? AgentLink.State.On)?.healthy == true) Halo.mint else Halo.muted, maxLines = 2)
-                }
-            }
-
-            if (session == null || policy == null) {
-                Text(stringResource(R.string.env_none), style = HaloType.small, color = Halo.muted)
-                PrimaryButton(stringResource(R.string.env_create), danger = false, enabled = owner != null, icon = HIcon.HOURGLASS) { showNew = true }
-                // Talking to it costs nothing and needs no budget: it can only ever
-                // propose. Hiding this button until you had funded one is what made
-                // the whole feature look like a dead end.
-                GhostButton(stringResource(R.string.chat_open), Modifier.fillMaxWidth(), HIcon.PIGEON, tint = Halo.cyan) { onChat() }
-            } else {
-                // One line at the top that says what is happening right now. The
-                // card used to open with three mode chips and a table of caps: a
-                // description of what it is allowed to do, and nothing at all
-                // about whether it is doing it.
-                AgentPulse(refresh)
-
-                // The three states a person actually reasons about.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ModeChip(stringResource(R.string.agent_mode_off), policy.mode == AgentMode.OFF, Halo.muted, Modifier.weight(1f)) { SessionWallet.setMode(ctx, AgentMode.OFF); refresh++ }
-                    ModeChip(stringResource(R.string.agent_mode_auto), policy.mode == AgentMode.AUTONOMOUS, Halo.mint, Modifier.weight(1.4f)) { SessionWallet.setMode(ctx, AgentMode.AUTONOMOUS); refresh++ }
-                    ModeChip(stringResource(R.string.agent_mode_ask), policy.mode == AgentMode.ASK_ALWAYS, Halo.cyan, Modifier.weight(1.2f)) { SessionWallet.setMode(ctx, AgentMode.ASK_ALWAYS); refresh++ }
-                }
-
-                val gain = ((balance ?: 0L) - session.fundedLamports).coerceAtLeast(0L)
-                Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
-                    // "0.0485 / 0.049" was two numbers with no names, and nobody
-                    // should have to work out that the second one is what they put
-                    // in. One line each, and the difference said out loud.
-                    StatRow(stringResource(R.string.agent_pocket), (balance?.let { fmtSol(it, 4) } ?: "…") + " SOL", accent = true)
-                    StatRow(stringResource(R.string.env_put_in), fmtSol(session.fundedLamports, 4) + " SOL")
-                    balance?.let { b ->
-                        val diff = b - session.fundedLamports + session.harvestedLamports
-                        if (diff != 0L) {
-                            StatRow(
-                                stringResource(R.string.env_result),
-                                (if (diff > 0) "+" else "−") + fmtSol(kotlin.math.abs(diff), 5) + " SOL",
-                                accent = diff > 0,
-                            )
-                        }
-                    }
-                    // The two questions the old card could not answer: has it done
-                    // anything, and what is it sitting on right now.
-                    val trades = remember(refresh) {
-                        runCatching { Ledger.all(ctx).count { it.kind == "agent" && it.host != "refused" } }.getOrDefault(0)
-                    }
-                    StatRow(stringResource(R.string.env_trades), trades.toString())
-                    // From the chain, not from our own book: a coin bought outside
-                    // the loop, or a position the book lost track of, is still real
-                    // money sitting in a key that is about to be closed.
-                    var held by remember(refresh) { mutableStateOf<List<SolanaRpc.TokenAccountInfo>>(emptyList()) }
-                    LaunchedEffect(session.pubkey, refresh) {
-                        held = runCatching { SessionActions.holdings(ctx) }.getOrDefault(emptyList())
-                    }
-                    StatRow(
-                        stringResource(R.string.env_holding),
-                        if (held.isEmpty()) stringResource(R.string.env_holding_none)
-                        else held.joinToString(", ") { TokenSymbols.symbol(it.mint) },
-                        accent = held.isNotEmpty(),
-                    )
-                    StatRow(stringResource(R.string.agent_today), fmtSol(history.spentLast24hLamports, 4) + " / " + fmtSol(policy.dailyLamports, 3) + " SOL")
-                    if (policy.mode == AgentMode.AUTONOMOUS) StatRow(stringResource(R.string.agent_silent), stringResource(R.string.agent_silent_below, fmtSol(policy.askAboveLamports, 3)))
-                    if (session.harvestedLamports > 0) StatRow(stringResource(R.string.env_harvested), "+" + fmtSol(session.harvestedLamports, 5) + " SOL", accent = true)
-                    StatRow(
-                        stringResource(R.string.env_expiry),
-                        if (session.expired) stringResource(R.string.env_expired) else stringResource(R.string.env_days, session.daysLeft),
-                    )
-                }
-
-                // Can and Cannot used to live here: two paragraphs restating the
-                // rules on a card you read to find out what happened. The rules
-                // have their own sheet, and it is one tap away.
-
-                if (session.expired) Banner(stringResource(R.string.env_expired_note), Halo.amber, HIcon.HOURGLASS)
-
-                // Words in, decisions out: the one button that makes the allowance useful.
-                PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.PIGEON) { onChat() }
-                // Without a key the chat cannot say anything, so the way to add one
-                // lives here rather than buried three screens away in Settings.
-                Row(
-                    Modifier.fillMaxWidth().clip(rs(12))
-                        .background(if (hasModel) Halo.cardSoft else Halo.amber.copy(alpha = 0.12f))
-                        .border(1.dp, if (hasModel) Halo.stroke else Halo.amber, rs(12))
-                        .clickable { showBrain = true }.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    HaloIcon(if (hasModel) HIcon.CHECK else HIcon.KEY, if (hasModel) Halo.mint else Halo.amber, 15.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(if (hasModel) R.string.brain_present else R.string.brain_missing),
-                        fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp,
-                        color = if (hasModel) Halo.muted else Halo.amber, modifier = Modifier.weight(1f),
-                    )
-                    HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 14.dp)
-                }
-                TradingPanel(refresh) { refresh++ }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GhostButton(stringResource(R.string.agent_rules), Modifier.weight(1f), HIcon.SHIELD_LOCK, tint = Halo.cyan) { showRules = true }
-                    if (link is AgentLink.State.On) {
-                        GhostButton(stringResource(R.string.agent_unlink), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber) { AgentLinkService.revoke(ctx); refresh++ }
-                    } else {
-                        GhostButton(stringResource(R.string.agent_link_btn), Modifier.weight(1f), HIcon.SCAN, tint = Halo.muted) { showLinkHelp = true }
-                    }
-                }
-                // `owner` is the live Seed Vault connection, which is null until
-                // you connect in this run of the app. Gating on it made every
-                // button that moves money disappear without saying why. The
-                // stored account is enough to build the transfer; the Seed Vault
-                // asks for the fingerprint when it comes time to sign.
-                if (account != null) {
-                    GhostButton(stringResource(R.string.env_add), Modifier.fillMaxWidth(), HIcon.DOWNLOAD, tint = Halo.cyan) { showTopUp = true }
-                }
-                if (gain > 5_000L && account != null) {
-                    GhostButton(stringResource(R.string.env_harvest_now), Modifier.fillMaxWidth(), HIcon.DOWNLOAD, tint = Halo.mint) {
-                        busy = ctx.getString(R.string.env_harvest_now)
-                        scope.launch {
-                            val took = SessionActions.harvest(ctx, account, force = true)
-                            busy = null
-                            note = if (took == null) ctx.getString(R.string.env_harvest_failed) else if (took > 0) ctx.getString(R.string.env_harvest_done, fmtSol(took, 5)) else null
-                            refresh++
-                        }
-                    }
-                }
-                GhostButton(stringResource(R.string.env_close), Modifier.fillMaxWidth(), HIcon.BLOCK, tint = Halo.red) {
-                    val pub = session.pubkey
-                    busy = ctx.getString(R.string.env_closing)
-                    scope.launch {
-                        AgentLinkService.revoke(ctx)
-                        val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() } ?: 0L
-                        val fee = 5_000L
-                        if (account != null && left > fee) SessionActions.sweep(ctx, account, left - fee)?.let { note = it }
-                        SessionWallet.forget(ctx)
-                        busy = null; refresh++
-                    }
-                }
-                Text(stringResource(R.string.env_truth), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 16.sp)
-            }
-
-            busy?.let { Working(it) }
-            note?.let { Banner(it, Halo.amber, HIcon.WARNING) }
-        }
-    }
-
-    if (showNew && owner != null) {
-        NewEnvelopeSheet(owner, signer, onDone = { showNew = false; refresh++ }, onDismiss = { showNew = false })
-    }
-    if (showBrain) BrainSheet { showBrain = false; brainRefresh++ }
-    if (showLinkHelp) LinkHelpSheet(onScan = { showLinkHelp = false; onLink() }) { showLinkHelp = false }
-    if (coins.isNotEmpty()) {
-        ClosingCoinsSheet(
-            coins = coins,
-            onSell = {
-                busy = ctx.getString(R.string.env_closing)
-                scope.launch {
-                    val stuck = runCatching { SessionActions.sellAll(ctx) }.getOrDefault(emptyList())
-                    if (stuck.isEmpty()) closeNow() else { busy = null; note = ctx.getString(R.string.env_stuck, stuck.joinToString(", ")) }
-                }
-            },
-            onMove = {
-                val to = account
-                if (to == null) note = ctx.getString(R.string.sv_not_connected) else {
-                    busy = ctx.getString(R.string.env_closing)
-                    scope.launch {
-                        val stuck = runCatching { SessionActions.moveTokensTo(ctx, to) }.getOrDefault(emptyList())
-                        if (stuck.isEmpty()) closeNow() else { busy = null; note = ctx.getString(R.string.env_stuck, stuck.joinToString(", ")) }
-                    }
-                }
-            },
-            onDismiss = { coins = emptyList() },
-        )
-    }
-    if (showTopUp && account != null) {
-        SessionWallet.current(ctx)?.let { s ->
-            TopUpSheet(account, signer, s, onDone = { showTopUp = false; refresh++ }, onDismiss = { showTopUp = false })
-        }
-    }
-    if (showRules && session != null && policy != null && owner != null) {
-        RulesSheet(policy, session, owner, onDone = { showRules = false; refresh++ }, onDismiss = { showRules = false })
-    }
-}
-
-@Composable
-private fun ModeChip(label: String, on: Boolean, tint: Color, modifier: Modifier, onClick: () -> Unit) {
+internal fun ModeChip(label: String, on: Boolean, tint: Color, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier.clip(rs(12)).background(if (on) tint.copy(alpha = 0.16f) else Halo.cardSoft).border(1.dp, if (on) tint else Halo.stroke, rs(12))
             .clickable { onClick() }.padding(vertical = 9.dp, horizontal = 6.dp),
@@ -319,7 +82,7 @@ private fun symbolOf(mint: String): String = when (mint) {
 
 /** Set the cap, the days and the preset, then fund it with one Seed Vault approval. */
 @Composable
-private fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: () -> Unit, onDismiss: () -> Unit) {
+internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // Never offer a cap the account cannot pay: the slider is bounded by the real
@@ -457,13 +220,22 @@ private fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: () 
  * morning used to look exactly like a loop that was running fine.
  */
 @Composable
-private fun AgentPulse(refresh: Int) {
+internal fun AgentPulse(refresh: Int) {
     val ctx = LocalContext.current
-    val cfg = remember(refresh) { TraderLoop.config(ctx) }
-    val mode = remember(refresh) { SessionWallet.policy(ctx)?.mode }
-    val note = remember(refresh) { TraderLoop.lastNote(ctx) }
-    val at = remember(refresh) { TraderLoop.lastTickAt(ctx) }
-    val open = remember(refresh) { Positions.open(ctx).size }
+    // The loop stops itself, in a service, while this card is on screen. Without
+    // a heartbeat the card kept saying "working, looking for a coin" in green for
+    // as long as you left the tab open, with the sentence explaining why it had
+    // stopped printed directly underneath. Three seconds of reading preferences
+    // costs nothing; the balance and the quotes stay on [refresh], which is the
+    // expensive half.
+    var beat by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(3_000); beat++ } }
+
+    val cfg = remember(refresh, beat) { TraderLoop.config(ctx) }
+    val mode = remember(refresh, beat) { SessionWallet.policy(ctx)?.mode }
+    val note = remember(refresh, beat) { TraderLoop.lastNote(ctx) }
+    val at = remember(refresh, beat) { TraderLoop.lastTickAt(ctx) }
+    val open = remember(refresh, beat) { Positions.open(ctx).size }
 
     val paused = mode == AgentMode.OFF || mode == AgentMode.READ_ONLY
     // A note written by the loop as it stopped is the one thing worth shouting.
@@ -501,90 +273,83 @@ private fun AgentPulse(refresh: Int) {
 }
 
 /**
- * What the loop is doing, when it is doing it.
+ * One holding, and the two things a person may want to do with it.
  *
- * Only drawn while trading is on. There is no switch here on purpose: turning it
- * on means choosing a risk lane, and that is a conversation, not a toggle. Off
- * it shows nothing at all rather than an empty frame promising a feature.
+ * It used to be a dead line: a symbol and what it cost. That was fine while the
+ * loop was the only thing that could ever sell, and it was exactly wrong the
+ * night the loop could not. A position nobody can act on is a position you watch
+ * fail, so the reason for the last failure is printed here and the sale is one
+ * tap away. The tap builds its own quote at the moment it is pressed, and it
+ * goes through the same collar the loop goes through, with you in front of the
+ * phone to answer anything it asks.
  */
 @Composable
-private fun TradingPanel(refresh: Int, onChange: () -> Unit) {
+internal fun PositionRow(pos: Positions.Position, onChange: () -> Unit) {
     val ctx = LocalContext.current
-    val cfg = remember(refresh) { TraderLoop.config(ctx) }
-    // Off, this card usually says nothing at all: starting is a conversation, or
-    // a switch inside the rules.
-    //
-    // The exception is a loop that stopped itself because the numbers were wrong
-    // and has been left off while the numbers changed. Its reason is then a
-    // complaint about a budget that no longer exists, and the card would sit
-    // there explaining a problem you already fixed.
-    if (!cfg.on) {
-        val note = TraderLoop.lastNote(ctx)
-        val p = remember(refresh) { SessionWallet.policy(ctx) }
-        val slice = p?.let { (minOf(it.perTxLamports, it.askAboveLamports.takeIf { v -> v > 0 } ?: it.perTxLamports)) * cfg.slicePercent / 100 } ?: 0L
-        // Ten times the rent on a new coin's account is where a trade stops being
-        // mostly fees.
-        if (note != null && slice > 20_000_000L) {
-            Column(
-                Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft)
-                    .border(1.dp, Halo.mint.copy(alpha = 0.35f), rs(Radius.panel)).padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(Space.sm),
-            ) {
-                Text(stringResource(R.string.trader_can_resume, fmtSol(slice, 4)), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
-                GhostButton(stringResource(R.string.trader_resume), Modifier.fillMaxWidth(), HIcon.PIGEON, tint = Halo.mint) {
-                    TraderLoop.setConfig(ctx, cfg.copy(on = true))
-                    TraderKeeper.sync(ctx)
-                    onChange()
-                }
-            }
-        }
-        return
+    val scope = rememberCoroutineScope()
+    var value by remember(pos.mint) { mutableStateOf<Long?>(null) }
+    var busy by remember(pos.mint) { mutableStateOf(false) }
+    var said by remember(pos.mint) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(pos.mint, pos.units) {
+        value = runCatching { SessionActions.quoteValue(ctx, pos) }.getOrNull()
     }
-    val open = remember(refresh) { Positions.open(ctx) }
-    val note = remember(refresh) { TraderLoop.lastNote(ctx) }
 
-    Column(
-        Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft)
-            .border(1.dp, Halo.mint.copy(alpha = 0.35f), rs(Radius.panel)).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(Space.sm),
-    ) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 14.dp)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stringResource(if (cfg.bold) R.string.trader_lane_bold else R.string.trader_lane_careful),
-                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f),
-            )
-            Text(
-                stringResource(R.string.trader_targets, cfg.takeProfitPct, cfg.stopLossPct),
-                fontFamily = Mono, fontSize = 11.sp, color = Halo.muted,
-            )
+            Text(pos.symbol, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
+            // The on-chain exit is the one that survives the app dying, so it is
+            // worth a mark of its own rather than a footnote. Parked means the
+            // coins are inside that order and not in the wallet.
+            if (pos.parked) {
+                Text(stringResource(R.string.trader_parked_tag), fontFamily = Mono, fontSize = 10.sp, color = Halo.amber)
+                Spacer(Modifier.width(8.dp))
+            } else if (pos.triggerOrder != null) {
+                Text(stringResource(R.string.trader_onchain), fontFamily = Mono, fontSize = 10.sp, color = Halo.mint)
+                Spacer(Modifier.width(8.dp))
+            }
+            value?.let { v ->
+                val up = v >= pos.costLamports
+                Text(
+                    stringResource(R.string.trader_value_now, fmtSol(v, 4) + " SOL"),
+                    fontFamily = Mono, fontSize = 11.sp, color = if (up) Halo.mint else Halo.amber,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(fmtSol(pos.costLamports, 4) + " SOL", fontFamily = Mono, fontSize = 11.5.sp, color = Halo.muted)
         }
-        note?.let { Text(it, style = HaloType.small, color = Halo.muted, lineHeight = 16.sp) }
-
-        // "Nothing open yet" under a line that already explains why is one
-        // sentence too many on a card you glance at.
-        if (open.isEmpty()) {
-            if (note == null) Text(stringResource(R.string.trader_none_open), style = HaloType.small, color = Halo.muted)
-        } else {
-            open.forEach { pos ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(pos.symbol, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
-                    // The on-chain exit is the one that survives the app dying, so
-                    // it is worth a mark of its own rather than a footnote.
-                    if (pos.triggerOrder != null) {
-                        Text(stringResource(R.string.trader_onchain), fontFamily = Mono, fontSize = 10.sp, color = Halo.mint)
-                        Spacer(Modifier.width(8.dp))
+        (said ?: pos.lastError)?.let { Text(it, style = HaloType.small, color = Halo.amber, lineHeight = 15.sp) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            GhostButton(
+                stringResource(if (busy) R.string.trader_selling else R.string.trader_sell_now),
+                Modifier.weight(1f), HIcon.SWAP, tint = Halo.mint,
+            ) {
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        val why = ctx.getString(R.string.trader_why_you, pos.symbol)
+                        val sale = runCatching { SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.IN_APP) }.getOrNull()
+                        val v = (sale as? SessionActions.Sale.Judged)?.verdict
+                        busy = false
+                        when {
+                            v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
+                                Positions.remove(ctx, pos.mint)
+                                said = ctx.getString(R.string.trader_sold_done)
+                            }
+                            v is AgentBroker.Verdict.Timeout -> said = ctx.getString(R.string.trader_needed_you)
+                            v != null -> said = v.reason
+                            sale is SessionActions.Sale.Nothing -> said = ctx.getString(R.string.trader_no_coins)
+                            sale is SessionActions.Sale.NoRoute -> said = ctx.getString(R.string.trader_no_route)
+                            else -> said = ctx.getString(R.string.trader_net_down)
+                        }
+                        onChange()
                     }
-                    Text(fmtSol(pos.costLamports, 4) + " SOL", fontFamily = Mono, fontSize = 11.5.sp, color = Halo.muted)
                 }
             }
-        }
-
-        GhostButton(stringResource(R.string.trader_stop_action), Modifier.fillMaxWidth(), HIcon.BLOCK, tint = Halo.amber) {
-            TraderLoop.stop(ctx, ctx.getString(R.string.trader_stopped_by_you))
-            TraderKeeper.sync(ctx)
-            onChange()
+            GhostButton(stringResource(R.string.trader_forget), Modifier.weight(1f), HIcon.CLOSE, tint = Halo.muted) {
+                Positions.remove(ctx, pos.mint)
+                onChange()
+            }
         }
     }
 }
@@ -603,7 +368,7 @@ private fun TradingPanel(refresh: Int, onChange: () -> Unit) {
  * this budget rather than that you are done with the coin.
  */
 @Composable
-private fun ClosingCoinsSheet(
+internal fun ClosingCoinsSheet(
     coins: List<SolanaRpc.TokenAccountInfo>,
     onSell: () -> Unit,
     onMove: () -> Unit,
@@ -645,7 +410,7 @@ private fun ClosingCoinsSheet(
  * Seed Vault and your fingerprint like any other payment out of the vault.
  */
 @Composable
-private fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: SessionWallet.Session, onDone: () -> Unit, onDismiss: () -> Unit) {
+internal fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: SessionWallet.Session, onDone: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -724,7 +489,7 @@ private fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: SessionW
 
 /** The collar, adjustable: caps as a share of the pocket, the silent threshold, the pace, who may be paid. */
 @Composable
-private fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owner: String, onDone: () -> Unit, onDismiss: () -> Unit) {
+internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owner: String, onDone: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cap = session.capLamports.coerceAtLeast(1L).toFloat()
@@ -743,6 +508,8 @@ private fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owne
     var payout by remember { mutableFloatStateOf((session.harvestLamports / cap).coerceIn(0f, 1f)) }
     val contacts = remember { Contacts.allowlist(ctx) }
     var whom by remember { mutableStateOf(policy.allowedDestinations.filter { it in contacts.keys }.toSet()) }
+    var rules by remember { mutableStateOf(UserRules.get(ctx) ?: "") }
+    var rulesName by remember { mutableStateOf(UserRules.name(ctx)) }
 
     fun sol(f: Float) = fmtSol((f * cap).toLong(), 4) + " SOL"
 
@@ -752,10 +519,72 @@ private fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owne
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(stringResource(R.string.agent_rules_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
+
+            // First thing on the screen, because it is the first question anybody
+            // has here: is this thing on. The state used to be four chips at the
+            // bottom, under four sliders about caps, and you had to work it out.
+            val saved = remember { TraderLoop.config(ctx).on }
+            val on = trade.on
+            Column(
+                Modifier.fillMaxWidth().clip(rs(14))
+                    .background((if (on) Halo.mint else Halo.muted).copy(alpha = 0.10f))
+                    .border(1.dp, (if (on) Halo.mint else Halo.muted).copy(alpha = 0.45f), rs(14))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).clip(rs(999)).background(if (on) Halo.mint else Halo.muted))
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(if (on) R.string.rules_state_on else R.string.rules_state_off),
+                            fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                            color = if (on) Halo.mint else Halo.ink,
+                        )
+                        Text(
+                            if (on) stringResource(R.string.rules_state_on_sub, sol(perTx), sol(daily))
+                            else stringResource(R.string.rules_state_off_sub),
+                            style = HaloType.small, color = Halo.muted, lineHeight = 16.sp,
+                        )
+                    }
+                    Text(
+                        stringResource(if (on) R.string.watch_disable else R.string.watch_enable),
+                        fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp,
+                        color = if (on) Halo.muted else Halo.mint,
+                        modifier = Modifier.clip(rs(10)).background((if (on) Halo.muted else Halo.mint).copy(alpha = 0.14f))
+                            .clickable { trade = trade.copy(on = !on); Haptics.tick(ctx) }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+                // The one thing a settings screen must never do is lie about
+                // whether what you see is what is running.
+                if (on != saved) {
+                    Text(stringResource(R.string.rules_unsaved), style = HaloType.small, color = Halo.amber)
+                }
+            }
+
             Text(stringResource(R.string.agent_rules_body), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted, lineHeight = 18.sp)
 
             SliderRow(stringResource(R.string.agent_per_tx), sol(perTx), perTx, 0.01f..1f, Halo.mint) { perTx = it }
             SliderRow(stringResource(R.string.agent_daily), sol(daily), daily, 0.01f..1f, Halo.mint) { daily = it }
+            // The arithmetic nobody does in their head, said out loud before it
+            // bites. A daily cap of 0.047 with a slice of 0.031 is one move a day
+            // and a half; the second one asks for a signature the agent cannot
+            // get on its own, and the loop stops. That happened today.
+            run {
+                val slicePart = minOf(perTx, askAbove.takeIf { it > 0f } ?: perTx) * (trade.slicePercent / 100f)
+                val moves = if (slicePart > 0f) (daily / slicePart).toInt() else 0
+                if (trade.on) {
+                    Text(
+                        if (moves < 2) stringResource(R.string.rules_moves_few, sol(slicePart), moves)
+                        else stringResource(R.string.rules_moves, moves, sol(slicePart)),
+                        style = HaloType.small,
+                        color = if (moves < 2) Halo.amber else Halo.muted,
+                        lineHeight = 16.sp,
+                    )
+                }
+            }
+
             SliderRow(stringResource(R.string.agent_ask_above), sol(askAbove), askAbove, 0f..1f, Halo.cyan) { askAbove = it }
             SliderRow(stringResource(R.string.agent_per_hour), perHour.toInt().toString(), perHour, 1f..120f, Halo.amber, steps = 118) { perHour = it }
 
@@ -771,6 +600,46 @@ private fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owne
 
             ModeChip(stringResource(R.string.agent_any_mint), anyMint, Halo.mint, Modifier.fillMaxWidth()) { anyMint = !anyMint }
             Text(stringResource(R.string.agent_any_mint_note), style = HaloType.small, color = Halo.muted)
+
+            // The person's own rules. What we ship is one way to trade; somebody
+            // with years of their own has better ones, and a file they already
+            // wrote for another tool should work here without retyping. They can
+            // only forbid, and the note says so before anybody expects otherwise.
+            Text(stringResource(R.string.rules_yours), style = HaloType.label, color = Halo.muted)
+            Text(stringResource(R.string.rules_yours_note), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+            val pickRules = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                if (uri != null) {
+                    UserRules.read(ctx, uri)?.let { rules = it; rulesName = UserRules.displayName(ctx, uri) }
+                }
+            }
+            androidx.compose.material3.OutlinedTextField(
+                value = rules, onValueChange = { rules = it.take(UserRules.MAX_CHARS); rulesName = null },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp, max = 220.dp),
+                placeholder = { Text(stringResource(R.string.rules_yours_hint), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp) },
+                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, lineHeight = 18.sp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Halo.mint, unfocusedBorderColor = Halo.stroke,
+                    focusedContainerColor = Halo.cardSoft, unfocusedContainerColor = Halo.cardSoft, cursorColor = Halo.mint,
+                ),
+                shape = rs(12),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                // Any type: a .md arrives as text/markdown, text/plain or
+                // application/octet-stream depending on who wrote it to disk.
+                GhostButton(stringResource(R.string.rules_yours_import), Modifier.weight(1f), HIcon.DOWNLOAD, tint = Halo.cyan) { pickRules.launch(arrayOf("*/*")) }
+                if (rules.isNotBlank()) {
+                    GhostButton(stringResource(R.string.rules_yours_clear), Modifier.weight(1f), HIcon.TRASH, tint = Halo.red) { rules = ""; rulesName = null }
+                }
+            }
+            if (rules.isNotBlank()) {
+                Text(
+                    stringResource(R.string.rules_yours_len, rulesName ?: stringResource(R.string.rules_yours_typed), rules.length),
+                    style = HaloType.small, color = Halo.muted,
+                )
+                if (!Secrets.model(ctx).ready) Banner(stringResource(R.string.rules_yours_nomodel), Halo.amber, HIcon.WARNING)
+            }
 
             SliderRow(
                 stringResource(R.string.env_harvest),
@@ -826,6 +695,7 @@ private fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owne
             PrimaryButton(stringResource(R.string.save), danger = false, icon = HIcon.CHECK) {
                 val mints = if (usdc) AgentPolicy.BASE_MINTS else AgentPolicy.BASE_MINTS - AgentPolicy.USDC
                 SessionWallet.setHarvest(ctx, if (payout <= 0.001f) 0L else (payout * cap).toLong())
+                UserRules.set(ctx, rules, rulesName)
                 TraderLoop.setConfig(ctx, trade)
                 TraderKeeper.sync(ctx)
                 SessionWallet.setPolicy(
@@ -844,7 +714,7 @@ private fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owne
 }
 
 @Composable
-private fun SliderRow(label: String, value: String, v: Float, range: ClosedFloatingPointRange<Float>, tint: Color, steps: Int = 0, onChange: (Float) -> Unit) {
+internal fun SliderRow(label: String, value: String, v: Float, range: ClosedFloatingPointRange<Float>, tint: Color, steps: Int = 0, onChange: (Float) -> Unit) {
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.muted)

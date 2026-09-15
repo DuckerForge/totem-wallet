@@ -165,6 +165,8 @@ class MainActivity : ComponentActivity() {
         // next fifteen-minute keeper window, so after force-stopping the app it
         // read as switched on and doing nothing at all.
         TraderKeeper.sync(this)
+        // Independent of trading: it reads other people's wallets and spends nothing.
+        SeekerKeeper.sync(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -183,7 +185,7 @@ class MainActivity : ComponentActivity() {
 
 private data class HomeAccount(val account: SvAccount, val lamports: Long?, val tokens: Int)
 
-private enum class Tab { WALLET, AGENT, RECEIPTS, SETTINGS }
+private enum class Tab { WALLET, MARKET, AGENT, RECEIPTS, SETTINGS }
 
 @Composable
 fun HomeScreen(signer: SeedVaultSigner) {
@@ -208,10 +210,13 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showSend by remember { mutableStateOf(requested == "send") }
         var showReceive by remember { mutableStateOf(requested == "receive") }
         var showSwap by remember { mutableStateOf(requested == "swap") }
+        // A coin chosen in the market tab: the swap opens already pointing at it.
+        var swapMint by remember { mutableStateOf<String?>(null) }
         var showChat by remember { mutableStateOf(false) }
         var showGift by remember { mutableStateOf(false) }
         var showTap by remember { mutableStateOf(false) }
         var showMore by remember { mutableStateOf(false) }
+        var showCrowd by remember { mutableStateOf(false) }
         var showHealth by remember { mutableStateOf(false) }
         var showPnl by remember { mutableStateOf(false) }
         var headline by remember { mutableStateOf<String?>(null) }
@@ -325,6 +330,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                                 HomeAction.RECEIVE -> showReceive = true
                                                 HomeAction.SWAP -> showSwap = true
                                                 HomeAction.SCAN -> scanHome()
+                                                HomeAction.CROWD -> showCrowd = true
                                                 HomeAction.TAP -> showTap = true
                                                 HomeAction.LINK -> showGift = true
                                                 // One "Agent" means one place. This used to open the
@@ -371,6 +377,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 Spacer(Modifier.height(8.dp))
                             }
                         }
+                        Tab.MARKET -> MarketScreen(owner = owner, signer = signer, onBuy = { mint -> swapMint = mint; tab = Tab.WALLET })
                         Tab.AGENT -> AgentScreen(owner, signer, onChat = { showChat = true })
                         Tab.RECEIPTS -> LedgerScreen()
                         Tab.SETTINGS -> SettingsScreen(signer, owner) { SecurityTools(signer, owner, contacts) }
@@ -378,10 +385,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 }
                 if (accounts.isNotEmpty()) BottomBar(tab, collapse) { tab = it }
             }
-            // Inside this Box on purpose. The sheets below are windows of their own
-            // and can live anywhere; a conversation is an ordinary composable, and
-            // out there — emitted straight into the root — it had no height to fill
-            // and folded up into a strip at the top of the screen.
+            // A page, like Scout: it sits over everything, tab bar included. Inside
+            // this Box so it fills the same height the tabs do.
             if (showChat) ChatScreen { showChat = false }
         }
         val first = accounts.firstOrNull()?.account
@@ -393,8 +398,17 @@ fun HomeScreen(signer: SeedVaultSigner) {
             ) { showSend = false; (ctx as? MainActivity)?.incoming = null }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
+        // A page, not a sheet: it sits over everything, tab bar included, because
+        // it is somewhere you go rather than something you peek at.
+        if (showCrowd) {
+            CrowdPage(
+                onBuy = { mint -> showCrowd = false; swapMint = mint; showSwap = true },
+            ) { showCrowd = false }
+        }
+
         if (showMore) {
             MoreSheet(
+                onTap = { showMore = false; showTap = true },
                 onHealth = { showMore = false; showHealth = true },
                 onContacts = { showMore = false; tab = Tab.SETTINGS },
                 onSettings = { showMore = false; tab = Tab.SETTINGS },
@@ -404,7 +418,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
         if (showPnl) PnlSheet { showPnl = false }
         if (showGift && owner != null) GiftSheet(signer, owner) { showGift = false }
         if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label, onTap = { showReceive = false; showTap = true }) { showReceive = false }
-        if (showSwap && first != null) SwapSheet(signer, first.pubkeyBase58) { showSwap = false }
+        if ((showSwap || swapMint != null) && first != null) {
+            SwapSheet(signer, first.pubkeyBase58, buyMint = swapMint) { showSwap = false; swapMint = null }
+        }
     }
 }
 
@@ -504,10 +520,10 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
             )
         }
         Spacer(Modifier.height(26.dp))
-        // Shown, not told: a payment crossing to another phone while a slice peels
-        // off to somewhere nobody mentioned. It is the one thing this app is for,
-        // and a paragraph saying the same would be skimmed.
-        HiddenCutDemo()
+        // Shown, not told: everything out there comes to this one phone and asks,
+        // and the request that lies is stopped at the glass. It is the one thing
+        // this app is for, and a paragraph saying the same would be skimmed.
+        GateDemo()
         Spacer(Modifier.height(4.dp))
         Text(
             stringResource(R.string.door_pitch),
@@ -539,6 +555,7 @@ private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
     ) {
         listOf(
             Tab.WALLET to (HIcon.WALLET to R.string.tab_wallet),
+            Tab.MARKET to (HIcon.STAR to R.string.tab_market),
             Tab.AGENT to (HIcon.PIGEON to R.string.tab_agent),
             Tab.RECEIPTS to (HIcon.RECEIPT to R.string.tab_receipts),
             Tab.SETTINGS to (HIcon.SETTINGS to R.string.tab_settings),
@@ -603,7 +620,7 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
         }
         if (account != null) {
             Row(
-                Modifier.clip(rs(999)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(999)).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                Modifier.clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999)).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(account.pubkeyBase58, 20.dp)

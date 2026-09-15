@@ -17,8 +17,8 @@ object Themes {
     /** Apply the saved selection. Call before `setContent` in every activity. */
     fun load(ctx: Context) {
         CustomTheme.palette(ctx) // prime the custom palette so byId() can return it
-        val id = prefs(ctx).getString(KEY_SELECTED, Palettes.halo.id)
-        Halo.palette = if (isUnlocked(ctx, id)) Palettes.byId(id) else Palettes.halo
+        val id = prefs(ctx).getString(KEY_SELECTED, Palettes.default.id)
+        Halo.palette = if (isUnlocked(ctx, id)) Palettes.byId(id) else Palettes.default
     }
 
     fun select(ctx: Context, id: String) {

@@ -29,7 +29,7 @@ object SeekerFeed {
      * always be served by the file it already had and the live feed would never
      * move on its own.
      */
-    private const val FRESH_MS = 90_000L
+    private const val FRESH_MS = 150_000L
 
     val available: Boolean get() = BuildConfig.CROWD_URL.isNotBlank()
 

@@ -137,10 +137,11 @@ private fun HoldingsField(rows: List<SeekerHolding>) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.width(66.dp))
             Text(stringResource(R.string.hold_col_who), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(8.dp + 36.dp + 6.dp))
+            // One label over the two number columns together, ending where the
+            // dollars end. Over the last column alone it floated on its own.
             Text(
                 stringResource(R.string.hold_col_each), style = HaloType.label, color = Halo.muted,
-                modifier = Modifier.width(44.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.width(8.dp + 36.dp + 6.dp + 44.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
             )
         }
         valued.take(9).forEachIndexed { i, h ->

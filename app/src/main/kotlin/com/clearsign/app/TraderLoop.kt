@@ -122,6 +122,29 @@ object TraderLoop {
         why?.let { note(ctx, it) }
     }
 
+    /**
+     * The loop switching itself off, said out loud.
+     *
+     * [stop] is also what the person's own Ferma button calls, and that one
+     * needs no notification: they are looking at the screen. This one is for
+     * the loop deciding on its own, from a service, with the app closed. It
+     * used to write a note into the card and nothing else, so an agent that
+     * stopped at four in the afternoon was found at six by somebody opening
+     * the app, with a position it had left unwatched in between.
+     */
+    fun stopSelf(ctx: Context, why: String) {
+        stop(ctx, why)
+        val unwatched = Positions.open(ctx).count { !it.parked && it.triggerOrder == null }
+        val body = if (unwatched > 0) why + "\n" + ctx.getString(R.string.trader_unwatched, unwatched) else why
+        AgentBroker.warn(ctx, ctx.getString(R.string.pulse_stopped), body)
+    }
+
+    /** Switch on, and forget what the last stop said: that was about a run that is over. */
+    fun start(ctx: Context, cfg: Config) {
+        setConfig(ctx, cfg.copy(on = true))
+        prefs(ctx).edit().remove("note").apply()
+    }
+
     /** The last thing the loop did, for the notification, the bubble and the widget. */
     fun lastNote(ctx: Context): String? = prefs(ctx).getString("note", null)
     fun lastTickAt(ctx: Context): Long = prefs(ctx).getLong("tickAt", 0L)
@@ -148,11 +171,11 @@ object TraderLoop {
         val s = SessionWallet.current(ctx)
         val p = SessionWallet.policy(ctx)
         if (s == null || p == null) {
-            stop(ctx, ctx.getString(R.string.trader_stop_nobudget))
+            stopSelf(ctx, ctx.getString(R.string.trader_stop_nobudget))
             return Tick(ctx.getString(R.string.trader_stop_nobudget), acted = false, stopped = true)
         }
         if (s.expired) {
-            stop(ctx, ctx.getString(R.string.trader_stop_closed))
+            stopSelf(ctx, ctx.getString(R.string.trader_stop_closed))
             return Tick(ctx.getString(R.string.trader_stop_closed), acted = false, stopped = true)
         }
         // Paused is not stopped. The notification's Pause button sets the mode
@@ -170,7 +193,7 @@ object TraderLoop {
         val ceiling = minOf(p.perTxLamports, p.askAboveLamports.takeIf { it > 0 } ?: p.perTxLamports)
         val slice = (ceiling * cfg.slicePercent / 100).coerceAtLeast(0L)
         if (slice <= FEE * 4) {
-            stop(ctx, ctx.getString(R.string.trader_stop_toosmall))
+            stopSelf(ctx, ctx.getString(R.string.trader_stop_toosmall))
             return Tick(ctx.getString(R.string.trader_stop_toosmall), acted = false, stopped = true)
         }
 
@@ -535,7 +558,7 @@ object TraderLoop {
                     null -> ctx.getString(R.string.trader_too_small_why, fmtSol(slice, 4), fmtSol(ATA_RENT, 4))
                     else -> ctx.getString(R.string.trader_asked_why, t.symbol, v.reason ?: v.rule.orEmpty())
                 }
-                stop(ctx, m)
+                stopSelf(ctx, m)
                 return Tick(m, acted = false, stopped = true)
             }
             // Turned down. By a person, which means they said no to this trade and
@@ -563,13 +586,13 @@ object TraderLoop {
                     AgentBroker.Verdict.Refused.By.COLLAR -> {
                         shadow("collar")
                         val m = ctx.getString(R.string.trader_refused_by_rules, t.symbol, v.reason ?: "")
-                        stop(ctx, m)
+                        stopSelf(ctx, m)
                         return Tick(m, acted = false, stopped = true)
                     }
                     AgentBroker.Verdict.Refused.By.PERSON -> {
                         shadow("you")
                         val m = ctx.getString(R.string.trader_declined, t.symbol)
-                        stop(ctx, m)
+                        stopSelf(ctx, m)
                         return Tick(m, acted = false, stopped = true)
                     }
                     // Nobody said no: the send failed, the key could not be read.

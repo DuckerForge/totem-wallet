@@ -1345,7 +1345,7 @@
     <string name="trader_no_onchain_small">Troppo piccola per un ordine su Jupiter, che ne vuole almeno 5$. La guarda solo il ciclo, mentre gira.</string>
     <string name="hold_bars_note">%1$d valgono soldi. La barra è quanti Seeker la tengono. I dollari sono quanto ne ha uno di loro, in media.</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
-    <string name="hold_col_each">A TESTA</string>
+    <string name="hold_col_each">% · $ A TESTA</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>
     <string name="send_blocked_drain">Bloccato: manda via quasi tutto il saldo a un indirizzo che questo telefono non ha mai visto. Se è un tuo conto, salvalo fra i contatti e riprova.</string>
     <string name="send_save_contact">Salva fra i contatti</string>

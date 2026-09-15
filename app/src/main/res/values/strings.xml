@@ -1035,7 +1035,7 @@
     <string name="brain_test">Test the key</string>
     <string name="brain_testing">Testing…</string>
     <string name="brain_test_ok">It answered. The key works.</string>
-    <string name="env_review">Pay</string>
+    <string name="env_review">See the receipt, then pay</string>
     <string name="wa_sim_generic">Could not read that transaction. Nothing was signed.</string>
     <string name="chat_greeting">Hello. How can I help?</string>
     <string name="chat_ex4">What would 0.01 SOL give me in USDC?</string>
@@ -1405,6 +1405,7 @@
     <string name="size_noprice">SOL price unavailable: cannot tell whether a buy clears the 5 $ Jupiter needs for an automatic sell order.</string>
     <string name="size_fits">At this size, the budget holds %1$d of %2$d positions.</string>
     <string name="env_slots_note">How many coins at once. With 1, all the money goes on one idea at a time, and it looks for the next only after selling.</string>
+    <string name="env_review_hint">This is what you will sign: your wallet sends the budget to the agent\'s own key. Hold the button below, then the fingerprint.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

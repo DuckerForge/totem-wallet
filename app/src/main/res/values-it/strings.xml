@@ -1035,7 +1035,7 @@
     <string name="brain_test">Prova la chiave</string>
     <string name="brain_testing">Sto provando…</string>
     <string name="brain_test_ok">Ha risposto. La chiave funziona.</string>
-    <string name="env_review">Paga</string>
+    <string name="env_review">Vedi lo scontrino, poi paga</string>
     <string name="wa_sim_generic">Non sono riuscito a leggere la transazione. Non ho firmato niente.</string>
     <string name="chat_greeting">Ciao. Come posso aiutarti?</string>
     <string name="chat_ex4">Quanto mi darebbero 0,01 SOL in USDC?</string>
@@ -1405,6 +1405,7 @@
     <string name="size_noprice">Prezzo del SOL non disponibile: non so dire se un acquisto supera i 5 $ che Jupiter chiede per l\'ordine automatico.</string>
     <string name="size_fits">Con questa cifra entrano %1$d posizioni su %2$d.</string>
     <string name="env_slots_note">Quante monete alla volta. Con 1, tutti i soldi vanno su un\'idea sola, e cerca la prossima solo dopo aver venduto.</string>
+    <string name="env_review_hint">Questo è quello che firmerai: il tuo wallet manda la paghetta alla chiave dell\'agente. Tieni premuto il bottone qui sotto, poi l\'impronta.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

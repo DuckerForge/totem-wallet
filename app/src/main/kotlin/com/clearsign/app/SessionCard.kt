@@ -117,9 +117,13 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
     var prepared by remember { mutableStateOf<Pair<ByteArray, String>?>(null) }
     val scope = rememberCoroutineScope()
 
+    // The receipt appears under the sliders; the sheet goes there by itself,
+    // because a receipt you have to find is a receipt you think is missing.
+    val scroll = rememberScrollState()
+    LaunchedEffect(review) { if (review != null) scroll.animateScrollTo(scroll.maxValue) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().verticalScroll(scroll).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(stringResource(R.string.env_new_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
@@ -174,7 +178,10 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
             state?.let { Working(it) }
             error?.let { Banner(it, Halo.red, HIcon.WARNING) }
 
-            review?.let { r -> SignReceiptBody(r.receipt, null) }
+            review?.let { r ->
+                Text(stringResource(R.string.env_review_hint), style = HaloType.small, color = Halo.mint, lineHeight = 17.sp)
+                SignReceiptBody(r.receipt, null)
+            }
 
             if (state == null && review == null) {
                 PrimaryButton(stringResource(R.string.env_review), danger = false, icon = HIcon.RECEIPT) {

@@ -132,6 +132,17 @@ private fun HoldingsField(rows: List<SeekerHolding>) {
     val maxPct = (valued.maxOfOrNull { it.pct } ?: 1.0).coerceAtLeast(1.0)
 
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        // What the columns are, said once above them. "$144" next to "32%" read
+        // as a price, and it is not: it is what one holder has, on average.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(66.dp))
+            Text(stringResource(R.string.hold_col_who), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp + 36.dp + 6.dp))
+            Text(
+                stringResource(R.string.hold_col_each), style = HaloType.label, color = Halo.muted,
+                modifier = Modifier.width(44.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            )
+        }
         valued.take(9).forEachIndexed { i, h ->
             val grow = rememberReveal(key = h.symbol, durationMs = 600 + i * 70)
             val tint = if (h.usdPer >= 50) Halo.mint else Halo.cyan

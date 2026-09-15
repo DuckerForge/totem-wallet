@@ -1343,5 +1343,7 @@
     <string name="trader_unwatched_tag">non guardata</string>
     <string name="trader_unwatched">Il ciclo è spento e %1$d posizione non ha nessuno che la guarda. Lo stop non scatta a ciclo spento, e l\'obiettivo sulla catena non c\'è. Vendi a mano o riaccendi.</string>
     <string name="trader_no_onchain_small">Troppo piccola per un ordine su Jupiter, che ne vuole almeno 5$. La guarda solo il ciclo, mentre gira.</string>
-    <string name="hold_bars_note">%1$d valgono soldi. La barra è quanti Seeker ne hanno, il numero a destra quanto vale la quota di uno.</string>
+    <string name="hold_bars_note">%1$d valgono soldi. La barra è quanti Seeker la tengono. I dollari sono quanto ne ha uno di loro, in media.</string>
+    <string name="hold_col_who">QUANTI LA TENGONO</string>
+    <string name="hold_col_each">A TESTA</string>
 </resources>

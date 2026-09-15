@@ -79,6 +79,62 @@
   .name{position:relative}
   .stack{display:flex;flex-wrap:wrap;gap:8px}
   .stack span{font-family:var(--mono);font-size:12px;padding:7px 11px;border:1px solid var(--stroke);border-radius:10px;color:var(--muted)}
+  /* ---- the aces: one scene each ---- */
+  .aces{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
+  .ace{position:relative;border:1px solid var(--stroke);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));overflow:hidden;min-height:330px;display:flex;flex-direction:column}
+  .ace .scene{height:170px;position:relative;overflow:hidden;background:radial-gradient(400px 160px at 50% 120%,rgba(77,255,208,.16),transparent 70%),#05080c;border-bottom:1px solid var(--stroke)}
+  .ace .txt{padding:18px 20px 20px}
+  .ace h3{font-family:var(--sora);font-size:19px;margin:0 0 6px;letter-spacing:-.01em}
+  .ace p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+  .ace .k{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mint);margin-bottom:6px;display:block}
+  /* phone frame */
+  .ph{position:absolute;left:50%;top:22px;transform:translateX(-50%);width:120px;height:230px;border-radius:22px;border:1px solid rgba(255,255,255,.18);background:#0b1218;box-shadow:0 0 40px rgba(77,255,208,.12),inset 0 0 0 4px #05080c}
+  .ph .bar{position:absolute;left:34px;right:34px;bottom:14px;height:2px;background:var(--mint);border-radius:2px;box-shadow:0 0 10px var(--mint)}
+  /* scout feed */
+  .feed{position:absolute;left:18px;right:18px;top:18px;display:flex;flex-direction:column;gap:8px}
+  .feed div{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#c9d3db;background:rgba(255,255,255,.04);border:1px solid var(--stroke);border-radius:10px;padding:7px 10px;animation:slide 6s ease-in-out infinite}
+  .feed div:nth-child(2){animation-delay:.6s}.feed div:nth-child(3){animation-delay:1.2s}.feed div:nth-child(4){animation-delay:1.8s}
+  .feed i{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px var(--mint);flex:none}
+  .feed b{color:var(--ink);font-weight:500}.feed em{margin-left:auto;font-style:normal;color:var(--muted)}
+  @keyframes slide{0%{opacity:0;transform:translateY(8px)}8%,90%{opacity:1;transform:none}100%{opacity:0}}
+  /* agent loop */
+  .loop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 14px}
+  .loop span{font-family:var(--mono);font-size:10.5px;padding:6px 8px;border:1px solid var(--stroke);border-radius:10px;background:rgba(255,255,255,.04);color:#c9d3db;white-space:nowrap;animation:glow 4s linear infinite}
+  .loop span:nth-child(3){animation-delay:1s}.loop span:nth-child(5){animation-delay:2s}.loop span:nth-child(7){animation-delay:3s}
+  .loop i{color:var(--muted);font-style:normal}
+  @keyframes glow{0%,100%{border-color:var(--stroke)}25%{border-color:var(--mint);box-shadow:0 0 14px rgba(77,255,208,.35)}}
+  /* receipt */
+  .rc{position:absolute;left:24px;right:24px;top:16px;background:#05080b;border:1px solid var(--stroke);border-radius:12px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:#c6d0d8;transform:rotate(-1.5deg)}
+  .rc .r{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.07)}.rc .r:last-child{border:0}
+  .rc .neg{color:var(--red)}.rc .pos{color:var(--mint)}.rc .w{color:var(--amber)}
+  .hold{position:absolute;left:24px;right:24px;bottom:12px;height:30px;border-radius:999px;background:linear-gradient(90deg,var(--mint) 0 60%,rgba(77,255,208,.15) 60%);color:#05080c;font-family:var(--inter);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;animation:fillup 3s ease-in-out infinite}
+  @keyframes fillup{0%{background:linear-gradient(90deg,var(--mint) 0 0%,rgba(77,255,208,.15) 0%)}70%,100%{background:linear-gradient(90deg,var(--mint) 0 100%,rgba(77,255,208,.15) 100%)}}
+  /* market */
+  .mk{position:absolute;inset:16px 22px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px}
+  .mk .bar{height:10px;border-radius:6px;background:linear-gradient(90deg,var(--cyan),var(--mint));position:relative}
+  .mk .bar::after{content:attr(data-l);position:absolute;right:0;top:-16px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .mk .bar.a{width:18%}.mk .bar.b{width:38%}.mk .bar.c{width:100%}
+  /* health ring */
+  .ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--mint) 0 88%,rgba(255,255,255,.08) 88% 100%);display:flex;align-items:center;justify-content:center}
+  .ring::before{content:"88";position:absolute;inset:10px;border-radius:50%;background:#05080c;display:flex;align-items:center;justify-content:center;font-family:var(--sora);font-weight:700;font-size:30px;color:var(--ink)}
+  .bub{position:absolute;right:26px;top:22px;width:44px;height:44px;border-radius:50%;background:#0b1218;border:1px solid var(--stroke);box-shadow:0 0 18px rgba(77,255,208,.25);animation:bob 3s ease-in-out infinite}
+  .bub::after{content:"";position:absolute;inset:6px;border-radius:50%;border:3px solid var(--mint);border-right-color:rgba(255,255,255,.1)}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  /* link drop */
+  .lnk{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(77,255,208,.4);background:rgba(77,255,208,.08);color:var(--mint);white-space:nowrap;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(77,255,208,.35)}50%{box-shadow:0 0 0 14px rgba(77,255,208,0)}}
+  .fly{position:absolute;top:34px;left:20px;font-size:22px;animation:fly 3s ease-in-out infinite}
+  @keyframes fly{0%{left:20px;opacity:0}20%{opacity:1}80%{opacity:1}100%{left:calc(100% - 40px);opacity:0}}
+  /* nfc */
+  .nfc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:90px;height:90px;border-radius:50%}
+  .nfc i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--cyan);opacity:0;animation:wave 2.4s ease-out infinite}
+  .nfc i:nth-child(2){animation-delay:.8s}.nfc i:nth-child(3){animation-delay:1.6s}
+  @keyframes wave{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+  /* eyes */
+  .eye{position:absolute;inset:14px 20px;display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px;color:#c9d3db}
+  .eye .ln{white-space:nowrap;overflow:hidden;border-right:2px solid var(--mint);width:0;animation:type 6s steps(40) infinite}
+  .eye .ln:nth-child(2){animation-delay:1.5s;color:var(--cyan)}.eye .ln:nth-child(3){animation-delay:3s;color:var(--mint)}
+  @keyframes type{0%{width:0}40%,85%{width:100%}100%{width:0}}
   footer{padding:60px 0 50px;text-align:center;color:var(--muted);font-size:13px}
   .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
   .reveal.in{opacity:1;transform:none}
@@ -96,15 +152,31 @@
     <div class="stats">
       <div class="stat"><b>31k</b><span>righe Kotlin</span></div>
       <div class="stat"><b>256</b><span>test verdi</span></div>
-      <div class="stat"><b>120k</b><span>Seeker censiti</span></div>
+      <div class="stat"><b>120k</b><span>telefoni Seeker censiti</span></div>
       <div class="stat"><b>0</b><span>server nostri con chiavi</span></div>
     </div>
   </div>
 </header>
 
 <nav class="toc"><div class="wrap">
-  <a href="#problema">Problema</a><a href="#fa">Cosa fa</a><a href="#agente">L'agente</a><a href="#scout">Scout</a><a href="#manca">Cosa manca</a><a href="#meglio">Da migliorare</a><a href="#nomi">10 nomi</a><a href="#stack">Com'è fatto</a>
+  <a href="#assi">Gli assi</a><a href="#problema">Problema</a><a href="#fa">Cosa fa</a><a href="#agente">L'agente</a><a href="#scout">Scout</a><a href="#manca">Cosa manca</a><a href="#meglio">Da migliorare</a><a href="#nomi">10 nomi</a><a href="#stack">Com'è fatto</a>
 </div></nav>
+
+
+<section id="assi"><div class="wrap">
+  <h2>Gli assi</h2>
+  <p class="sub">Otto cose che nessun altro wallet sul Seeker fa così. Ognuna è una scena, perché è così che si presentano.</p>
+  <div class="aces">
+    <div class="ace reveal"><div class="scene"><div class="feed"><div><i></i><b>Vesper·7r</b> ha comprato SKR<em>12 s fa</em></div><div><i></i><b>Balena 3</b> ha comprato JUP<em>40 s fa</em></div><div><i></i><b>Orbit·9k</b> ha comprato Bonk<em>1 min fa</em></div><div><i></i><b>Balena 1</b> ha comprato JitoSOL<em>2 min fa</em></div></div></div><div class="txt"><span class="k">Scout</span><h3>Cosa comprano i Seeker</h3><p>Censimento di 120.000 telefoni Seeker, i 10.527 attivi guardati ogni dieci minuti. La diretta, le balene, cosa tengono davvero. Una stella e l'agente copia chi segui.</p></div></div>
+    <div class="ace reveal"><div class="scene"><div class="loop"><span>paghetta</span><i>→</i><span>2° conto</span><i>→</i><span>caccia</span><i>→</i><span>compra</span><i>→</i><span>vende</span><i>→</i><span>chiude + rent</span></div></div><div class="txt"><span class="k">Agente</span><h3>Compra da solo, col guinzaglio</h3><p>Crea un secondo conto in automatico, ci mette la paghetta, cerca ogni sei minuti con i cancelli dei bot che vincono più Rugcheck, vende a +30 / −15, manda a casa i guadagni e alla chiusura riporta tutto, rent compreso. La tua seed non la vede mai.</p></div></div>
+    <div class="ace reveal"><div class="scene"><div class="rc"><div class="r"><span>Esce</span><span class="neg">−0,0377 SOL</span></div><div class="r"><span>Entra</span><span class="pos">+3.204,92 ALL</span></div><div class="r"><span>A</span><span>Jupiter Ultra · MEV</span></div><div class="r"><span>Rischio</span><span class="w">nuovo destinatario</span></div></div><div class="hold">Tieni premuto per firmare</div></div><div class="txt"><span class="k">Scontrino</span><h3>Vedi prima di firmare</h3><p>I byte veri della transazione, simulati dalla rete: quanto esce, quanto entra, a chi, con quali rischi. Poi tieni premuto, poi l'impronta. Vale per le dApp, per lo swap, per l'agente. Nella lingua del telefono.</p></div></div>
+    <div class="ace reveal"><div class="scene"><div class="mk"><div class="bar a" data-l="adesso · 340 M$"></div><div class="bar b" data-l="×10 · come RENDER"></div><div class="bar c" data-l="×100 · come SOL"></div></div></div><div class="txt"><span class="k">Mercato</span><h3>CoinGecko e marketcapof, insieme</h3><p>Classifica, ricerca, seguite con quello che hai altrove, il totale con il portafoglio. "E se fosse grande come…" con la scala ×2 ×10 ×100 e la moneta che scegli tu. La campanella a ogni 5%.</p></div></div>
+    <div class="ace reveal"><div class="scene"><div class="ring"></div><div class="bub"></div></div><div class="txt"><span class="k">Salute</span><h3>Il telefono ti dice come sta</h3><p>Deleghe da revocare, account vuoti col rent da riprendere, spazzatura da bruciare. Un punteggio, un widget sulla home, e la bolla che galleggia sopra ogni app. Il Watchtower avvisa anche a app chiusa.</p></div></div>
+    <div class="ace reveal"><div class="scene"><span class="fly">💸</span><div class="lnk">apex.link/r7Kq…</div></div><div class="txt"><span class="k">Link</span><h3>Soldi con un link, a chiunque</h3><p>Apex crea un portafoglino usa e getta, ci mette la cifra e ti dà un link. Lo mandi su WhatsApp a chi vuoi, anche a chi non ha un wallet: chi lo apre porta i soldi nel suo.</p></div></div>
+    <div class="ace reveal"><div class="scene"><div class="ph"><div class="bar"></div></div><div class="nfc"><i></i><i></i><i></i></div></div><div class="txt"><span class="k">Tocco</span><h3>Fatti pagare col tocco</h3><p>Due telefoni che si toccano: uno chiede, l'altro vede lo scontrino e firma con l'impronta. NFC del Seeker, niente QR, niente indirizzi copiati.</p></div></div>
+    <div class="ace reveal"><div class="scene"><div class="eye"><div class="ln">19:49:12 Cerco: 14 monete, 11 scartate</div><div class="ln">19:49:31 Guardo ALL: Rugcheck ferma, copia</div><div class="ln">19:55:02 Comprato SKR con 0,0576 SOL</div></div></div><div class="txt"><span class="k">I suoi occhi</span><h3>Guardalo lavorare</h3><p>Uno schermo che non si spegne: un grafico per moneta con entrata, obiettivo e stop, i suoi ragionamenti battuti a macchina, e una voce che dice "Cerco", "Comprato". Vendi, Ancora, Vendi e cerca altro.</p></div></div>
+  </div>
+</div></section>
 
 <section id="problema"><div class="wrap">
   <h2>Il problema, e cosa risolve</h2>
@@ -143,7 +215,7 @@
   <p class="sub">Tutto quello che c'è nell'app installata sul Seeker adesso. Le etichette dicono se è provato sul telefono o solo nel codice.</p>
   <div class="grid">
     <div class="card reveal"><h3><span class="dot"></span>Scontrino prima della firma</h3><p>Decodifica, simulazione, flussi per ogni token, etichetta di fiducia sul destinatario, rischi in chiaro. Vale per le dApp via <b>Mobile Wallet Adapter</b> e per le azioni dell'app.</p><span class="tag ok">provato</span></div>
-    <div class="card reveal"><h3><span class="dot"></span>Portafoglio e DeFi</h3><p>Saldo totale che conta e prende luce, tira giù per aggiornare, e la sezione <b>In DeFi</b>: SOL in staking (con il validatore per nome) e depositi su Jupiter Lend, letti dalla catena senza chiave, dentro il totale.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Portafoglio e DeFi</h3><p>Saldo totale che conta e prende luce, tira giù per aggiornare, e la sezione <b>In DeFi</b>: SOL in staking (con il validatore per nome), <b>SKR in staking dai Guardiani Seeker</b> e depositi su Jupiter Lend, letti dalla catena senza chiave, dentro il totale.</p><span class="tag ok">provato</span></div>
     <div class="card reveal"><h3><span class="dot"></span>Invia · Ricevi · Swap</h3><p>Swap con Jupiter e impatto sul prezzo, invio con contatti fidati e blocco anti prosciugamento, <b>Solana Pay</b> da QR con importo e moneta, <b>tocco NFC</b> fra telefoni.</p><span class="tag ok">provato</span><span class="tag warn">NFC senza secondo telefono</span></div>
     <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Porta biometrica</h3><p>La scena della porta: stelle, il pianeta, il telefono che fa da scudo alle richieste in arrivo. Chiede l'impronta da sola. Solo "Apex Wallet", nessun'altra scritta.</p><span class="tag ok">provato</span></div>
     <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Mercato</h3><p>Classifica per capitalizzazione, ricerca su tutte le monete con prezzo, seguite con la quantità che hai altrove e il <b>totale seguite + portafoglio</b>. "E se fosse grande come…" con la scala ×2 ×10 ×100 e la moneta che scegli tu. BTC ed ETH via ponte ufficiale. <b>Campanella</b>: una notifica a ogni 5% di movimento.</p><span class="tag ok">provato</span></div>

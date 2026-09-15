@@ -1345,7 +1345,14 @@
     <string name="alert_hit_body">%1$s is %2$s %3$s</string>
     <string name="order_notif_perm">Without notification permission the alert cannot reach you.</string>
     <string name="order_notif_ask">Allow notifications</string>
-    <string name="trader_unwatched_tag">unwatched</string>
+        <string name="agent_channel_quiet">How the coins are doing</string>
+    <plurals name="trader_progress_title">
+        <item quantity="one">1 coin running</item>
+        <item quantity="other">%d coins running</item>
+    </plurals>
+    <string name="trader_milestone_title">%1$s at %2$s</string>
+    <string name="trader_milestone_body">Sells on its own at +%1$d%%. Stops at −%2$d%%.</string>
+<string name="trader_unwatched_tag">unwatched</string>
     <string name="trader_unwatched">The loop is off and %1$d position has nothing watching it. The stop does not fire while the loop is off, and there is no on-chain target. Sell it by hand or switch the loop back on.</string>
     <string name="trader_no_onchain_small">Too small for an order on Jupiter, which wants at least $5. Only the loop watches it, while it runs.</string>
     <string name="hold_bars_note">%1$d are worth money. The bar is how many Seekers hold it. The dollars are what one of them holds, on average.</string>

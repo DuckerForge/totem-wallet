@@ -219,6 +219,7 @@ object TraderLoop {
         }
 
         val exit = exits(ctx, s.pubkey)
+        progress(ctx, cfg, exit.moves)
         exit.did?.let { note(ctx, it); return Tick(it, acted = true) }
 
         // A coin that could not be sold is worth saying, and it is not a reason
@@ -294,8 +295,47 @@ object TraderLoop {
 
     // ---- exits ---------------------------------------------------------------
 
+    /**
+     * How the open coins are doing, said where a person can see it without
+     * opening the app.
+     *
+     * Two things, and neither asks a model anything: the prices are the ones
+     * the exit check just read. A quiet card, no sound, rewritten every tick:
+     * "Bert −2% · ALL +21%". And one real notification each time a coin crosses
+     * a new ten percent line it had not reached before, up or down, so a coin
+     * at +21% has said "+10" and "+20" once each and then goes silent until
+     * +30, where the loop sells it anyway. The lines already crossed are kept
+     * per coin and forgotten when the coin is bought again.
+     */
+    private fun progress(ctx: Context, cfg: Config, moves: Map<String, Double>) {
+        val open = Positions.open(ctx)
+        if (open.isEmpty()) { AgentBroker.progressClear(ctx); return }
+        val p = prefs(ctx)
+        val lines = open.map { pos ->
+            val m = moves[pos.mint]
+            val shown = if (m == null) "…" else (if (m >= 0) "+" else "") + String.format("%.0f", m) + "%"
+            if (m != null) {
+                val bucket = (m / 10).toInt()
+                val hi = p.getInt("hi_" + pos.mint, 0)
+                val lo = p.getInt("lo_" + pos.mint, 0)
+                if (bucket > hi || bucket < lo) {
+                    p.edit().putInt(if (bucket > hi) "hi_" + pos.mint else "lo_" + pos.mint, bucket).apply()
+                    AgentBroker.warn(
+                        ctx, ctx.getString(R.string.trader_milestone_title, pos.symbol, shown),
+                        ctx.getString(R.string.trader_milestone_body, cfg.takeProfitPct, cfg.stopLossPct),
+                    )
+                }
+            }
+            pos.symbol + " " + shown
+        }
+        AgentBroker.progress(
+            ctx, ctx.resources.getQuantityString(R.plurals.trader_progress_title, open.size, open.size),
+            lines.joinToString(" · "),
+        )
+    }
+
     /** What the exit half of a tick did: one action, or one problem worth saying. */
-    private data class ExitOutcome(val did: String? = null, val problem: String? = null)
+    private data class ExitOutcome(val did: String? = null, val problem: String? = null, val moves: Map<String, Double> = emptyMap())
 
     /**
      * Sell anything that reached its target or its stop.
@@ -308,11 +348,13 @@ object TraderLoop {
     private suspend fun exits(ctx: Context, envelope: String): ExitOutcome {
         val at = System.currentTimeMillis()
         var problem: String? = null
+        val moves = LinkedHashMap<String, Double>()
         for (pos in Positions.open(ctx)) {
             // Failed three times already: it gets a slower lane, not the same
             // ninety seconds forever.
             if (at < pos.readyAt) continue
             val now = unitPriceLamports(pos) ?: continue
+            pos.entryLamports?.takeIf { it > 0 }?.let { moves[pos.mint] = (now - it) / it * 100.0 }
             val exit = pos.verdict(now) ?: continue
 
             // The coins are in Jupiter's escrow, held by a take-profit order, so
@@ -338,7 +380,7 @@ object TraderLoop {
                 // and the coins are back in the wallet. If the cancel fell
                 // through, the row is still parked with its key and this runs
                 // again, instead of being parked with no key for ever.
-                return ExitOutcome(did = ctx.getString(R.string.trader_order_cancelled, pos.symbol))
+                return ExitOutcome(did = ctx.getString(R.string.trader_order_cancelled, pos.symbol), moves = moves)
             }
 
             val moved = (if (exit.movePct >= 0) "+" else "") + String.format("%.1f", exit.movePct) + "%"
@@ -356,6 +398,7 @@ object TraderLoop {
                         if (exit.why == Positions.Exit.Why.TARGET) R.string.trader_sold_target else R.string.trader_sold_stop,
                         pos.symbol, moved,
                     ),
+                    moves = moves,
                 )
             }
             // Put it back rather than stranding it: a failed sale is a sale to
@@ -388,7 +431,7 @@ object TraderLoop {
                 AgentBroker.warn(ctx, ctx.getString(R.string.trader_stuck_title, pos.symbol), problem)
             }
         }
-        return ExitOutcome(problem = problem)
+        return ExitOutcome(problem = problem, moves = moves)
     }
 
     /** Why a sale did not happen, in the words the person reads. */
@@ -540,6 +583,7 @@ object TraderLoop {
                 .put("agent", AGENT).put("reason", reason)
             val v = handle(ctx, tx, intent)
             if (v is AgentBroker.Verdict.SignedSilently) {
+                prefs(ctx).edit().remove("hi_" + t.mint).remove("lo_" + t.mint).apply()
                 AgentTrace.say(ctx.getString(R.string.trader_bought, t.symbol, fmtSol(slice, 4)), AgentTrace.Kind.ACTED)
                 shadow(null)
                 armOnChainExit(ctx, s.pubkey, t.mint)

@@ -160,8 +160,11 @@ object Orders {
 object OrdersKeeper {
     private const val WORK = "apex-orders-keeper"
 
+    /** How far a coin must move, either way, before its bell rings again. */
+    const val MOVE_PCT = 5.0
+
     fun sync(ctx: Context) {
-        val needed = Orders.all(ctx).isNotEmpty() || Orders.alerts(ctx).isNotEmpty()
+        val needed = Orders.all(ctx).isNotEmpty() || Orders.alerts(ctx).isNotEmpty() || Watchlist.movesKeys(ctx).isNotEmpty()
         if (!needed) { WorkManager.getInstance(ctx).cancelUniqueWork(WORK); return }
         val req = PeriodicWorkRequestBuilder<Worker>(15, TimeUnit.MINUTES, 5, TimeUnit.MINUTES).build()
         WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, req)
@@ -189,6 +192,31 @@ object OrdersKeeper {
                         ),
                     )
                     Orders.removeAlert(ctx, a.id)
+                }
+            }
+            // The bells: coins that moved five percent from where they last rang.
+            val bells = Watchlist.movesKeys(ctx)
+            if (bells.isNotEmpty()) {
+                val mints = bells.filter { !it.startsWith("cg:") }
+                val ids = bells.filter { it.startsWith("cg:") }.map { it.removePrefix("cg:") }
+                val now = HashMap<String, Double>()
+                withContext(Dispatchers.IO) {
+                    if (mints.isNotEmpty()) runCatching { Prices.usd(mints) }.getOrNull()?.let { now.putAll(it) }
+                    if (ids.isNotEmpty()) runCatching { Market.pricesFor(ids) }.getOrNull()?.forEach { (id, c) -> c.priceUsd?.let { now["cg:$id"] = it } }
+                }
+                for (key in bells) {
+                    val p = now[key] ?: continue
+                    val base = Watchlist.moveBase(ctx, key)
+                    if (base == null || base <= 0) { Watchlist.setMoveBase(ctx, key, p); continue }
+                    val pct = (p - base) / base * 100.0
+                    if (kotlin.math.abs(pct) >= MOVE_PCT) {
+                        val name = Watchlist.recallCoin(ctx, key)?.let { Market.fromJson(it)?.symbol } ?: TokenSymbols.symbol(key)
+                        Watchtower.notify(
+                            ctx, ctx.getString(R.string.move_title, name, String.format(java.util.Locale.ROOT, "%+.1f%%", pct)),
+                            ctx.getString(R.string.move_body, fmtPrice(base, "USD"), fmtPrice(p, "USD")),
+                        )
+                        Watchlist.setMoveBase(ctx, key, p)
+                    }
                 }
             }
             sync(ctx)

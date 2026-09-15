@@ -194,7 +194,9 @@ object WalletActions {
                 add(WalletTx.createAtaIdempotent(ownerKey, Pda.associatedTokenAddress(treasury, mint, program), treasury, mint, program))
             }
         }
-        return signAndSend(ctx, signer, owner, ixs, LogInfo(kind = "setup", recipientLabel = ctx.getString(R.string.swapfees_log)))
+        val r = signAndSend(ctx, signer, owner, ixs, LogInfo(kind = "setup", recipientLabel = ctx.getString(R.string.swapfees_log)))
+        if (r is Result.Sent) Jupiter.forgetFeeAccounts()
+        return r
     }
 
     /**

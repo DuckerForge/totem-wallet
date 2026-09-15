@@ -107,6 +107,8 @@ internal fun SendSheet(
     /** Filled in by a tap or a payment link: the form opens ready to review. */
     prefillTo: String? = null,
     prefillAmount: String? = null,
+    /** The coin the request asks for, when it asks for one. Null means SOL. */
+    prefillMint: String? = null,
     onGift: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
@@ -123,11 +125,29 @@ internal fun SendSheet(
     var tapping by remember { mutableStateOf(false) }
     val contacts = remember { Contacts.allowlist(ctx) }
 
+    /** A coin a request asked for, applied once the wallet's assets are known. */
+    var wantedMint by remember { mutableStateOf(prefillMint) }
+
     // A tap can land while this screen is already open: `to` was only seeded once,
     // so without this the form sat there empty with the request already read.
-    LaunchedEffect(prefillTo, prefillAmount) {
+    LaunchedEffect(prefillTo, prefillAmount, prefillMint) {
         prefillTo?.takeIf { it.isNotBlank() }?.let { to = it; tapping = false; Haptics.tick(ctx) }
         prefillAmount?.takeIf { it.isNotBlank() }?.let { amount = it }
+        wantedMint = prefillMint
+    }
+
+    // The coin the request named, and not SOL by default. A request for ten
+    // USDC used to open the form on SOL with "10" in the amount: the number was
+    // right and the coin was wrong, which is the one mistake a payment form must
+    // never make on the person's behalf. If the coin is not in this wallet, say
+    // so and leave the amount empty rather than let it mean something else.
+    LaunchedEffect(assets, wantedMint) {
+        val m = wantedMint ?: return@LaunchedEffect
+        if (assets.isEmpty()) return@LaunchedEffect
+        val match = assets.firstOrNull { it.mint == m }
+        if (match != null) asset = match
+        else { amount = ""; formError = ctx.getString(R.string.send_wanted_missing, TokenSymbols.symbol(m)) }
+        wantedMint = null
     }
 
     LaunchedEffect(owner) {
@@ -144,7 +164,16 @@ internal fun SendSheet(
         if (asset == null) asset = assets.first()
     }
 
-    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { r -> r.contents?.let { to = parseScanned(it) } }
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { r ->
+        r.contents?.let { text ->
+            val req = parseScanned(text)
+            to = req.recipient
+            // What the code asked for, not just where: the amount and the coin
+            // used to be thrown away, and a merchant's QR became a bare address.
+            req.amount?.let { amount = fmtUi(it) }
+            wantedMint = req.mint ?: com.clearsign.core.NATIVE_SOL_MINT
+        }
+    }
     val destValid = Base58.decodePubkey(to.trim()) != null
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
@@ -297,7 +326,25 @@ internal fun SendSheet(
                     }
                     is SendState.Review -> {
                         if (s.analyzed.receipt.blocksApproval) {
-                            Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
+                            // The one block a person can lift themselves: sending most
+                            // of a balance to an address this phone has never seen is
+                            // the shape of a drainer, and the way to say "no, that is
+                            // my new wallet" is to save it as a contact. Said here,
+                            // with the chip that does it, instead of a red line that
+                            // named a severity and left the person to guess.
+                            val onlyDrain = s.analyzed.receipt.risks.filter { it.severity == com.clearsign.core.Severity.DANGER }
+                                .all { it.flag == com.clearsign.core.RiskFlag.DRAINS_BALANCE }
+                            if (onlyDrain) {
+                                Banner(stringResource(R.string.send_blocked_drain), Halo.amber, HIcon.WARNING)
+                                Spacer(Modifier.height(8.dp))
+                                GhostButton(stringResource(R.string.send_save_contact), Modifier.fillMaxWidth(), HIcon.CONTACTS, tint = Halo.mint) {
+                                    Contacts.saveContact(ctx, s.dest, shorten(s.dest))
+                                    Haptics.tick(ctx)
+                                    state = SendState.Form
+                                }
+                            } else {
+                                Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
+                            }
                             Spacer(Modifier.height(8.dp))
                             GhostButton(stringResource(R.string.back)) { state = SendState.Form }
                         } else {
@@ -374,11 +421,11 @@ internal fun fmtUnits(raw: Long, decimals: Int): String {
  * A scanned QR may be a bare address, a Solana Pay URI (`solana:<addr>?…`), or the
  * web link Apex hands out — the one a phone without a wallet can also open.
  */
-private fun parseScanned(text: String): String {
+private fun parseScanned(text: String): com.clearsign.core.PayRequest {
     val t = text.trim()
-    com.clearsign.core.SolanaPay.parse(t)?.let { return it.recipient }
+    com.clearsign.core.SolanaPay.parse(t)?.let { return it }
     val body = if (t.startsWith("solana:", ignoreCase = true)) t.substringAfter(':').substringBefore('?') else t
-    return body.trim()
+    return com.clearsign.core.PayRequest(body.trim(), null, null, null, null)
 }
 
 internal fun clipboardText(ctx: Context): String? =

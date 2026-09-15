@@ -151,9 +151,18 @@ object TraderLoop {
             stop(ctx, ctx.getString(R.string.trader_stop_nobudget))
             return Tick(ctx.getString(R.string.trader_stop_nobudget), acted = false, stopped = true)
         }
-        if (p.mode == AgentMode.OFF || p.mode == AgentMode.READ_ONLY || s.expired) {
+        if (s.expired) {
             stop(ctx, ctx.getString(R.string.trader_stop_closed))
             return Tick(ctx.getString(R.string.trader_stop_closed), acted = false, stopped = true)
+        }
+        // Paused is not stopped. The notification's Pause button sets the mode
+        // to OFF and its Resume button sets it back, and this used to switch
+        // trading off for good at the first tick in between: Resume then brought
+        // back an agent that would not trade until somebody found the switch in
+        // the rules. While paused the loop waits, touches nothing, and picks up
+        // where it was the moment the mode comes back.
+        if (p.mode == AgentMode.OFF || p.mode == AgentMode.READ_ONLY) {
+            return Tick(ctx.getString(R.string.pulse_paused), acted = false)
         }
 
         // A move the collar would want confirmed cannot happen without a person,

@@ -69,14 +69,13 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
     // While it is on we also claim the AID, because another installed app claims
     // the same one and Android would otherwise have no reason to route to us.
     DisposableEffect(armed, request) {
-        val activity = ctx as? android.app.Activity
         if (armed) {
             TapService.arm(request)
-            activity?.let { TapService.preferWhileVisible(it, true) }
+            TapService.preferWhileVisible(ctx, true)
         }
         onDispose {
             TapService.disarm()
-            activity?.let { TapService.preferWhileVisible(it, false) }
+            TapService.preferWhileVisible(ctx, false)
         }
     }
     if (armed && tapped > seenAt) seenAt = tapped

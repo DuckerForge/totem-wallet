@@ -407,6 +407,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
             SendSheet(
                 signer, first.pubkeyBase58,
                 prefillTo = request?.recipient, prefillAmount = request?.amount?.let { fmtUi(it) },
+                prefillMint = request?.let { it.mint ?: com.clearsign.core.NATIVE_SOL_MINT },
                 onGift = { showSend = false; showGift = true },
             ) { showSend = false; (ctx as? MainActivity)?.incoming = null }
         }

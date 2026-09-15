@@ -306,7 +306,11 @@ object HealthWidgetData {
     suspend fun refresh(ctx: Context, updateWidgets: Boolean = true) = withContext(Dispatchers.IO) {
         val owner = Settings.watchWallet(ctx) ?: return@withContext
         val rpc = SolanaRpc.urlFor(null)
-        val accounts = runCatching { SolanaRpc.tokenAccountsOf(rpc, owner) }.getOrDefault(emptyList())
+        // A node that did not answer is not a wallet with nothing in it. The
+        // lenient reader turned a failed call into an empty list, the score
+        // became 100 and the alert line "all clean", and that overwrote a true
+        // snapshot on the home screen. Keep what we had and try again later.
+        val accounts = runCatching { SolanaRpc.tokensOf(rpc, owner) }.getOrNull() ?: return@withContext
         val health = WalletHealth.of(owner, accounts)
         val lamports = runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() ?: load(ctx)?.lamports ?: 0L
         val currency = Settings.currency.value

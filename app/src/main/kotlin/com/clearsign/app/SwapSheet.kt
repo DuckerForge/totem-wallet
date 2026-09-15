@@ -286,8 +286,12 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                // Leave enough SOL behind to pay for the transaction itself.
-                                val spendable = if (from.mint == Jupiter.SOL_MINT) (fromBalance - 2_000_000L).coerceAtLeast(0) else fromBalance
+                                // Leave enough SOL behind for the transaction itself, and
+                                // for the wrapped-SOL account Jupiter opens and closes inside
+                                // it: that account needs 0.00204 SOL of rent for the duration,
+                                // on top of the amount. A reserve of 0.002 was 0.00004 short,
+                                // so "MAX" from SOL built a swap that failed in simulation.
+                                val spendable = if (from.mint == Jupiter.SOL_MINT) (fromBalance - 3_000_000L).coerceAtLeast(0) else fromBalance
                                 fun slice(pct: Int) { amount = fmtUnits(spendable / 100L * pct, from.decimals) }
                                 SmallChip("25%", null) { slice(25) }
                                 SmallChip("50%", null) { slice(50) }

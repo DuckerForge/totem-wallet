@@ -67,6 +67,13 @@ object Market {
         return top
     }
 
+    /** One coin with its price and market cap, whether or not the ranked page carries it. */
+    fun byId(id: String): Coin? {
+        top.firstOrNull { it.id == id && it.marketCap != null }?.let { return it }
+        val arr = getArray("$BASE/coins/markets?vs_currency=usd&ids=" + URLEncoder.encode(id, "UTF-8") + "&price_change_percentage=24h") ?: return null
+        return parse(arr).firstOrNull()
+    }
+
     /** Free text across every coin, not only the ranked page. */
     fun search(query: String): List<Coin> {
         val q = query.trim()

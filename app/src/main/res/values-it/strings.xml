@@ -1409,6 +1409,12 @@
     <string name="size_each">Ogni acquisto</string>
     <string name="env_duration_note">Dopo smette di comprare e restituisce i soldi.</string>
     <string name="env_pay_title">Paga %1$s SOL</string>
+    <string name="whatif_pick">Confronta con…</string>
+    <string name="whatif_mine">Capitalizzazione adesso: %1$s</string>
+    <string name="whatif_search_hint">Nome o simbolo di qualsiasi moneta</string>
+    <string name="whatif_row_mc">con la capitalizzazione di %1$s (%2$s), una varrebbe %3$s</string>
+    <string name="whatif_step">per fare ×%1$s</string>
+    <string name="whatif_yours_pick">scelta tua</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

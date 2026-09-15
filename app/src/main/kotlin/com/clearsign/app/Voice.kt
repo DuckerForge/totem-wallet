@@ -46,6 +46,16 @@ object Voice {
         runCatching { engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "apex") }
     }
 
+    /** Say [text] after whatever is being said, for a screen that narrates a stream of lines. */
+    fun add(ctx: Context, text: String) {
+        warm(ctx)
+        val engine = tts ?: return
+        if (!ready) return
+        val t = text.trim().take(200)
+        if (t.isEmpty()) return
+        runCatching { engine.speak(t, TextToSpeech.QUEUE_ADD, null, "apex" + t.hashCode()) }
+    }
+
     fun stop() {
         runCatching { tts?.stop() }
     }

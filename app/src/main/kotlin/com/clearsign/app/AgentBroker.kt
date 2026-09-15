@@ -40,6 +40,7 @@ object AgentBroker {
     private const val CHANNEL = "agent"
     private const val QUIET = "agent_quiet"
     private const val PROGRESS_ID = 5100
+    const val MILESTONE_ID = 5200
     private const val ASK_TIMEOUT_MS = 90_000L   // a blockhash lives about that long
 
     /**
@@ -261,8 +262,36 @@ object AgentBroker {
      * same as no note at all, and the whole point of this round of work is that a
      * stuck agent must be loud exactly once rather than quiet eighty-four times.
      */
-    fun warn(ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null, color: Int? = null) =
-        notify(ctx, title, body, null, picture = picture, color = color)
+    fun warn(
+        ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null, color: Int? = null,
+        rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null,
+    ) = notify(ctx, title, body, null, picture = picture, color = color, rhythm = rhythm, actions = actions, id = id)
+
+    fun dismiss(ctx: Context, id: Int) = ctx.getSystemService(NotificationManager::class.java).cancel(id)
+
+    /**
+     * A vibration you can tell apart in a pocket. Android lets a channel own
+     * the pattern, not a notification, so each rhythm is its own channel: two
+     * short taps for a coin going up, one long for a coin going down, three
+     * for a sale or a stop.
+     */
+    enum class Rhythm(val channel: String, val nameRes: Int, val pattern: LongArray) {
+        UP("agent_up", R.string.agent_channel_up, longArrayOf(0, 60, 90, 60)),
+        DOWN("agent_down", R.string.agent_channel_down, longArrayOf(0, 420)),
+        STOP("agent_stop", R.string.agent_channel_stop, longArrayOf(0, 110, 100, 110, 100, 110)),
+    }
+
+    private fun channelFor(ctx: Context, r: Rhythm): String {
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(r.channel) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(r.channel, ctx.getString(r.nameRes), NotificationManager.IMPORTANCE_HIGH).apply {
+                    enableVibration(true); vibrationPattern = r.pattern
+                },
+            )
+        }
+        return r.channel
+    }
 
     /**
      * The quiet card: one notification, rewritten in place, that never makes a
@@ -305,13 +334,14 @@ object AgentBroker {
     private fun notify(
         ctx: Context, title: String, body: String, txSig: String?, tap: PendingIntent? = null, heads: Boolean = false,
         picture: android.graphics.Bitmap? = null, color: Int? = null,
+        rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null,
     ) {
         channel(ctx)
         val open = tap ?: PendingIntent.getActivity(
             ctx, 0, Intent(ctx, MainActivity::class.java).putExtra("open", "agent").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val n = Notification.Builder(ctx, CHANNEL)
+        val n = Notification.Builder(ctx, rhythm?.let { channelFor(ctx, it) } ?: CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title).setContentText(body)
             .setStyle(
@@ -320,9 +350,12 @@ object AgentBroker {
             )
             .setColor(color ?: Halo.palette.accent.toArgb())
             .setContentIntent(open).setAutoCancel(true)
-            .apply { if (heads) setCategory(Notification.CATEGORY_CALL) }
+            .apply {
+                if (heads) setCategory(Notification.CATEGORY_CALL)
+                actions.forEach { addAction(it) }
+            }
             .build()
-        ctx.getSystemService(NotificationManager::class.java).notify(if (tap != null) 5000 else (txSig?.hashCode() ?: body.hashCode()), n)
+        ctx.getSystemService(NotificationManager::class.java).notify(id ?: if (tap != null) 5000 else (txSig?.hashCode() ?: body.hashCode()), n)
     }
 
     private fun cancelNotification(ctx: Context, jobId: String) {

@@ -224,6 +224,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             }
 
             RecentMoves(refresh)
+            FollowsSection(refresh)
 
             // Everything else, small. Each opens the same sheet it always did.
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -417,6 +418,51 @@ private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false,
  * What the agent did last, five lines. Each is a ledger row, so the receipt
  * behind it is one tab away; here it is the sentence, the sum, and when.
  */
+/**
+ * Copy trading, where the person can see it. The star in Scout follows a
+ * wallet; this is the list of what that star did, with each wallet's last buy
+ * from the feed. What they buy goes to the front of the loop's list, through
+ * the same gates as everything else.
+ */
+@Composable
+private fun FollowsSection(refresh: Int) {
+    val ctx = LocalContext.current
+    val follows = remember(refresh) { Follows.all(ctx).toList() }
+    val events = remember(refresh) { runCatching { SeekerFeed.cached(ctx)?.events }.getOrNull().orEmpty() }
+    val now = System.currentTimeMillis()
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HaloIcon(HIcon.STAR, Halo.amber, 14.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.agent_copy_title).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
+                if (follows.isNotEmpty()) Text(stringResource(R.string.crowd_followed, follows.size), style = HaloType.small, color = Halo.muted)
+            }
+            if (follows.isEmpty()) {
+                Text(stringResource(R.string.agent_copy_none), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+            }
+            follows.forEach { w ->
+                val last = events.filter { it.wallet == w }.maxByOrNull { it.at }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(com.clearsign.core.SeekerCrowd.nickname(w), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, maxLines = 1)
+                        Text(
+                            if (last != null) stringResource(R.string.agent_copy_last, last.symbol, ((now - last.at) / 60_000L).coerceAtLeast(0L))
+                            else stringResource(R.string.agent_copy_quiet),
+                            fontFamily = Inter, fontSize = 10.5.sp, color = if (last != null) Halo.mint else Halo.muted, maxLines = 1,
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.follow_on), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber,
+                        modifier = Modifier.clip(rs(8)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) }.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            Text(stringResource(R.string.agent_copy_how), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
+        }
+    }
+}
+
 @Composable
 private fun RecentMoves(refresh: Int) {
     val ctx = LocalContext.current

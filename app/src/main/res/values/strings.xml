@@ -1399,6 +1399,11 @@
     <string name="trace_rug_stop">Rugcheck stops %1$s: %2$s</string>
     <string name="trace_rug_ok">Rugcheck %1$s: score %2$d, LP %3$s locked</string>
     <string name="trace_rug_unknown">Rugcheck did not answer for %1$s, going on</string>
+    <string name="size_slice">Each slice: %1$s SOL (%2$s $).</string>
+    <string name="size_onchain_ok">Above 5 $: the target goes on the chain and fires with the phone off.</string>
+    <string name="size_onchain_no">Under 5 $: only the loop holds the target, phone on. For the chain, raise the per move ceiling to %1$s SOL.</string>
+    <string name="size_noprice">SOL price unavailable: cannot tell whether the slice clears 5 $.</string>
+    <string name="size_fits">This budget holds %1$d of %2$d slots at this slice.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

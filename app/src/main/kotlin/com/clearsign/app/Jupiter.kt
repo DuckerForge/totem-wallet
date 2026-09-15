@@ -123,6 +123,14 @@ object Jupiter {
 
     private val feeAccountExists = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
+    /**
+     * Forget what we knew about the fee accounts. Called after they are created:
+     * the cache had them as missing for the life of the process, so the swap
+     * right after "activate fees" still took no fee, and so did every swap until
+     * the app was killed.
+     */
+    fun forgetFeeAccounts() = feeAccountExists.clear()
+
     /** The platform fee wallet's ATA for [outputMint], where our cut lands. Null when no fee wallet is set. */
     fun feeAccountFor(outputMint: String): String? {
         val fee = Base58.decodePubkey(BuildConfig.SKR_TREASURY) ?: return null

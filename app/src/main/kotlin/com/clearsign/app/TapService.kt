@@ -69,7 +69,14 @@ class TapService : HostApduService() {
          * has no reason to pick us. `setPreferredService` says "while this screen
          * is up, route it here", which is exactly true and lasts no longer.
          */
-        fun preferWhileVisible(activity: android.app.Activity, on: Boolean) {
+        fun preferWhileVisible(ctx: Context, on: Boolean) {
+            // Inside a sheet the composition's context is often a wrapper around
+            // the Activity, not the Activity: `as? Activity` was null there, the
+            // preference was never set, and the other app that claims the same
+            // AID got the tap. Walk the wrappers until the Activity turns up.
+            var c: Context? = ctx
+            while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
+            val activity = c as? android.app.Activity ?: return
             val adapter = android.nfc.NfcAdapter.getDefaultAdapter(activity) ?: return
             val ce = runCatching { android.nfc.cardemulation.CardEmulation.getInstance(adapter) }.getOrNull() ?: return
             val me = android.content.ComponentName(activity, TapService::class.java)

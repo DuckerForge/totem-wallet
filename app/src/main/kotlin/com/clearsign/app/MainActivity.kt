@@ -12,6 +12,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -295,7 +297,17 @@ fun HomeScreen(signer: SeedVaultSigner) {
                     // the old screen said so with a small card and two thirds of an
                     // empty page under it. One door, the whole screen, and the tab
                     // bar stays away until there is something behind it.
-                    if (accounts.isEmpty()) {
+                    // A door that opens, not a cut: the scene fades and grows a
+                    // touch as the wallet comes up under it.
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = accounts.isEmpty(),
+                        transitionSpec = {
+                            (androidx.compose.animation.fadeIn(tween(520)) + androidx.compose.animation.scaleIn(tween(520), initialScale = 0.97f))
+                                .togetherWith(androidx.compose.animation.fadeOut(tween(420)) + androidx.compose.animation.scaleOut(tween(420), targetScale = 1.04f))
+                        },
+                        label = "door",
+                    ) { noWallet ->
+                    if (noWallet) {
                         val saved = remember { Settings.watchWallet(ctx) }
                         fun ask() {
                             busy = true; status = null
@@ -312,7 +324,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                             if (saved == null) connect() else ask()
                         }
                     }
-                    else when (tab) {
+                    else Box(Modifier.fillMaxSize()) { when (tab) {
                         Tab.WALLET -> androidx.compose.runtime.CompositionLocalProvider(LocalEntrance provides remember { java.util.concurrent.atomic.AtomicInteger() }) {
                             Column(
                                 Modifier.fillMaxSize().verticalScroll(walletScroll).padding(horizontal = 20.dp, vertical = 14.dp),
@@ -381,6 +393,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                         Tab.AGENT -> AgentScreen(owner, signer, onChat = { showChat = true })
                         Tab.RECEIPTS -> LedgerScreen()
                         Tab.SETTINGS -> SettingsScreen(signer, owner) { SecurityTools(signer, owner, contacts) }
+                    } }
                     }
                 }
                 if (accounts.isNotEmpty()) BottomBar(tab, collapse) { tab = it }
@@ -519,18 +532,23 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
                 letterSpacing = 3.sp,
             )
         }
-        Spacer(Modifier.height(26.dp))
-        // Shown, not told: everything out there comes to this one phone and asks,
-        // and the request that lies is stopped at the glass. It is the one thing
-        // this app is for, and a paragraph saying the same would be skimmed.
-        GateDemo()
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(14.dp))
+        // The sentence sits under the name, above the scene, where nothing crosses
+        // it. It used to sit under a fixed-height strip, on top of the planet's
+        // atmosphere, with half a page of dark under it.
         Text(
             stringResource(R.string.door_pitch),
             fontFamily = Inter, fontSize = 14.sp, color = Halo.muted, lineHeight = 21.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(8.dp))
+        // Shown, not told: everything out there comes to this one phone and asks,
+        // and the request that lies is stopped at the glass. It is the one thing
+        // this app is for, and a paragraph saying the same would be skimmed. The
+        // scene takes the whole middle of the screen: the planet's limb sits
+        // just above the button, the phone holds station in the centre.
+        GateDemo(Modifier.weight(1f).heightIn(min = 220.dp), opening = busy)
+        Spacer(Modifier.height(12.dp))
         PrimaryButton(
             when {
                 busy -> stringResource(R.string.connecting)

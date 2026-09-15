@@ -312,8 +312,11 @@ private fun WhoWeWatch(feed: SeekerFeed.Feed?) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
+            // Counts up on arrival: a number that lands says "measured", a number
+            // that is just there says "typed".
+            val shown = rememberCountUp(followed.toFloat(), durationMs = 900).toInt()
             Text(
-                thousands(followed), fontFamily = Sora, fontWeight = FontWeight.Bold,
+                thousands(shown), fontFamily = Sora, fontWeight = FontWeight.Bold,
                 fontSize = 21.sp, color = Halo.mint, style = Tabular,
             )
             Text(

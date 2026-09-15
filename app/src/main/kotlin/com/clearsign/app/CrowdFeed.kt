@@ -95,7 +95,9 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, onBuy: (String) -> Unit) {
                     color = Halo.cyan, modifier = Modifier.weight(1f),
                 )
             }
-            events.take(12).forEach { e -> FeedRow(e, now, onBuy) }
+            // Each row slides in once, keyed on the purchase itself, so a new
+            // buy landing at the top arrives rather than being suddenly there.
+            events.take(12).forEachIndexed { i, e -> Box(Modifier.staggeredEntrance(i, key = e.wallet + e.at)) { FeedRow(e, now, onBuy) } }
             Text(
                 stringResource(R.string.feed_note),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -48,8 +49,13 @@ import kotlin.math.sin
  * and it is the only animation in the app that runs without being asked for.
  */
 @Composable
-internal fun GateDemo(modifier: Modifier = Modifier) {
+internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     val loop = rememberInfiniteTransition(label = "orbit")
+    // The door opening: the phone's light goes to full and a ring leaves it for
+    // the edge of the screen, once, while the wallet fades in underneath. It is
+    // the one moment the scene answers the person instead of playing to itself.
+    val open = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(opening) { if (opening) open.animateTo(1f, tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(6200, easing = LinearEasing)), label = "t")
     val slow by loop.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "slow")
 
@@ -64,7 +70,9 @@ internal fun GateDemo(modifier: Modifier = Modifier) {
     val bad = Halo.red
     val faint = Halo.muted
 
-    Canvas(modifier.fillMaxWidth().height(190.dp)) {
+    // The height is the caller's. On the door it is the whole middle of the
+    // screen, which used to be a 190dp strip with half a page of dark under it.
+    Canvas(modifier.fillMaxWidth()) {
         val w = size.width
         val h = size.height
         val unit = min(w, h)
@@ -74,6 +82,28 @@ internal fun GateDemo(modifier: Modifier = Modifier) {
             val twinkle = 0.35f + 0.4f * (0.5f + 0.5f * sin(slow * 1.7f + s.phase))
             val drift = sin(slow * 0.35f + s.phase) * unit * 0.004f
             drawCircle(Color.White.copy(alpha = 0.55f * twinkle), s.r, Offset(s.x * w + drift, s.y * h))
+        }
+
+        // ---- one falling star, early in the loop, never in the silence -------
+        // Between the first arrival and the second, when nothing else moves: a
+        // streak across the top that says the dark is deep. It stays out of the
+        // last beat on purpose; the refusal owns that silence.
+        run {
+            val local = (t - 0.14f) / 0.07f
+            if (local > 0f && local < 1f) {
+                val p = easeOut(local)
+                val from = Offset(w * 0.12f, h * 0.06f)
+                val to = Offset(w * 0.58f, h * 0.20f)
+                val head = Offset(from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p)
+                val fade = 1f - local
+                for (k in 6 downTo 0) {
+                    val u = (p - k * 0.035f).coerceAtLeast(0f)
+                    val q = Offset(from.x + (to.x - from.x) * u, from.y + (to.y - from.y) * u)
+                    val a = 1f - k / 7f
+                    drawCircle(Color.White.copy(alpha = 0.55f * a * a * fade), unit * 0.0035f * (0.4f + a), q)
+                }
+                drawCircle(Color.White.copy(alpha = 0.9f * fade), unit * 0.005f, head)
+            }
         }
 
         // ---- the planet ----------------------------------------------------
@@ -178,10 +208,19 @@ internal fun GateDemo(modifier: Modifier = Modifier) {
             back = false, body = Halo.cardSoft, edge = Halo.stroke, ink = Halo.ink, glass = Halo.ground,
         )
         val breath = 0.5f + 0.5f * sin(slow * 1.9f)
-        drawCircle(mint.copy(alpha = 0.08f + 0.08f * breath), phoneW * 0.5f, phone)
-        drawCircle(mint.copy(alpha = 0.6f + 0.3f * breath), phoneW * 0.12f, phone)
+        val o = open.value
+        drawCircle(mint.copy(alpha = 0.08f + 0.08f * breath + 0.25f * o), phoneW * (0.5f + 0.6f * o), phone)
+        drawCircle(mint.copy(alpha = 0.6f + 0.3f * breath), phoneW * (0.12f + 0.10f * o), phone)
         // The station light: a thin ring that says the thing is awake and watching.
         drawCircle(mint.copy(alpha = 0.10f + 0.06f * breath), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
+        if (o > 0f) {
+            // Opening: two rings leaving the phone for the edge, thinning as they go.
+            for (k in 0 until 2) {
+                val q = ((o - k * 0.18f) / 0.82f).coerceIn(0f, 1f)
+                if (q <= 0f) continue
+                drawCircle(mint.copy(alpha = 0.5f * (1f - q)), shieldR + (w * 0.9f) * q, phone, style = Stroke((2.2f * (1f - q) + 0.4f).dp.toPx()))
+            }
+        }
     }
 }
 

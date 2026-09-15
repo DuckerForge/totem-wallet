@@ -96,15 +96,8 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
     val ceiling = (((have ?: 0L) - reserve) / 1e9f).coerceAtLeast(0f)
     val enough = have != null && ceiling >= floor
     var cap by remember { mutableFloatStateOf(0f) }
-    // In SOL, not as a fraction of something invisible.
-    var perTx by remember { mutableFloatStateOf(0f) }
-    var daily by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(ceiling) {
-        if (cap <= 0f && ceiling > 0f) {
-            cap = (ceiling / 3f).coerceIn(floor, ceiling)
-            perTx = cap / 5f
-            daily = cap / 2f
-        }
+        if (cap <= 0f && ceiling > 0f) cap = (ceiling / 3f).coerceIn(floor, ceiling)
     }
     var days by remember { mutableFloatStateOf(7f) }
     var slots by remember { mutableFloatStateOf(TraderLoop.config(ctx).maxPositions.toFloat()) }
@@ -137,33 +130,22 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
 
             if (enough) {
             SliderRow(stringResource(R.string.env_cap), "%.3f SOL".format(cap), cap, floor..ceiling, Halo.mint) { cap = it }
-            // Keep the two limits inside the budget whenever the budget itself moves.
-            LaunchedEffect(cap) {
-                perTx = perTx.coerceIn(cap / 50f, cap)
-                daily = daily.coerceIn(perTx, cap)
-            }
-            SliderRow(stringResource(R.string.env_duration), stringResource(R.string.env_days, days.toInt()), days, 1f..30f, Halo.cyan, steps = 28) { days = it }
-
-            // "Prudent" and "Trader" were four hidden fractions of the cap, not two
-            // behaviours: both autonomous, both allowed Jupiter, both allowed USDC.
-            // Two sliders in real SOL say the same thing and hide nothing.
-            // Clamped at draw time, not only in the effect above: when the budget
-            // slider drops below the per move ceiling, the daily slider's range
-            // was empty for one frame and the app fell over on it.
-            val perTxV = perTx.coerceIn(cap / 50f, cap)
-            val dailyV = daily.coerceIn(perTxV, cap)
-            SliderRow(stringResource(R.string.agent_per_tx), "%.4f SOL".format(perTxV), perTxV, (cap / 50f)..cap, Halo.mint) { perTx = it }
-            SliderRow(stringResource(R.string.agent_daily), "%.4f SOL".format(dailyV), dailyV, perTxV..cap, Halo.mint) { daily = it }
-            Text(
-                stringResource(R.string.env_limits_note, "%.4f".format(perTxV), "%.4f".format(dailyV)),
-                style = HaloType.small, color = Halo.muted,
-            )
             // How many coins at once. One is a fine answer: all the money on one
             // idea at a time, and the loop looks for the next only after it sells.
             SliderRow(stringResource(R.string.trader_slots), slots.toInt().toString(), slots, 1f..5f, Halo.cyan, steps = 3) { slots = it }
             Text(stringResource(R.string.env_slots_note), style = HaloType.small, color = Halo.muted)
-            // The slice this makes, and whether the chain can guard it, before signing.
+
+            // The two ceilings of the collar follow from these two numbers, and
+            // are said, not asked: one buy is the budget split by the coins,
+            // and a day can spend the whole budget. Four sliders in real SOL
+            // were honest and nobody could read them. The ceilings stay in the
+            // rules, for the person who wants to move them.
+            val perTxV = (cap / slots.toInt().coerceIn(1, 5)).coerceIn(cap / 50f, cap)
+            val dailyV = cap
             SizingNote((cap * 1e9).toLong(), (perTxV * 1e9).toLong(), (perTxV * 1e9).toLong(), TraderLoop.config(ctx).slicePercent, slots.toInt())
+
+            SliderRow(stringResource(R.string.env_duration), stringResource(R.string.env_days, days.toInt()), days, 1f..30f, Halo.cyan, steps = 28) { days = it }
+            Text(stringResource(R.string.env_duration_note), style = HaloType.small, color = Halo.muted)
 
             Text(stringResource(R.string.env_harvest_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
             Text(stringResource(R.string.env_harvest_body), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp)
@@ -214,9 +196,9 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                         SessionWallet.setPolicy(
                             ctx,
                             AgentPolicy.prudent(lamports, owner, s.pubkey, contacts, s.expiresAt).copy(
-                                perTxLamports = (perTx.coerceIn(cap / 50f, cap) * 1e9).toLong(),
-                                dailyLamports = (daily.coerceIn(perTx.coerceIn(cap / 50f, cap), cap) * 1e9).toLong(),
-                                askAboveLamports = (perTx.coerceIn(cap / 50f, cap) * 1e9).toLong(),
+                                perTxLamports = ((cap / slots.toInt().coerceIn(1, 5)).coerceIn(cap / 50f, cap) * 1e9).toLong(),
+                                dailyLamports = (cap * 1e9).toLong(),
+                                askAboveLamports = ((cap / slots.toInt().coerceIn(1, 5)).coerceIn(cap / 50f, cap) * 1e9).toLong(),
                             ),
                         )
                         val out = SessionActions.fund(ctx, signer, owner, s.pubkey, lamports)

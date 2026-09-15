@@ -727,7 +727,7 @@
     <string name="env_closing">Sweeping it back…</string>
     <string name="env_truth">What holds even if the agent\'s machine is hacked: it can never move more than what is in the budget, and closing it ends its power at once. The rules are applied here on the phone, and they protect you from the agent, not from a hacked phone. Nothing is enforced on chain.</string>
     <string name="env_new_title">A new budget</string>
-    <string name="env_new_body">You fund it once with your fingerprint. From then on Apex signs for the agent with the budget key, silently under the rules, asking you above them.</string>
+    <string name="env_new_body">Money set apart from your wallet. The agent spends only this. Above its limits it asks for your fingerprint.</string>
     <string name="env_duration">Duration</string>
     <string name="env_warn">Whatever you put in is what you can lose if the agent is compromised. Start small.</string>
     <string name="env_hold">Hold to give it %1$s SOL</string>
@@ -1400,12 +1400,14 @@
     <string name="trace_rug_ok">Rugcheck %1$s: score %2$d, LP %3$s locked</string>
     <string name="trace_rug_unknown">Rugcheck did not answer for %1$s, going on</string>
     <string name="size_slice">Each buy: %1$s SOL (%2$s $).</string>
-    <string name="size_onchain_ok">Above 5 $ per buy, Jupiter can hold the sell order for you: the coin sells at the target even with the phone off.</string>
-    <string name="size_onchain_no">Jupiter accepts an automatic sell order only from 5 $ per buy. Under that, the app sells at the target from the phone, which must stay on and running. For the order to live on the chain, set per move to at least %1$s SOL.</string>
-    <string name="size_noprice">SOL price unavailable: cannot tell whether a buy clears the 5 $ Jupiter needs for an automatic sell order.</string>
-    <string name="size_fits">At this size, the budget holds %1$d of %2$d positions.</string>
+    <string name="size_onchain_ok">Above 5 $: Jupiter sells at the target by itself, phone off too.</string>
+    <string name="size_onchain_no">Under 5 $: the app sells, phone on only. Fewer coins at once, or more budget.</string>
+    <string name="size_noprice">SOL price unavailable: cannot tell whether a buy clears 5 $.</string>
+    <string name="size_fits">At this size only %1$d of %2$d coins fit.</string>
     <string name="env_slots_note">How many coins at once. With 1, all the money goes on one idea at a time, and it looks for the next only after selling.</string>
     <string name="env_review_hint">This is what you will sign: your wallet sends the budget to the agent\'s own key. Hold the button below, then the fingerprint.</string>
+    <string name="size_each">Each buy</string>
+    <string name="env_duration_note">After this it stops buying and gives the money back.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

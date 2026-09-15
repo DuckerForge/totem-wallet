@@ -1,7 +1,19 @@
 package com.clearsign.app
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,14 +70,26 @@ internal fun SizingNote(capLamports: Long, perTxLamports: Long, askAboveLamports
         solUsd = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(com.clearsign.core.NATIVE_SOL_MINT))[com.clearsign.core.NATIVE_SOL_MINT] }.getOrNull() }
     }
     val s = BudgetMath.sizing(capLamports, perTxLamports, askAboveLamports, slicePct, slots, solUsd)
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        val usd = s.sliceUsd?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "?"
-        val head = stringResource(R.string.size_slice, fmtSol(s.sliceLamports, 4), usd)
-        when (s.onChain) {
-            true -> Banner(head + " " + stringResource(R.string.size_onchain_ok), Halo.mint, HIcon.SHIELD_LOCK)
-            false -> Banner(head + " " + stringResource(R.string.size_onchain_no, fmtSol(s.perTxNeeded ?: 0L, 3)), Halo.amber, HIcon.WARNING)
-            null -> Banner(head + " " + stringResource(R.string.size_noprice), Halo.muted, HIcon.INFO)
+    val usd = s.sliceUsd?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "?"
+    val tint = when (s.onChain) { true -> Halo.mint; false -> Halo.amber; null -> Halo.muted }
+    Column(
+        Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.size_each), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f))
+            Text(fmtSol(s.sliceLamports, 4) + " SOL", fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Halo.ink, style = Tabular)
+            Spacer(Modifier.width(8.dp))
+            Text("$usd $", fontFamily = Mono, fontSize = 12.sp, color = tint, style = Tabular)
         }
-        if (s.fits < slots && s.sliceLamports > 0) Banner(stringResource(R.string.size_fits, s.fits, slots), Halo.amber, HIcon.WARNING)
+        Text(
+            when (s.onChain) {
+                true -> stringResource(R.string.size_onchain_ok)
+                false -> stringResource(R.string.size_onchain_no)
+                null -> stringResource(R.string.size_noprice)
+            },
+            style = HaloType.small, color = tint, lineHeight = 16.sp,
+        )
+        if (s.fits < slots && s.sliceLamports > 0) Text(stringResource(R.string.size_fits, s.fits, slots), style = HaloType.small, color = Halo.amber)
     }
 }

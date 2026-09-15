@@ -206,6 +206,30 @@ object SessionWallet {
      * Done here rather than at the button, because there is more than one way to
      * close a budget and only one of them would have remembered.
      */
+    /**
+     * The account of a budget that was closed: what went in, what came back,
+     * and what happened in between. Kept apart from the budget's own prefs,
+     * which [forget] wipes, so the last one can be shown after it is gone.
+     */
+    data class Close(
+        val fundedLamports: Long, val harvestedLamports: Long, val backLamports: Long,
+        val createdAt: Long, val closedAt: Long, val buys: Int, val sells: Int,
+    ) {
+        val resultLamports: Long get() = harvestedLamports + backLamports - fundedLamports
+        val resultPct: Double get() = if (fundedLamports > 0) resultLamports * 100.0 / fundedLamports else 0.0
+    }
+
+    fun recordClose(ctx: Context, c: Close) {
+        val o = org.json.JSONObject().put("funded", c.fundedLamports).put("harvested", c.harvestedLamports).put("back", c.backLamports)
+            .put("created", c.createdAt).put("closed", c.closedAt).put("buys", c.buys).put("sells", c.sells)
+        ctx.getSharedPreferences("apex_closes", Context.MODE_PRIVATE).edit().putString("last", o.toString()).apply()
+    }
+
+    fun lastClose(ctx: Context): Close? = runCatching {
+        val o = org.json.JSONObject(ctx.getSharedPreferences("apex_closes", Context.MODE_PRIVATE).getString("last", null) ?: return null)
+        Close(o.getLong("funded"), o.getLong("harvested"), o.getLong("back"), o.getLong("created"), o.getLong("closed"), o.getInt("buys"), o.getInt("sells"))
+    }.getOrNull()
+
     fun forget(ctx: Context) {
         prefs(ctx).edit().clear().apply()
         runCatching { TraderLoop.reset(ctx) }

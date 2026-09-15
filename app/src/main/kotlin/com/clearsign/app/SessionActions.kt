@@ -341,30 +341,40 @@ object SessionActions {
      * SOL for the fee, and the rent goes straight to the owner, not through the
      * budget. Returns how many accounts were closed. Never throws.
      */
-    suspend fun closeEmpty(ctx: Context, owner: String): Int = withContext(Dispatchers.IO) {
-        val session = SessionWallet.current(ctx) ?: return@withContext 0
-        val from = Base58.decodePubkey(session.pubkey) ?: return@withContext 0
-        val to = Base58.decodePubkey(owner) ?: return@withContext 0
+    /** What closing the empty accounts did: how many landed, how many did not, and the rent that reached the owner. */
+    class Closed(val closed: Int, val failed: Int, val rentLamports: Long)
+
+    suspend fun closeEmpty(ctx: Context, owner: String): Closed = withContext(Dispatchers.IO) {
+        val session = SessionWallet.current(ctx) ?: return@withContext Closed(0, 0, 0L)
+        val from = Base58.decodePubkey(session.pubkey) ?: return@withContext Closed(0, 0, 0L)
+        val to = Base58.decodePubkey(owner) ?: return@withContext Closed(0, 0, 0L)
         val rpc = SolanaRpc.urlFor(null)
         val empty = runCatching { SolanaRpc.tokenAccountsOf(rpc, session.pubkey, force = true) }.getOrDefault(emptyList())
             .filter { it.amount == 0L && it.state != "frozen" && (it.closeAuthority == null || it.closeAuthority == session.pubkey) }
-        if (empty.isEmpty()) return@withContext 0
-        val before = runCatching { SolanaRpc.getBalance(rpc, session.pubkey) }.getOrNull()
+        if (empty.isEmpty()) return@withContext Closed(0, 0, 0L)
         var closed = 0
+        var failed = 0
+        var rent = 0L
         // A dozen per transaction keeps each one small; a budget rarely has more.
         for (batch in empty.chunked(12)) {
-            val bh = SolanaRpc.latestBlockhash(rpc) ?: break
+            val bh = SolanaRpc.latestBlockhash(rpc)
             val ixs = batch.mapNotNull { a ->
                 val acct = Base58.decodePubkey(a.pubkey) ?: return@mapNotNull null
                 WalletTx.tokenCloseAccount(acct, to, from, WalletTx.tokenProgramFor(a.program))
             }
-            if (ixs.isEmpty()) continue
+            if (bh == null || ixs.isEmpty()) { failed += batch.size; continue }
             val tx = WalletTx.build(from, Base58.decode(bh.hash), ixs)
-            val signature = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx)) ?: break
+            val signature = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx))
+            if (signature == null) { failed += batch.size; continue }
             val signed = SolanaTx.attachSignature(tx, 0, signature)
             val out = SolanaRpc.send(rpc, signed)
-            if (out.signature == null) continue
+            // Sent is not landed. It was recorded as done once, twice, for two
+            // transactions that never reached the chain, and the key was
+            // forgotten with the rent still inside. The ledger row and the
+            // count wait for the chain's word.
+            if (out.signature == null || !SolanaRpc.confirmed(rpc, out.signature)) { failed += batch.size; continue }
             closed += ixs.size
+            rent += batch.sumOf { it.lamports }
             val receipt = runCatching {
                 ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), signed, owner, null, requireSim = false).receipt
             }.getOrNull()
@@ -379,16 +389,7 @@ object SessionActions {
                 ),
             )
         }
-        // The sweep that follows reads the balance; wait for the fee of the
-        // close to land so it does not send 5000 lamports it no longer has.
-        if (closed > 0 && before != null) {
-            repeat(10) {
-                kotlinx.coroutines.delay(800)
-                val now = runCatching { SolanaRpc.getBalance(rpc, session.pubkey) }.getOrNull()
-                if (now != null && now != before) return@withContext closed
-            }
-        }
-        closed
+        Closed(closed, failed, rent)
     }
 
     /**
@@ -409,6 +410,9 @@ object SessionActions {
         val signed = SolanaTx.attachSignature(tx, 0, signature)
         val out = SolanaRpc.send(rpc, signed)
         if (out.signature == null) return@withContext ctx.getString(R.string.wa_send_failed, out.error ?: "?")
+        // The key is about to be forgotten on the strength of this. Wait for
+        // the chain, not the node.
+        if (!SolanaRpc.confirmed(rpc, out.signature)) return@withContext ctx.getString(R.string.env_sweep_unconfirmed)
         val at = System.currentTimeMillis()
         // Read the bytes we just sent, so the ledger row says how much came back and
         // from where. It used to record `r = null`: the receipt said a budget had

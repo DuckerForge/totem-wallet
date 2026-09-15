@@ -1386,6 +1386,16 @@
     <string name="trader_sell_worse">Jupiter quotes %1$s SOL, the chain gives %2$s (−%3$d%%). Sell anyway?</string>
     <string name="trader_sell_anyway">Sell anyway at %1$s SOL</string>
     <string name="trader_target_unreal">%1$s: the target shows on the quote, but the chain gives %2$s SOL (−%3$d%%). Waiting.</string>
+    <plurals name="env_rent_stuck">
+        <item quantity="one">%1$d empty account did not close. The rent is still inside, so the budget stays open. Try again.</item>
+        <item quantity="other">%1$d empty accounts did not close. The rent is still inside, so the budget stays open. Try again.</item>
+    </plurals>
+    <string name="env_sweep_unconfirmed">The return did not land on the chain. The budget stays open. Try again.</string>
+    <string name="env_close_summary">Put in %1$s SOL, got back %2$s SOL: %3$s SOL (%4$s).</string>
+    <string name="env_last_title">The last budget</string>
+    <string name="env_last_in">Put in: %1$s SOL</string>
+    <string name="env_last_out">Got back: %1$s SOL</string>
+    <string name="env_last_moves">%1$d buys, %2$d sales, %3$s</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

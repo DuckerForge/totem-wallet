@@ -84,6 +84,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     var showRules by remember { mutableStateOf(false) }
     var showTopUp by remember { mutableStateOf(false) }
     var showLane by remember { mutableStateOf(false) }
+    var showEyes by remember { mutableStateOf(false) }
     var showTruth by remember { mutableStateOf(false) }
     var showLinkHelp by remember { mutableStateOf(false) }
     var lucky by remember { mutableStateOf(false) }
@@ -203,6 +204,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 }
                 Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.PIGEON) { onChat() } }
             }
+            // The screen that never sleeps: charts, lines, and the loop's own words.
+            GhostButton(stringResource(R.string.eyes_open), Modifier.fillMaxWidth(), HIcon.SEARCH, tint = Halo.cyan) { showEyes = true }
 
             val open = remember(refresh) { Positions.open(ctx) }
             if (open.isNotEmpty()) {
@@ -350,6 +353,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     if (showLinkHelp) LinkHelpSheet(onScan = { showLinkHelp = false; scan() }) { showLinkHelp = false }
     if (lucky) LuckySheet(onDone = { refresh++ }) { lucky = false }
     if (showTruth) TruthSheet { showTruth = false }
+    if (showEyes) EyesDialog { showEyes = false }
     if (showLane) LaneSheet(onStarted = { showLane = false; refresh++ }) { showLane = false }
     if (coins.isNotEmpty()) {
         ClosingCoinsSheet(

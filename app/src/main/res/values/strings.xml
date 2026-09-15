@@ -1356,6 +1356,16 @@
     <string name="agent_copy_how">When a wallet you follow buys, or two whales buy the same coin within the hour, that coin goes to the front of the list. It passes the same checks as any other.</string>
     <string name="agent_copy_last">bought %1$s %2$d min ago</string>
     <string name="agent_copy_quiet">no buys in the last hours</string>
+    <string name="eyes_open">Watch it work</string>
+    <string name="eyes_title">Its eyes</string>
+    <string name="eyes_off">The loop is off. What you see is the last thing it saw.</string>
+    <string name="eyes_working">Working…</string>
+    <string name="eyes_watching">Watching %1$d coins, every 90 seconds</string>
+    <string name="eyes_none">Nothing in play. When it buys, the chart appears here with its three lines.</string>
+    <string name="eyes_entry">in</string>
+    <string name="eyes_since_entry">bought with %1$s SOL</string>
+    <string name="eyes_thoughts">What it is thinking</string>
+    <string name="eyes_quiet">Quiet. The first tick writes here.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

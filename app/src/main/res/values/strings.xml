@@ -1409,6 +1409,12 @@
     <string name="size_each">Each buy</string>
     <string name="env_duration_note">After this it stops buying and gives the money back.</string>
     <string name="env_pay_title">Pay %1$s SOL</string>
+    <string name="whatif_pick">Compare with…</string>
+    <string name="whatif_mine">Market cap now: %1$s</string>
+    <string name="whatif_search_hint">Name or symbol of any coin</string>
+    <string name="whatif_row_mc">at %1$s\'s market cap (%2$s), one would be worth %3$s</string>
+    <string name="whatif_step">to do a ×%1$s</string>
+    <string name="whatif_yours_pick">your pick</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

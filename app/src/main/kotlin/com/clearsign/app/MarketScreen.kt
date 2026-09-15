@@ -25,6 +25,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -213,43 +215,118 @@ private fun WhatIf(coin: Market.Coin, amount: Double) {
     val ranked = remember { Market.cachedTop() }
     if (ranked.isEmpty()) return
 
-    val targets = remember(coin.id, ranked) {
+    // The three fixed thoughts, then the ladder: the ranked coin nearest to
+    // twice, ten times and a hundred times this one. "To do a ×10 it has to
+    // become as big as X" is the sentence people actually think in.
+    val fixed = remember(coin.id, ranked) {
         val above = coin.rank?.let { r -> ranked.filter { (it.rank ?: 0) < r && it.id != coin.id }.minByOrNull { it.rank ?: 0 } }
-        listOfNotNull(
-            above,
-            ranked.firstOrNull { it.symbol == "SOL" },
-            ranked.firstOrNull { it.symbol == "BTC" },
-        ).distinctBy { it.id }.filter { (it.marketCap ?: 0.0) > mine }
+        listOfNotNull(above, ranked.firstOrNull { it.symbol == "SOL" }, ranked.firstOrNull { it.symbol == "BTC" })
+            .distinctBy { it.id }.filter { (it.marketCap ?: 0.0) > mine }
     }
-    if (targets.isEmpty()) return
+    val ladder = remember(coin.id, ranked) {
+        listOf(2.0, 10.0, 100.0).mapNotNull { m ->
+            ranked.filter { it.id != coin.id && (it.marketCap ?: 0.0) > mine }
+                .minByOrNull { kotlin.math.abs(kotlin.math.ln((it.marketCap ?: 1.0) / (mine * m))) }
+                ?.let { m to it }
+        }.distinctBy { it.second.id }
+    }
+
+    // Your own choice, searched by name. The search gives names only; the cap
+    // comes with one more call when a name is picked.
+    var picking by remember(coin.id) { mutableStateOf(false) }
+    var query by remember(coin.id) { mutableStateOf("") }
+    var found by remember(coin.id) { mutableStateOf<List<Market.Coin>>(emptyList()) }
+    var picked by remember(coin.id) { mutableStateOf<List<Market.Coin>>(emptyList()) }
+    var fetching by remember(coin.id) { mutableStateOf(false) }
+    LaunchedEffect(query) {
+        if (query.trim().length < 2) { found = emptyList(); return@LaunchedEffect }
+        kotlinx.coroutines.delay(350)
+        found = withContext(Dispatchers.IO) { runCatching { Market.search(query) }.getOrDefault(emptyList()) }.filter { it.id != coin.id }.take(6)
+    }
+    val scope = rememberCoroutineScope()
 
     Spacer(Modifier.height(4.dp))
-    Text(stringResource(R.string.whatif_title), style = HaloType.label, color = Halo.muted)
-    targets.forEach { t ->
-        val cap = t.marketCap ?: return@forEach
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.whatif_title), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
+        SmallChip(stringResource(R.string.whatif_pick), HIcon.SEARCH, tint = Halo.cyan) { picking = !picking }
+    }
+    Text(stringResource(R.string.whatif_mine, fmtCap(mine)), style = HaloType.small, color = Halo.muted)
+
+    if (picking) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            placeholder = { Text(stringResource(R.string.whatif_search_hint), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted) },
+            textStyle = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Halo.ink),
+            colors = pickerField(), shape = rs(12),
+        )
+        if (fetching) Text(stringResource(R.string.w_analyzing), style = HaloType.small, color = Halo.muted)
+        found.forEach { f ->
+            Row(
+                Modifier.fillMaxWidth().clip(rs(10)).clickable {
+                    fetching = true
+                    scope.launch {
+                        val full = withContext(Dispatchers.IO) { runCatching { Market.byId(f.id) }.getOrNull() }
+                        fetching = false
+                        if (full?.marketCap != null && full.marketCap > 0) {
+                            picked = (picked.filter { it.id != full.id } + full).takeLast(4)
+                            picking = false; query = ""
+                        }
+                    }
+                }.padding(vertical = 6.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TokenLogo(f.mint ?: f.id, f.symbol, f.image, 22.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(f.name, fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f), maxLines = 1)
+                Text(f.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
+            }
+        }
+    }
+
+    @Composable
+    fun row(t: Market.Coin, label: String?, removable: Boolean) {
+        val cap = t.marketCap ?: return
         val mult = cap / mine
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             TokenLogo(t.mint ?: t.id, t.symbol, t.image, 22.dp)
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
+                label?.let { Text(it, fontFamily = Mono, fontSize = 10.sp, color = Halo.cyan) }
                 Text(
-                    stringResource(R.string.whatif_row, t.symbol, fmtPrice(price * mult, "USD")),
+                    stringResource(R.string.whatif_row_mc, t.symbol, fmtCap(cap), fmtPrice(price * mult, "USD")),
                     fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, maxLines = 2,
                 )
                 if (amount > 0) {
-                    Text(
-                        stringResource(R.string.whatif_yours, fmtFiat(amount * price * mult, "USD")),
-                        fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint,
-                    )
+                    Text(stringResource(R.string.whatif_yours, fmtFiat(amount * price * mult, "USD")), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint)
                 }
             }
             Text(
                 "×" + (if (mult >= 100) mult.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", mult)),
-                fontFamily = Mono, fontSize = 13.sp, color = Halo.cyan,
+                fontFamily = Mono, fontSize = 13.sp, color = if (mult >= 1) Halo.cyan else Halo.red,
             )
+            if (removable) {
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.size(26.dp).clip(rs(999)).clickable { picked = picked.filter { it.id != t.id } }, contentAlignment = Alignment.Center) {
+                    HaloIcon(HIcon.CLOSE, Halo.muted, 13.dp)
+                }
+            }
         }
     }
+
+    picked.forEach { row(it, stringResource(R.string.whatif_yours_pick), removable = true) }
+    ladder.forEach { (m, t) -> row(t, stringResource(R.string.whatif_step, if (m >= 10) m.toInt().toString() else "2"), removable = false) }
+    fixed.filter { f -> ladder.none { it.second.id == f.id } && picked.none { it.id == f.id } }.forEach { row(it, null, removable = false) }
     Text(stringResource(R.string.whatif_note), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
+}
+
+/** A market cap in three characters and a unit: 1,2 Mld$, 340 M$, 52 k$. */
+internal fun fmtCap(v: Double): String = when {
+    v >= 1e12 -> String.format(java.util.Locale.getDefault(), "%.2f T$", v / 1e12)
+    v >= 1e9 -> String.format(java.util.Locale.getDefault(), "%.1f Mld$", v / 1e9)
+    v >= 1e6 -> String.format(java.util.Locale.getDefault(), "%.0f M$", v / 1e6)
+    v >= 1e3 -> String.format(java.util.Locale.getDefault(), "%.0f k$", v / 1e3)
+    else -> String.format(java.util.Locale.getDefault(), "%.0f $", v)
 }
 
 /** A coin we follow by mint but that the ranked page does not carry. */
@@ -291,7 +368,8 @@ private fun CoinRow(c: Market.Coin, followed: Boolean, amount: Double, onOpen: (
         Column(Modifier.weight(1f)) {
             Text(c.name, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, maxLines = 1)
             val mine = amount.takeIf { it > 0 }?.let { fmtUi(it) + " " + c.symbol }
-            Text(mine ?: c.symbol, fontFamily = Inter, fontSize = 11.sp, color = if (mine != null) Halo.mint else Halo.muted, maxLines = 1)
+            val sub = mine ?: (c.symbol + (c.marketCap?.takeIf { it > 0 }?.let { " · " + fmtCap(it) } ?: ""))
+            Text(sub, fontFamily = Inter, fontSize = 11.sp, color = if (mine != null) Halo.mint else Halo.muted, maxLines = 1)
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(

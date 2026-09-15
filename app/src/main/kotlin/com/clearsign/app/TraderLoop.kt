@@ -141,7 +141,7 @@ object TraderLoop {
         stop(ctx, why)
         val unwatched = Positions.open(ctx).count { !it.parked && it.triggerOrder == null }
         val body = if (unwatched > 0) why + "\n" + ctx.getString(R.string.trader_unwatched, unwatched) else why
-        AgentBroker.warn(ctx, ctx.getString(R.string.pulse_stopped), body)
+        AgentBroker.warn(ctx, ctx.getString(R.string.pulse_stopped), body, rhythm = AgentBroker.Rhythm.STOP)
     }
 
     /** Switch on, and forget what the last stop said: that was about a run that is over. */
@@ -327,6 +327,12 @@ object TraderLoop {
                         ctx.getString(R.string.trader_milestone_body, cfg.takeProfitPct, cfg.stopLossPct),
                         picture = art,
                         color = (if (m >= 0) Halo.palette.accent else Halo.palette.red).toArgb(),
+                        rhythm = if (bucket > hi) AgentBroker.Rhythm.UP else AgentBroker.Rhythm.DOWN,
+                        actions = listOf(
+                            android.app.Notification.Action.Builder(null, ctx.getString(R.string.notif_sell_now), AgentActionReceiver.sellIntent(ctx, pos.mint)).build(),
+                            android.app.Notification.Action.Builder(null, ctx.getString(R.string.notif_stop), AgentActionReceiver.stopIntent(ctx)).build(),
+                        ),
+                        id = AgentBroker.MILESTONE_ID,
                     )
                 }
             }

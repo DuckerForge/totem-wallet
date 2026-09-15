@@ -228,5 +228,10 @@
             </intent-filter>
         </receiver>
 
+        <!-- The buttons under the agent's notifications: sell this coin, stop the loop. -->
+        <receiver
+            android:name=".AgentActionReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>

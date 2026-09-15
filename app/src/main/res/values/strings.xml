@@ -1404,6 +1404,7 @@
     <string name="size_onchain_no">Jupiter accepts an automatic sell order only from 5 $ per buy. Under that, the app sells at the target from the phone, which must stay on and running. For the order to live on the chain, set per move to at least %1$s SOL.</string>
     <string name="size_noprice">SOL price unavailable: cannot tell whether a buy clears the 5 $ Jupiter needs for an automatic sell order.</string>
     <string name="size_fits">At this size, the budget holds %1$d of %2$d positions.</string>
+    <string name="env_slots_note">How many coins at once. With 1, all the money goes on one idea at a time, and it looks for the next only after selling.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

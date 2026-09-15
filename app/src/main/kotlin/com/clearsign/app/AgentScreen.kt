@@ -580,12 +580,15 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val cfg = remember { TraderLoop.config(ctx) }
+            var cfg by remember { mutableStateOf(TraderLoop.config(ctx)) }
             Text(stringResource(R.string.lane_title), style = HaloType.title, color = Halo.ink)
             Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
             StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
             StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
-            StatRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString())
+            // The one number worth changing at the door: how many coins at once.
+            SliderRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString(), cfg.maxPositions.toFloat(), 1f..5f, Halo.cyan, steps = 3) {
+                cfg = cfg.copy(maxPositions = it.toInt().coerceIn(1, 5))
+            }
             run {
                 val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
                 if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)

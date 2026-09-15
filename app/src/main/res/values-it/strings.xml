@@ -1404,6 +1404,7 @@
     <string name="size_onchain_no">Jupiter accetta un ordine di vendita automatica solo da 5 $ per acquisto. Sotto, la vendita all\'obiettivo la fa l\'app dal telefono, che deve restare acceso e col ciclo attivo. Per avere l\'ordine sulla catena porta "per mossa" ad almeno %1$s SOL.</string>
     <string name="size_noprice">Prezzo del SOL non disponibile: non so dire se un acquisto supera i 5 $ che Jupiter chiede per l\'ordine automatico.</string>
     <string name="size_fits">Con questa cifra entrano %1$d posizioni su %2$d.</string>
+    <string name="env_slots_note">Quante monete alla volta. Con 1, tutti i soldi vanno su un\'idea sola, e cerca la prossima solo dopo aver venduto.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

@@ -139,9 +139,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         }
 
         // ---- the phone, holding station ------------------------------------
-        val phoneH = h * 0.34f
+        // The phone sits in the upper part of the scene, whatever the scene's
+        // height. On the door the fingerprint sheet rises over the bottom half
+        // of the screen, and a phone at the vertical middle of a tall canvas
+        // was exactly the thing it covered. Sized from the width, so a taller
+        // screen gives the planet more sky, not the phone a longer fall.
+        val phoneH = min(h * 0.34f, w * 0.30f)
         val phoneW = phoneH * 0.47f
-        val phone = Offset(w / 2f, h * 0.46f + sin(slow) * unit * 0.008f)   // a slow float, never still
+        val phone = Offset(w / 2f, min(h * 0.46f, w * 0.42f) + sin(slow) * unit * 0.008f)   // a slow float, never still
         val shieldR = phoneW * 0.95f
 
         // ---- three arrivals -------------------------------------------------

@@ -274,6 +274,67 @@ object SessionActions {
     }
 
     /**
+     * Close the budget's empty token accounts and send their rent to [owner].
+     *
+     * Every coin the agent buys opens an account that holds about 0.002 SOL of
+     * rent, and selling the coin leaves the account open with the rent inside.
+     * Forgetting the key with those still open leaves that rent where nobody
+     * can ever reach it again; it happened once, two accounts, 0.003 SOL. So the
+     * close runs before the sweep, while the key can still sign and still has
+     * SOL for the fee, and the rent goes straight to the owner, not through the
+     * budget. Returns how many accounts were closed. Never throws.
+     */
+    suspend fun closeEmpty(ctx: Context, owner: String): Int = withContext(Dispatchers.IO) {
+        val session = SessionWallet.current(ctx) ?: return@withContext 0
+        val from = Base58.decodePubkey(session.pubkey) ?: return@withContext 0
+        val to = Base58.decodePubkey(owner) ?: return@withContext 0
+        val rpc = SolanaRpc.urlFor(null)
+        val empty = runCatching { SolanaRpc.tokenAccountsOf(rpc, session.pubkey, force = true) }.getOrDefault(emptyList())
+            .filter { it.amount == 0L && it.state != "frozen" && (it.closeAuthority == null || it.closeAuthority == session.pubkey) }
+        if (empty.isEmpty()) return@withContext 0
+        val before = runCatching { SolanaRpc.getBalance(rpc, session.pubkey) }.getOrNull()
+        var closed = 0
+        // A dozen per transaction keeps each one small; a budget rarely has more.
+        for (batch in empty.chunked(12)) {
+            val bh = SolanaRpc.latestBlockhash(rpc) ?: break
+            val ixs = batch.mapNotNull { a ->
+                val acct = Base58.decodePubkey(a.pubkey) ?: return@mapNotNull null
+                WalletTx.tokenCloseAccount(acct, to, from, WalletTx.tokenProgramFor(a.program))
+            }
+            if (ixs.isEmpty()) continue
+            val tx = WalletTx.build(from, Base58.decode(bh.hash), ixs)
+            val signature = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx)) ?: break
+            val signed = SolanaTx.attachSignature(tx, 0, signature)
+            val out = SolanaRpc.send(rpc, signed)
+            if (out.signature == null) continue
+            closed += ixs.size
+            val receipt = runCatching {
+                ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), signed, owner, null, requireSim = false).receipt
+            }.getOrNull()
+            LedgerRecorder.record(
+                ctx,
+                LedgerRecorder.fromReceipt(
+                    at = System.currentTimeMillis(), kind = "envelope", dApp = ctx.getString(R.string.env_title), host = null, pkg = ctx.packageName,
+                    cluster = null, wallet = owner, r = receipt, signature = out.signature, sent = true,
+                    txIndex = 0, txCount = 1, groupId = LedgerRecorder.newId(),
+                    attestation = null, attestationSig = null,
+                    recipientLabelFallback = ctx.getString(R.string.env_log_rent),
+                ),
+            )
+        }
+        // The sweep that follows reads the balance; wait for the fee of the
+        // close to land so it does not send 5000 lamports it no longer has.
+        if (closed > 0 && before != null) {
+            repeat(10) {
+                kotlinx.coroutines.delay(800)
+                val now = runCatching { SolanaRpc.getBalance(rpc, session.pubkey) }.getOrNull()
+                if (now != null && now != before) return@withContext closed
+            }
+        }
+        closed
+    }
+
+    /**
      * Sweep [lamports] from the envelope back to [owner], signed with the
      * envelope key. Returns an error, or null when it landed.
      */

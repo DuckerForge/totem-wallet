@@ -106,9 +106,13 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         busy = ctx.getString(R.string.env_closing)
         scope.launch {
             AgentLinkService.revoke(ctx)
+            // Empty token accounts first: their rent goes to the wallet while
+            // the key can still sign. Then whatever SOL is left.
+            val rent = if (account != null) runCatching { SessionActions.closeEmpty(ctx, account) }.getOrDefault(0) else 0
             val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() } ?: 0L
             val fee = 5_000L
             if (account != null && left > fee) SessionActions.sweep(ctx, account, left - fee)?.let { note = it }
+            if (note == null && rent > 0) note = ctx.resources.getQuantityString(R.plurals.env_rent_back, rent, rent)
             SessionWallet.forget(ctx)
             busy = null; coins = emptyList(); refresh++
         }

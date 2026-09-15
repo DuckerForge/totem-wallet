@@ -255,11 +255,10 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
             }
         }
 
-        // The phone is not there until something comes. Between arrivals it is
-        // a ghost of an outline in the dark; as a streak closes in it takes
-        // shape, and by the time the streak reaches the glass it is solid. Then
-        // it fades again. So the eye learns the scene's one rule by watching it:
-        // the thing that decides appears when there is something to decide.
+        // The phone is always there, whole, in the middle of the dark. What
+        // changes as a streak closes in is its light: the glass wakes, the
+        // station ring shows, and the shield takes the hit. No fading in and
+        // out, no cuts: the eye should be able to rest on it.
         val o = open.value
         var wake = o
         lanes.forEach { lane ->
@@ -268,13 +267,6 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
             val rise = ((local - 0.25f) / 0.45f).coerceIn(0f, 1f)
             val fall = 1f - ((local - 1.0f) / 0.35f).coerceIn(0f, 1f)
             wake = max(wake, rise * rise * (3f - 2f * rise) * fall)
-        }
-        val presence = 0.10f + 0.90f * wake
-        drawIntoCanvas { c ->
-            c.saveLayer(
-                androidx.compose.ui.geometry.Rect(phone.x - phoneW, phone.y - phoneH, phone.x + phoneW, phone.y + phoneH),
-                androidx.compose.ui.graphics.Paint().apply { alpha = presence },
-            )
         }
         drawPhone(
             phone.x - phoneW / 2f, phone.y - phoneH / 2f, phoneW, phoneH,
@@ -288,16 +280,15 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val glassW = phoneW * 0.80f
         val glassH = phoneH * 0.84f
         drawRect(
-            Brush.verticalGradient(listOf(Color.Transparent, mint.copy(alpha = 0.22f + 0.35f * o)), startY = glassT, endY = glassT + glassH),
+            Brush.verticalGradient(listOf(Color.Transparent, mint.copy(alpha = 0.14f + 0.30f * wake + 0.20f * o)), startY = glassT, endY = glassT + glassH),
             Offset(glassL, glassT), androidx.compose.ui.geometry.Size(glassW, glassH),
         )
         drawLine(
             mint.copy(alpha = 0.85f), Offset(phone.x - phoneW * 0.18f, glassT + glassH - phoneH * 0.06f),
             Offset(phone.x + phoneW * 0.18f, glassT + glassH - phoneH * 0.06f), strokeWidth = 2f * density, cap = StrokeCap.Round,
         )
-        drawIntoCanvas { it.restore() }
-        // The station light, only while it is awake: a thin ring that says watching.
-        drawCircle(mint.copy(alpha = 0.16f * wake), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
+        // The station light, brighter while it is awake: a thin ring that says watching.
+        drawCircle(mint.copy(alpha = 0.06f + 0.14f * wake), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
         if (o > 0f) {
             // Opening: two rings leaving the phone for the edge, thinning as they go.
             for (k in 0 until 2) {

@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -184,11 +185,14 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
     // to sign, the hold, then the print. A receipt under the sliders was a
     // receipt people scrolled past, or never found.
     review?.let { r ->
-        Dialog(onDismissRequest = { if (state == null) { review = null; prepared = null } }) {
+        Dialog(
+            onDismissRequest = { if (state == null) { review = null; prepared = null } },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
             Column(
-                Modifier.fillMaxWidth().clip(rs(22)).background(Halo.ground2).border(1.dp, Halo.stroke, rs(22))
-                    .padding(horizontal = 18.dp, vertical = 16.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                Modifier.fillMaxSize().background(Halo.ground2).statusBarsPadding().navigationBarsPadding()
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(stringResource(R.string.env_pay_title, "%.3f".format(cap)), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
                 Text(stringResource(R.string.env_review_hint), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)

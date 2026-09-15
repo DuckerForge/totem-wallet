@@ -113,6 +113,21 @@ object Market {
         return mint.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * Coins that do not live on Solana but have an official bridged form there:
+     * the same asset, held by a custodian or a bridge, tradable on Jupiter. Only
+     * the versions Jupiter marks verified and that carry real liquidity
+     * (checked on the 15th of September 2026): the search is full of copies.
+     */
+    data class Bridged(val label: String, val mint: String)
+    val bridged: Map<String, List<Bridged>> = mapOf(
+        "bitcoin" to listOf(
+            Bridged("WBTC (Portal)", "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"),
+            Bridged("cbBTC (Coinbase)", "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij"),
+        ),
+        "ethereum" to listOf(Bridged("ETH (Portal)", "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs")),
+    )
+
     /** Prices for coins already known by id, for the followed list. */
     fun pricesFor(ids: Collection<String>): Map<String, Coin> {
         if (ids.isEmpty()) return emptyMap()

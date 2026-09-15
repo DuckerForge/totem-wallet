@@ -24,6 +24,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -98,7 +100,15 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         if (q.length < 2) { searching = false; return@LaunchedEffect }
         delay(350)
         searching = true
-        found = withContext(Dispatchers.IO) { runCatching { Market.search(q) }.getOrDefault(emptyList()) }
+        val hits = withContext(Dispatchers.IO) { runCatching { Market.search(q) }.getOrDefault(emptyList()) }
+        found = hits
+        // The search knows names, not prices. One more call fills the rows that
+        // came back thin, so a coin with a price is never shown as "no price".
+        val thin = hits.filter { it.priceUsd == null }.map { it.id }.take(25)
+        if (thin.isNotEmpty()) {
+            val px = withContext(Dispatchers.IO) { runCatching { Market.pricesFor(thin) }.getOrDefault(emptyMap()) }
+            if (px.isNotEmpty()) found = hits.map { c -> px[c.id]?.let { it.copy(mint = c.mint ?: it.mint) } ?: c }
+        }
         searching = false
     }
 
@@ -415,7 +425,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -454,6 +464,9 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 onSaved(); onDismiss()
             }
 
+            // The shape of the price, when the coin lives on Solana.
+            mint?.let { PriceChart(it, coin.symbol) }
+
             // What if it were as big as something else. Arithmetic, not a forecast.
             WhatIf(coin, qty.toDoubleOrNull() ?: 0.0)
 
@@ -483,6 +496,15 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 looking -> Text(stringResource(R.string.market_checking_chain), style = HaloType.small, color = Halo.muted)
                 mint != null -> GhostButton(stringResource(R.string.market_buy, coin.symbol), Modifier.fillMaxWidth(), HIcon.SWAP, tint = Halo.mint) {
                     onBuy(mint!!)
+                }
+                // Not on Solana as itself, but here as an official bridged coin:
+                // the same asset, and a way to buy it, said which.
+                Market.bridged[coin.id] != null -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.market_bridged_title, coin.symbol), style = HaloType.label, color = Halo.muted)
+                    Market.bridged[coin.id]!!.forEach { b ->
+                        GhostButton(stringResource(R.string.market_buy, b.label), Modifier.fillMaxWidth(), HIcon.SWAP, tint = Halo.mint) { onBuy(b.mint) }
+                    }
+                    Text(stringResource(R.string.market_bridged_note), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
                 }
                 // Said once, plainly, instead of a button that cannot work.
                 else -> Text(stringResource(R.string.market_not_on_solana), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)

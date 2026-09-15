@@ -592,7 +592,7 @@ private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
     ) {
         listOf(
             Tab.WALLET to (HIcon.WALLET to R.string.tab_wallet),
-            Tab.MARKET to (HIcon.STAR to R.string.tab_market),
+            Tab.MARKET to (HIcon.CHART to R.string.tab_market),
             Tab.AGENT to (HIcon.PIGEON to R.string.tab_agent),
             Tab.RECEIPTS to (HIcon.RECEIPT to R.string.tab_receipts),
             Tab.SETTINGS to (HIcon.SETTINGS to R.string.tab_settings),

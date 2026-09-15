@@ -20,7 +20,8 @@ import java.util.TimeZone
 object FiatRates {
     private const val TAG = "ClearSign-Fiat"
     private const val BASE = "https://api.coingecko.com/api/v3"
-    val SUPPORTED = listOf("EUR", "USD", "GBP", "CHF", "JPY")
+    /** The currencies the app can count in. SOL is one of them: a wallet on Solana is allowed to think in SOL. */
+    val SUPPORTED = listOf("EUR", "USD", "GBP", "CHF", "JPY", "SOL")
     private const val PREFS = "clearsign_fiat"
 
     private val dayFmt = SimpleDateFormat("dd-MM-yyyy", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }
@@ -51,6 +52,7 @@ object FiatRates {
 
     /** SOL price on a given UTC day, cached forever (history doesn't change). */
     fun history(ctx: Context, at: Long, currency: String): Double? {
+        if (currency == "SOL") return 1.0
         val key = "sol:$currency:${day(at)}"
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (p.contains(key)) return p.getString(key, null)?.toDoubleOrNull()

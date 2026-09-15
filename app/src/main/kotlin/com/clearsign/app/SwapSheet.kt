@@ -74,6 +74,10 @@ private sealed interface SwapState {
         val pair: SwapPair,
         /** When this price was fetched, so the screen can say how fresh it is. */
         val at: Long = 0L,
+        /** Set when Jupiter Ultra built it: MEV protection, its slippage, and Jupiter lands it. */
+        val ultraRequestId: String? = null,
+        val ultraSlippageBps: Int = 0,
+        val gasless: Boolean = false,
     ) : SwapState
     data object Signing : SwapState
     data class Done(val signature: String) : SwapState
@@ -156,14 +160,16 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
      * existed on a transaction that would no longer land.
      */
     suspend fun buildReview(q: Jupiter.Quote, raw: Long): SwapState = try {
-        // Decided before anything is built: a quote that carries a platform fee
-        // can only be built with the account that fee is paid into, so the two
-        // have to agree. No account, no fee, and the swap works.
-        val feeAccount = withContext(Dispatchers.IO) { Jupiter.feeAccountIfUsable(to.mint) }
-        val priced = if (feeAccount != null) q else withContext(Dispatchers.IO) {
+        // Ultra first: the route, the slippage and the priority fee chosen by
+        // Jupiter, landed by Jupiter, out of the sandwich bots' sight. The
+        // receipt reads those bytes like any other. When Ultra does not answer,
+        // swap v1 as before, with our fee account when one exists.
+        val ultra = withContext(Dispatchers.IO) { runCatching { JupiterUltra.order(from.mint, to.mint, raw, owner) }.getOrNull() }
+        val feeAccount = if (ultra != null) null else withContext(Dispatchers.IO) { Jupiter.feeAccountIfUsable(to.mint) }
+        val priced = ultra?.asQuote() ?: if (feeAccount != null) q else withContext(Dispatchers.IO) {
             Jupiter.quote(from.mint, to.mint, raw, feeBps = 0) ?: q
         }
-        val tx = withContext(Dispatchers.IO) {
+        val tx = ultra?.tx ?: withContext(Dispatchers.IO) {
             Jupiter.swapTransaction(priced, owner, feeAccount) ?: Jupiter.swapTransaction(priced, owner, null)
         }
         if (tx == null) SwapState.Error(ctx.getString(R.string.swap_build_failed)) else {
@@ -176,6 +182,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                     inMint = to.mint, inSymbol = to.symbol, inUi = fmtUnits(priced.outAmount, to.decimals),
                 ),
                 at = System.currentTimeMillis(),
+                ultraRequestId = ultra?.requestId, ultraSlippageBps = ultra?.slippageBps ?: 0, gasless = ultra?.gasless ?: false,
             )
         }
     } catch (e: Exception) {
@@ -374,6 +381,12 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             }
                         }
                         SwapSummary(from, to, s.quote)
+                        if (s.ultraRequestId != null) {
+                            Banner(
+                                stringResource(R.string.swap_ultra, "%.2f%%".format(s.ultraSlippageBps / 100.0)) + (if (s.gasless) " " + stringResource(R.string.swap_gasless) else ""),
+                                Halo.mint, HIcon.SHIELD_LOCK,
+                            )
+                        }
                         Text(stringResource(R.string.swap_live), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                         SignReceiptBody(s.analyzed.receipt, null, s.pair, plain = true)
                     }
@@ -417,7 +430,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             GhostButton(stringResource(R.string.swap_anyway), tint = Halo.muted) {
                                 state = SwapState.Signing
                                 scope.launch {
-                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap")) {
+                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap", ultraRequestId = s.ultraRequestId)) {
                                         is WalletActions.Result.Sent -> SwapState.Done(r.signature)
                                         is WalletActions.Result.Failed -> SwapState.Error(r.message)
                                     }
@@ -428,7 +441,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             HoldToConfirm(stringResource(R.string.swap_hold, s.outUi, s.outSym)) {
                                 state = SwapState.Signing
                                 scope.launch {
-                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap")) {
+                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap", ultraRequestId = s.ultraRequestId)) {
                                         is WalletActions.Result.Sent -> SwapState.Done(r.signature)
                                         is WalletActions.Result.Failed -> SwapState.Error(r.message)
                                     }

@@ -426,16 +426,16 @@ object BrainTools {
             )
         }
         val raw = (amount * Math.pow(10.0, src.second.toDouble())).toLong()
-        val quote = withContext(Dispatchers.IO) { Jupiter.quote(inMint, outMint, raw, feeBps = 0) }
+        val built = SessionActions.buildSwap(inMint, outMint, raw, s.pubkey)
             ?: return JSONObject().put("error", "no route for that swap right now")
-        val tx = withContext(Dispatchers.IO) { Jupiter.swapTransaction(quote, s.pubkey, null) }
-            ?: return JSONObject().put("error", "could not build the swap")
+        val quote = built.quote
+        val tx = built.tx
         val intent = JSONObject().put("action", "swap").put("outMint", symbol(inMint)).put("outAmount", amount)
             .put("inMint", symbol(outMint)).put("inAmount", quote.outAmount / Math.pow(10.0, dst.second.toDouble()))
             .put("expectMint", outMint)
             .put("agent", agent).put("reason", reason)
         grade?.let { intent.put("safety", it.score).put("safetyBand", it.band.name) }
-        val verdict = judge(ctx, tx, intent, agent)
+        val verdict = judge(ctx, tx, intent, agent, built.ultraRequestId)
         // Whatever the grade found that was not fatal travels back with the verdict,
         // so the model has to say it out loud instead of quietly buying.
         grade?.takeIf { it.flags.isNotEmpty() }?.let {
@@ -461,10 +461,10 @@ object BrainTools {
     }
 
     /** The one door. Everything the model proposes goes through the judge. */
-    private suspend fun judge(ctx: Context, tx: ByteArray, intent: JSONObject, agent: String): JSONObject {
+    private suspend fun judge(ctx: Context, tx: ByteArray, intent: JSONObject, agent: String, ultraRequestId: String? = null): JSONObject {
         val job = AgentBroker.Job(
             id = LedgerRecorder.newId(), tx = tx, intentJson = intent.toString(),
-            cluster = null, agent = agent, source = AgentBroker.Job.Source.IN_APP,
+            cluster = null, agent = agent, source = AgentBroker.Job.Source.IN_APP, ultraRequestId = ultraRequestId,
         )
         val verdict = AgentBroker.handle(ctx, job)
         return verdict.toJson().put(

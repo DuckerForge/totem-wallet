@@ -1437,6 +1437,8 @@
     <string name="market_moves_off">Spento. Accendi per una notifica a ogni 5% di movimento.</string>
     <string name="move_title">%1$s %2$s</string>
     <string name="move_body">Da %1$s a %2$s dall\'ultimo avviso.</string>
+    <string name="swap_ultra">Jupiter Ultra: protezione MEV, slippage %1$s, la fa atterrare Jupiter.</string>
+    <string name="swap_gasless">Gasless: nessuna commissione di rete per te.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

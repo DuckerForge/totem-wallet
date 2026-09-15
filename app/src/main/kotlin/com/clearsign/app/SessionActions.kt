@@ -109,6 +109,22 @@ object SessionActions {
      * the loop counted every one of them as a sale that failed: three blinks of
      * the network in a row pushed a live stop-loss into the six-hour lane.
      */
+    /**
+     * A swap transaction, Ultra first and swap v1 when Ultra does not answer.
+     * The caller reads [quote] the way it always did and hands [ultraRequestId]
+     * to whoever sends, so Jupiter lands its own bytes.
+     */
+    class Built(val tx: ByteArray, val quote: Jupiter.Quote, val ultraRequestId: String?)
+
+    suspend fun buildSwap(inMint: String, outMint: String, amount: Long, taker: String, slippageBps: Int? = null): Built? = withContext(Dispatchers.IO) {
+        runCatching { JupiterUltra.order(inMint, outMint, amount, taker, slippageBps) }.getOrNull()?.let { o ->
+            return@withContext Built(o.tx, o.asQuote(), o.requestId)
+        }
+        val q = runCatching { Jupiter.quote(inMint, outMint, amount, slippageBps = slippageBps ?: 50, feeBps = 0) }.getOrNull() ?: return@withContext null
+        val tx = runCatching { Jupiter.swapTransaction(q, taker, null) }.getOrNull() ?: return@withContext null
+        Built(tx, q, null)
+    }
+
     sealed class Sale {
         /** The chain says the budget holds none of this coin. The book is wrong, not the sale. */
         object Nothing : Sale()
@@ -139,12 +155,9 @@ object SessionActions {
         if (raw <= 0L) return Sale.Nothing
         // Wider slippage on the way out than on the way in: a stop that does not
         // fill because the price moved while we asked is not a stop at all.
-        val quote = withContext(Dispatchers.IO) {
-            runCatching { Jupiter.quote(pos.mint, Jupiter.SOL_MINT, raw, slippageBps = 300, feeBps = 0) }.getOrNull()
-        } ?: return Sale.NoRoute
-        val tx = withContext(Dispatchers.IO) {
-            runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull()
-        } ?: return Sale.NoRoute
+        val built = buildSwap(pos.mint, Jupiter.SOL_MINT, raw, s.pubkey, slippageBps = 300) ?: return Sale.NoRoute
+        val quote = built.quote
+        val tx = built.tx
         val units = raw / Math.pow(10.0, pos.decimals.toDouble())
         // What the chain says comes back, before anything is declared. On a
         // thin coin Jupiter's quote and the simulated route can be far apart,
@@ -173,7 +186,7 @@ object SessionActions {
                 ctx,
                 AgentBroker.Job(
                     id = LedgerRecorder.newId(), tx = tx, intentJson = intent.toString(),
-                    cluster = null, agent = TraderLoop.AGENT, source = source,
+                    cluster = null, agent = TraderLoop.AGENT, source = source, ultraRequestId = built.ultraRequestId,
                 ),
             ),
         )

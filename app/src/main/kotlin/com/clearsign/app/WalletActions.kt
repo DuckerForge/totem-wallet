@@ -122,13 +122,20 @@ object WalletActions {
     suspend fun signAndSendRaw(
         ctx: Context, signer: SeedVaultSigner, owner: String, txBytes: ByteArray,
         receipt: com.clearsign.core.Receipt?, kind: String, cluster: String? = null,
+        /** Set when the bytes came from Jupiter Ultra: Jupiter lands them, not our RPC. */
+        ultraRequestId: String? = null,
     ): Result {
         val rpc = SolanaRpc.urlFor(cluster)
         try { signer.ensureAccount(owner) } catch (e: Exception) { return Result.Failed(e.message ?: ctx.getString(R.string.sv_not_connected)) }
         val signature = try { signer.signSuspend(txBytes) } catch (e: Exception) { return Result.Failed(e.message ?: ctx.getString(R.string.sign_error)) }
         val signed = SolanaTx.attachSignature(txBytes, 0, signature)
-        val out = withContext(Dispatchers.IO) { SolanaRpc.send(rpc, signed) }
-        val sig = out.signature ?: return Result.Failed(ctx.getString(R.string.wa_send_failed, out.error ?: "?"))
+        val sig = if (ultraRequestId != null) {
+            val ex = withContext(Dispatchers.IO) { JupiterUltra.execute(signed, ultraRequestId) }
+            ex.signature?.takeIf { ex.error == null } ?: return Result.Failed(ctx.getString(R.string.wa_send_failed, ex.error ?: ex.status))
+        } else {
+            val out = withContext(Dispatchers.IO) { SolanaRpc.send(rpc, signed) }
+            out.signature ?: return Result.Failed(ctx.getString(R.string.wa_send_failed, out.error ?: "?"))
+        }
         val at = System.currentTimeMillis()
         val statement = Attestation.statement(
             at, "ClearSign", null, cluster, listOf(Attestation.sha256Hex(txBytes)),
@@ -139,7 +146,7 @@ object WalletActions {
         LedgerRecorder.record(
             ctx,
             LedgerRecorder.fromReceipt(
-                at = at, kind = kind, dApp = "Jupiter", host = "jup.ag", pkg = ctx.packageName, cluster = cluster, wallet = owner,
+                at = at, kind = kind, dApp = if (ultraRequestId != null) "Jupiter Ultra" else "Jupiter", host = "jup.ag", pkg = ctx.packageName, cluster = cluster, wallet = owner,
                 r = receipt, signature = sig, sent = true, txIndex = 0, txCount = 1, groupId = LedgerRecorder.newId(),
                 attestation = if (attSig != null) statement else null, attestationSig = attSig,
             ),

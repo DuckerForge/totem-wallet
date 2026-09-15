@@ -55,6 +55,8 @@ object AgentBroker {
         val cluster: String?,
         val agent: String,
         val source: Source = Source.LINK,
+        /** Set when the bytes came from Jupiter Ultra: Jupiter lands them, not our RPC. */
+        val ultraRequestId: String? = null,
     ) {
         enum class Source { LINK, IN_APP }
     }
@@ -168,8 +170,13 @@ object AgentBroker {
         val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(job.tx)) ?: return Verdict.Refused(ctx.getString(R.string.env_key_missing))
         val idx = SolanaTx.decode(job.tx)?.let { d -> d.staticAccountKeys.indexOf(envelope).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
         val signed = SolanaTx.attachSignature(job.tx, idx, sig)
-        val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(job.cluster), signed) }
-        val txSig = out.signature ?: return Verdict.Refused(ctx.getString(R.string.err_send, out.error ?: "?"))
+        val txSig = if (job.ultraRequestId != null) {
+            val ex = withContext(Dispatchers.IO) { JupiterUltra.execute(signed, job.ultraRequestId) }
+            ex.signature?.takeIf { ex.error == null } ?: return Verdict.Refused(ctx.getString(R.string.err_send, ex.error ?: ex.status))
+        } else {
+            val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(job.cluster), signed) }
+            out.signature ?: return Verdict.Refused(ctx.getString(R.string.err_send, out.error ?: "?"))
+        }
         SessionWallet.recordSpend(ctx, valueLamports)
         // The book of what the agent is holding, and what it paid. Kept here and
         // not in the loop so a coin bought or sold from the chat is tracked too.

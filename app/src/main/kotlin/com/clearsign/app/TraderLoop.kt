@@ -207,16 +207,15 @@ object TraderLoop {
                 AgentTrace.say(ctx.getString(R.string.trace_rug_stop, t.symbol, rug.reason), AgentTrace.Kind.REFUSED)
                 return@working ctx.getString(R.string.trace_rug_stop, t.symbol, rug.reason)
             }
-            val quote = withContext(Dispatchers.IO) { runCatching { Jupiter.quote(Jupiter.SOL_MINT, t.mint, slice, feeBps = 0) }.getOrNull() }
-                ?: return@working ctx.getString(R.string.trader_no_route)
-            val tx = withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull() }
-                ?: return@working ctx.getString(R.string.trader_no_route)
+            val built = SessionActions.buildSwap(Jupiter.SOL_MINT, t.mint, slice, s.pubkey) ?: return@working ctx.getString(R.string.trader_no_route)
+            val quote = built.quote
+            val tx = built.tx
             val reason = ctx.getString(R.string.trader_why_more, t.symbol)
             val intent = JSONObject().put("action", "swap").put("outMint", "SOL").put("outAmount", slice / 1e9)
                 .put("inMint", t.symbol).put("inAmount", quote.outAmount / Math.pow(10.0, t.decimals.toDouble()))
                 .put("expectMint", t.mint)
                 .put("agent", AGENT).put("reason", reason)
-            when (val v = handle(ctx, tx, intent, AgentBroker.Job.Source.IN_APP)) {
+            when (val v = handle(ctx, tx, intent, AgentBroker.Job.Source.IN_APP, built.ultraRequestId)) {
                 is AgentBroker.Verdict.SignedSilently, is AgentBroker.Verdict.Confirmed -> {
                     val m = ctx.getString(R.string.trader_bought, t.symbol, fmtSol(slice, 4))
                     AgentTrace.say(m, AgentTrace.Kind.ACTED)
@@ -603,7 +602,8 @@ object TraderLoop {
             }
 
             val s = SessionWallet.current(ctx) ?: return Tick("no budget", acted = false)
-            val quote = withContext(Dispatchers.IO) { runCatching { Jupiter.quote(Jupiter.SOL_MINT, t.mint, slice, feeBps = 0) }.getOrNull() } ?: continue
+            val built = SessionActions.buildSwap(Jupiter.SOL_MINT, t.mint, slice, s.pubkey) ?: continue
+            val quote = built.quote
 
             // What one whole coin costs at this moment, straight out of the quote
             // the trade would have used. The shadow book starts here and nowhere
@@ -672,13 +672,13 @@ object TraderLoop {
                 continue
             }
 
-            val tx = withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull() } ?: continue
+            val tx = built.tx
             val reason = ctx.getString(R.string.trader_why_buy, t.symbol, pick.notes.firstOrNull() ?: "")
             val intent = JSONObject().put("action", "swap").put("outMint", "SOL").put("outAmount", slice / 1e9)
                 .put("inMint", t.symbol).put("inAmount", quote.outAmount / Math.pow(10.0, t.decimals.toDouble()))
                 .put("expectMint", t.mint)
                 .put("agent", AGENT).put("reason", reason)
-            val v = handle(ctx, tx, intent)
+            val v = handle(ctx, tx, intent, ultraRequestId = built.ultraRequestId)
             if (v is AgentBroker.Verdict.SignedSilently) {
                 prefs(ctx).edit().remove("hi_" + t.mint).remove("lo_" + t.mint).apply()
                 AgentTrace.say(ctx.getString(R.string.trader_bought, t.symbol, fmtSol(slice, 4)), AgentTrace.Kind.ACTED)
@@ -835,12 +835,14 @@ object TraderLoop {
      * posts no notification when the collar wants a person, so a background
      * move would wait ninety seconds against a screen that never appeared.
      */
-    private suspend fun handle(ctx: Context, tx: ByteArray, intent: JSONObject, source: AgentBroker.Job.Source = AgentBroker.Job.Source.LINK): AgentBroker.Verdict =
+    private suspend fun handle(
+        ctx: Context, tx: ByteArray, intent: JSONObject, source: AgentBroker.Job.Source = AgentBroker.Job.Source.LINK, ultraRequestId: String? = null,
+    ): AgentBroker.Verdict =
         AgentBroker.handle(
             ctx,
             AgentBroker.Job(
                 id = LedgerRecorder.newId(), tx = tx, intentJson = intent.toString(),
-                cluster = null, agent = AGENT, source = source,
+                cluster = null, agent = AGENT, source = source, ultraRequestId = ultraRequestId,
             ),
         )
 }

@@ -1437,6 +1437,8 @@
     <string name="market_moves_off">Off. Turn on for a notification at every 5% move.</string>
     <string name="move_title">%1$s %2$s</string>
     <string name="move_body">From %1$s to %2$s since the last notice.</string>
+    <string name="swap_ultra">Jupiter Ultra: MEV protection, slippage %1$s, Jupiter lands it.</string>
+    <string name="swap_gasless">Gasless: no network fee for you.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

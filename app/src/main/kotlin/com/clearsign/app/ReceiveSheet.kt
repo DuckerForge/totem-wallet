@@ -66,7 +66,7 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
                     Text(label ?: stringResource(R.string.receive_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 }
                 Box(
-                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(1.dp, Halo.stroke, rs(999)).clickable { onDismiss() },
+                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
                 ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
             }
@@ -202,7 +202,7 @@ private fun LinkMode(label: String, on: Boolean, onClick: () -> Unit) {
 @Composable
 internal fun SheetBlock(title: String, sub: String, icon: HIcon, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(18)).padding(12.dp),
+        modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {

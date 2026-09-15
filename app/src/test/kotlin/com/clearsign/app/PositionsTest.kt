@@ -5,6 +5,7 @@ import com.clearsign.core.NATIVE_SOL_MINT
 import com.clearsign.core.Receipt
 import com.clearsign.core.Severity
 import com.clearsign.core.TrustLevel
+import com.clearsign.app.Positions.Position
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -126,6 +127,130 @@ class PositionsTest {
             ins = listOf(d(other, bonk, "BONK", 5, 100_000_000L)),
         )
         assertNull(Positions.fromReceipt(r, env, 30, 15))
+    }
+
+    // ---- the book against the chain -----------------------------------------
+    //
+    // The night this was written the agent had spent sixteen hours trying to sell
+    // 1214 LEVERCAT belonging to a budget that had been closed and replaced. The
+    // new key had never held them, so every simulation moved nothing, the collar
+    // read that as the agent lying, and the tick stopped at that position before
+    // it could buy anything either. The book has to be checked against the chain,
+    // and the chain always wins.
+
+    private val old = "Old11111111111111111111111111111111111111111"
+
+    private fun book(vararg p: Position) = p.toList()
+    private fun Position.on(raw: Long) = mint to raw
+
+    @Test fun aPositionFromAClosedBudgetIsNotOurs() {
+        val ghost = pos().copy(owner = old)
+        val r = Positions.reconcile(book(ghost), env, mapOf(ghost.on(100_000_000L)), emptySet())
+        assertEquals(listOf(ghost), r.gone, "coins on chain do not make it ours: that key is gone")
+        assertTrue(r.keep.isEmpty())
+        assertTrue(r.changed)
+    }
+
+    @Test fun aCoinTheWalletDoesNotHoldIsNotAPosition() {
+        val p = pos().copy(owner = env)
+        val r = Positions.reconcile(book(p), env, emptyMap(), emptySet())
+        assertEquals(listOf(p), r.gone)
+    }
+
+    /** Parked in a Trigger order: out of the wallet, not out of the book. */
+    @Test fun coinsInsideAnOrderAreKept() {
+        val p = pos().copy(owner = env, triggerOrder = "OrderXXXX")
+        val r = Positions.reconcile(book(p), env, emptyMap(), setOf(p.mint))
+        assertTrue(r.gone.isEmpty())
+        assertTrue(r.keep.single().parked)
+    }
+
+    /**
+     * A cancel that Jupiter accepted is not a cancel that landed. The key stays
+     * until Jupiter no longer lists the order and the coins are back.
+     */
+    @Test fun anOrderKeyIsDroppedOnlyOnJupitersWord() {
+        val p = pos().copy(owner = env, triggerOrder = "OrderXXXX")
+        // Coins back, Jupiter asked, order not there: the key goes.
+        val cleared = Positions.reconcile(book(p), env, mapOf(p.on(100_000_000L)), emptySet(), liveByMint = emptyMap())
+        assertNull(cleared.keep.single().triggerOrder)
+        assertTrue(cleared.changed)
+        // Coins back, Jupiter not asked: nothing is guessed.
+        val kept = Positions.reconcile(book(p), env, mapOf(p.on(100_000_000L)), emptySet(), liveByMint = null)
+        assertEquals("OrderXXXX", kept.keep.single().triggerOrder)
+        // Coins back, but Jupiter still lists the order: the escrow has not caught up. Keep it.
+        val still = Positions.reconcile(book(p), env, mapOf(p.on(100_000_000L)), emptySet(), liveByMint = mapOf(p.mint to "OrderXXXX"))
+        assertEquals("OrderXXXX", still.keep.single().triggerOrder)
+    }
+
+    /** Parked in an order the row has no key for: take the key Jupiter has, so it can be cancelled. */
+    @Test fun aParkedRowWithoutAKeyTakesJupiters() {
+        val p = pos().copy(owner = env, triggerOrder = null)
+        val r = Positions.reconcile(book(p), env, emptyMap(), setOf(p.mint), liveByMint = mapOf(p.mint to "OrderYYYY"))
+        assertTrue(r.keep.single().parked)
+        assertEquals("OrderYYYY", r.keep.single().triggerOrder)
+    }
+
+    @Test fun aRowWithNoOwnerIsAdoptedWhenTheCoinsAreThere() {
+        val p = pos()
+        val r = Positions.reconcile(book(p), env, mapOf(p.on(100_000_000L)), emptySet())
+        assertEquals(env, r.keep.single().owner)
+    }
+
+    /**
+     * Half the coin was sold somewhere else. The book follows the chain down, and
+     * the cost follows the units, so the entry price stays what we actually paid.
+     */
+    @Test fun aSmallerBalanceShrinksThePositionAndItsCost() {
+        val p = pos(units = 1_000.0, cost = 10_000_000L).copy(owner = env)
+        val r = Positions.reconcile(book(p), env, mapOf(p.on(50_000_000L)), emptySet())
+        val k = r.keep.single()
+        assertEquals(500.0, k.units, 0.001)
+        assertEquals(5_000_000L, k.costLamports)
+        assertEquals(10_000.0, k.entryLamports!!, 0.001, "the price we paid per coin does not change")
+    }
+
+    /**
+     * The other direction is refused on purpose. More coins against the same cost
+     * reads as a lower entry price, and a lower entry price sells at a target the
+     * position never reached.
+     */
+    @Test fun aBiggerBalanceDoesNotMoveTheEntryPrice() {
+        val p = pos(units = 1_000.0, cost = 10_000_000L).copy(owner = env)
+        val r = Positions.reconcile(book(p), env, mapOf(p.on(400_000_000L)), emptySet())
+        val k = r.keep.single()
+        assertEquals(1_000.0, k.units, 0.001)
+        assertEquals(10_000.0, k.entryLamports!!, 0.001)
+    }
+
+    /** A tick that died mid-sale must not hide the position for ever. */
+    @Test fun aHalfClosedRowWithItsCoinsStillThereIsReopened() {
+        val p = pos().copy(owner = env, closing = true)
+        val r = Positions.reconcile(book(p), env, mapOf(p.on(100_000_000L)), emptySet())
+        assertTrue(!r.keep.single().closing)
+        assertTrue(r.changed)
+    }
+
+    @Test fun nothingToCorrectIsNotAChange() {
+        val p = pos().copy(owner = env)
+        val r = Positions.reconcile(book(p), env, mapOf(p.on(100_000_000L)), emptySet())
+        assertEquals(listOf(p), r.keep)
+        assertTrue(!r.changed)
+    }
+
+    // ---- how often to try again ---------------------------------------------
+
+    @Test fun theFirstThreeTriesAreAtFullSpeed() {
+        assertEquals(0L, Positions.retryDelay(0))
+        assertEquals(0L, Positions.retryDelay(2))
+        assertEquals(0L, pos().copy(fails = 2, lastTryAt = 1_000L).readyAt)
+    }
+
+    @Test fun afterThatItBacksOffAndStops() {
+        assertEquals(5 * 60_000L, Positions.retryDelay(3))
+        assertEquals(10 * 60_000L, Positions.retryDelay(4))
+        assertEquals(6 * 3_600_000L, Positions.retryDelay(30), "capped at six hours, not doubling for ever")
+        assertEquals(1_000L + 5 * 60_000L, pos().copy(fails = 3, lastTryAt = 1_000L).readyAt)
     }
 
     @Test fun severityIsUntouched() {

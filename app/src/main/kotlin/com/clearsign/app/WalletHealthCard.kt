@@ -75,12 +75,29 @@ internal fun WalletHealthCard(owner: String?, refreshKey: Int = 0) {
                 }
             }
             h?.issues?.forEach { issue ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    HaloIcon(iconFor(issue.kind), colorFor(issue.kind), 15.dp); Spacer(Modifier.width(8.dp))
-                    Text(textFor(ctx, issue), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        HaloIcon(iconFor(issue.kind), colorFor(issue.kind), 15.dp); Spacer(Modifier.width(8.dp))
+                        Text(textFor(ctx, issue), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
+                    }
+                    // A frozen account is the one line here with no fix behind it.
+                    // Only the freeze authority can thaw it, it cannot even be
+                    // closed to get the rent back, and listing it next to things
+                    // you *can* fix promised a button that could never exist.
+                    if (issue.kind == HealthIssue.Kind.FROZEN) {
+                        Text(
+                            stringResource(R.string.health_frozen_why),
+                            fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
+                            modifier = Modifier.padding(start = 23.dp, top = 2.dp),
+                        )
+                    }
                 }
             }
-            if (h != null && !h.isClean) Text(stringResource(R.string.health_fix_hint), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+            // The hint is about the issues that have a fix. With only a frozen
+            // account to report there is nothing to send anybody to.
+            if (h != null && h.issues.any { it.kind != HealthIssue.Kind.FROZEN }) {
+                Text(stringResource(R.string.health_fix_hint), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+            }
         }
     }
 }
@@ -111,5 +128,5 @@ private fun textFor(ctx: android.content.Context, i: HealthIssue): String = when
     HealthIssue.Kind.UNLIMITED_APPROVAL -> ctx.getString(R.string.health_unlimited, i.count, i.detail)
     HealthIssue.Kind.LIMITED_APPROVAL -> ctx.getString(R.string.health_limited, i.count)
     HealthIssue.Kind.DUST_ACCOUNTS -> ctx.getString(R.string.health_dust, i.count)
-    HealthIssue.Kind.FROZEN -> ctx.getString(R.string.health_frozen, i.count)
+    HealthIssue.Kind.FROZEN -> ctx.getString(R.string.health_frozen, i.count, i.detail)
 }

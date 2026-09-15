@@ -15,6 +15,14 @@ android {
         val f = rootProject.file("local.properties"); if (f.exists()) f.inputStream().use { load(it) }
     }
     val heliusRpcUrl = localProps.getProperty("clearsign.heliusRpcUrl", "")
+    // A second, separate key for the Seeker crowd scan. Deliberately not the same one:
+    // the scan reads thousands of wallets on a schedule, and if it ever burns through its
+    // month the agent must keep trading as if nothing happened. Blank → the feature is off.
+    val scanRpcUrl = localProps.getProperty("clearsign.scanRpcUrl", "")
+    // Where the one central scanner publishes what the Seeker crowd is buying.
+    // Every phone reads this file; none of them scans. Blank → each phone falls
+    // back to scanning for itself, which is fine for one user and absurd for many.
+    val crowdUrl = localProps.getProperty("clearsign.crowdUrl", "")
     // Wallet that receives SKR for premium themes. Blank → purchases disabled in the UI.
     val skrTreasury = localProps.getProperty("clearsign.skrTreasury", "")
 
@@ -25,6 +33,8 @@ android {
         versionCode = 1
         versionName = "0.1"
         buildConfigField("String", "HELIUS_RPC_URL", "\"$heliusRpcUrl\"")
+        buildConfigField("String", "SCAN_RPC_URL", "\"$scanRpcUrl\"")
+        buildConfigField("String", "CROWD_URL", "\"$crowdUrl\"")
         buildConfigField("String", "SKR_TREASURY", "\"$skrTreasury\"")
     }
 

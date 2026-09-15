@@ -3,6 +3,7 @@ package com.clearsign.app
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 /**
  * The two chain operations the envelope needs: filling it, and taking it back.
@@ -49,29 +50,163 @@ object SessionActions {
     }
 
     /**
+     * What the budget really holds, raw units per mint, straight from the chain.
+     *
+     * The loop needs this before it believes its own book, and the panel needs it
+     * before it offers a button that sells something.
+     */
+    suspend fun heldRaw(ctx: Context, owner: String): Map<String, Long>? = withContext(Dispatchers.IO) {
+        // Null when the chain did not answer, never an empty map: the loop treats
+        // an empty map as "the coins are gone", and a rate-limited node is not that.
+        runCatching { SolanaRpc.tokensOf(SolanaRpc.urlFor(null), owner) }
+            .getOrNull()
+            ?.filter { it.amount > 0 }
+            ?.associate { it.mint to it.amount }
+    }
+
+    /**
+     * Sell one holding back to SOL, now, and let the collar judge it.
+     *
+     * The one door out, used by the loop on a target or a stop and by the button
+     * on the position. Both build the transaction **here, at the moment of the
+     * decision**: a swap carries a blockhash that dies in about ninety seconds,
+     * so a transaction prepared earlier and approved later is a transaction that
+     * fails on send.
+     *
+     * The amount comes from the chain and never from the book. What comes back
+     * says which of four things happened, because they used to all be null and
+     * the loop counted every one of them as a sale that failed: three blinks of
+     * the network in a row pushed a live stop-loss into the six-hour lane.
+     */
+    sealed class Sale {
+        /** The chain says the budget holds none of this coin. The book is wrong, not the sale. */
+        object Nothing : Sale()
+        /** The node did not answer. Try again, count nothing. */
+        object Unreachable : Sale()
+        /** Jupiter gave no quote or no transaction for it. A real problem with this coin, worth counting. */
+        object NoRoute : Sale()
+        class Judged(val verdict: AgentBroker.Verdict) : Sale()
+    }
+
+    suspend fun sellNow(
+        ctx: Context,
+        pos: Positions.Position,
+        reason: String,
+        source: AgentBroker.Job.Source,
+    ): Sale {
+        val s = SessionWallet.current(ctx) ?: return Sale.Nothing
+        val held = heldRaw(ctx, s.pubkey) ?: return Sale.Unreachable
+        val raw = held[pos.mint] ?: return Sale.Nothing
+        if (raw <= 0L) return Sale.Nothing
+        // Wider slippage on the way out than on the way in: a stop that does not
+        // fill because the price moved while we asked is not a stop at all.
+        val quote = withContext(Dispatchers.IO) {
+            runCatching { Jupiter.quote(pos.mint, Jupiter.SOL_MINT, raw, slippageBps = 300, feeBps = 0) }.getOrNull()
+        } ?: return Sale.NoRoute
+        val tx = withContext(Dispatchers.IO) {
+            runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull()
+        } ?: return Sale.NoRoute
+        val units = raw / Math.pow(10.0, pos.decimals.toDouble())
+        val intent = JSONObject()
+            .put("action", "swap").put("outMint", pos.symbol).put("outAmount", units)
+            .put("inMint", "SOL").put("inAmount", quote.outAmount / 1e9)
+            .put("agent", TraderLoop.AGENT).put("reason", reason)
+        return Sale.Judged(
+            AgentBroker.handle(
+                ctx,
+                AgentBroker.Job(
+                    id = LedgerRecorder.newId(), tx = tx, intentJson = intent.toString(),
+                    cluster = null, agent = TraderLoop.AGENT, source = source,
+                ),
+            ),
+        )
+    }
+
+    /** What the whole holding would fetch in lamports right now, or null. */
+    suspend fun quoteValue(ctx: Context, pos: Positions.Position): Long? {
+        val s = SessionWallet.current(ctx) ?: return null
+        val raw = heldRaw(ctx, s.pubkey)?.get(pos.mint) ?: return null
+        if (raw <= 0L) return null
+        return withContext(Dispatchers.IO) {
+            runCatching { Jupiter.quote(pos.mint, Jupiter.SOL_MINT, raw, feeBps = 0) }.getOrNull()?.outAmount
+        }
+    }
+
+    /**
      * Sell everything the budget holds back to SOL, one coin at a time.
      *
      * Returns the symbols it could not sell, which is not always a failure: a
      * coin with no route out cannot be sold by anybody, and saying so is more
      * useful than retrying.
      */
-    suspend fun sellAll(ctx: Context): List<String> {
+    /**
+     * Sell one coin back to SOL. Returns true when the transaction went out.
+     *
+     * Its own function because "sell everything" is this, repeated, and a retry
+     * of one coin has to be exactly the same operation as the first attempt.
+     */
+    private suspend fun sellOne(ctx: Context, owner: String, h: SolanaRpc.TokenAccountInfo): Boolean {
+        val quote = withContext(Dispatchers.IO) {
+            runCatching { Jupiter.quote(h.mint, Jupiter.SOL_MINT, h.amount, slippageBps = 500, feeBps = 0) }.getOrNull()
+        } ?: return false
+        val tx = withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(quote, owner, null) }.getOrNull() } ?: return false
+        val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx)) ?: return false
+        val idx = SolanaTx.decode(tx)?.let { d -> d.staticAccountKeys.indexOf(owner).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
+        val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(null), SolanaTx.attachSignature(tx, idx, sig)) }
+        return out.signature != null
+    }
+
+    /**
+     * Sell everything the budget holds back to SOL, and mean it.
+     *
+     * The first version walked the list once, back to back, and came home having
+     * sold one coin: Jupiter answers a burst of quotes from the same client with
+     * a rate limit, so every coin after the first got no quote and was quietly
+     * filed as "could not sell". A button that says *everything* and does one is
+     * worse than no button, because you press it three times and never know
+     * whether the third press did anything.
+     *
+     * So: a breath between coins, a second pass for whatever did not go, and the
+     * holdings re-read from the chain between passes — the only honest way to
+     * know there is nothing left. [onProgress] reports "n of total" so the screen
+     * can show it working instead of looking frozen.
+     *
+     * Returns the symbols that would not sell, which is not always a failure: a
+     * coin with no route out cannot be sold by anybody.
+     */
+    suspend fun sellAll(ctx: Context, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<String> {
         val s = SessionWallet.current(ctx) ?: return emptyList()
-        val stuck = ArrayList<String>()
-        for (h in holdings(ctx)) {
-            val sym = TokenSymbols.symbol(h.mint)
-            val quote = withContext(Dispatchers.IO) {
-                runCatching { Jupiter.quote(h.mint, Jupiter.SOL_MINT, h.amount, slippageBps = 500, feeBps = 0) }.getOrNull()
+        var left = holdings(ctx)
+        val total = left.size
+        var done = 0
+        val stuck = LinkedHashMap<String, SolanaRpc.TokenAccountInfo>()
+
+        repeat(2) { pass ->
+            if (left.isEmpty()) return@repeat
+            for ((i, h) in left.withIndex()) {
+                val sym = TokenSymbols.symbol(h.mint)
+                if (sellOne(ctx, s.pubkey, h)) {
+                    done++
+                    stuck.remove(sym)
+                } else {
+                    stuck[sym] = h
+                }
+                onProgress(done, total)
+                // Jupiter rate-limits a burst from one client, and this loop is a
+                // burst by definition. Three quarters of a second between coins
+                // costs nothing on a handful of them and is the difference
+                // between selling one and selling all of them.
+                if (i < left.lastIndex) kotlinx.coroutines.delay(750)
             }
-            val tx = quote?.let { q -> withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(q, s.pubkey, null) }.getOrNull() } }
-            if (tx == null) { stuck += sym; continue }
-            val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx))
-            if (sig == null) { stuck += sym; continue }
-            val idx = SolanaTx.decode(tx)?.let { d -> d.staticAccountKeys.indexOf(s.pubkey).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
-            val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(null), SolanaTx.attachSignature(tx, idx, sig)) }
-            if (out.signature == null) stuck += sym
+            if (stuck.isEmpty()) return@repeat
+            // Between passes, believe the chain rather than our own list: a coin
+            // that did land is gone from it, and one that did not is still there.
+            kotlinx.coroutines.delay(1_500)
+            val onChain = holdings(ctx).associateBy { TokenSymbols.symbol(it.mint) }
+            left = stuck.keys.mapNotNull { onChain[it] }
+            stuck.keys.retainAll(onChain.keys)
         }
-        return stuck
+        return stuck.keys.toList()
     }
 
     /**

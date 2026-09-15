@@ -66,44 +66,88 @@ object JupiterTrigger {
         val target = position.costLamports * (100L + position.takeProfitPct) / 100L
         if (target <= 0) return Placed.Failed("no target")
 
-        val body = JSONObject()
-            .put("inputMint", position.mint)
-            .put("outputMint", Jupiter.SOL_MINT)
-            .put("maker", maker).put("payer", maker)
-            .put(
-                "params",
-                JSONObject().put("makingAmount", raw.toString()).put("takingAmount", target.toString())
-                    // Thirty days, then the order lapses on its own rather than
-                    // sitting on chain against a coin nobody remembers.
-                    .put("expiredAt", ((System.currentTimeMillis() / 1000) + 30L * 86_400).toString()),
-            )
-            .put("computeUnitPrice", "auto")
-
-        val built = post("/createOrder", body) ?: return Placed.Failed("unreachable")
-        built.optString("error").takeIf { it.isNotEmpty() }?.let { e ->
-            return if (e.contains("at least", true) && e.contains("USD", true)) Placed.TooSmall else Placed.Failed(e)
+        val built = when (val b = build(maker, position.mint, Jupiter.SOL_MINT, raw, target)) {
+            is Build.Ok -> b.built
+            Build.TooSmall -> return Placed.TooSmall
+            is Build.Failed -> return Placed.Failed(b.reason)
         }
-        val order = built.optString("order").takeIf { it.isNotEmpty() } ?: return Placed.Failed("no order account")
-        val requestId = built.optString("requestId").takeIf { it.isNotEmpty() } ?: return Placed.Failed("no request id")
-        val unsigned = built.optString("transaction").takeIf { it.isNotEmpty() }
-            ?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
-            ?: return Placed.Failed("no transaction")
-
         // These bytes were built by somebody else's server, and the key that is
         // about to sign them holds real money. Apex does not sign anything it has
         // not looked at, and an automatic order placed while nobody is watching is
         // the last place to make an exception.
-        checkItOnlySellsThis(ctx, unsigned, maker, position)?.let { return Placed.Failed(it) }
+        checkItOnlySellsThis(ctx, built.unsigned, maker, position)?.let { return Placed.Failed(it) }
 
-        val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(unsigned)) ?: return Placed.Failed("could not sign")
-        val idx = SolanaTx.decode(unsigned)?.let { d -> d.staticAccountKeys.indexOf(maker).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
-        val signed = SolanaTx.attachSignature(unsigned, idx, sig)
-
-        val done = post("/execute", JSONObject().put("requestId", requestId).put("signedTransaction", Base64.encodeToString(signed, Base64.NO_WRAP)))
-            ?: return Placed.Failed("unreachable")
+        val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(built.unsigned)) ?: return Placed.Failed("could not sign")
+        val done = execute(built, attach(built.unsigned, maker, sig)) ?: return Placed.Failed("unreachable")
         done.optString("error").takeIf { it.isNotEmpty() }?.let { return Placed.Failed(it) }
-        return Placed.Ok(order, done.optString("signature").takeIf { it.isNotEmpty() })
+        return Placed.Ok(built.order, done.optString("signature").takeIf { it.isNotEmpty() })
     }
+
+    // ---- the pieces, for whoever signs ------------------------------------
+
+    /** An order Jupiter has built and nobody has signed yet. [order] is empty for a cancel. */
+    class Built(val order: String, val requestId: String, val unsigned: ByteArray)
+
+    sealed class Build {
+        class Ok(val built: Built) : Build()
+        /** Jupiter will not take an order this small. Not an error, just a floor. */
+        object TooSmall : Build()
+        class Failed(val reason: String) : Build()
+    }
+
+    /**
+     * Ask Jupiter for the order: sell [makingRaw] of [inputMint] for at least
+     * [takingRaw] of [outputMint]. Two shapes of the same call: a take-profit is
+     * "sell this coin for at least this much SOL", a limit buy is "sell this much
+     * SOL for at least this many coins". Nothing is signed here; the bytes come
+     * back for whoever holds the key, the budget or the Seed Vault, to look at
+     * first. The person gets the ordinary receipt; the loop gets
+     * [checkItOnlySellsThis].
+     */
+    fun build(maker: String, inputMint: String, outputMint: String, makingRaw: Long, takingRaw: Long, expiresInDays: Int = 30): Build {
+        val body = JSONObject()
+            .put("inputMint", inputMint)
+            .put("outputMint", outputMint)
+            .put("maker", maker).put("payer", maker)
+            .put(
+                "params",
+                JSONObject().put("makingAmount", makingRaw.toString()).put("takingAmount", takingRaw.toString())
+                    // Then the order lapses on its own rather than sitting on
+                    // chain against a coin nobody remembers.
+                    .put("expiredAt", ((System.currentTimeMillis() / 1000) + expiresInDays.toLong() * 86_400).toString()),
+            )
+            .put("computeUnitPrice", "auto")
+        val built = post("/createOrder", body) ?: return Build.Failed("unreachable")
+        built.optString("error").takeIf { it.isNotEmpty() }?.let { e ->
+            return if (e.contains("at least", true) && e.contains("USD", true)) Build.TooSmall else Build.Failed(e)
+        }
+        val order = built.optString("order").takeIf { it.isNotEmpty() } ?: return Build.Failed("no order account")
+        val requestId = built.optString("requestId").takeIf { it.isNotEmpty() } ?: return Build.Failed("no request id")
+        val unsigned = built.optString("transaction").takeIf { it.isNotEmpty() }
+            ?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
+            ?: return Build.Failed("no transaction")
+        return Build.Ok(Built(order, requestId, unsigned))
+    }
+
+    /** The cancel, built and not signed. Null when Jupiter did not answer or refused. */
+    fun buildCancel(maker: String, order: String): Built? {
+        val built = post("/cancelOrder", JSONObject().put("maker", maker).put("order", order).put("computeUnitPrice", "auto")) ?: return null
+        if (built.optString("error").isNotEmpty()) return null
+        val requestId = built.optString("requestId").takeIf { it.isNotEmpty() } ?: return null
+        val unsigned = built.optString("transaction").takeIf { it.isNotEmpty() }
+            ?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() } ?: return null
+        return Built(order, requestId, unsigned)
+    }
+
+    /** The signature in its slot. The maker is the fee payer and usually the first signer, but never assumed. */
+    fun attach(unsigned: ByteArray, maker: String, sig: ByteArray): ByteArray {
+        val idx = SolanaTx.decode(unsigned)?.let { d -> d.staticAccountKeys.indexOf(maker).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
+        return SolanaTx.attachSignature(unsigned, idx, sig)
+    }
+
+    /** Hand the signed bytes back to Jupiter, which sends them. The raw answer, or null when unreachable. */
+    fun execute(built: Built, signed: ByteArray): JSONObject? =
+        post("/execute", JSONObject().put("requestId", built.requestId).put("signedTransaction", Base64.encodeToString(signed, Base64.NO_WRAP)))
 
     /**
      * Simulate the order before signing it, and refuse anything that is not the
@@ -132,11 +176,36 @@ object JupiterTrigger {
         return null
     }
 
-    /** The orders still standing for [user]. Empty on any failure: never an accusation. */
-    fun open(user: String): List<String> {
-        val o = get("/getTriggerOrders?user=$user&orderStatus=active") ?: return emptyList()
-        val arr = o.optJSONArray("orders") ?: return emptyList()
-        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.optString("orderKey")?.takeIf { k -> k.isNotEmpty() } }
+    /** The orders standing for a user: their accounts, and the coins they hold in escrow. */
+    data class Live(val orders: Set<String>, val mints: Set<String>, val byMint: Map<String, String> = emptyMap())
+
+    /**
+     * What is live on chain for [user], or **null when Jupiter could not be asked**.
+     *
+     * Null and empty are not the same thing here, and the difference is worth a
+     * position. Empty means the coins really are not in an order, so a holding
+     * the wallet does not have is a holding that is gone. Null means we do not
+     * know, and dropping a position on a failed network call would throw away the
+     * price we paid for it and the stop that was watching it.
+     */
+    fun live(user: String): Live? {
+        val o = get("/getTriggerOrders?user=$user&orderStatus=active") ?: return null
+        if (o.optString("error").isNotEmpty()) return null
+        val arr = o.optJSONArray("orders") ?: return Live(emptySet(), emptySet())
+        val orders = HashSet<String>()
+        val mints = HashSet<String>()
+        val byMint = HashMap<String, String>()
+        for (i in 0 until arr.length()) {
+            val e = arr.optJSONObject(i) ?: continue
+            val key = e.optString("orderKey").takeIf { it.isNotEmpty() }
+            val mint = e.optString("inputMint").takeIf { it.isNotEmpty() }
+            key?.let { orders += it }
+            mint?.let { mints += it }
+            // Which order holds which coin, so a position that lost its key can
+            // get it back instead of sitting "parked in an order I did not place".
+            if (key != null && mint != null) byMint.putIfAbsent(mint, key)
+        }
+        return Live(orders, mints, byMint)
     }
 
     /**
@@ -144,15 +213,9 @@ object JupiterTrigger {
      * on chain trying to sell tokens the budget no longer has.
      */
     suspend fun cancel(ctx: Context, maker: String, order: String): Boolean {
-        val built = post("/cancelOrder", JSONObject().put("maker", maker).put("order", order).put("computeUnitPrice", "auto"))
-            ?: return false
-        val requestId = built.optString("requestId").takeIf { it.isNotEmpty() } ?: return false
-        val unsigned = built.optString("transaction").takeIf { it.isNotEmpty() }
-            ?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() } ?: return false
-        val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(unsigned)) ?: return false
-        val idx = SolanaTx.decode(unsigned)?.let { d -> d.staticAccountKeys.indexOf(maker).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
-        val signed = SolanaTx.attachSignature(unsigned, idx, sig)
-        val done = post("/execute", JSONObject().put("requestId", requestId).put("signedTransaction", Base64.encodeToString(signed, Base64.NO_WRAP)))
+        val built = buildCancel(maker, order) ?: return false
+        val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(built.unsigned)) ?: return false
+        val done = execute(built, attach(built.unsigned, maker, sig))
         return done != null && done.optString("error").isEmpty()
     }
 

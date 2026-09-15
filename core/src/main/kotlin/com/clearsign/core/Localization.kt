@@ -53,6 +53,7 @@ object Localization {
 
     private val riskEn = mapOf(
         RiskFlag.SIMULATION_FAILED to "Transaction could not be simulated — refusing to sign blind.",
+        RiskFlag.SIMULATION_UNAVAILABLE to "The network did not answer the simulation — refusing to sign blind.",
         RiskFlag.BLOCKED_MALICIOUS to "Flagged as malicious by security scan.",
         RiskFlag.SANCTIONED to "Recipient is on a sanctions list: %s",
         RiskFlag.UNLIMITED_APPROVAL to "Grants unlimited spending authority over your tokens.",
@@ -75,6 +76,7 @@ object Localization {
     )
     private val riskIt = mapOf(
         RiskFlag.SIMULATION_FAILED to "Impossibile simulare la transazione: non firmo alla cieca.",
+        RiskFlag.SIMULATION_UNAVAILABLE to "La rete non ha risposto alla simulazione: non firmo alla cieca.",
         RiskFlag.BLOCKED_MALICIOUS to "Segnalata come malevola dalla scansione di sicurezza.",
         RiskFlag.SANCTIONED to "Il destinatario è in una lista di sanzioni: %s",
         RiskFlag.UNLIMITED_APPROVAL to "Concede autorità di spesa ILLIMITATA sui tuoi token.",

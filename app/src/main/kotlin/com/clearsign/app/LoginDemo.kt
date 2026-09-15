@@ -10,177 +10,195 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.unit.dp
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 /**
- * What Apex is for, shown instead of said.
+ * What Apex is, shown instead of said.
  *
- * A payment leaves one phone for another, and on the way a slice peels off to
- * somewhere nobody mentioned. That is the thing this whole app exists to catch,
- * and it lands in two seconds of watching where a paragraph of text would have
- * been skimmed and forgotten.
+ * Orbit. The curve of a planet across the bottom with its atmosphere lit from
+ * behind, one phone holding station above it, and requests arriving out of the
+ * dark as streaks of light that slow as they come. Two are ordinary and are
+ * taken in. The third turns red on approach and breaks against a ring of light
+ * that leaves the phone to meet it.
  *
- * It plays on the door, where there is nothing else to do but wait for a
- * fingerprint, and it is the only animation in the app that runs without being
- * asked for. That is the exception the door earns: everywhere else, motion here
- * answers something a person did.
+ * That is the product in six seconds: everything out there can only arrive and
+ * ask, the phone is the thing that decides, and what lies does not get in.
+ *
+ * It replaced a version with three straight spokes into a wireframe globe, which
+ * read as a spider rather than a scene. The rules that keep it a scene: no
+ * straight lines, no grid, no text, nothing moving at constant speed, and a beat
+ * of silence at the end of each loop so the refusal is a moment instead of a
+ * stream.
+ *
+ * It plays on the door, where there is nothing to do but wait for a fingerprint,
+ * and it is the only animation in the app that runs without being asked for.
  */
 @Composable
-internal fun HiddenCutDemo(modifier: Modifier = Modifier) {
-    // The coin that crosses is the real SOL logo, the same one the receipt sends
-    // along its line. Null until it loads, and the plain disc stands in.
-    val sol = rememberCoinBitmap(com.clearsign.core.NATIVE_SOL_MINT)
-    val loop = rememberInfiniteTransition(label = "cut")
-    val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "t")
+internal fun GateDemo(modifier: Modifier = Modifier) {
+    val loop = rememberInfiniteTransition(label = "orbit")
+    val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(6200, easing = LinearEasing)), label = "t")
+    val slow by loop.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "slow")
 
-    val body = Halo.cardSoft
-    val edge = Halo.stroke
-    val ink = Halo.ink
-    val glass = Halo.ground
-    val good = Halo.mint
+    // Fixed once: a starfield that reshuffled every frame would be snow.
+    val stars = remember {
+        val rnd = java.util.Random(7)
+        List(26) { Star(rnd.nextFloat(), rnd.nextFloat() * 0.62f, 0.6f + rnd.nextFloat() * 1.5f, rnd.nextFloat() * 6.28f) }
+    }
+
+    val mint = Halo.mint
+    val cyan = Halo.cyan
     val bad = Halo.red
     val faint = Halo.muted
 
-    Canvas(modifier.fillMaxWidth().height(150.dp)) {
+    Canvas(modifier.fillMaxWidth().height(190.dp)) {
         val w = size.width
         val h = size.height
-        val phoneH = h * 0.68f
-        val phoneW = phoneH * 0.47f
-        val cy = h * 0.38f
+        val unit = min(w, h)
 
-        val from = Offset(w * 0.14f, cy)
-        val to = Offset(w * 0.86f, cy)
-
-        // Fronts, not backs. Somebody paying is looking at a screen, and two
-        // phones showing their camera islands read as two phones lying face down.
-        drawPhone(from.x - phoneW / 2f, cy - phoneH / 2f, phoneW, phoneH, back = false, body = body, edge = edge, ink = ink, glass = glass)
-        drawPhone(to.x - phoneW / 2f, cy - phoneH / 2f, phoneW, phoneH, back = false, body = body, edge = edge, ink = ink, glass = glass)
-
-        // The honest road: a gentle arc between the two phones.
-        // From edge to edge, so the line leaves one phone and reaches the other
-        // instead of appearing out of the middle of both.
-        val a0 = Offset(from.x + phoneW * 0.62f, cy)
-        val a1 = Offset(to.x - phoneW * 0.62f, cy)
-        val ctrl = Offset((a0.x + a1.x) / 2f, cy - h * 0.22f)
-        val road = Path().apply { moveTo(a0.x, a0.y); quadraticBezierTo(ctrl.x, ctrl.y, a1.x, a1.y) }
-        drawPath(road, faint.copy(alpha = 0.40f), style = Stroke(1.6.dp.toPx()))
-
-        fun on(p: Float): Offset {
-            val m = 1 - p
-            return Offset(
-                m * m * a0.x + 2 * m * p * ctrl.x + p * p * a1.x,
-                m * m * a0.y + 2 * m * p * ctrl.y + p * p * a1.y,
-            )
+        // ---- the dark, and what is in it -----------------------------------
+        stars.forEach { s ->
+            val twinkle = 0.35f + 0.4f * (0.5f + 0.5f * sin(slow * 1.7f + s.phase))
+            val drift = sin(slow * 0.35f + s.phase) * unit * 0.004f
+            drawCircle(Color.White.copy(alpha = 0.55f * twinkle), s.r, Offset(s.x * w + drift, s.y * h))
         }
 
-        // Which way the money is going, said once at the end of each line.
-        arrow(on(0.96f), on(1f), faint.copy(alpha = 0.75f), min(w, h) * 0.048f)
+        // ---- the planet ----------------------------------------------------
+        // Only its limb crosses the frame. A circle this large reads as a world;
+        // the same circle small enough to see whole reads as a ball.
+        val planetR = w * 1.35f
+        val planet = Offset(w / 2f, h * 0.92f + planetR)
+        val limbY = planet.y - planetR
 
-        // Where the slice leaves. Fixed, so the eye learns the spot across loops.
-        val forkAt = 0.46f
-        val fork = on(forkAt)
-        val skim = Offset(w * 0.66f, h * 0.86f)
-        val skimCtrl = Offset(fork.x + (skim.x - fork.x) * 0.2f, skim.y - h * 0.12f)
-        val skimR = min(w, h) * 0.052f
+        // The atmosphere first, so the body draws over its inner edge and the glow
+        // survives only outside the horizon, which is where it is in a photograph.
+        for (k in 3 downTo 1) {
+            drawCircle(cyan.copy(alpha = 0.05f * k), planetR + unit * 0.012f * k * k, planet, style = Stroke(unit * 0.02f * k))
+        }
+        clipRect(top = limbY) {
+            drawCircle(Halo.ground, planetR, planet)
+            drawCircle(
+                brush = Brush.verticalGradient(
+                    listOf(cyan.copy(alpha = 0.16f), Color.Transparent),
+                    startY = limbY, endY = limbY + h * 0.45f,
+                ),
+                radius = planetR, center = planet,
+            )
+            drawCircle(cyan.copy(alpha = 0.45f), planetR, planet, style = Stroke(1.2.dp.toPx()))
+            // Cities, breathing out of phase. Six points of life, not a grid.
+            for (k in 0 until 6) {
+                val a = -1.15f + k * 0.46f
+                val lit = 0.25f + 0.75f * (0.5f + 0.5f * sin(slow * 2.1f + k * 1.7f))
+                val p = Offset(planet.x + planetR * sin(a) * 0.62f, limbY + h * (0.04f + 0.05f * ((k % 3) + 1)))
+                drawCircle(cyan.copy(alpha = 0.5f * lit), unit * 0.006f, p)
+                drawCircle(cyan.copy(alpha = 0.14f * lit), unit * 0.018f, p)
+            }
+        }
 
-        // Timeline of one loop: the coin crosses, the cut leaves halfway, both
-        // settle, and a beat of nothing before it starts again. The pause matters:
-        // without it the loop reads as a stream and you never see the moment.
-        val move = clamp((t - 0.04f) / 0.56f)
-        val cut = clamp((t - 0.30f) / 0.34f)
-        val fade = 1f - clamp((t - 0.86f) / 0.14f)
+        // ---- the phone, holding station ------------------------------------
+        val phoneH = h * 0.34f
+        val phoneW = phoneH * 0.47f
+        val phone = Offset(w / 2f, h * 0.46f + sin(slow) * unit * 0.008f)   // a slow float, never still
+        val shieldR = phoneW * 0.95f
 
-        val coinR = min(w, h) * 0.030f
+        // ---- three arrivals -------------------------------------------------
+        // Two are ordinary, the third lies. Always the third, always from the same
+        // side: the eye learns where to look before it knows why.
+        val lanes = listOf(
+            Lane(Offset(-w * 0.25f, h * 0.16f), Offset(w * 0.22f, h * 0.02f), 0.02f, mint, true),
+            Lane(Offset(w * 1.25f, h * 0.30f), Offset(w * 0.80f, h * 0.04f), 0.28f, cyan, true),
+            Lane(Offset(w * 1.28f, -h * 0.10f), Offset(w * 0.86f, h * 0.30f), 0.56f, bad, false),
+        )
 
-        if (cut > 0f) {
-            fun onSkim(p: Float): Offset {
-                val m = 1 - p
+        lanes.forEach { lane ->
+            val local = (t - lane.start) / 0.30f
+            if (local <= 0f || local > 1.35f) return@forEach
+            val p = easeOut(clamp(local))
+            // The liar never reaches the glass: it stops where the shield is.
+            val stopAt = if (lane.honest) 1f else 0.72f
+            val travel = min(p, stopAt)
+            val fade = 1f - clamp((local - 1f) / 0.35f)
+
+            fun at(u: Float): Offset {
+                val m = 1 - u
                 return Offset(
-                    m * m * fork.x + 2 * m * p * skimCtrl.x + p * p * skim.x,
-                    m * m * fork.y + 2 * m * p * skimCtrl.y + p * p * skim.y,
+                    m * m * lane.from.x + 2 * m * u * lane.ctrl.x + u * u * phone.x,
+                    m * m * lane.from.y + 2 * m * u * lane.ctrl.y + u * u * phone.y,
                 )
             }
-            // Thin and quiet on purpose. A thick red arrow shouts, and the point
-            // is that this is the part nobody points at.
-            val skimPath = Path().apply {
-                moveTo(fork.x, fork.y)
-                quadraticBezierTo(skimCtrl.x, skimCtrl.y, skim.x, skim.y)
-            }
-            drawPath(
-                skimPath,
-                bad.copy(alpha = 0.55f * fade),
-                style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
-            )
-            // Where it ends up: a wallet nobody named.
-            val landed = clamp((cut - 0.75f) / 0.25f)
-            if (landed > 0f) {
-                drawCircle(bad.copy(alpha = 0.14f * fade * landed), skimR * 1.5f, skim)
-                drawCircle(bad.copy(alpha = 0.9f * fade * landed), skimR, skim, style = Stroke(1.8.dp.toPx()))
-            }
-            coin(onSkim(cut), coinR * 0.8f, bad, fade)
-        }
 
-        if (move > 0f) {
-            // The coin shrinks the instant it passes the fork: less arrives than
-            // left, which is the whole story in one gesture.
-            val took = if (move < forkAt) 1f else 0.72f
-            val at = on(move)
-            val r = coinR * took * 2.0f
-            if (sol != null) {
-                drawCircle(good.copy(alpha = 0.28f * fade), r * 1.15f, at)
-                clipPath(Path().apply { addOval(Rect(at.x - r, at.y - r, at.x + r, at.y + r)) }) {
-                    drawImage(
-                        image = sol,
-                        dstOffset = IntOffset((at.x - r).toInt(), (at.y - r).toInt()),
-                        dstSize = IntSize((r * 2).toInt(), (r * 2).toInt()),
-                        alpha = fade,
-                    )
+            // A tail of eight, thinning behind the head. Cheaper than a gradient
+            // stroke and it bends with the curve for free.
+            for (k in 7 downTo 0) {
+                val u = (travel - k * 0.026f).coerceAtLeast(0f)
+                if (u <= 0f) continue
+                val a = (1f - k / 8f)
+                drawCircle(lane.color.copy(alpha = 0.5f * a * a * fade), unit * (0.004f + 0.010f * a), at(u))
+            }
+            val head = at(travel)
+            drawCircle(lane.color.copy(alpha = 0.18f * fade), unit * 0.030f, head)
+            drawCircle(lane.color.copy(alpha = 0.95f * fade), unit * 0.011f, head)
+
+            if (lane.honest) {
+                // Taken in: a ring closing on the phone, quick and quiet.
+                val land = clamp((p - 0.92f) / 0.08f)
+                if (land > 0f) {
+                    drawCircle(lane.color.copy(alpha = 0.45f * (1f - land) * fade), shieldR * (1.4f - 0.5f * land), phone, style = Stroke(1.6.dp.toPx()))
                 }
-                drawCircle(good.copy(alpha = 0.9f * fade), r, at, style = Stroke(1.4.dp.toPx()))
-            } else {
-                coin(at, coinR * took, good, fade)
+            } else if (p >= stopAt) {
+                // Refused: the shield goes out to meet it and the thing breaks up.
+                val hit = clamp((p - stopAt) / (1f - stopAt))
+                drawCircle(bad.copy(alpha = 0.55f * (1f - hit) * fade), shieldR * (1f + 1.6f * hit), phone, style = Stroke((2.4f * (1f - hit)).coerceAtLeast(0.4f).dp.toPx()))
+                drawCircle(bad.copy(alpha = 0.10f * (1f - hit) * fade), shieldR * (1f + 1.6f * hit), phone)
+                for (k in 0 until 3) {
+                    val ang = -0.9f + k * 0.9f
+                    val d = unit * 0.09f * hit
+                    val frag = Offset(head.x + cos(ang) * d, head.y + sin(ang) * d + d * 0.5f)
+                    drawCircle(bad.copy(alpha = 0.7f * (1f - hit) * fade), unit * 0.006f * (1f - hit), frag)
+                }
             }
         }
+
+        // The phone last: every streak passes behind it, nothing crosses the glass.
+        drawPhone(
+            phone.x - phoneW / 2f, phone.y - phoneH / 2f, phoneW, phoneH,
+            back = false, body = Halo.cardSoft, edge = Halo.stroke, ink = Halo.ink, glass = Halo.ground,
+        )
+        val breath = 0.5f + 0.5f * sin(slow * 1.9f)
+        drawCircle(mint.copy(alpha = 0.08f + 0.08f * breath), phoneW * 0.5f, phone)
+        drawCircle(mint.copy(alpha = 0.6f + 0.3f * breath), phoneW * 0.12f, phone)
+        // The station light: a thin ring that says the thing is awake and watching.
+        drawCircle(mint.copy(alpha = 0.10f + 0.06f * breath), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
     }
 }
 
-/** A small head at [tip], pointing the way the line was already going. */
-private fun DrawScope.arrow(before: Offset, tip: Offset, color: Color, size: Float) {
-    val dx = tip.x - before.x
-    val dy = tip.y - before.y
-    val len = kotlin.math.hypot(dx, dy).takeIf { it > 0.0001f } ?: return
-    val ux = dx / len
-    val uy = dy / len
-    // Perpendicular, for the two barbs.
-    val px = -uy
-    val py = ux
-    val back = Offset(tip.x - ux * size, tip.y - uy * size)
-    val head = Path().apply {
-        moveTo(tip.x, tip.y)
-        lineTo(back.x + px * size * 0.5f, back.y + py * size * 0.5f)
-        lineTo(back.x - px * size * 0.5f, back.y - py * size * 0.5f)
-        close()
-    }
-    drawPath(head, color)
-}
+private class Star(val x: Float, val y: Float, val r: Float, val phase: Float)
 
-private fun DrawScope.coin(at: Offset, r: Float, color: Color, alpha: Float) {
-    drawCircle(color.copy(alpha = 0.22f * alpha), r * 2.1f, at)
-    drawCircle(color.copy(alpha = 0.95f * alpha), r, at)
-    drawCircle(Halo.ground.copy(alpha = 0.8f * alpha), r * 0.34f, at)
+private class Lane(
+    val from: Offset,
+    val ctrl: Offset,
+    val start: Float,
+    val color: Color,
+    val honest: Boolean,
+)
+
+/** Fast in, slow on arrival. Nothing in a scene moves at a constant speed. */
+private fun easeOut(p: Float): Float {
+    val m = 1f - p
+    return 1f - m * m * m
 }
 
 private fun clamp(v: Float) = max(0f, min(1f, v))

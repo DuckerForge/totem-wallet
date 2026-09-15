@@ -111,7 +111,7 @@ internal fun ProSheet(signer: SeedVaultSigner, owner: String?, onDismiss: () -> 
             when (val s = state) {
                 ProState.Checking -> Row(verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.theme_unlock_checking), fontFamily = Mono, fontSize = 12.5.sp, color = Halo.muted); Spacer(Modifier.width(6.dp)); BlinkCaret(Halo.mint, 13.dp) }
                 is ProState.Ready -> {
-                    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(14.dp)) {
+                    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(14.dp)) {
                         StatRow(stringResource(R.string.theme_unlock_price), "${WalletActions.PRO_PRICE_SKR} SKR", accent = true)
                         StatRow(stringResource(R.string.theme_unlock_balance), s.quote.uiBalance() + " SKR")
                         StatRow(stringResource(R.string.theme_unlock_fee), "≈ 0.00001 SOL")

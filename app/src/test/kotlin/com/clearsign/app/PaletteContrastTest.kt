@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 /** Every palette must stay readable: these are the floors the design promises. */
 class PaletteContrastTest {
     @Test fun allPalettesAreReadable() {
-        assertEquals(10, Palettes.all.size)
+        assertEquals(11, Palettes.all.size)
         for (p in Palettes.all) {
             for (ground in listOf(p.ground, p.ground2)) {
                 val muted = contrastRatio(p.muted, ground)
@@ -69,11 +69,11 @@ class PaletteContrastTest {
     @Test fun idsAreUniqueAndHaloIsFree() {
         assertEquals(Palettes.all.size, Palettes.all.map { it.id }.toSet().size)
         assertTrue(Palettes.halo.isFree)
-        // Four candidate themes are free on purpose: a theme you cannot select
-        // is a theme you cannot judge.
-        assertTrue(Palettes.all.count { it.premium } == 5)
-        assertTrue(Palettes.all.count { it.isFree } == 5)
-        assertEquals(Palettes.halo, Palettes.byId("nope"))
+        // Candidate themes are free on purpose: a theme you cannot select is a
+        // theme you cannot judge.
+        assertTrue(Palettes.all.count { it.premium } == 4)
+        assertTrue(Palettes.all.count { it.isFree } == 7)
+        assertEquals(Palettes.default, Palettes.byId("nope"))
     }
 
     @Test fun everyPaletteHasTypeAndStyle() {

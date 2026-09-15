@@ -52,7 +52,7 @@ class AgentGateActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         // Closing the receipt without deciding is a "no": never leave the agent hanging.
-        envelopeJob?.let { AgentBroker.complete(it, AgentBroker.Verdict.Refused(getString(R.string.agent_declined))) }
+        envelopeJob?.let { AgentBroker.complete(it, AgentBroker.Verdict.Refused(getString(R.string.agent_declined), AgentBroker.Verdict.Refused.By.PERSON)) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,12 +125,12 @@ class AgentGateActivity : ComponentActivity() {
             // The gate itself: claim vs. simulated effect.
             var guard = IntentGuard.check(agentIntent, analyzed.receipt, owner, deviceLocaleTag())
             agentIntent.reason?.takeIf { it.isNotBlank() }?.let { r -> guard = guard.copy(detail = guard.detail + "  " + getString(R.string.agent_reason, r)) }
-            intent?.getStringExtra("why")?.takeIf { envelopeJob != null }?.let { w -> guard = guard.copy(detail = guard.detail + "  " + getString(R.string.agent_why, w)) }
+            val askedWhy = intent?.getStringExtra("why")?.takeIf { envelopeJob != null && it.isNotBlank() }
             val receipt: Receipt = analyzed.receipt.copy(risks = (listOf(guard) + analyzed.receipt.risks).distinctBy { it.flag to it.detail }.sortedByDescending { it.severity.ordinal })
             val item = analyzed.copy(receipt = receipt)
 
             ui = MwaUi.SignRequest(
-                dApp = dApp, receipts = listOf(receipt), willSend = send, cluster = cluster,
+                dApp = dApp, receipts = listOf(receipt), willSend = send, cluster = cluster, askedWhy = askedWhy,
                 onApprove = {
                     ui = MwaUi.Working(getString(R.string.w_drift))
                     lifecycleScope.launch {
@@ -181,7 +181,7 @@ class AgentGateActivity : ComponentActivity() {
                     }
                 },
                 onDecline = {
-                    envelopeJob?.let { j -> AgentBroker.complete(j, AgentBroker.Verdict.Refused(getString(R.string.agent_declined))); envelopeJob = null }
+                    envelopeJob?.let { j -> AgentBroker.complete(j, AgentBroker.Verdict.Refused(getString(R.string.agent_declined), AgentBroker.Verdict.Refused.By.PERSON)); envelopeJob = null }
                     deliverError("declined"); finishAndRemoveTask()
                 },
             )

@@ -4,6 +4,7 @@ package com.clearsign.app
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -70,9 +72,17 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.clip(rs(12)).background(Halo.mint.copy(alpha = 0.15f)).padding(9.dp)) { HaloIcon(HIcon.GIFT, Halo.mint, 20.dp) }
+                Box(Modifier.clip(rs(12)).background(Halo.mint.copy(alpha = 0.15f)).padding(9.dp)) { HaloIcon(HIcon.SHARE, Halo.mint, 20.dp) }
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.gift_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
+                Text(
+                    stringResource(R.string.gift_title), fontFamily = Sora, fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp, color = Halo.ink, modifier = Modifier.weight(1f),
+                )
+                // A way out that does not depend on knowing you can swipe a sheet down.
+                Box(
+                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onDismiss() },
+                    contentAlignment = Alignment.Center,
+                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
             }
 
             if (link != null) {
@@ -131,9 +141,13 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                     }
                 }
 
+                // One button at a time. Both used to sit there together — "Rivedi" and
+                // "Tieni premuto" — which asks you to choose between looking and doing,
+                // and nobody picks looking. Now the hold only exists once the receipt is
+                // on screen, so the order is the answer instead of a question.
                 if (busy) {
                     Working(stringResource(R.string.gift_creating))
-                } else if (lamports > 0) {
+                } else if (lamports > 0 && review != null) {
                     HoldToConfirm(stringResource(R.string.gift_create, fmtSol(lamports, 5))) {
                         busy = true; error = null
                         scope.launch {
@@ -150,7 +164,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                     Text(stringResource(R.string.gift_open), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
                     open.forEach { g ->
                         Row(
-                            Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)).padding(12.dp),
+                            Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {

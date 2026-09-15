@@ -162,7 +162,7 @@ private fun ColorBlock(
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(26.dp).clip(rs(8)).background(preview).border(1.dp, Halo.stroke, rs(8)))
+            Box(Modifier.size(26.dp).clip(rs(8)).background(preview).border(cardBorder(), rs(8)))
             Spacer(Modifier.width(10.dp))
             Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
         }

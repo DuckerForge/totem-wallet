@@ -48,6 +48,24 @@ enum class SafetyFlag {
     FEW_HOLDERS,
     /** Not on Jupiter's verified list. */
     UNVERIFIED,
+    /**
+     * Someone can take this token out of your wallet whenever they like.
+     *
+     * The Token-2022 permanent delegate. On an anonymous coin it is the whole
+     * scam in one field, and no second wallet protects you from it: the coin is
+     * burned wherever it sits. On a verified issuer's token it is how a
+     * regulated stablecoin is supposed to work, which is why this is graded the
+     * same way freeze and mint are.
+     */
+    SEIZABLE,
+    /** A program of the creator's choosing runs on every transfer, and can block sells. */
+    TRANSFER_HOOK,
+    /** The token takes a cut of every transfer, yours included. */
+    TRANSFER_TAX,
+    /** It cannot be transferred at all. */
+    NON_TRANSFERABLE,
+    /** New accounts start frozen: buying is allowed, selling is the creator's decision. */
+    DEFAULT_FROZEN,
 }
 
 /** What we know about a coin, all of it optional except the obvious. */
@@ -68,6 +86,12 @@ data class TokenFacts(
     val liquidityUsd: Double = 0.0,
     /** A real quote back to SOL succeeded. Null when we did not ask. */
     val sellable: Boolean? = null,
+    /**
+     * What the mint account itself says it can do, read from the chain. The
+     * registry cannot tell us this: it reports "Token-2022" and stops, and the
+     * powers that empty a wallet after the purchase all live in here.
+     */
+    val ext: MintExtensions = MintExtensions.NONE,
 )
 
 data class TokenSafety(val score: Int, val band: SafetyBand, val flags: List<SafetyFlag>) {
@@ -109,7 +133,23 @@ fun assessToken(f: TokenFacts): TokenSafety {
     }
     f.devPct?.let { p -> if (p >= 30) cap(45, SafetyFlag.DEV_HEAVY) }
     if (f.devMints >= 25) cap(50, SafetyFlag.SERIAL_CREATOR)
-    if (f.token2022) cap(62, SafetyFlag.NEW_TOKEN_PROGRAM)
+    // The extensions, read from the mint itself. A fatal vector is a ceiling and
+    // not a penalty: no amount of liquidity, holders or organic score buys its way
+    // past a creator who can take the coin back out of your wallet.
+    if (f.ext.nonTransferable) cap(4, SafetyFlag.NON_TRANSFERABLE)
+    if (f.ext.permanentDelegate) {
+        // Same fact, two meanings, exactly as with freeze and mint above: PYUSD
+        // and EURC need this to exist at all, an anonymous coin uses it to burn
+        // your balance seconds after you buy.
+        if (f.verified) cap(72, SafetyFlag.ISSUER_CONTROLLED) else cap(8, SafetyFlag.SEIZABLE)
+    }
+    if (f.ext.defaultFrozen && !f.verified) cap(12, SafetyFlag.DEFAULT_FROZEN)
+    if (f.ext.transferHook && !f.verified) cap(20, SafetyFlag.TRANSFER_HOOK)
+    f.ext.transferFeeBps?.let { bps ->
+        if (bps >= 1_000) cap(25, SafetyFlag.TRANSFER_TAX) else if (bps > 0) cap(60, SafetyFlag.TRANSFER_TAX)
+    }
+    // Token-2022 on its own, with none of the above, is just a newer standard.
+    if (f.token2022 && !f.ext.any) cap(68, SafetyFlag.NEW_TOKEN_PROGRAM)
     if (f.liquidityUsd in 0.0..10_000.0) cap(45, SafetyFlag.THIN)
     if (f.holders in 1..99) cap(50, SafetyFlag.FEW_HOLDERS)
     if (!f.verified) cap(75, SafetyFlag.UNVERIFIED)

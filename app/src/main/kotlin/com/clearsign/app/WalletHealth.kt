@@ -32,7 +32,9 @@ data class WalletHealth(val score: Int, val issues: List<HealthIssue>, val recla
                 if (unlimited.isNotEmpty()) add(HealthIssue(HealthIssue.Kind.UNLIMITED_APPROVAL, unlimited.size, unlimited.joinToString { TokenSymbols.symbol(it.mint) }))
                 if (limited.isNotEmpty()) add(HealthIssue(HealthIssue.Kind.LIMITED_APPROVAL, limited.size, limited.joinToString { TokenSymbols.symbol(it.mint) }))
                 if (dust.isNotEmpty()) add(HealthIssue(HealthIssue.Kind.DUST_ACCOUNTS, dust.size, ""))
-                if (frozen.isNotEmpty()) add(HealthIssue(HealthIssue.Kind.FROZEN, frozen.size, ""))
+                // Named, because "1 frozen account" is not something anybody can
+                // act on and the coin is the only part that tells you what happened.
+                if (frozen.isNotEmpty()) add(HealthIssue(HealthIssue.Kind.FROZEN, frozen.size, frozen.joinToString { TokenSymbols.symbol(it.mint) }))
             }
             return WalletHealth(score, issues, dust.sumOf { it.lamports })
         }

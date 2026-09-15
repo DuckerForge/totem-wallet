@@ -67,9 +67,11 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
         SettingsGroup(stringResource(R.string.set_g_agent), stringResource(R.string.set_g_agent_sub), HIcon.SPARK) {
             AgentGateCard()
             BrainCard()
+            WebCheckCard()
         }
 
         SettingsGroup(stringResource(R.string.set_g_wallet), stringResource(R.string.set_g_wallet_sub), HIcon.WALLET) {
+            ConnectionsCard()
             tools()
             ProtectionsCard()
             AttestationCard()
@@ -194,6 +196,34 @@ private fun AgentGateCard() {
     }
 }
 
+/**
+ * The way in to the list of who can ask this wallet for things.
+ *
+ * Lives under the wallet group rather than the agent one: an agent is one of the
+ * things that can ask, not the only one, and the person looking for "which sites
+ * am I logged into" is thinking about the wallet.
+ */
+@Composable
+private fun ConnectionsCard() {
+    val ctx = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    val count = remember(open) { runCatching { Connections.all(ctx).count { !it.revoked } }.getOrDefault(0) }
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(HIcon.LOGIN, Halo.cyan, 18.dp) }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.conn_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
+                    Text(stringResource(R.string.conn_card_sub, count), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                }
+            }
+            GhostButton(stringResource(R.string.conn_open), Modifier.fillMaxWidth(), HIcon.CHEVRON_RIGHT, tint = Halo.cyan) { open = true }
+        }
+    }
+    if (open) ConnectionsSheet { open = false }
+}
+
 @Composable
 private fun CompanionCard() {
     val ctx = LocalContext.current
@@ -271,6 +301,43 @@ private fun WidgetCard() {
                 }
                 Text(stringResource(R.string.widget_card_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
             }
+        }
+    }
+}
+
+/**
+ * The one setting in the app that spends money on something other than a trade,
+ * so it says so in the same breath as the switch, and starts off.
+ */
+@Composable
+private fun WebCheckCard() {
+    val ctx = LocalContext.current
+    val on by Settings.webCheck
+    val ready = remember { Secrets.model(ctx).let { it.ready && it.anthropic } }
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(HIcon.SEARCH, Halo.cyan, 18.dp) }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.webcheck_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
+                    Text(
+                        if (!ready) stringResource(R.string.webcheck_needs_key)
+                        else if (on) stringResource(R.string.webcheck_on) else stringResource(R.string.webcheck_off),
+                        fontFamily = Inter, fontSize = 12.sp, color = if (on && ready) Halo.mint else Halo.muted,
+                    )
+                }
+                if (ready) {
+                    Text(
+                        if (on) stringResource(R.string.watch_disable) else stringResource(R.string.watch_enable),
+                        fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = if (on) Halo.muted else Halo.mint,
+                        modifier = Modifier.clip(rs(10)).background((if (on) Halo.muted else Halo.mint).copy(alpha = 0.12f)).clickable {
+                            Settings.setWebCheck(ctx, !on); Haptics.tick(ctx)
+                        }.padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+            }
+            Text(stringResource(R.string.webcheck_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp)
         }
     }
 }
@@ -360,6 +427,19 @@ private fun SwapFeesCard(signer: SeedVaultSigner, owner: String?) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionTitle(stringResource(R.string.swapfees_title), stringResource(R.string.swapfees_sub), HIcon.COINS)
                 Text(stringResource(R.string.swapfees_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                // Counted before you press it: how many accounts are missing and
+                // what opening them costs in rent. Both come back to you, since
+                // the treasury is your own address.
+                val pending by androidx.compose.runtime.produceState<List<String>?>(initialValue = null, owner) {
+                    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { WalletActions.feeMintsToOpen(ctx, owner) }.getOrNull() }
+                }
+                pending?.let { list ->
+                    Text(
+                        if (list.isEmpty()) stringResource(R.string.swapfees_all_set)
+                        else stringResource(R.string.swapfees_pending, list.size, fmtSol(list.size * 2_040_000L, 4)),
+                        fontFamily = Inter, fontSize = 11.5.sp, color = if (list.isEmpty()) Halo.mint else Halo.amber,
+                    )
+                }
                 if (busy) Working(stringResource(R.string.theme_unlock_signing))
                 else GhostButton(stringResource(R.string.swapfees_btn), icon = HIcon.COINS, tint = Halo.mint) {
                     busy = true; msg = null
@@ -426,7 +506,7 @@ internal fun ProtectionsSheet(onDismiss: () -> Unit) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.prot_intro), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted)
                 Protections.items.forEachIndexed { i, it ->
-                    Row(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(14)).padding(12.dp), verticalAlignment = Alignment.Top) {
+                    Row(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).border(cardBorder(), rs(14)).padding(12.dp), verticalAlignment = Alignment.Top) {
                         Box(Modifier.size(32.dp).clip(rs(10)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(it.icon, Halo.cyan, 17.dp) }
                         Spacer(Modifier.width(10.dp))
                         Column {
@@ -448,7 +528,7 @@ internal fun AttestationKeyRow() {
     val key = remember { Attestation.publicKeyBase64() } ?: return
     var copied by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)).clickable { copyText(ctx, key); copied = true; Haptics.tick(ctx) }.padding(10.dp),
+        Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).clickable { copyText(ctx, key); copied = true; Haptics.tick(ctx) }.padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HaloIcon(HIcon.SHIELD_LOCK, Halo.muted, 13.dp); Spacer(Modifier.width(6.dp))

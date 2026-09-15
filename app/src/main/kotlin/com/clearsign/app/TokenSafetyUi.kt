@@ -49,6 +49,11 @@ internal fun safetyLabel(flag: SafetyFlag): String = stringResource(
         SafetyFlag.DEV_HEAVY -> R.string.safe_dev_heavy
         SafetyFlag.SERIAL_CREATOR -> R.string.safe_serial
         SafetyFlag.NEW_TOKEN_PROGRAM -> R.string.safe_token2022
+        SafetyFlag.SEIZABLE -> R.string.safe_seizable
+        SafetyFlag.TRANSFER_HOOK -> R.string.safe_hook
+        SafetyFlag.TRANSFER_TAX -> R.string.safe_tax
+        SafetyFlag.NON_TRANSFERABLE -> R.string.safe_frozen_forever
+        SafetyFlag.DEFAULT_FROZEN -> R.string.safe_default_frozen
         SafetyFlag.THIN -> R.string.safe_thin
         SafetyFlag.FEW_HOLDERS -> R.string.safe_few_holders
         SafetyFlag.UNVERIFIED -> R.string.safe_unverified
@@ -126,7 +131,8 @@ internal fun IncomingCoinCard(r: com.clearsign.core.Receipt, owner: String?) {
             val c = runCatching { JupiterTokens.candidateOf(leg.mint) }.getOrNull()
             val tok = JupiterTokens.cached(leg.mint)
             val sellable = runCatching { Jupiter.sellableBack(leg.mint, leg.decimals, tok?.usd) }.getOrNull()
-            safety = tok?.let { com.clearsign.core.assessToken(it.facts(sellable)) }
+            val ext = tok?.let { TokenExtensions.of(leg.mint, it.token2022) }
+            safety = tok?.let { com.clearsign.core.assessToken(it.facts(sellable, ext)) }
             // The bold lane is the loosest thing the agent would ever use. If even
             // that turns the coin down, the reason is worth saying out loud here.
             shape = c?.let { com.clearsign.core.passesGate(it, com.clearsign.core.ScanGate.BOLD) }

@@ -36,6 +36,21 @@ object Portfolio {
         "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo", // PYUSD
     )
 
+    /**
+     * The last view loaded, kept for the life of the process.
+     *
+     * Switching tabs throws the wallet page's composition away, so coming back
+     * started from null: the hero drew itself empty, the cards under it sat high,
+     * and half a second later the numbers arrived and shoved everything down. The
+     * data had not changed, only our memory of it had. A total half a second stale
+     * is not a lie; a page that jumps is simply broken.
+     */
+    @Volatile private var last: Pair<String, PortfolioView>? = null
+
+    /** What we knew a moment ago, so the page can be drawn at its real size at once. */
+    fun cached(owner: String?, currency: String): PortfolioView? =
+        last?.takeIf { it.first == "$owner|$currency" }?.second
+
     suspend fun load(owner: String, currency: String): PortfolioView = withContext(Dispatchers.IO) {
         val rpc = SolanaRpc.urlFor(null)
         val lam = runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() ?: 0L
@@ -64,5 +79,6 @@ object Portfolio {
         holdings.sortWith(compareByDescending<Holding> { it.fiat ?: -1.0 }.thenByDescending { it.ui })
         val total = holdings.sumOf { it.fiat ?: 0.0 }
         PortfolioView(currency, total, holdings, holdings.count { it.fiat != null }, holdings.count { it.fiat == null && it.isMain })
+            .also { last = "$owner|$currency" to it }
     }
 }

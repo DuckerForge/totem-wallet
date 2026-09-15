@@ -39,8 +39,14 @@ object Brain {
     /**
      * Send [history] plus the new user message and run the tool loop to the end.
      * Returns every turn produced, so the screen can show the tool results too.
+     *
+     * The answer streams. [onText] gets the assistant's text so far, each time a
+     * piece arrives, so the screen can show the first word after a second rather
+     * than the whole paragraph after ten. Tool calls are collected as they stream
+     * and run once the turn ends, exactly as before; a provider that will not
+     * stream falls back to one whole answer through the same callback.
      */
-    suspend fun ask(ctx: Context, history: List<Turn>, agentName: String): Reply = withContext(Dispatchers.IO) {
+    suspend fun ask(ctx: Context, history: List<Turn>, agentName: String, onText: (String) -> Unit = {}): Reply = withContext(Dispatchers.IO) {
         val cfg = Secrets.model(ctx)
         if (!cfg.ready) return@withContext Reply.Failed(ctx.getString(R.string.brain_no_key))
         val produced = ArrayList<Turn>()
@@ -55,63 +61,186 @@ object Brain {
         try {
             var rounds = 0
             while (rounds++ <= MAX_TOOL_ROUNDS) {
-                val body = if (cfg.anthropic) anthropicBody(cfg, system, messages) else openAiBody(cfg, system, messages)
+                val body = (if (cfg.anthropic) anthropicBody(cfg, system, messages) else openAiBody(cfg, system, messages)).put("stream", true)
                 val url = if (cfg.anthropic) "https://api.anthropic.com/v1/messages" else cfg.baseUrl.trimEnd('/') + "/chat/completions"
-                val response = post(url, body, cfg) ?: return@withContext Reply.Failed(ctx.getString(R.string.brain_unreachable))
-                response.optJSONObject("error")?.let { e ->
-                    return@withContext Reply.Failed(e.optString("message").ifBlank { ctx.getString(R.string.brain_unreachable) })
+                val turn = when (val r = stream(url, body, cfg, onText)) {
+                    is Streamed.Failed -> return@withContext Reply.Failed(r.message.ifBlank { ctx.getString(R.string.brain_unreachable) })
+                    is Streamed.Ok -> r
                 }
+                messages.put(turn.assistant)
+                if (turn.text.isNotBlank()) produced += Turn("assistant", turn.text.trim())
+                if (turn.calls.isEmpty()) return@withContext Reply.Ok(produced)
 
-                val calls = ArrayList<Triple<String, String, JSONObject>>()   // id, name, args
-                var text = ""
-                if (cfg.anthropic) {
-                    val content = response.optJSONArray("content") ?: JSONArray()
-                    for (i in 0 until content.length()) {
-                        val block = content.getJSONObject(i)
-                        when (block.optString("type")) {
-                            "text" -> text += block.optString("text")
-                            "tool_use" -> calls += Triple(block.optString("id"), block.optString("name"), block.optJSONObject("input") ?: JSONObject())
-                        }
-                    }
-                    messages.put(JSONObject().put("role", "assistant").put("content", content))
-                } else {
-                    val msg = response.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message") ?: JSONObject()
-                    text = msg.optString("content").takeIf { it != "null" } ?: ""
-                    val tc = msg.optJSONArray("tool_calls") ?: JSONArray()
-                    for (i in 0 until tc.length()) {
-                        val c = tc.getJSONObject(i)
-                        val fn = c.optJSONObject("function") ?: continue
-                        val args = runCatching { JSONObject(fn.optString("arguments", "{}")) }.getOrDefault(JSONObject())
-                        calls += Triple(c.optString("id"), fn.optString("name"), args)
-                    }
-                    messages.put(msg)
-                }
-
-                if (text.isNotBlank()) produced += Turn("assistant", text.trim())
-                if (calls.isEmpty()) return@withContext Reply.Ok(produced)
-
-                for ((id, name, args) in calls) {
+                // Anthropic wants every result of one assistant turn in a single
+                // user message; one message per result is a 400 as soon as the
+                // model calls two tools at once, which it does when asked to look
+                // at the budget and the market before answering. OpenAI-shaped
+                // endpoints want the opposite: one `tool` message per call.
+                val results = JSONArray()
+                for ((id, name, args) in turn.calls) {
                     val result = runCatching { BrainTools.run(ctx, name, args, agentName) }
                         .getOrElse { e -> JSONObject().put("error", e.message ?: "tool failed") }
                     produced += Turn("tool", result.toString(), tool = name, verdict = result.optString("decision").ifBlank { null })
-                    messages.put(
-                        if (cfg.anthropic) {
-                            JSONObject().put("role", "user").put(
-                                "content",
-                                JSONArray().put(
-                                    JSONObject().put("type", "tool_result").put("tool_use_id", id).put("content", result.toString()),
-                                ),
-                            )
-                        } else {
-                            JSONObject().put("role", "tool").put("tool_call_id", id).put("content", result.toString())
-                        },
-                    )
+                    if (cfg.anthropic) {
+                        results.put(JSONObject().put("type", "tool_result").put("tool_use_id", id).put("content", result.toString()))
+                    } else {
+                        messages.put(JSONObject().put("role", "tool").put("tool_call_id", id).put("content", result.toString()))
+                    }
                 }
+                if (cfg.anthropic) messages.put(JSONObject().put("role", "user").put("content", results))
             }
             Reply.Ok(produced + Turn("assistant", ctx.getString(R.string.brain_too_many_steps)))
         } catch (e: Exception) {
             Log.w(TAG, "ask failed", e)
             Reply.Failed(e.message ?: ctx.getString(R.string.brain_unreachable))
+        }
+    }
+
+    /** One streamed assistant turn: its text, its tool calls, and the message to echo back. */
+    private sealed class Streamed {
+        class Ok(val text: String, val calls: List<Triple<String, String, JSONObject>>, val assistant: JSONObject) : Streamed()
+        class Failed(val message: String) : Streamed()
+    }
+
+    /**
+     * POST with `stream: true` and read server-sent events until the turn ends.
+     *
+     * Two dialects, one reader. Anthropic sends typed blocks (`content_block_start`
+     * / `_delta` / `_stop`) and tool arguments as partial JSON; OpenAI-shaped
+     * endpoints send `choices[0].delta` with `content` and `tool_calls[]` pieces
+     * keyed by index, then `[DONE]`. Both get reassembled into exactly the
+     * assistant message the non-streaming answer would have carried, so the rest
+     * of the loop does not know the difference.
+     */
+    private fun stream(url: String, body: JSONObject, cfg: Secrets.Model, onText: (String) -> Unit): Streamed {
+        val c = try {
+            (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"; doOutput = true; connectTimeout = 10_000; readTimeout = 120_000
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Accept", "text/event-stream")
+                if (cfg.anthropic) {
+                    setRequestProperty("x-api-key", cfg.key)
+                    setRequestProperty("anthropic-version", "2023-06-01")
+                } else {
+                    setRequestProperty("Authorization", "Bearer " + cfg.key)
+                }
+                outputStream.use { it.write(body.toString().toByteArray()) }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "stream open failed: ${e.javaClass.simpleName}")
+            return Streamed.Failed("")
+        }
+        try {
+            val code = c.responseCode
+            if (code !in 200..299) {
+                val err = c.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                val msg = runCatching { JSONObject(err).optJSONObject("error")?.optString("message") }.getOrNull().orEmpty()
+                return Streamed.Failed(msg.ifBlank { "HTTP $code" })
+            }
+            val text = StringBuilder()
+            // Tool calls by block index (Anthropic) or by tool_calls index (OpenAI).
+            val ids = HashMap<Int, String>()
+            val names = HashMap<Int, String>()
+            val args = HashMap<Int, StringBuilder>()
+            val order = ArrayList<Int>()
+            var failed: String? = null
+            c.inputStream.bufferedReader().useLines { lines ->
+                for (raw in lines) {
+                    if (!raw.startsWith("data:")) continue
+                    val data = raw.removePrefix("data:").trim()
+                    if (data.isEmpty() || data == "[DONE]") continue
+                    val o = runCatching { JSONObject(data) }.getOrNull() ?: continue
+                    if (cfg.anthropic) {
+                        when (o.optString("type")) {
+                            "content_block_start" -> {
+                                val i = o.optInt("index")
+                                val b = o.optJSONObject("content_block") ?: continue
+                                if (b.optString("type") == "tool_use") {
+                                    ids[i] = b.optString("id"); names[i] = b.optString("name"); args[i] = StringBuilder(); order += i
+                                }
+                            }
+                            "content_block_delta" -> {
+                                val i = o.optInt("index")
+                                val d = o.optJSONObject("delta") ?: continue
+                                when (d.optString("type")) {
+                                    "text_delta" -> { text.append(d.optString("text")); onText(text.toString()) }
+                                    "input_json_delta" -> args[i]?.append(d.optString("partial_json"))
+                                }
+                            }
+                            "error" -> failed = o.optJSONObject("error")?.optString("message") ?: "error"
+                        }
+                    } else {
+                        o.optJSONObject("error")?.let { failed = it.optString("message").ifBlank { "error" } }
+                        val d = o.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("delta") ?: continue
+                        d.optString("content").takeIf { it.isNotEmpty() && it != "null" }?.let { text.append(it); onText(text.toString()) }
+                        val tc = d.optJSONArray("tool_calls") ?: continue
+                        for (k in 0 until tc.length()) {
+                            val t = tc.optJSONObject(k) ?: continue
+                            val i = t.optInt("index", k)
+                            if (i !in args) { args[i] = StringBuilder(); order += i }
+                            t.optString("id").takeIf { it.isNotEmpty() }?.let { ids[i] = it }
+                            t.optJSONObject("function")?.let { f ->
+                                f.optString("name").takeIf { it.isNotEmpty() }?.let { names[i] = it }
+                                args[i]?.append(f.optString("arguments"))
+                            }
+                        }
+                    }
+                }
+            }
+            failed?.let { return Streamed.Failed(it) }
+
+            val calls = order.map { i ->
+                val parsed = runCatching { JSONObject(args[i].toString().ifBlank { "{}" }) }.getOrDefault(JSONObject())
+                Triple(ids[i].orEmpty(), names[i].orEmpty(), parsed)
+            }
+            val assistant = if (cfg.anthropic) {
+                val content = JSONArray()
+                if (text.isNotEmpty()) content.put(JSONObject().put("type", "text").put("text", text.toString()))
+                calls.forEach { (id, name, input) -> content.put(JSONObject().put("type", "tool_use").put("id", id).put("name", name).put("input", input)) }
+                JSONObject().put("role", "assistant").put("content", content)
+            } else {
+                val m = JSONObject().put("role", "assistant").put("content", if (text.isEmpty()) JSONObject.NULL else text.toString())
+                if (calls.isNotEmpty()) {
+                    val tc = JSONArray()
+                    calls.forEach { (id, name, input) ->
+                        tc.put(JSONObject().put("id", id).put("type", "function").put("function", JSONObject().put("name", name).put("arguments", input.toString())))
+                    }
+                    m.put("tool_calls", tc)
+                }
+                m
+            }
+            return Streamed.Ok(text.toString(), calls, assistant)
+        } catch (e: Exception) {
+            Log.w(TAG, "stream failed: ${e.javaClass.simpleName}")
+            return Streamed.Failed("")
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /**
+     * One question, one answer, no tools, on whichever provider is configured.
+     * For the checks that want a verdict rather than a conversation. Null when
+     * nobody answered or the provider complained.
+     */
+    suspend fun complete(ctx: Context, system: String, user: String, maxTokens: Int = 256): String? = withContext(Dispatchers.IO) {
+        val cfg = Secrets.model(ctx)
+        if (!cfg.ready) return@withContext null
+        val ask = JSONObject().put("role", "user").put("content", user)
+        val body = if (cfg.anthropic) {
+            JSONObject().put("model", cfg.model).put("max_tokens", maxTokens).put("system", system).put("messages", JSONArray().put(ask))
+        } else {
+            JSONObject().put("model", cfg.model).put("max_tokens", maxTokens)
+                .put("messages", JSONArray().put(JSONObject().put("role", "system").put("content", system)).put(ask))
+        }
+        val url = if (cfg.anthropic) "https://api.anthropic.com/v1/messages" else cfg.baseUrl.trimEnd('/') + "/chat/completions"
+        val r = post(url, body, cfg) ?: return@withContext null
+        if (r.has("error")) { Log.w(TAG, "complete: " + r.optJSONObject("error")?.optString("type")); return@withContext null }
+        if (cfg.anthropic) {
+            val content = r.optJSONArray("content") ?: return@withContext null
+            buildString { for (i in 0 until content.length()) content.optJSONObject(i)?.let { if (it.optString("type") == "text") append(it.optString("text")) } }
+        } else {
+            r.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")?.takeIf { it != "null" }
         }
     }
 
@@ -145,7 +274,7 @@ object Brain {
         )
         if (s == null || p == null) {
             sb.append(if (italian) "Non hai ancora una paghetta, quindi non puoi spendere niente. Se serve, di' alla persona di creartene una dalla linguetta Agente." else "You have no budget yet, so you cannot spend anything. If needed, tell the person to give you one in the Agent tab.")
-            return sb.toString()
+            return sb.append(ownRules(ctx, italian)).toString()
         }
         val mode = when (p.mode) {
             AgentMode.OFF -> if (italian) "spento: non passerà niente" else "off: nothing will go through"
@@ -176,8 +305,12 @@ object Brain {
                 "The main account lives in the Seed Vault and you never touch it: you can only send gains to it with harvest.\nThere are two pots and you must never blur them: the budget, which is the only money you can spend, and the main account, which you can only look at. Always say which one you are talking about. Call wallet_status before proposing a spend. Before proposing a swap, look at the market: market_scan to find what is worth looking at right now, market_search to learn what a coin is, what it costs and whether it is a trap, quote_swap to learn what it would really return, portfolio to know what they hold. Never pick a coin from memory: what you remember is a year old and that ticker may belong to somebody else today. When you are looking for something new, always start from market_scan, and say what it threw out as well as what it kept.\nIf the person asks you to work on your own, to look for opportunities, or to keep going while they close the app, that is start_trading. Ask them which lane first, blue chip or degen, and wait for the answer: do not choose it for them. Use those two words exactly; they are the ones people in crypto actually use. Once it is on, tell them the real numbers the tool gave back, the slice per position, how many positions, where it sells in profit and where in loss, and that they can close the app. Say the limits the tool reports too, without softening them. To know how it is going use positions, not memory. Quote the real numbers you found, not impressions. After each operation say how it went, with the real amount.\nWrite in short sentences, the way you would say it out loud. No tables, no pipes, no asterisks, no markdown: the phone shows raw text and a table turns into noise. For a list, one line per item with a dash."
             },
         )
-        return sb.toString()
+        return sb.append(ownRules(ctx, italian)).toString()
     }
+
+    /** The person's own rules, last, after the truths they cannot override. Empty when there is no file. */
+    private fun ownRules(ctx: Context, italian: Boolean): String =
+        UserRules.get(ctx)?.let { UserRules.chatBlock(it, italian) } ?: ""
 
     // ---- wire ------------------------------------------------------------------
 

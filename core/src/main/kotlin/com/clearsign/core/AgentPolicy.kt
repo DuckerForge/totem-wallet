@@ -121,9 +121,50 @@ object PolicyEngine {
         if (now > policy.expiresAt) return Decision.Refuse("expired", if (it) "la paghetta è scaduta" else "the budget has expired")
         if (policy.mode == AgentMode.READ_ONLY) return Decision.Refuse("read_only", if (it) "l'agente è in sola lettura" else "the agent is read-only")
 
+        // What the transaction is, read once: the rules below all need it, and so
+        // does the drain exemption immediately after.
+        val programs = receipt.stats?.programs.orEmpty()
+        val exchange = programs.any { p -> p in EXCHANGE_PROGRAMS && p in policy.allowedPrograms }
+        val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
+        val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
+        /**
+         * An exchange where something comes back into this same pocket.
+         *
+         * [RiskFlag.DRAINS_BALANCE] means "this sends out almost everything you
+         * have of one thing", and on a person's wallet that is the shape of a
+         * drainer. On the agent's budget it is the shape of **an ordinary trade**:
+         * the budget is small on purpose and the slice is most of it by design, so
+         * after one purchase the next one always spends nine tenths of the SOL
+         * left. It fired on every coin, refused as DANGER before any other rule
+         * ran, and switched the loop off for the night. Measured on the phone:
+         * "Fermo su SV151. Il collare ha detto no. Fa uscire il 93% del tuo saldo
+         * in SOL", with 0.033 SOL of a 0.036 SOL balance going into a swap.
+         *
+         * Exempting it costs nothing, because a swap that really takes the money
+         * away is caught by rules that *measure* rather than guess: an exchange
+         * must invoke an allowed exchange program (5), and it must give back most
+         * of what it takes (10, `rate_quality`), and it must fit the caps (11).
+         * A transfer wearing a swap's clothes returns nothing, so it is not this.
+         */
+        val exchangeWithReturn = exchange && outs.isNotEmpty() && ins.isNotEmpty()
+
         // 2. The claim does not hold, or the transaction is dangerous on its own.
         if (guard.flag == RiskFlag.AGENT_INTENT_MISMATCH) return Decision.Refuse("intent_mismatch", guard.detail)
-        receipt.risks.firstOrNull { r -> r.severity == Severity.DANGER }?.let { r -> return Decision.Refuse("danger", r.detail) }
+        receipt.risks.firstOrNull { r ->
+            r.severity == Severity.DANGER && !(r.flag == RiskFlag.DRAINS_BALANCE && exchangeWithReturn)
+        }?.let { r ->
+            // A transaction nobody could simulate is refused like anything else —
+            // this wallet does not sign blind — but under its own name, because
+            // "the network was down" is something to try again, "the node ran it
+            // and it failed" is a bad proposal to skip, and "this moves your
+            // money somewhere else" is neither.
+            val code = when (r.flag) {
+                RiskFlag.SIMULATION_UNAVAILABLE -> "no_simulation"
+                RiskFlag.SIMULATION_FAILED -> "sim_failed"
+                else -> "danger"
+            }
+            return Decision.Refuse(code, r.detail)
+        }
 
         // 3. The vault is out of bounds. The envelope key cannot authorise the vault
         //    to pay, so a vault that only receives is fine ("send the winnings home").
@@ -148,10 +189,6 @@ object PolicyEngine {
         //    governs transfers. A transaction counts as an exchange only when it
         //    actually invokes an allowed exchange program: a plain transfer
         //    dressed up with a dust inflow does not qualify.
-        val programs = receipt.stats?.programs.orEmpty()
-        val exchange = programs.any { p -> p in EXCHANGE_PROGRAMS && p in policy.allowedPrograms }
-        val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
-        val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         if (!exchange) {
             val payees = receipt.distributions.filter { s -> !s.isNewAccount }.map { s -> s.address } +
                 listOfNotNull(receipt.primaryRecipient)
@@ -174,39 +211,103 @@ object PolicyEngine {
             return Decision.Ask("program", if (it) "usa un programma non in lista: ${short(p)}" else "uses a program not on the list: ${short(p)}")
         }
 
-        // 8. Value. Nothing of unknown worth is signed silently.
-        var total = 0L
-        for (d in outs) {
-            val v = valueLamports(d) ?: return Decision.Ask("unknown_value", if (it) "non so quanto vale ${trim(abs(d.uiAmount))} ${d.symbol}" else "cannot value ${trim(abs(d.uiAmount))} ${d.symbol}")
-            total += v
+        // 8. Is the agent coming home? A coin it holds, turned back into the money
+        //    the budget is kept in, landing in the same pocket it left.
+        val unwind = isUnwind(policy, receipt)
+
+        // 9. Value. Nothing of unknown worth is signed silently. A coming home is
+        //    the exception: what matters there is what arrives, and what arrives
+        //    is SOL, which is never unpriceable.
+        outs.firstOrNull { d -> valueLamports(d) == null }?.let { d ->
+            if (!unwind) return Decision.Ask("unknown_value", if (it) "non so quanto vale ${trim(abs(d.uiAmount))} ${d.symbol}" else "cannot value ${trim(abs(d.uiAmount))} ${d.symbol}")
         }
-        // 9. An exchange must give back most of what it takes: a swap at a
-        //    terrible rate is how a transfer hides inside a swap.
+        val total = outs.sumOf { d -> valueLamports(d) ?: 0L }
+        // 10. An exchange must give back most of what it takes: a swap at a
+        //     terrible rate is how a transfer hides inside a swap.
         if (exchange) {
-            var back = 0L
-            for (d in ins) {
-                val v = valueLamports(d) ?: return Decision.Ask("unknown_value", if (it) "non so quanto vale ciò che riceve (${d.symbol})" else "cannot value what comes back (${d.symbol})")
-                back += v
+            ins.firstOrNull { d -> valueLamports(d) == null }?.let { d ->
+                if (!unwind) return Decision.Ask("unknown_value", if (it) "non so quanto vale ciò che riceve (${d.symbol})" else "cannot value what comes back (${d.symbol})")
             }
-            if (back < total / 2) {
-                return Decision.Refuse("rate_quality", if (it) "non è uno scambio: manda ${sol(total)} SOL e riceve l'equivalente di ${sol(back)} SOL" else "this is not an exchange: sends ${sol(total)} SOL and gets back the equivalent of ${sol(back)} SOL")
+            val back = ins.sumOf { d -> valueLamports(d) ?: 0L }
+
+            // What actually went *into the exchange*, which is not everything that
+            // left the wallet.
+            //
+            // Buying a coin for the first time also pays the network and the rent
+            // to open the account that will hold it — about 0.002 SOL per account,
+            // money that buys an account and not a coin. Counting it here made a
+            // clean trade look like a bad one: 0.0312 SOL swapped into coins worth
+            // 0.0311 was reported as "sends 0.0359, gets back 0.0303", 84%, and
+            // the agent was sent to ask for a fingerprint over a spread of 1.3%
+            // that did not exist. Measured against the chain, not guessed.
+            val rent = receipt.distributions.filter { s -> s.isNewAccount }.sumOf { s -> abs(s.delta.rawAmount) }
+            val swapped = (total - rent - receipt.feeLamports).coerceAtLeast(1L)
+
+            if (back < swapped / 2) {
+                return Decision.Refuse("rate_quality", if (it) "non è uno scambio: scambia ${sol(swapped)} SOL e riceve l'equivalente di ${sol(back)} SOL" else "this is not an exchange: swaps ${sol(swapped)} SOL and gets back the equivalent of ${sol(back)} SOL")
             }
-            if (back < total * 9 / 10) {
-                return Decision.Ask("rate", if (it) "cambio sfavorevole: manda ${sol(total)} SOL e riceve l'equivalente di ${sol(back)} SOL" else "poor rate: sends ${sol(total)} SOL and gets back the equivalent of ${sol(back)} SOL")
+            // Getting out of a coin pays the spread and the impact, and that is
+            // often more than a tenth. Asking here is the same as refusing: the
+            // loop runs with nobody in front of the phone.
+            if (!unwind && back < swapped * 9 / 10) {
+                return Decision.Ask("rate", if (it) "cambio sfavorevole: scambia ${sol(swapped)} SOL e riceve l'equivalente di ${sol(back)} SOL" else "poor rate: swaps ${sol(swapped)} SOL and gets back the equivalent of ${sol(back)} SOL")
             }
         }
-        if (total > policy.perTxLamports) {
-            return Decision.Ask("per_tx", if (it) "${sol(total)} SOL supera il tetto per operazione di ${sol(policy.perTxLamports)} SOL" else "${sol(total)} SOL is over the per-transaction cap of ${sol(policy.perTxLamports)} SOL")
+        // 11. The caps bound what the budget can lose. A coming home is the
+        //     opposite of a loss: the coin becomes money again, in the same
+        //     pocket, and nothing can leave through it. Measuring it against the
+        //     per-move cap is what left a position unsellable at exactly the
+        //     moment it had grown enough to be worth selling.
+        if (!unwind) {
+            if (total > policy.perTxLamports) {
+                return Decision.Ask("per_tx", if (it) "${sol(total)} SOL supera il tetto per operazione di ${sol(policy.perTxLamports)} SOL" else "${sol(total)} SOL is over the per-transaction cap of ${sol(policy.perTxLamports)} SOL")
+            }
+            if (history.spentLast24hLamports + total > policy.dailyLamports) {
+                return Decision.Ask("daily", if (it) "supererebbe il tetto giornaliero di ${sol(policy.dailyLamports)} SOL" else "would exceed the daily cap of ${sol(policy.dailyLamports)} SOL")
+            }
         }
-        if (history.spentLast24hLamports + total > policy.dailyLamports) {
-            return Decision.Ask("daily", if (it) "supererebbe il tetto giornaliero di ${sol(policy.dailyLamports)} SOL" else "would exceed the daily cap of ${sol(policy.dailyLamports)} SOL")
-        }
+        // An explicit "always ask me" is a choice about every move, including
+        // this one. It is the one rule a coming home does not walk past.
         if (policy.mode == AgentMode.ASK_ALWAYS) return Decision.Ask("ask_always", if (it) "hai scelto di essere sempre interpellato" else "you chose to always be asked")
-        if (total > policy.askAboveLamports) {
+        if (!unwind && total > policy.askAboveLamports) {
             return Decision.Ask("silent_threshold", if (it) "${sol(total)} SOL supera la soglia silenziosa di ${sol(policy.askAboveLamports)} SOL" else "${sol(total)} SOL is over the silent threshold of ${sol(policy.askAboveLamports)} SOL")
         }
         return Decision.Auto
     }
+
+    /**
+     * The agent coming home: a coin the budget holds, swapped back into the money
+     * the budget is kept in.
+     *
+     * Why this deserves a name of its own. Every cap in the collar exists to bound
+     * what the budget can *lose* — per move, per day, and the line above which a
+     * person is asked. A sale loses nothing: the same pocket that held the coin
+     * holds the SOL afterwards, and no address outside the budget can receive
+     * anything through it. Running a sale past the spending caps meant the agent
+     * could buy a coin it was then forbidden to sell, which is the worst shape a
+     * rule can have. It also meant a stop-loss turning into a ninety-second wait
+     * for a fingerprint that nobody was there to give.
+     *
+     * Deliberately narrow: it must be a real exchange through an allowed program,
+     * nothing of the budget's base money may leave, and everything arriving must
+     * be base money. A swap into another coin is not a coming home, and neither is
+     * a transfer wearing a swap's clothes.
+     *
+     * [receipt] is the *simulated* receipt, whose legs are already only the
+     * budget's own, so this reads what will happen and never what was claimed.
+     */
+    fun isUnwind(policy: AgentPolicy, receipt: Receipt): Boolean {
+        val programs = receipt.stats?.programs.orEmpty()
+        if (programs.none { p -> p in EXCHANGE_PROGRAMS && p in policy.allowedPrograms }) return false
+        val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
+        val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
+        if (outs.isEmpty() || ins.isEmpty()) return false
+        if (outs.any { d -> isBase(d.mint) }) return false
+        return ins.all { d -> isBase(d.mint) }
+    }
+
+    /** The money a budget is kept in: SOL, wrapped SOL, USDC. */
+    private fun isBase(mint: String) = mint in AgentPolicy.BASE_MINTS
 
     private fun allowedMint(p: AgentPolicy, d: BalanceDelta): Boolean =
         p.allowAnyMint ||

@@ -76,14 +76,14 @@ internal fun LedgerScreen() {
             FilterLabel(stringResource(R.string.ledger_kind))
             ChipRow(
                 listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all_kinds)) +
-                    listOf("tx", "send", "agent", "gift", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
+                    listOf("tx", "send", "agent", "order", "gift", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
                 kind,
             ) { kind = it }
 
             // ---- period totals ----------------------------------------------
             if (shown.isNotEmpty()) {
                 val totals = remember(shown, currency) { Totals.of(shown, currency) }
-                Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.ledger_totals), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
                         Spacer(Modifier.weight(1f))
@@ -155,7 +155,7 @@ internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>
 @Composable
 private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
-    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "agent" -> if (e.host == "refused") HIcon.BLOCK else HIcon.PIGEON; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
+    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.PIGEON; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
     Row(
         Modifier.fillMaxWidth().clip(rs(14)).background(Halo.card).border(1.dp, if (danger) Halo.red.copy(alpha = 0.5f) else Halo.stroke, rs(14)).clickable { onTap() }.padding(12.dp),
@@ -166,7 +166,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(e.dApp + (e.host?.let { " · $it" } ?: ""), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Halo.ink, maxLines = 1)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (if (e.kind == "agent") agentHow(ctx, e.host) else "") + (e.recipientLabel?.let { " · $it" } ?: ""), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (if (e.kind == "agent") agentHow(ctx, e.host) else "") + (if (e.kind == "order" && e.note.isNotBlank()) " · " + e.note else "") + (e.recipientLabel?.let { " · $it" } ?: ""), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (e.attestationSig != null) { Spacer(Modifier.width(5.dp)); HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 11.dp) }
                 if (e.tags.isNotEmpty()) { Spacer(Modifier.width(5.dp)); Text(e.tags.first(), fontFamily = Inter, fontSize = 10.sp, color = Halo.cyan) }
             }
@@ -184,7 +184,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
 @Composable
 internal fun AnalyticsCard(a: Analytics) {
     var open by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
             HaloIcon(HIcon.COINS, Halo.cyan, 14.dp); Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.pnl_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
@@ -216,13 +216,14 @@ internal fun agentHow(ctx: android.content.Context, host: String?): String = whe
     "auto" -> " · " + ctx.getString(R.string.agent_how_auto)
     "asked" -> " · " + ctx.getString(R.string.agent_how_asked)
     "refused" -> " · " + ctx.getString(R.string.agent_how_refused)
+    "expired" -> " · " + ctx.getString(R.string.agent_how_expired)
     else -> ""
 }
 
 internal fun kindLabel(ctx: android.content.Context, k: String): String = when (k) {
     "signin" -> ctx.getString(R.string.kind_signin); "message" -> ctx.getString(R.string.kind_message); "theme" -> ctx.getString(R.string.kind_theme)
     "revoke" -> ctx.getString(R.string.kind_revoke); "close" -> ctx.getString(R.string.kind_close); "burn" -> ctx.getString(R.string.kind_burn); "envelope" -> ctx.getString(R.string.kind_envelope); "send" -> ctx.getString(R.string.kind_send)
-    "agent" -> ctx.getString(R.string.kind_agent); "gift" -> ctx.getString(R.string.kind_gift)
+    "agent" -> ctx.getString(R.string.kind_agent); "gift" -> ctx.getString(R.string.kind_gift); "order" -> ctx.getString(R.string.kind_order)
     else -> ctx.getString(R.string.kind_tx)
 }
 
@@ -240,6 +241,27 @@ private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", 
 
 internal fun fmtUi(v: Double): String = String.format(Locale.ROOT, "%,.6f", v).replace(',', ' ').trimEnd('0').trimEnd('.')
 internal fun fmtFiat(v: Double, cur: String): String = String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
+
+/**
+ * The price of one coin, which is not the same kind of number as a total.
+ *
+ * Two decimals is right for what a holding is worth and useless for what one
+ * unit of it costs: most of what the agent buys trades at four zeros after the
+ * point, and "0,00 €" is not a price. So the decimals follow the size of the
+ * number, down to eight, and the trailing zeros go.
+ */
+internal fun fmtPrice(v: Double, cur: String): String {
+    val symbol = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)
+    val decimals = when {
+        v >= 100 -> 2
+        v >= 1 -> 3
+        v >= 0.01 -> 4
+        v >= 0.0001 -> 6
+        else -> 8
+    }
+    val s = String.format(Locale.getDefault(), "%,.${decimals}f", v)
+    return (if (s.contains(',') || s.contains('.')) s.trimEnd('0').trimEnd(',', '.') else s) + " " + symbol
+}
 
 /** The caption that says what a row of chips filters. */
 @Composable

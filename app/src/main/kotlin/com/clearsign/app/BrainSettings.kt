@@ -79,12 +79,21 @@ internal fun BrainFields(compact: Boolean = false) {
         }
         Text(stringResource(R.string.brain_free_note), style = HaloType.small, color = Halo.muted)
 
+        // The paid ones people already have a key for. Each chip fills the base
+        // URL and a model that answers tool calls, so a key is all that is typed.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingChip("Anthropic", cfg.provider == "anthropic", Modifier.weight(1f)) {
                 cfg = cfg.copy(provider = "anthropic", model = Secrets.DEFAULT_ANTHROPIC_MODEL)
             }
-            SettingChip("OpenAI-compatible", cfg.provider != "anthropic", Modifier.weight(1f)) {
-                cfg = cfg.copy(provider = "openai", model = "openai/gpt-4o-mini")
+            SettingChip("OpenAI", cfg.baseUrl.contains("api.openai.com"), Modifier.weight(1f)) {
+                cfg = cfg.copy(provider = "openai", baseUrl = "https://api.openai.com/v1", model = "gpt-4o-mini")
+            }
+            SettingChip("Gemini", cfg.baseUrl.contains("googleapis"), Modifier.weight(1f)) {
+                // Google's OpenAI-shaped door: same chat body, same tool calls.
+                cfg = cfg.copy(provider = "openai", baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai", model = "gemini-2.5-flash")
+            }
+            SettingChip("xAI", cfg.baseUrl.contains("x.ai"), Modifier.weight(1f)) {
+                cfg = cfg.copy(provider = "openai", baseUrl = "https://api.x.ai/v1", model = "grok-4")
             }
         }
 
@@ -92,6 +101,7 @@ internal fun BrainFields(compact: Boolean = false) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingChip("Haiku 4.5", cfg.model == Secrets.DEFAULT_ANTHROPIC_MODEL, Modifier.weight(1f)) { cfg = cfg.copy(model = Secrets.DEFAULT_ANTHROPIC_MODEL) }
                 SettingChip("Sonnet 5", cfg.model == "claude-sonnet-5", Modifier.weight(1f)) { cfg = cfg.copy(model = "claude-sonnet-5") }
+                SettingChip("Opus 5", cfg.model == "claude-opus-5", Modifier.weight(1f)) { cfg = cfg.copy(model = "claude-opus-5") }
             }
         } else {
             BrainField(stringResource(R.string.brain_base), cfg.baseUrl) { cfg = cfg.copy(baseUrl = it) }
@@ -214,7 +224,7 @@ internal fun LinkHelpSheet(onScan: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.link_help_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
             Text(stringResource(R.string.link_help_body), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted, lineHeight = 19.sp)
             Column(
-                Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(1.dp, Halo.stroke, rs(12)).padding(12.dp),
+                Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).padding(12.dp),
             ) {
                 Text(stringResource(R.string.link_help_cmd), fontFamily = Mono, fontSize = 11.sp, color = Halo.ink, lineHeight = 17.sp)
             }

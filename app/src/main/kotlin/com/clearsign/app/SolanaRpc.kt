@@ -551,17 +551,49 @@ object SolanaRpc {
         return out
     }
 
-    /** Both token programs queried concurrently (they're independent). */
+    /**
+     * What a wallet holds, or **null when the chain could not be asked**.
+     *
+     * The lenient reader below turns a failed call into an empty list, which is
+     * the right shape for a portfolio screen and the wrong one for anything that
+     * acts on the answer: the trading loop reconciled its book against it, read
+     * a rate-limited node as "the wallet holds nothing", and dropped every open
+     * position, coins still in the wallet and no stop watching them. Here a
+     * failed read is a null, and both programs must answer for the list to count.
+     *
+     * Also the reader for wallets that are not ours: the Seeker whale card uses it
+     * with the scanner's own key, deliberately never the agent's, so reading a
+     * stranger's balances cannot eat the month that real trades depend on.
+     * Blocking, two calls, so call it on IO and only when somebody asked.
+     */
+    fun tokensOf(rpcUrl: String, owner: String): List<TokenAccountInfo>? {
+        val parts = readTokenAccounts(rpcUrl, owner)
+        if (parts.any { it == null }) return null
+        val list = parts.flatMap { it.orEmpty() }
+        TokenSymbols.resolve(list.map { it.mint })
+        tokenListCache["$rpcUrl|$owner"] = Cached(list, System.currentTimeMillis())
+        return list
+    }
+
+    /** Both token programs queried concurrently (they're independent). A failed call reads as empty. */
     private fun getTokenAccounts(rpcUrl: String, owner: String): List<TokenAccountInfo> {
+        val list = readTokenAccounts(rpcUrl, owner).flatMap { it.orEmpty() }
+        // Learn the symbols of whatever tokens this wallet holds (one DAS call, cached).
+        TokenSymbols.resolve(list.map { it.mint })
+        return list
+    }
+
+    /** One list per token program, in order; null for a program whose call did not come back. */
+    private fun readTokenAccounts(rpcUrl: String, owner: String): List<List<TokenAccountInfo>?> {
         val futures = listOf(TOKEN_PROGRAM, TOKEN_2022).map { program ->
             async {
                 val params = JSONArray()
                     .put(owner)
                     .put(JSONObject().put("programId", program))
                     .put(JSONObject().put("encoding", "jsonParsed").put("commitment", COMMITMENT))
+                val resp = post(rpcUrl, "getTokenAccountsByOwner", params) ?: return@async null
+                val arr = resp.optJSONObject("result")?.optJSONArray("value") ?: return@async null
                 val out = ArrayList<TokenAccountInfo>()
-                val resp = post(rpcUrl, "getTokenAccountsByOwner", params) ?: return@async out
-                val arr = resp.optJSONObject("result")?.optJSONArray("value") ?: return@async out
                 for (i in 0 until arr.length()) {
                     val obj = arr.optJSONObject(i) ?: continue
                     parseTokenAccount(obj)?.let { out.add(it) }
@@ -569,10 +601,7 @@ object SolanaRpc {
                 out
             }
         }
-        val list = futures.flatMap { runCatching { it.get() }.getOrDefault(emptyList()) }
-        // Learn the symbols of whatever tokens this wallet holds (one DAS call, cached).
-        TokenSymbols.resolve(list.map { it.mint })
-        return list
+        return futures.map { runCatching { it.get() }.getOrNull() }
     }
 
     /**

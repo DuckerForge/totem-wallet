@@ -1383,6 +1383,9 @@
     <string name="eyes_guard_chain">Order on Jupiter: sells alone at +%1$d%%, phone off too. The stop is the loop\'s.</string>
     <string name="eyes_guard_loop">No order on the chain (slice under $5): the loop sells, every 90 s, while it runs.</string>
     <string name="eyes_guard_none">No order on the chain and the loop is off: nobody sells this, up or down.</string>
+    <string name="trader_sell_worse">Jupiter quotes %1$s SOL, the chain gives %2$s (−%3$d%%). Sell anyway?</string>
+    <string name="trader_sell_anyway">Sell anyway at %1$s SOL</string>
+    <string name="trader_target_unreal">%1$s: the target shows on the quote, but the chain gives %2$s SOL (−%3$d%%). Waiting.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

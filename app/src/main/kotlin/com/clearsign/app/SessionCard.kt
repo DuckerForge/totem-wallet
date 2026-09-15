@@ -290,6 +290,7 @@ internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: ()
     var value by remember(pos.mint) { mutableStateOf<Long?>(null) }
     var busy by remember(pos.mint) { mutableStateOf(false) }
     var said by remember(pos.mint) { mutableStateOf<String?>(null) }
+    var worse by remember(pos.mint) { mutableStateOf<SessionActions.Sale.Worse?>(null) }
 
     LaunchedEffect(pos.mint, pos.units) {
         value = runCatching { SessionActions.quoteValue(ctx, pos) }.getOrNull()
@@ -332,27 +333,17 @@ internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: ()
         (said ?: pos.lastError)?.let { Text(it, style = HaloType.small, color = Halo.amber, lineHeight = 15.sp) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             GhostButton(
-                stringResource(if (busy) R.string.trader_selling else R.string.trader_sell_now),
-                Modifier.weight(1f), HIcon.SWAP, tint = Halo.mint,
+                if (busy) stringResource(R.string.trader_selling)
+                else worse?.let { stringResource(R.string.trader_sell_anyway, fmtSol(it.realLamports, 4)) } ?: stringResource(R.string.trader_sell_now),
+                Modifier.weight(1f), HIcon.SWAP, tint = if (worse != null) Halo.red else Halo.mint,
             ) {
                 if (!busy) {
                     busy = true
                     scope.launch {
-                        val why = ctx.getString(R.string.trader_why_you, pos.symbol)
-                        val sale = runCatching { SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.IN_APP) }.getOrNull()
-                        val v = (sale as? SessionActions.Sale.Judged)?.verdict
+                        val r = SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP, acceptReal = worse != null)
                         busy = false
-                        when {
-                            v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
-                                Positions.remove(ctx, pos.mint)
-                                said = ctx.getString(R.string.trader_sold_done)
-                            }
-                            v is AgentBroker.Verdict.Timeout -> said = ctx.getString(R.string.trader_needed_you)
-                            v != null -> said = v.reason
-                            sale is SessionActions.Sale.Nothing -> said = ctx.getString(R.string.trader_no_coins)
-                            sale is SessionActions.Sale.NoRoute -> said = ctx.getString(R.string.trader_no_route)
-                            else -> said = ctx.getString(R.string.trader_net_down)
-                        }
+                        said = r.text
+                        worse = r.worse
                         onChange()
                     }
                 }

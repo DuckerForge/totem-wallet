@@ -99,6 +99,9 @@ internal fun EyesScreen(onClose: () -> Unit) {
     var spot by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var busy by remember { mutableStateOf<String?>(null) }
     var said by remember { mutableStateOf<String?>(null) }
+    // A sale the chain prices lower than Jupiter's quote: the question stays
+    // on screen with the real number until the person answers or moves on.
+    var worse by remember { mutableStateOf<Pair<Positions.Position, SessionActions.Sale.Worse>?>(null) }
     var voice by remember { mutableStateOf(Settings.eyesVoice(ctx)) }
     val scope = rememberCoroutineScope()
 
@@ -125,7 +128,7 @@ internal fun EyesScreen(onClose: () -> Unit) {
 
     fun run(label: String, block: suspend () -> String) {
         if (busy != null) return
-        busy = label; said = null
+        busy = label; said = null; worse = null
         scope.launch {
             said = runCatching { block() }.getOrElse { ctx.getString(R.string.trader_net_down) }
             busy = null; refresh++
@@ -233,6 +236,11 @@ internal fun EyesScreen(onClose: () -> Unit) {
             }
             busy?.let { Working(it) }
             said?.let { Banner(it, Halo.amber, HIcon.INFO) }
+            worse?.let { (pos, w) ->
+                GhostButton(stringResource(R.string.trader_sell_anyway, fmtSol(w.realLamports, 4)), Modifier.fillMaxWidth(), HIcon.SWAP, tint = Halo.red) {
+                    run(sellingLabel) { SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP, acceptReal = true).text }
+                }
+            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -278,14 +286,20 @@ internal fun EyesScreen(onClose: () -> Unit) {
                             // Three things a person can do while watching. No more.
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 SmallChip(stringResource(R.string.eyes_sell), HIcon.SWAP, tint = Halo.red) {
-                                    run(sellingLabel) { SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP).second }
+                                    run(sellingLabel) {
+                                        val r = SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP)
+                                        r.worse?.let { worse = pos to it }
+                                        r.text
+                                    }
                                 }
                                 SmallChip(stringResource(R.string.eyes_more), HIcon.DOWNLOAD, tint = Halo.mint) {
                                     run(buyingLabel) { TraderLoop.buyMore(ctx, pos.mint) }
                                 }
                                 SmallChip(stringResource(R.string.eyes_next), HIcon.SEARCH, tint = Halo.cyan) {
                                     run(sellingLabel) {
-                                        val (ok, m) = SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP)
+                                        val r = SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.IN_APP)
+                                        r.worse?.let { worse = pos to it }
+                                        val (ok, m) = r.ok to r.text
                                         when {
                                             !ok -> m
                                             !TraderLoop.config(ctx).on -> loopOff

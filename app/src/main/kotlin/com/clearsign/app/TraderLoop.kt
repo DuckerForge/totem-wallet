@@ -458,7 +458,18 @@ object TraderLoop {
                 pos.symbol,
             )
             Positions.markClosing(ctx, pos.mint)
-            val sale = SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.LINK)
+            // A stop is about getting out, and a thin coin's real price is
+            // whatever the chain gives: the stop accepts it. A target is about
+            // the price, so a target that the chain does not confirm is not
+            // reached, and the row waits.
+            val sale = SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.LINK, acceptReal = exit.why == Positions.Exit.Why.STOP)
+            if (sale is SessionActions.Sale.Worse) {
+                val drop = ((1 - sale.realLamports.toDouble() / sale.quotedLamports) * 100).toInt()
+                val m = ctx.getString(R.string.trader_target_unreal, pos.symbol, fmtSol(sale.realLamports, 4), drop)
+                Positions.note(ctx, pos.mint, m)
+                problem = m
+                continue
+            }
             val v = (sale as? SessionActions.Sale.Judged)?.verdict
             if (v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed) {
                 Positions.remove(ctx, pos.mint)

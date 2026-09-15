@@ -777,6 +777,30 @@ object SolanaRpc {
         return out
     }
 
+    /** The raw bytes of one account, or null. */
+    fun accountBytes(rpcUrl: String, pubkey: String): ByteArray? {
+        val v = post(rpcUrl, "getAccountInfo", JSONArray().put(pubkey).put(JSONObject().put("encoding", "base64")))
+            ?.optJSONObject("result")?.optJSONObject("value") ?: return null
+        val b64 = v.optJSONArray("data")?.optString(0) ?: return null
+        return runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
+    }
+
+    /** The SKR this wallet has staked with the Seeker Guardians, or null when it has none or the node did not answer. */
+    fun skrStake(rpcUrl: String, owner: String): SkrStake.Position? {
+        val params = JSONArray().put(SkrStake.PROGRAM).put(
+            JSONObject().put("encoding", "base64").put(
+                "filters",
+                JSONArray().put(JSONObject().put("dataSize", SkrStake.USER_STAKE_SIZE))
+                    .put(JSONObject().put("memcmp", JSONObject().put("offset", SkrStake.OWNER_OFFSET).put("bytes", owner))),
+            ),
+        )
+        val arr = post(rpcUrl, "getProgramAccounts", params)?.optJSONArray("result") ?: return null
+        val b64 = arr.optJSONObject(0)?.optJSONObject("account")?.optJSONArray("data")?.optString(0) ?: return null
+        val user = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull() ?: return null
+        val config = accountBytes(rpcUrl, SkrStake.CONFIG) ?: return null
+        return SkrStake.decode(user, config)?.takeIf { it.rawSkr > 0 }
+    }
+
     // ---- transport -----------------------------------------------------------
 
     private sealed interface Http {

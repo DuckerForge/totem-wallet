@@ -119,6 +119,15 @@ object Portfolio {
             }
         }
         runCatching {
+            SolanaRpc.skrStake(rpc, owner)?.let { st ->
+                val skrUsd = quotes[SkrStake.SKR_MINT]?.usd ?: runCatching { Prices.quotes(listOf(SkrStake.SKR_MINT))[SkrStake.SKR_MINT]?.usd }.getOrNull()
+                defi += DefiPosition(
+                    DefiPosition.Kind.STAKE, "SKR", "Guardiani Seeker", "SKR", st.ui,
+                    skrUsd?.let { p -> fx?.let { p * it * st.ui } }, image = TokenSymbols.image(SkrStake.SKR_MINT), state = "active",
+                )
+            }
+        }
+        runCatching {
             for (d in JupiterLend.deposits(owner)) {
                 val ui = d.raw / 10.0.pow(d.decimals)
                 val usd = d.priceUsd ?: quotes[d.asset]?.usd ?: if (d.asset in STABLES) 1.0 else null

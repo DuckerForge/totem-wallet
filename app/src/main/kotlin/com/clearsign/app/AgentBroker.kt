@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import android.content.Intent
 import android.net.Uri
 import android.util.Base64
@@ -260,14 +261,15 @@ object AgentBroker {
      * same as no note at all, and the whole point of this round of work is that a
      * stuck agent must be loud exactly once rather than quiet eighty-four times.
      */
-    fun warn(ctx: Context, title: String, body: String) = notify(ctx, title, body, null)
+    fun warn(ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null, color: Int? = null) =
+        notify(ctx, title, body, null, picture = picture, color = color)
 
     /**
      * The quiet card: one notification, rewritten in place, that never makes a
      * sound. It is the loop's pulse for somebody who wants to glance at the
      * shade, not be interrupted by it.
      */
-    fun progress(ctx: Context, title: String, body: String) {
+    fun progress(ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(QUIET) == null) {
             nm.createNotificationChannel(NotificationChannel(QUIET, ctx.getString(R.string.agent_channel_quiet), NotificationManager.IMPORTANCE_LOW))
@@ -279,7 +281,11 @@ object AgentBroker {
         val n = Notification.Builder(ctx, QUIET)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title).setContentText(body)
-            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setColor(Halo.palette.accent.toArgb())
+            .setStyle(
+                if (picture != null) Notification.BigPictureStyle().bigPicture(picture).setSummaryText(body)
+                else Notification.BigTextStyle().bigText(body),
+            )
             .setContentIntent(open).setOnlyAlertOnce(true).setAutoCancel(false)
             .build()
         nm.notify(PROGRESS_ID, n)
@@ -296,7 +302,10 @@ object AgentBroker {
         }
     }
 
-    private fun notify(ctx: Context, title: String, body: String, txSig: String?, tap: PendingIntent? = null, heads: Boolean = false) {
+    private fun notify(
+        ctx: Context, title: String, body: String, txSig: String?, tap: PendingIntent? = null, heads: Boolean = false,
+        picture: android.graphics.Bitmap? = null, color: Int? = null,
+    ) {
         channel(ctx)
         val open = tap ?: PendingIntent.getActivity(
             ctx, 0, Intent(ctx, MainActivity::class.java).putExtra("open", "agent").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -305,7 +314,11 @@ object AgentBroker {
         val n = Notification.Builder(ctx, CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title).setContentText(body)
-            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setStyle(
+                if (picture != null) Notification.BigPictureStyle().bigPicture(picture).setSummaryText(body)
+                else Notification.BigTextStyle().bigText(body),
+            )
+            .setColor(color ?: Halo.palette.accent.toArgb())
             .setContentIntent(open).setAutoCancel(true)
             .apply { if (heads) setCategory(Notification.CATEGORY_CALL) }
             .build()

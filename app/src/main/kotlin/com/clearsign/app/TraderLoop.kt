@@ -1,6 +1,7 @@
 package com.clearsign.app
 
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import com.clearsign.core.AgentMode
 import com.clearsign.core.NATIVE_SOL_MINT
 import com.clearsign.core.ScanGate
@@ -320,17 +321,23 @@ object TraderLoop {
                 val lo = p.getInt("lo_" + pos.mint, 0)
                 if (bucket > hi || bucket < lo) {
                     p.edit().putInt(if (bucket > hi) "hi_" + pos.mint else "lo_" + pos.mint, bucket).apply()
+                    val art = runCatching { NotifArt.tracks(ctx, listOf(NotifArt.Row(pos.symbol, m, cfg.takeProfitPct, cfg.stopLossPct))) }.getOrNull()
                     AgentBroker.warn(
                         ctx, ctx.getString(R.string.trader_milestone_title, pos.symbol, shown),
                         ctx.getString(R.string.trader_milestone_body, cfg.takeProfitPct, cfg.stopLossPct),
+                        picture = art,
+                        color = (if (m >= 0) Halo.palette.accent else Halo.palette.red).toArgb(),
                     )
                 }
             }
             pos.symbol + " " + shown
         }
+        val art = runCatching {
+            NotifArt.tracks(ctx, open.map { NotifArt.Row(it.symbol, moves[it.mint], cfg.takeProfitPct, cfg.stopLossPct) })
+        }.getOrNull()
         AgentBroker.progress(
             ctx, ctx.resources.getQuantityString(R.plurals.trader_progress_title, open.size, open.size),
-            lines.joinToString(" · "),
+            lines.joinToString(" · "), art,
         )
     }
 

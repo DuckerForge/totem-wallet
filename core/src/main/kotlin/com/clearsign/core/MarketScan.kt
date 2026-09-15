@@ -115,7 +115,12 @@ data class ScanGate(
         /** Vetted small caps. Real holders, real depth, nothing minted this morning. */
         val CAREFUL = ScanGate(
             name = "careful",
-            liquidityMinUsd = 30_000.0, organicScoreMin = 10.0, mcapMaxUsd = 50_000_000.0,
+            // Fifty thousand of liquidity, not thirty: the floor the paid bots
+            // (GMGN, Photon, Trojan) put under "low-potential" tokens in their
+            // own guides, and the number that separates a pool somebody can
+            // pull from a pool that would cost them to. This is the one lane
+            // now; the wild one stays in the code and out of the app.
+            liquidityMinUsd = 50_000.0, organicScoreMin = 10.0, mcapMaxUsd = 50_000_000.0,
             topHoldersMaxPct = 30.0, holderCountMin = 150, numBuysFloor = 40,
             liqMcFloorPct = 0.001, thinIsVeto = true,
             ageBand = listOf(10.0, 360.0, 20_160.0, 43_200.0),

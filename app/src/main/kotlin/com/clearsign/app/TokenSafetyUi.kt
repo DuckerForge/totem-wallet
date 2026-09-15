@@ -135,7 +135,7 @@ internal fun IncomingCoinCard(r: com.clearsign.core.Receipt, owner: String?) {
             safety = tok?.let { com.clearsign.core.assessToken(it.facts(sellable, ext)) }
             // The bold lane is the loosest thing the agent would ever use. If even
             // that turns the coin down, the reason is worth saying out loud here.
-            shape = c?.let { com.clearsign.core.passesGate(it, com.clearsign.core.ScanGate.BOLD) }
+            shape = c?.let { com.clearsign.core.passesGate(it, com.clearsign.core.ScanGate.CAREFUL) }
         }
     }
 

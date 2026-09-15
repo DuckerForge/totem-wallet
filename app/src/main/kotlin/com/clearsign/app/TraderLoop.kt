@@ -65,7 +65,11 @@ object TraderLoop {
         val stopLossPct: Int = 15,
         val slicePercent: Int = 80,
     ) {
-        val gate: ScanGate get() = if (bold) ScanGate.BOLD else ScanGate.CAREFUL
+        // One lane. There used to be two and the agent asked which; on Solana
+        // the honest answer is that the wild one is where the money goes to die,
+        // and the paid bots that win all run the same safe floor. [bold] stays
+        // stored so an old budget still reads, and is ignored.
+        val gate: ScanGate get() = ScanGate.CAREFUL
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

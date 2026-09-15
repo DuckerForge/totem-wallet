@@ -300,7 +300,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 ProSection(stringResource(R.string.pro_trading), HIcon.GEM) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            stringResource(if (cfg.bold) R.string.trader_lane_bold else R.string.trader_lane_careful),
+                            stringResource(R.string.trader_lane_one),
                             fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f),
                         )
                         Text(stringResource(R.string.trader_targets, cfg.takeProfitPct, cfg.stopLossPct), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
@@ -463,22 +463,21 @@ private fun RecentMoves(refresh: Int) {
 private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var bold by remember { mutableStateOf(TraderLoop.config(ctx).bold) }
     val blocked = remember { TraderLoop.cannotStart(ctx) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val cfg = remember { TraderLoop.config(ctx) }
             Text(stringResource(R.string.lane_title), style = HaloType.title, color = Halo.ink)
             Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ModeChip(stringResource(R.string.trader_careful), !bold, Halo.mint, Modifier.weight(1f)) { bold = false }
-                ModeChip(stringResource(R.string.trader_bold), bold, Halo.amber, Modifier.weight(1f)) { bold = true }
-            }
+            StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
+            StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
+            StatRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString())
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.PIGEON) {
-                TraderLoop.start(ctx, TraderLoop.config(ctx).copy(bold = bold))
+                TraderLoop.start(ctx, cfg)
                 TraderKeeper.sync(ctx)
                 Haptics.tick(ctx)
                 onStarted()

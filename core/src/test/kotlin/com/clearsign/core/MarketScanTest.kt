@@ -162,7 +162,8 @@ class MarketScanTest {
     @Test fun missingDataNeverVetoes() {
         val bare = Candidate(
             mint = "New11111111111111111111111111111111111111111", symbol = "NEW",
-            liquidity = 40_000.0,
+            // Above the one lane's floor (50k): the point here is the missing data, not the pool.
+            liquidity = 60_000.0,
             s1h = ScanWindow(priceChange = 1.0, buyVolume = 1_000.0, sellVolume = 900.0, numBuys = 60, numTraders = 50),
         )
         assertNull(passesGate(bare, ScanGate.CAREFUL), "no holders, no audit, no mcap: unknown, not guilty")

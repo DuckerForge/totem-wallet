@@ -83,7 +83,7 @@ internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
 
     LaunchedEffect(bold) {
         picks = null
-        val gate = if (bold) com.clearsign.core.ScanGate.BOLD else com.clearsign.core.ScanGate.CAREFUL
+        val gate = com.clearsign.core.ScanGate.CAREFUL
         val pool = withContext(Dispatchers.IO) { runCatching { JupiterTokens.pool() }.getOrDefault(emptyList()) }
         picks = com.clearsign.core.safestPicks(pool, gate, limit = 3)
     }
@@ -110,8 +110,7 @@ internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.lucky_sub), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ModeChip(stringResource(R.string.trader_careful), !bold, Halo.mint, Modifier.weight(1f)) { bold = false }
-                ModeChip(stringResource(R.string.trader_bold), bold, Halo.amber, Modifier.weight(1f)) { bold = true }
+                // One lane now; the chips that chose between two are gone.
             }
 
             when (val p = picks) {

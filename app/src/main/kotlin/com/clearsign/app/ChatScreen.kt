@@ -184,7 +184,7 @@ internal fun ChatScreen(onClose: () -> Unit) {
         // "what do I do" are different questions, and nine chips in a row were
         // nine things to read before finding the one you meant.
         if (turns.isNotEmpty() && draft.isBlank()) {
-            val asked = turns.lastOrNull { it.role == "assistant" }?.text?.contains("degen", true) == true
+            val asked = false
             Box(Modifier.fillMaxWidth()) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp),

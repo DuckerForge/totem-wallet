@@ -30,6 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -52,14 +54,19 @@ internal fun WalletHero(
     onPnl: () -> Unit,
     /** The header takes the balance over once the big one has scrolled away. */
     onTotal: (String?) -> Unit = {},
+    /** Bumped by the page when the person pulls down: reload everything. */
+    reload: Int = 0,
+    /** Called when a reload has finished, whatever it found. */
+    onLoaded: () -> Unit = {},
 ) {
     val currency by Settings.currency
     var refreshKey by remember { mutableStateOf(0) }
     // Starts from what we already knew, not from nothing: see Portfolio.cached.
-    val pv by produceState<PortfolioView?>(Portfolio.cached(owner, currency), owner, currency, refreshKey) {
+    val pv by produceState<PortfolioView?>(Portfolio.cached(owner, currency), owner, currency, refreshKey, reload) {
         val fresh = owner?.let { runCatching { Portfolio.load(it, currency) }.getOrNull() }
         // A failed refresh keeps the last good view rather than blanking the page.
         if (fresh != null) value = fresh
+        onLoaded()
     }
     LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
     var picked by remember { mutableStateOf<Holding?>(null) }
@@ -79,10 +86,7 @@ internal fun WalletHero(
             verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
             Text(stringResource(R.string.hero_total), style = HaloType.label, color = Halo.muted)
-            Text(
-                pv?.let { fmtFiat(it.total, it.currency) } ?: "…",
-                style = HaloType.amount, color = Halo.ink,
-            )
+            pv?.let { BigTotal(it.total, it.currency) } ?: Text("…", style = HaloType.amount, color = Halo.ink)
             pv?.let { v ->
                 val d = v.change24hValue
                 val p = v.change24hPct
@@ -297,5 +301,43 @@ private fun TokenSheet(h: Holding, owner: String, signer: SeedVaultSigner, curre
             }
             Spacer(Modifier.height(4.dp))
         }
+    }
+}
+
+/**
+ * The number the page is about. Bigger than any other text, it counts to
+ * its new value instead of jumping, and a soft light sweeps across the
+ * digits now and then, the way light moves on a card held in the hand.
+ */
+@Composable
+private fun BigTotal(total: Double, currency: String) {
+    val shown by androidx.compose.animation.core.animateFloatAsState(
+        total.toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "total",
+    )
+    val sweep by androidx.compose.animation.core.rememberInfiniteTransition(label = "sweep").animateFloat(
+        -1f, 2f,
+        androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "sweepX",
+    )
+    val ink = Halo.ink
+    val lit = Halo.mint
+    androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+        // The glow behind: the accent, very faint, so the number sits in light.
+        Text(
+            fmtFiat(shown.toDouble(), currency),
+            style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = lit.copy(alpha = 0.18f)),
+            modifier = Modifier.graphicsLayer { renderEffect = android.graphics.RenderEffect.createBlurEffect(18f, 18f, android.graphics.Shader.TileMode.DECAL).asComposeRenderEffect() },
+        )
+        Text(
+            fmtFiat(shown.toDouble(), currency),
+            style = HaloType.amount.copy(
+                fontSize = 44.sp, lineHeight = 50.sp,
+                brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                    0f to ink, (sweep - 0.25f).coerceIn(0f, 1f) to ink, sweep.coerceIn(0f, 1f) to lit, (sweep + 0.25f).coerceIn(0f, 1f) to ink, 1f to ink,
+                ),
+            ),
+        )
     }
 }

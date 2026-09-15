@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.clearsign.app
 
 import android.content.Intent
@@ -328,6 +330,23 @@ fun HomeScreen(signer: SeedVaultSigner) {
                     }
                     else Box(Modifier.fillMaxSize()) { when (tab) {
                         Tab.WALLET -> androidx.compose.runtime.CompositionLocalProvider(LocalEntrance provides remember { java.util.concurrent.atomic.AtomicInteger() }) {
+                            // Pull down: everything on the page is asked again.
+                            var pulling by remember { mutableStateOf(false) }
+                            var reload by remember { mutableStateOf(0) }
+                            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                                isRefreshing = pulling,
+                                onRefresh = {
+                                    pulling = true; reload++
+                                    scope.launch {
+                                        val list = accounts
+                                        val bal = withContext(Dispatchers.IO) {
+                                            runCatching { SolanaRpc.assetsSummaryMulti(SolanaRpc.urlFor(null), list.map { it.account.pubkeyBase58 }) }.getOrNull()
+                                        }
+                                        if (bal != null) accounts = list.map { a -> val (l, t) = bal[a.account.pubkeyBase58] ?: (null to 0); HomeAccount(a.account, l, t) }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
                             Column(
                                 Modifier.fillMaxSize().verticalScroll(walletScroll).padding(horizontal = 20.dp, vertical = 14.dp),
                                 verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -338,6 +357,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                 if (accounts.isNotEmpty()) {
                                     WalletHero(
                                         owner, signer, collapse,
+                                        reload = reload, onLoaded = { pulling = false },
                                         onAction = { a ->
                                             when (a) {
                                                 HomeAction.SEND -> showSend = true
@@ -389,6 +409,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 }
 
                 Spacer(Modifier.height(8.dp))
+                            }
                             }
                         }
                         Tab.MARKET -> MarketScreen(owner = owner, signer = signer, onBuy = { mint -> swapMint = mint; tab = Tab.WALLET })

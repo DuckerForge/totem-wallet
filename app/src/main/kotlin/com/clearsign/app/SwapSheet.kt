@@ -353,6 +353,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                                 .border(cardBorder(), rs(16)).padding(14.dp),
                         ) { PriceChart(to.mint, to.symbol) }
                         safety?.let { SafetyCard(it, to.symbol) }
+                        ShieldCard(to.mint, to.symbol)
                         // Quote details
                         quote?.let { q ->
                             Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f)).border(cardBorder(), rs(16)).padding(14.dp)) {

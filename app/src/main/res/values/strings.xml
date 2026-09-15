@@ -737,6 +737,11 @@
     <string name="env_key_missing">The key is not available.</string>
     <string name="env_log_fund">Agent budget funded</string>
     <string name="env_log_sweep">Agent budget closed</string>
+    <string name="env_log_rent">Budget rent reclaimed</string>
+    <plurals name="env_rent_back">
+        <item quantity="one">%1$d empty account closed. Its rent is back in your wallet.</item>
+        <item quantity="other">%1$d empty accounts closed. Their rent is back in your wallet.</item>
+    </plurals>
     <string name="kind_envelope">Budget</string>
     <string name="env_log_harvest">Agent gains cashed in</string>
     <string name="env_harvest">Auto payout</string>

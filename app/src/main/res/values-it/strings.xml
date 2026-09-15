@@ -737,6 +737,11 @@
     <string name="env_key_missing">La chiave della paghetta non è disponibile.</string>
     <string name="env_log_fund">Paghetta caricata</string>
     <string name="env_log_sweep">Paghetta chiusa</string>
+    <string name="env_log_rent">Rent della paghetta recuperato</string>
+    <plurals name="env_rent_back">
+        <item quantity="one">%1$d account vuoto chiuso. Il rent è tornato nel tuo wallet.</item>
+        <item quantity="other">%1$d account vuoti chiusi. Il rent è tornato nel tuo wallet.</item>
+    </plurals>
     <string name="kind_envelope">Paghetta</string>
     <string name="env_log_harvest">Guadagni dell\'agente incassati</string>
     <string name="env_harvest">Incasso automatico</string>

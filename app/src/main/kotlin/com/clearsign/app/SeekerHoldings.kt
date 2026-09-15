@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.clearsign.app
 
 import android.content.Context
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -87,9 +90,7 @@ internal fun SeekerHoldingsCard() {
                 )
             }
             HoldingsField(rows)
-            // The legend lives outside the canvas. Inside it, at nine pixels, it was
-            // there and unreadable, which is the same as not being there.
-            Legend(Halo.mint, stringResource(R.string.hold_axis_up, rows.size - free))
+            Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
             Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
             Text(
                 stringResource(R.string.hold_note, free, rows.size, sample),
@@ -109,104 +110,79 @@ private fun Legend(dot: Color, text: String) {
 }
 
 /**
- * Two worlds, one line between them.
+ * What they hold, as bars.
  *
- * Above the line, the things worth money: a bubble each, as wide as the crowd
- * that holds it, as high as what one holder's share is worth. Below it, in the
- * dark, the things that came free with the phone — nineteen of the thirty-four
- * most widely held, worth nothing, held by everybody because nobody chose them.
+ * It was a field of bubbles, floating higher the more one holder's share was
+ * worth, with the free things in a dim row along the floor. Pretty, and not
+ * readable: at fifteen bubbles the labels sat on each other (USDC over SKR,
+ * PUMP over JitoSOL over PENGU) and "higher means worth more" needed a legend
+ * to explain the legend. A bar is a thing a person reads without being taught:
+ * longer is more people, the number on the right is the money. The free things
+ * keep their own row underneath, dim, so the point survives: most of what this
+ * crowd holds came with the phone and is worth nothing.
  *
- * The line is the point. Everything else is labelling.
+ * Each bar grows into place, one after another, the first time the card is
+ * seen. Once, on arrival: motion here says "this is being drawn for you", and
+ * a bar that kept growing would say the number was changing.
  */
 @Composable
 private fun HoldingsField(rows: List<SeekerHolding>) {
-    val drift by rememberInfiniteTransition(label = "drift").animateFloat(
-        0f, (2 * Math.PI).toFloat(),
-        infiniteRepeatable(tween(13000, easing = LinearEasing)), label = "d",
-    )
-    val tm = rememberTextMeasurer()
-    val mint = Halo.mint
-    val cyan = Halo.cyan
-    val muted = Halo.muted
-    val ink = Halo.ink
-
     val valued = rows.filter { it.usdPer >= 0.01 }.sortedByDescending { it.pct }
     val gifts = rows.filter { it.usdPer < 0.01 }.sortedByDescending { it.pct }
-    val maxPct = rows.maxOf { it.pct }
-    val maxUsd = valued.maxOfOrNull { it.usdPer } ?: 1.0
+    val maxPct = (valued.maxOfOrNull { it.pct } ?: 1.0).coerceAtLeast(1.0)
 
-    Canvas(Modifier.fillMaxWidth().height(230.dp)) {
-        val line = size.height * 0.68f
-        val top = 30f * density
-        val left = 8f * density
-        val right = size.width - 8f * density
-
-        // The divider, brightest in the middle, where the eye lands.
-        drawLine(
-            Brush.horizontalGradient(
-                listOf(mint.copy(alpha = 0f), mint.copy(alpha = 0.55f), mint.copy(alpha = 0f)),
-            ),
-            Offset(0f, line), Offset(size.width, line), 1.6f * density, StrokeCap.Round,
-        )
-
-        fun label(text: String, x: Float, y: Float, size2: Float, color: Color, bold: Boolean = false) {
-            val lay = tm.measure(
-                text,
-                TextStyle(
-                    fontFamily = Inter, fontSize = size2.sp, color = color,
-                    fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
-                ),
-            )
-            drawText(lay, topLeft = Offset(x - lay.size.width / 2f, y - lay.size.height / 2f))
-        }
-
-        // Above: what is worth something.
-        valued.forEachIndexed { i, h ->
-            val r = (9f + 15f * sqrt(h.pct / maxPct)).toFloat() * density
-            val x = left + r + (right - left - 2 * r) * (i.toFloat() / (valued.size - 1).coerceAtLeast(1))
-            val lift = (ln(1 + h.usdPer) / ln(1 + maxUsd)).toFloat().coerceIn(0f, 1f)
-            val y = line - 18f * density - lift * (line - top - 18f * density)
-            val bob = sin(drift + i * 0.8f) * 2.6f * density
-            val tint = if (h.usdPer >= 50) mint else cyan
-
-            drawCircle(tint.copy(alpha = 0.10f), r * 2.0f, Offset(x, y + bob))
-            drawCircle(tint.copy(alpha = 0.20f), r, Offset(x, y + bob))
-            drawCircle(tint, r, Offset(x, y + bob), style = Stroke(1.5f * density))
-            // A line down to the divider, so height reads as a measurement and not
-            // as a bubble that happens to be floating there.
-            drawLine(
-                tint.copy(alpha = 0.16f), Offset(x, y + bob + r), Offset(x, line),
-                1f * density, StrokeCap.Round,
-            )
-            if (r > 11f * density) {
-                label(h.symbol, x, y + bob - 5f * density, 9f, ink, bold = true)
-                label("$" + h.usdPer.toInt(), x, y + bob + 5f * density, 8f, tint)
-            } else {
-                // Too small to write inside, so the name goes underneath it. A bubble
-                // with no name is a dot, and a dot carries no information at all.
-                label(h.symbol, x, y + bob + r + 7f * density, 8f, ink.copy(alpha = 0.75f))
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        valued.take(9).forEachIndexed { i, h ->
+            val grow = rememberReveal(key = h.symbol, durationMs = 600 + i * 70)
+            val tint = if (h.usdPer >= 50) Halo.mint else Halo.cyan
+            Row(Modifier.fillMaxWidth().staggeredEntrance(i, key = h.symbol), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    h.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.ink,
+                    modifier = Modifier.width(66.dp), maxLines = 1,
+                )
+                // The bar: a track the full width, the fill as long as the share
+                // of the crowd, drawn rather than laid out so the growth is smooth.
+                Canvas(Modifier.weight(1f).height(10.dp)) {
+                    val r = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+                    drawRoundRect(Halo.stroke.copy(alpha = 0.5f), cornerRadius = r)
+                    val w = (size.width * (h.pct / maxPct) * grow).toFloat().coerceAtLeast(size.height)
+                    drawRoundRect(
+                        Brush.horizontalGradient(listOf(tint.copy(alpha = 0.55f), tint), endX = w),
+                        size = androidx.compose.ui.geometry.Size(w, size.height), cornerRadius = r,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    String.format("%.0f%%", h.pct), fontFamily = Mono, fontSize = 11.sp, color = tint, style = Tabular,
+                    modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "$" + h.usdPer.toInt(), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, style = Tabular,
+                    modifier = Modifier.width(44.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
             }
-            // How much of the crowd holds it, above the bubble: the width of a circle
-            // is not something anybody reads as a percentage.
-            label(
-                String.format("%.0f%%", h.pct), x, y + bob - r - 7f * density, 8f,
-                tint.copy(alpha = 0.8f),
-            )
         }
-
-        // Below: the free things, small and dim, in a single row nobody has to read.
-        gifts.forEachIndexed { i, h ->
-            val r = (4f + 5f * sqrt(h.pct / maxPct)).toFloat() * density
-            val per = ((right - left) / gifts.size)
-            val x = left + per * (i + 0.5f)
-            val y = line + 24f * density + sin(drift * 0.7f + i * 1.3f) * 1.4f * density
-            drawCircle(muted.copy(alpha = 0.13f), r, Offset(x, y))
-            drawCircle(muted.copy(alpha = 0.34f), r, Offset(x, y), style = Stroke(1f * density))
-            // Every other one gets its name: all of them would collide, none of them
-            // would leave the reader wondering what the dark row even is.
-            if (i % 2 == 0) label(h.symbol, x, y + r + 7f * density, 7.5f, muted.copy(alpha = 0.85f))
+        if (gifts.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            // The free things, in one dim line that wraps. Named, because a row of
+            // dots carries no information at all, and dim, because that is the
+            // whole message about them.
+            androidx.compose.foundation.layout.FlowRow(
+                Modifier.fillMaxWidth().staggeredEntrance(valued.size.coerceAtMost(9), key = "gifts"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                gifts.forEach { h ->
+                    Row(
+                        Modifier.clip(rs(999)).background(Halo.muted.copy(alpha = 0.10f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(h.symbol, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted.copy(alpha = 0.9f))
+                        Spacer(Modifier.width(4.dp))
+                        Text(String.format("%.0f%%", h.pct), fontFamily = Mono, fontSize = 10.sp, color = Halo.muted.copy(alpha = 0.7f), style = Tabular)
+                    }
+                }
+            }
         }
-
-
     }
 }

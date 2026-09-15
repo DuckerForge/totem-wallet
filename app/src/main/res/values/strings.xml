@@ -1396,6 +1396,9 @@
     <string name="env_last_in">Put in: %1$s SOL</string>
     <string name="env_last_out">Got back: %1$s SOL</string>
     <string name="env_last_moves">%1$d buys, %2$d sales, %3$s</string>
+    <string name="trace_rug_stop">Rugcheck stops %1$s: %2$s</string>
+    <string name="trace_rug_ok">Rugcheck %1$s: score %2$d, LP %3$s locked</string>
+    <string name="trace_rug_unknown">Rugcheck did not answer for %1$s, going on</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

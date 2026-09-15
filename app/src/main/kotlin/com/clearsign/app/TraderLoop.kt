@@ -202,6 +202,11 @@ object TraderLoop {
             val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.candidateOf(mint) }.getOrNull() }
                 ?: return@working ctx.getString(R.string.trader_net_down)
             AgentTrace.say(ctx.getString(R.string.trace_more, t.symbol), AgentTrace.Kind.FOUND)
+            val rug = RugCheck.verdict(t.mint, deviceLocaleTag() == "it")
+            if (rug is RugCheck.Verdict.Stop) {
+                AgentTrace.say(ctx.getString(R.string.trace_rug_stop, t.symbol, rug.reason), AgentTrace.Kind.REFUSED)
+                return@working ctx.getString(R.string.trace_rug_stop, t.symbol, rug.reason)
+            }
             val quote = withContext(Dispatchers.IO) { runCatching { Jupiter.quote(Jupiter.SOL_MINT, t.mint, slice, feeBps = 0) }.getOrNull() }
                 ?: return@working ctx.getString(R.string.trader_no_route)
             val tx = withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull() }
@@ -583,6 +588,18 @@ object TraderLoop {
             if (safety.bad) {
                 AgentTrace.say(ctx.getString(R.string.trace_unsafe, t.symbol, safety.score), AgentTrace.Kind.REFUSED)
                 continue
+            }
+            // The pool's story, from Rugcheck: LP burned or pullable, copies of
+            // verified coins, creators who rugged before. Unknown never blocks.
+            when (val rug = RugCheck.verdict(t.mint, deviceLocaleTag() == "it")) {
+                is RugCheck.Verdict.Stop -> {
+                    AgentTrace.say(ctx.getString(R.string.trace_rug_stop, t.symbol, rug.reason), AgentTrace.Kind.REFUSED)
+                    continue
+                }
+                is RugCheck.Verdict.Ok -> AgentTrace.say(
+                    ctx.getString(R.string.trace_rug_ok, t.symbol, rug.score, rug.lpLockedPct?.let { String.format(java.util.Locale.ROOT, "%.0f%%", it) } ?: "?"),
+                )
+                RugCheck.Verdict.Unknown -> AgentTrace.say(ctx.getString(R.string.trace_rug_unknown, t.symbol))
             }
 
             val s = SessionWallet.current(ctx) ?: return Tick("no budget", acted = false)

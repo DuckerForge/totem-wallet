@@ -69,11 +69,17 @@ object SessionActions {
      * the coins are gone and the row removed, false with the reason otherwise.
      * The card, the notification button and the eyes all say the same thing.
      */
-    suspend fun sellSaid(ctx: Context, pos: Positions.Position, source: AgentBroker.Job.Source): Pair<Boolean, String> {
+    class Said(val ok: Boolean, val text: String, val worse: Sale.Worse? = null)
+
+    suspend fun sellSaid(ctx: Context, pos: Positions.Position, source: AgentBroker.Job.Source, acceptReal: Boolean = false): Said {
         val why = ctx.getString(R.string.trader_why_you, pos.symbol)
-        val sale = runCatching { sellNow(ctx, pos, why, source) }.getOrNull()
+        val sale = runCatching { sellNow(ctx, pos, why, source, acceptReal) }.getOrNull()
         val v = (sale as? Sale.Judged)?.verdict
-        return when {
+        if (sale is Sale.Worse) {
+            val drop = ((1 - sale.realLamports.toDouble() / sale.quotedLamports) * 100).toInt()
+            return Said(false, ctx.getString(R.string.trader_sell_worse, fmtSol(sale.quotedLamports, 4), fmtSol(sale.realLamports, 4), drop), sale)
+        }
+        val r: Pair<Boolean, String> = when {
             v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
                 Positions.remove(ctx, pos.mint)
                 val m = ctx.getString(R.string.trader_sold_you, pos.symbol)
@@ -86,6 +92,7 @@ object SessionActions {
             sale is Sale.NoRoute -> false to ctx.getString(R.string.trader_no_route)
             else -> false to ctx.getString(R.string.trader_net_down)
         }
+        return Said(r.first, r.second)
     }
 
     /**
@@ -110,6 +117,13 @@ object SessionActions {
         /** Jupiter gave no quote or no transaction for it. A real problem with this coin, worth counting. */
         object NoRoute : Sale()
         class Judged(val verdict: AgentBroker.Verdict) : Sale()
+        /**
+         * Jupiter's quote and the chain's own simulation disagree by more than
+         * the collar allows: the sale would bring [realLamports], not
+         * [quotedLamports]. Nothing was proposed. A person can say "sell anyway"
+         * and the sale is proposed again declaring the real number.
+         */
+        class Worse(val quotedLamports: Long, val realLamports: Long) : Sale()
     }
 
     suspend fun sellNow(
@@ -117,6 +131,7 @@ object SessionActions {
         pos: Positions.Position,
         reason: String,
         source: AgentBroker.Job.Source,
+        acceptReal: Boolean = false,
     ): Sale {
         val s = SessionWallet.current(ctx) ?: return Sale.Nothing
         val held = heldRaw(ctx, s.pubkey) ?: return Sale.Unreachable
@@ -131,9 +146,27 @@ object SessionActions {
             runCatching { Jupiter.swapTransaction(quote, s.pubkey, null) }.getOrNull()
         } ?: return Sale.NoRoute
         val units = raw / Math.pow(10.0, pos.decimals.toDouble())
+        // What the chain says comes back, before anything is declared. On a
+        // thin coin Jupiter's quote and the simulated route can be far apart,
+        // and the collar rightly refuses to sign a thing that differs from what
+        // was declared. So look first: if the real number is worse than the
+        // quote by more than the guard tolerates, either say so and stop, or,
+        // when the caller accepts it, declare the real number and let the
+        // collar judge that.
+        val real = withContext(Dispatchers.IO) {
+            runCatching {
+                ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, s.pubkey, null, requireSim = true).receipt
+                    .inflows.firstOrNull { it.mint == com.clearsign.core.NATIVE_SOL_MINT }?.rawAmount
+            }.getOrNull()
+        }
+        var declared = quote.outAmount
+        if (real != null && real > 0 && real < quote.outAmount * 0.97) {
+            if (!acceptReal) return Sale.Worse(quote.outAmount, real)
+            declared = (real * 0.99).toLong()
+        }
         val intent = JSONObject()
             .put("action", "swap").put("outMint", pos.symbol).put("outAmount", units)
-            .put("inMint", "SOL").put("inAmount", quote.outAmount / 1e9)
+            .put("inMint", "SOL").put("inAmount", declared / 1e9)
             .put("agent", TraderLoop.AGENT).put("reason", reason)
         return Sale.Judged(
             AgentBroker.handle(

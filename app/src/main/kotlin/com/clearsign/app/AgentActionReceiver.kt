@@ -36,21 +36,8 @@ class AgentActionReceiver : BroadcastReceiver() {
 
     private suspend fun sell(ctx: Context, mint: String) {
         val pos = Positions.open(ctx).firstOrNull { it.mint == mint } ?: return
-        val why = ctx.getString(R.string.trader_why_you, pos.symbol)
-        val sale = runCatching { SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.LINK) }.getOrNull()
-        val v = (sale as? SessionActions.Sale.Judged)?.verdict
-        val said = when {
-            v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
-                Positions.remove(ctx, pos.mint)
-                ctx.getString(R.string.trader_sold_done)
-            }
-            v is AgentBroker.Verdict.Timeout -> ctx.getString(R.string.trader_needed_you)
-            v != null -> v.reason ?: ctx.getString(R.string.trader_net_down)
-            sale is SessionActions.Sale.Nothing -> ctx.getString(R.string.trader_no_coins)
-            sale is SessionActions.Sale.NoRoute -> ctx.getString(R.string.trader_no_route)
-            else -> ctx.getString(R.string.trader_net_down)
-        }
-        AgentBroker.warn(ctx, pos.symbol, said, rhythm = AgentBroker.Rhythm.STOP)
+        val r = SessionActions.sellSaid(ctx, pos, AgentBroker.Job.Source.LINK)
+        AgentBroker.warn(ctx, pos.symbol, r.text, rhythm = AgentBroker.Rhythm.STOP)
     }
 
     private fun stop(ctx: Context) {

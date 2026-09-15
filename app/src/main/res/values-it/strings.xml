@@ -1383,6 +1383,9 @@
     <string name="eyes_guard_chain">Ordine su Jupiter: vende da solo a +%1$d%%, anche a telefono spento. Lo stop è del ciclo.</string>
     <string name="eyes_guard_loop">Nessun ordine sulla catena (fetta sotto 5 $): vende il ciclo, ogni 90 s, finché gira.</string>
     <string name="eyes_guard_none">Nessun ordine sulla catena e ciclo spento: questa non la vende nessuno, né su né giù.</string>
+    <string name="trader_sell_worse">Jupiter promette %1$s SOL, la rete ne dà %2$s (−%3$d%%). Vendere lo stesso?</string>
+    <string name="trader_sell_anyway">Vendi lo stesso a %1$s SOL</string>
+    <string name="trader_target_unreal">%1$s: l\'obiettivo c\'è sul preventivo, ma la rete dà %2$s SOL (−%3$d%%). Aspetto.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

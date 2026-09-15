@@ -8,7 +8,26 @@
  *
  * Il piano gratuito di Cloudflare dà 50 chiamate in uscita per esecuzione, quindi
  * ogni esecuzione legge una fetta del censimento e le fette ruotano: il giro
- * completo si chiude in quindici minuti.
+ * completo si chiude in un'ora e mezza.
+ *
+ * ## Perché lo stato è in tre pezzi, e uno è binario
+ *
+ * Il 15/09/2026 alle 08:52 il worker ha smesso di pubblicare: `exceededCpu` a
+ * **10 ms**, il limite del piano gratuito, dopo 40 ms di orologio. Non stava
+ * facendo niente: stava *leggendo lo stato*, un oggetto JSON da 612 KB con
+ * 10.527 saldi come chiavi, e poi riscrivendolo. Solo parse e stringify di quel
+ * blob passavano i dieci millisecondi, e ogni esecuzione moriva prima della
+ * prima chiamata RPC.
+ *
+ * Quindi niente più JSON per i saldi. `bal` è un `Float64Array` grezzo in KV
+ * (84 KB, zero parsing: si legge come buffer e si indicizza), dove l'indice è la
+ * posizione del portafoglio nel censimento. Il censimento è spezzato in chiavi:
+ * `rw` le balene con il loro indice, `rd:<k>` un blocco di cento delfini, e ogni
+ * esecuzione legge solo i blocchi che tocca. Lo stato vero e proprio (`state2`)
+ * tiene solo gli acquisti, il cursore e un'impronta del pubblicato.
+ *
+ * Tre scritture per giro al massimo (saldi, stato, e il pubblicato solo se è
+ * cambiato), con un giro ogni cinque minuti: sotto le mille scritture al giorno.
  */
 
 const MONEY = new Set([
@@ -31,26 +50,11 @@ const KEEP = 3 * 24 * 3600_000;
 
 /**
  * Il vero limite del piano gratuito: 50 chiamate in uscita per esecuzione, e la
- * cinquantunesima non rallenta, *lancia*. La prima versione ne faceva 34 per i
- * saldi e poi fino a quattro per ogni portafoglio in movimento: finché nessuno si
- * muoveva andava, e dal primo movimento in poi ogni esecuzione moriva prima di
- * salvare. Il cursore restava fermo e nessun acquisto arrivava mai.
- *
- * Quindi si conta. Quarantacinque, con cinque di margine per i tentativi.
+ * cinquantunesima non rallenta, *lancia*. Quindi si conta. Quarantacinque, con
+ * cinque di margine per i tentativi.
  */
 const BUDGET = 45;
-/**
- * Le balene si leggono tutte a ogni giro; i delfini a turno.
- *
- * Non è un compromesso al ribasso: le balene sono 1.252, cioè tredici blocchi, e
- * sono quelle che vale la pena vedere subito. I 9.275 delfini ruotano e si
- * chiudono in poco più di un'ora, che per loro basta.
- *
- * Il numero è tarato sulla riserva, non scelto a occhio: con tredici blocchi di
- * delfini restavano diciannove chiamate per approfondire, cioè tre portafogli su
- * undici che si erano mossi. Leggere i saldi non serve a niente se poi non resta
- * abbastanza per guardare cosa hanno fatto.
- */
+/** Le balene si leggono tutte a ogni giro (tredici blocchi); i delfini a turno, cinque blocchi. */
 const DOLPHIN_CHUNKS_PER_RUN = 5;
 
 async function rpc(env, method, params) {
@@ -62,21 +66,6 @@ async function rpc(env, method, params) {
   if (!r.ok) return null;
   const j = await r.json().catch(() => null);
   return j && !j.error ? j.result : null;
-}
-
-/** L'elenco dei portafogli, dal file che sta anche dentro l'app. */
-async function roster(env) {
-  const raw = await env.SEEKER.get("roster");
-  if (!raw) return [];
-  const out = [];
-  for (const line of raw.split("\n")) {
-    const l = line.trim();
-    if (!l || l[0] === "#") continue;
-    const p = l.split(" ");
-    if (p.length < 3 || p[0].length < 32) continue;
-    out.push({ a: p[0], w: p[1] === "b" });
-  }
-  return out;
 }
 
 /**
@@ -163,17 +152,36 @@ function rank(buys, now, followed) {
   return { at: now, followed, window: WINDOW, rows: rows.slice(0, 20), events };
 }
 
-async function sweep(env) {
-  const all = await roster(env);
-  if (!all.length) return;
+/** Un'impronta corta di una stringa, per sapere se il pubblicato è cambiato senza tenerlo in memoria. */
+function fingerprint(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(16);
+}
 
-  const state = JSON.parse((await env.SEEKER.get("state")) || "{}");
-  const bal = state.bal || {};
+async function sweep(env) {
+  // Il censimento, a pezzi: le balene con il loro indice, e i cinque blocchi di
+  // delfini che toccano a questo giro. Il resto non si legge nemmeno.
+  const rwRaw = await env.SEEKER.get("rw");
+  if (!rwRaw) return;
+  const rw = JSON.parse(rwRaw);            // { n, nd, w: [[addr, idx], ...] }
+  const state = JSON.parse((await env.SEEKER.get("state2")) || "{}");
   let buys = state.buys || [];
   let cursor = state.cursor || 0;
   // Mezz'ora di sovrapposizione: abbastanza da non perdere niente fra un giro e
   // l'altro, poca abbastanza da non rileggere le stesse transazioni per un'ora.
   const since = state.since || Date.now() - 2 * 3600_000;
+
+  const chunks = [];
+  for (let k = 0; k < DOLPHIN_CHUNKS_PER_RUN && rw.nd > 0; k++) {
+    const raw = await env.SEEKER.get("rd:" + ((cursor + k) % rw.nd));
+    if (raw) chunks.push(JSON.parse(raw));
+  }
+  cursor = (cursor + DOLPHIN_CHUNKS_PER_RUN) % Math.max(rw.nd, 1);
+
+  // I saldi: un array di numeri, letto come buffer. Niente da parsare.
+  const buf = await env.SEEKER.get("bal", "arrayBuffer");
+  const bal = buf && buf.byteLength === rw.n * 8 ? new Float64Array(buf) : new Float64Array(rw.n);
 
   // Una sola riserva, spesa da tutti. Quando finisce si smette e si salva quello
   // che si è fatto: un giro parziale salvato vale infinitamente più di un giro
@@ -185,36 +193,26 @@ async function sweep(env) {
     return rpc(env, method, params);
   };
 
-  const chunk = (arr) => {
-    const out = [];
-    for (let i = 0; i < arr.length; i += 100) out.push(arr.slice(i, i + 100));
-    return out;
-  };
-  const whaleChunks = chunk(all.filter((x) => x.w));
-  const dolphinChunks = chunk(all.filter((x) => !x.w));
-
   const movers = [];
-  const read = async (c) => {
+  const read = async (list, whale) => {
+    // list: [[addr, idx], ...] di al più cento
     const res = await call("getMultipleAccounts", [
-      c.map((x) => x.a),
+      list.map((x) => x[0]),
       { encoding: "base64", dataSlice: { offset: 0, length: 0 } },
     ]);
     if (!res || !res.value) return;
-    c.forEach((x, i) => {
+    list.forEach((x, i) => {
       const lam = res.value[i] ? res.value[i].lamports : 0;
-      const was = bal[x.a];
+      const was = bal[x[1]];
       // Alla primissima lettura non c'è un prima: si registra e basta, perché
       // inventare un movimento da un confronto che non esiste segnerebbe tutti.
-      if (was !== undefined && was !== lam) movers.push(x);
-      bal[x.a] = lam;
+      if (was !== 0 && was !== lam) movers.push({ a: x[0], w: whale });
+      bal[x[1]] = lam;
     });
   };
 
-  for (const c of whaleChunks) await read(c);
-  for (let k = 0; k < DOLPHIN_CHUNKS_PER_RUN && dolphinChunks.length; k++) {
-    await read(dolphinChunks[(cursor + k) % dolphinChunks.length]);
-  }
-  cursor = (cursor + DOLPHIN_CHUNKS_PER_RUN) % Math.max(dolphinChunks.length, 1);
+  for (let i = 0; i < rw.w.length; i += 100) await read(rw.w.slice(i, i + 100), true);
+  for (const c of chunks) await read(c, false);
 
   // Balene per prime: se la riserva finisce, deve finire sui più piccoli.
   movers.sort((a, b) => (b.w ? 1 : 0) - (a.w ? 1 : 0));
@@ -239,12 +237,16 @@ async function sweep(env) {
 
   const now = Date.now();
   buys = buys.filter((b) => b.at > now - KEEP);
-  const out = rank(buys, now, all.length);
+  const out = JSON.stringify(rank(buys, now, rw.n));
+  const fp = fingerprint(out);
 
-  await env.SEEKER.put("crowd", JSON.stringify(out));
+  // I saldi sempre, lo stato sempre, il pubblicato solo se è cambiato: le
+  // scritture del piano gratuito sono mille al giorno e questo le tiene sotto.
+  await env.SEEKER.put("bal", bal.buffer);
+  if (fp !== state.crowd) await env.SEEKER.put("crowd", out);
   await env.SEEKER.put(
-    "state",
-    JSON.stringify({ bal, buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length }),
+    "state2",
+    JSON.stringify({ buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length, crowd: fp, at: now }),
   );
 }
 

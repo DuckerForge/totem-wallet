@@ -99,7 +99,7 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, onBuy: (String) -> Unit) {
             // buy landing at the top arrives rather than being suddenly there.
             events.take(12).forEachIndexed { i, e -> Box(Modifier.staggeredEntrance(i, key = e.wallet + e.at)) { FeedRow(e, now, onBuy) } }
             Text(
-                stringResource(R.string.feed_note),
+                stringResource(R.string.feed_note) + " " + stringResource(R.string.feed_follow_note),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
             )
         }
@@ -161,7 +161,18 @@ private fun FeedRow(e: CrowdBuy, now: Long, onBuy: (String) -> Unit) {
                 color = if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted, style = Tabular,
             )
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
+        // Follow this wallet: from now on what it buys goes to the agent as a
+        // candidate, through the gates. A star, because that is what following
+        // looks like everywhere else, and it stays lit so the list says who.
+        var followed by remember(e.wallet) { mutableStateOf(Follows.has(ctx, e.wallet)) }
+        Box(
+            Modifier.size(30.dp).clip(rs(999))
+                .background(if (followed) Halo.amber.copy(alpha = 0.16f) else Halo.cardSoft)
+                .clickable { followed = Follows.toggle(ctx, e.wallet); Haptics.tick(ctx) },
+            contentAlignment = Alignment.Center,
+        ) { HaloIcon(if (followed) HIcon.STAR_FILLED else HIcon.STAR, if (followed) Halo.amber else Halo.muted, 15.dp) }
+        Spacer(Modifier.width(6.dp))
         Box(
             Modifier.clip(rs(999)).background(Halo.mint.copy(alpha = 0.14f))
                 .border(1.dp, Halo.mint.copy(alpha = 0.45f), rs(999))

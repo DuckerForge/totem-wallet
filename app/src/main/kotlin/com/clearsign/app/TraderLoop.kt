@@ -414,7 +414,15 @@ object TraderLoop {
             return Tick("market unreachable", acted = false)
         }
         val scan = com.clearsign.core.scanMarket(pool.filter { it.mint !in held }, cfg.gate, limit = 5)
-        val picks = scan.picks
+        // What the Seeker crowd is buying right now, ahead of the registry's
+        // ranking. A wallet the person follows bought something, or two whales
+        // bought the same thing inside the hour: those coins are looked at first,
+        // through exactly the same gates, and with the same slice. This is copy
+        // trading with a collar on: the signal says where to look, never what to
+        // do, and it arrives a few minutes late by design, which is why the gates
+        // are not optional here.
+        val scout = scoutPicks(ctx, cfg, held)
+        val picks = scout + scan.picks.filter { p -> scout.none { it.c.mint == p.c.mint } }
         AgentTrace.say(ctx.getString(R.string.trace_scanned, pool.size, picks.size))
         // The commonest reason the whole field was thrown out, said once. It is
         // the difference between "found nothing" and "found nothing because every
@@ -609,6 +617,43 @@ object TraderLoop {
             return Tick("waiting on you", acted = false)
         }
         return Tick("nothing passed", acted = false)
+    }
+
+    /**
+     * The live feed's candidates, graded like everybody else's.
+     *
+     * One registry call per signal to turn a mint into a [Candidate] with its
+     * trading windows, bounded so a loud hour cannot spend the budget on
+     * lookups. Each pick carries the signal in its first note, so the receipt
+     * and the trace say why this coin and not another.
+     */
+    private suspend fun scoutPicks(ctx: Context, cfg: Config, held: Set<String>): List<com.clearsign.core.Scored> {
+        val feed = withContext(Dispatchers.IO) { runCatching { SeekerFeed.refresh(ctx) ?: SeekerFeed.cached(ctx) }.getOrNull() } ?: return emptyList()
+        val follows = Follows.all(ctx)
+        val signals = com.clearsign.core.SeekerCrowd.signals(feed.events, follows, System.currentTimeMillis())
+            .filter { it.mint !in held }.take(4)
+        if (signals.isEmpty()) return emptyList()
+        AgentTrace.say(ctx.getString(R.string.trace_scout, signals.size), AgentTrace.Kind.FOUND)
+        val out = ArrayList<com.clearsign.core.Scored>()
+        for (sig in signals) {
+            val c = withContext(Dispatchers.IO) { runCatching { JupiterTokens.candidateOf(sig.mint) }.getOrNull() } ?: continue
+            val why = when (sig) {
+                is com.clearsign.core.CrowdSignal.Followed -> ctx.getString(
+                    R.string.scout_signal_follow, com.clearsign.core.SeekerCrowd.nickname(sig.wallet), c.symbol,
+                    ((System.currentTimeMillis() - sig.at) / 60_000L).coerceAtLeast(0L),
+                )
+                is com.clearsign.core.CrowdSignal.Crowd -> ctx.getString(R.string.scout_signal_crowd, sig.whales, c.symbol)
+            }
+            val graded = com.clearsign.core.scanMarket(listOf(c), cfg.gate, limit = 1)
+            val pick = graded.picks.firstOrNull()
+            if (pick == null) {
+                AgentTrace.say(ctx.getString(R.string.trace_scout_rejected, c.symbol, graded.rejected.keys.firstOrNull() ?: ""), AgentTrace.Kind.REFUSED)
+                continue
+            }
+            AgentTrace.say(why, AgentTrace.Kind.FOUND)
+            out += pick.copy(notes = listOf(why) + pick.notes)
+        }
+        return out
     }
 
     /**

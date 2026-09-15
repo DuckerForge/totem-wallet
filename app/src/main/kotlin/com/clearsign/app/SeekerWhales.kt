@@ -206,6 +206,14 @@ private fun WhaleRow(rank: Int, w: Whale, open: Boolean, onToggle: () -> Unit) {
                 h.unpriced > 0 -> Note(stringResource(R.string.whale_unpriced, h.unpriced))
                 else -> Note(stringResource(R.string.whale_empty))
             }
+            // Follow: what this wallet buys becomes a candidate for the agent.
+            var followed by remember(w.address) { mutableStateOf(Follows.has(ctx, w.address)) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallChip(
+                    stringResource(if (followed) R.string.follow_on else R.string.follow_btn),
+                    if (followed) HIcon.STAR_FILLED else HIcon.STAR, tint = Halo.amber,
+                ) { followed = Follows.toggle(ctx, w.address); Haptics.tick(ctx) }
+            }
             // Solscan keeps its place, on a target of its own. The row itself now
             // has a job, and one tap cannot do two things.
             Row(

@@ -119,4 +119,33 @@ class SeekerCrowdTest {
         assertEquals(817173L, r[0].centiSol)
         assertEquals(SeekerTier.DOLPHIN, r[1].tier)
     }
+
+    // ---- the live feed as a source of candidates ---------------------------
+
+    private fun fbuy(w: String, mint: String, at: Long, whale: Boolean = true, sol: Double = 0.5) =
+        CrowdBuy(w, if (whale) SeekerTier.WHALE else SeekerTier.DOLPHIN, mint, "X", at, sol)
+
+    @Test fun aFollowedWalletsBuyIsASignalAndOneWalletTenTimesIsNotACrowd() {
+        val now = 1_000_000_000L
+        val h = 60 * 60_000L
+        val buys = listOf(
+            fbuy("Luca", "WIF", now - 5 * 60_000L),
+            fbuy("Anon", "TOS", now - 10 * 60_000L), fbuy("Anon", "TOS", now - 9 * 60_000L), fbuy("Anon", "TOS", now - 8 * 60_000L),
+            fbuy("W1", "BONK", now - 20 * 60_000L), fbuy("W2", "BONK", now - 15 * 60_000L),
+            fbuy("W3", "OLD", now - 3 * h), fbuy("W4", "OLD", now - 2 * h),
+            fbuy("W5", "So11111111111111111111111111111111111111112", now - 60_000L), fbuy("W6", "So11111111111111111111111111111111111111112", now - 60_000L),
+        )
+        val s = SeekerCrowd.signals(buys, follows = setOf("Luca"), now = now)
+        assertEquals(listOf("WIF", "BONK"), s.map { it.mint })
+        assertTrue(s[0] is CrowdSignal.Followed && (s[0] as CrowdSignal.Followed).wallet == "Luca")
+        assertTrue(s[1] is CrowdSignal.Crowd && (s[1] as CrowdSignal.Crowd).whales == 2)
+    }
+
+    @Test fun aFollowedBuyIsNotCountedTwiceAsACrowd() {
+        val now = 1_000_000_000L
+        val buys = listOf(fbuy("Luca", "WIF", now - 60_000L), fbuy("W2", "WIF", now - 120_000L))
+        val s = SeekerCrowd.signals(buys, setOf("Luca"), now)
+        assertEquals(1, s.size)
+        assertTrue(s[0] is CrowdSignal.Followed)
+    }
 }

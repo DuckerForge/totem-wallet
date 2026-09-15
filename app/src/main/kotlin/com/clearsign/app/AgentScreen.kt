@@ -478,7 +478,7 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.PIGEON) {
-                TraderLoop.setConfig(ctx, TraderLoop.config(ctx).copy(on = true, bold = bold))
+                TraderLoop.start(ctx, TraderLoop.config(ctx).copy(bold = bold))
                 TraderKeeper.sync(ctx)
                 Haptics.tick(ctx)
                 onStarted()

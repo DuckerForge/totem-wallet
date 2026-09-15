@@ -1345,7 +1345,7 @@
     <string name="trader_no_onchain_small">Too small for an order on Jupiter, which wants at least $5. Only the loop watches it, while it runs.</string>
     <string name="hold_bars_note">%1$d are worth money. The bar is how many Seekers hold it. The dollars are what one of them holds, on average.</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
-    <string name="hold_col_each">EACH</string>
+    <string name="hold_col_each">% · $ EACH</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>
     <string name="send_blocked_drain">Blocked: this sends almost the whole balance to an address this phone has never seen. If it is your own account, save it as a contact and try again.</string>
     <string name="send_save_contact">Save as a contact</string>

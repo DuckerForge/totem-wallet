@@ -707,7 +707,9 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 val mints = if (usdc) AgentPolicy.BASE_MINTS else AgentPolicy.BASE_MINTS - AgentPolicy.USDC
                 SessionWallet.setHarvest(ctx, if (payout <= 0.001f) 0L else (payout * cap).toLong())
                 UserRules.set(ctx, rules, rulesName)
-                TraderLoop.setConfig(ctx, trade)
+                // Switching on from here clears the last stop's note too: it was
+                // about a run that is over.
+                if (trade.on && !TraderLoop.config(ctx).on) TraderLoop.start(ctx, trade) else TraderLoop.setConfig(ctx, trade)
                 TraderKeeper.sync(ctx)
                 SessionWallet.setPolicy(
                     ctx,

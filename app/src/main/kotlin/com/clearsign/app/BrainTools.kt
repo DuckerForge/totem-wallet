@@ -187,7 +187,7 @@ object BrainTools {
             takeProfitPct = args.optInt("takeProfitPct", 30).coerceIn(2, 500),
             stopLossPct = if (args.has("stopLossPct")) args.optInt("stopLossPct").coerceIn(0, 90) else 15,
         )
-        TraderLoop.setConfig(ctx, cfg)
+        TraderLoop.start(ctx, cfg)
         TraderKeeper.sync(ctx)
         val ceiling = minOf(p.perTxLamports, p.askAboveLamports.takeIf { it > 0 } ?: p.perTxLamports)
         val slice = ceiling * cfg.slicePercent / 100

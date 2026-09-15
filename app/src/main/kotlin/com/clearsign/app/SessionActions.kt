@@ -203,14 +203,23 @@ object SessionActions {
      * of one coin has to be exactly the same operation as the first attempt.
      */
     private suspend fun sellOne(ctx: Context, owner: String, h: SolanaRpc.TokenAccountInfo): Boolean {
-        val quote = withContext(Dispatchers.IO) {
-            runCatching { Jupiter.quote(h.mint, Jupiter.SOL_MINT, h.amount, slippageBps = 500, feeBps = 0) }.getOrNull()
-        } ?: return false
-        val tx = withContext(Dispatchers.IO) { runCatching { Jupiter.swapTransaction(quote, owner, null) }.getOrNull() } ?: return false
-        val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx)) ?: return false
-        val idx = SolanaTx.decode(tx)?.let { d -> d.staticAccountKeys.indexOf(owner).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
-        val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(null), SolanaTx.attachSignature(tx, idx, sig)) }
-        return out.signature != null
+        // Through the collar, like every other sale. It used to sign directly,
+        // which made "sell everything" the one button in the app that skipped
+        // the receipt. The chain's real price is accepted: the person asked to
+        // be out, not to be asked again.
+        val cfg = TraderLoop.config(ctx)
+        val pos = Positions.open(ctx).firstOrNull { it.mint == h.mint } ?: Positions.Position(
+            mint = h.mint, symbol = TokenSymbols.symbol(h.mint), decimals = h.decimals,
+            units = h.amount / Math.pow(10.0, h.decimals.toDouble()), owner = owner,
+            costLamports = 0L, openedAt = System.currentTimeMillis(),
+            takeProfitPct = cfg.takeProfitPct, stopLossPct = cfg.stopLossPct,
+        )
+        val why = ctx.getString(R.string.trader_why_you, pos.symbol)
+        val sale = runCatching { sellNow(ctx, pos, why, AgentBroker.Job.Source.IN_APP, acceptReal = true) }.getOrNull()
+        val v = (sale as? Sale.Judged)?.verdict
+        val ok = v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed
+        if (ok) Positions.remove(ctx, pos.mint)
+        return ok
     }
 
     /**

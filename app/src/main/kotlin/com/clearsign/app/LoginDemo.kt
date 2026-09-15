@@ -59,10 +59,20 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(6200, easing = LinearEasing)), label = "t")
     val slow by loop.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "slow")
 
-    // Fixed once: a starfield that reshuffled every frame would be snow.
+    // Fixed once: a starfield that reshuffled every frame would be snow. Three
+    // depths, because a sky with one depth is wallpaper: the far ones are many,
+    // tiny and slow; the near ones are few, bright, and drift a little faster
+    // across them. Each has its own phase and pace, so no two twinkle together.
     val stars = remember {
         val rnd = java.util.Random(7)
-        List(26) { Star(rnd.nextFloat(), rnd.nextFloat() * 0.62f, 0.6f + rnd.nextFloat() * 1.5f, rnd.nextFloat() * 6.28f) }
+        List(70) { i ->
+            val depth = when { i < 44 -> 0; i < 62 -> 1; else -> 2 }
+            Star(
+                rnd.nextFloat(), rnd.nextFloat() * 0.78f,
+                r = when (depth) { 0 -> 0.5f + rnd.nextFloat() * 0.7f; 1 -> 1.0f + rnd.nextFloat() * 0.9f; else -> 1.8f + rnd.nextFloat() * 1.2f },
+                phase = rnd.nextFloat() * 6.28f, depth = depth, pace = 0.6f + rnd.nextFloat() * 1.6f,
+            )
+        }
     }
 
     val mint = Halo.mint
@@ -78,10 +88,34 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val unit = min(w, h)
 
         // ---- the dark, and what is in it -----------------------------------
+        // A breath of colour behind everything: two soft clouds, cyan and
+        // violet, drifting against each other so the black is not flat.
+        run {
+            val c1 = Offset(w * (0.30f + 0.06f * sin(slow * 0.5f)), h * (0.22f + 0.03f * cos(slow * 0.4f)))
+            val c2 = Offset(w * (0.74f + 0.05f * cos(slow * 0.45f)), h * (0.40f + 0.04f * sin(slow * 0.6f)))
+            drawCircle(Brush.radialGradient(listOf(cyan.copy(alpha = 0.07f), Color.Transparent), center = c1, radius = w * 0.55f), w * 0.55f, c1)
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF8B7CF6).copy(alpha = 0.06f), Color.Transparent), center = c2, radius = w * 0.5f), w * 0.5f, c2)
+        }
         stars.forEach { s ->
-            val twinkle = 0.35f + 0.4f * (0.5f + 0.5f * sin(slow * 1.7f + s.phase))
-            val drift = sin(slow * 0.35f + s.phase) * unit * 0.004f
-            drawCircle(Color.White.copy(alpha = 0.55f * twinkle), s.r, Offset(s.x * w + drift, s.y * h))
+            val tw = 0.5f + 0.5f * sin(slow * 1.7f * s.pace + s.phase)
+            val twinkle = when (s.depth) { 0 -> 0.25f + 0.35f * tw; 1 -> 0.4f + 0.5f * tw; else -> 0.55f + 0.45f * tw }
+            // Parallax: the near layer moves three times as much as the far one.
+            val par = (s.depth + 1) * unit * 0.004f
+            val p = Offset(s.x * w + sin(slow * 0.35f + s.phase) * par, s.y * h + cos(slow * 0.25f + s.phase) * par * 0.4f)
+            val rr = s.r * unit / 1000f * 2.2f
+            if (s.depth == 2) {
+                // The bright few: a halo, and a four-point flare that opens on
+                // the peak of the twinkle and is gone a moment later.
+                drawCircle(Color.White.copy(alpha = 0.10f * twinkle), rr * 3.2f, p)
+                val flare = ((tw - 0.82f) / 0.18f).coerceIn(0f, 1f)
+                if (flare > 0f) {
+                    val len = rr * (3f + 7f * flare)
+                    val a = Color.White.copy(alpha = 0.55f * flare)
+                    drawLine(a, Offset(p.x - len, p.y), Offset(p.x + len, p.y), strokeWidth = 1.1f * density)
+                    drawLine(a, Offset(p.x, p.y - len), Offset(p.x, p.y + len), strokeWidth = 1.1f * density)
+                }
+            }
+            drawCircle(Color.White.copy(alpha = 0.9f * twinkle), rr, p)
         }
 
         // ---- one falling star, early in the loop, never in the silence -------
@@ -113,28 +147,42 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val planet = Offset(w / 2f, h * 0.92f + planetR)
         val limbY = planet.y - planetR
 
-        // The atmosphere first, so the body draws over its inner edge and the glow
-        // survives only outside the horizon, which is where it is in a photograph.
-        for (k in 3 downTo 1) {
-            drawCircle(cyan.copy(alpha = 0.05f * k), planetR + unit * 0.012f * k * k, planet, style = Stroke(unit * 0.02f * k))
-        }
+        // The atmosphere is one soft radial glow just outside the horizon, not
+        // stroked arcs: arcs scaled with the scene and turned into three thick
+        // bands when the scene got tall. A gradient over the same radius fades
+        // out on its own, whatever the size.
+        val glowOut = w * 0.09f
+        drawCircle(
+            Brush.radialGradient(
+                colorStops = arrayOf(
+                    (planetR - w * 0.01f) / (planetR + glowOut) to Color.Transparent,
+                    planetR / (planetR + glowOut) to cyan.copy(alpha = 0.55f),
+                    (planetR + glowOut * 0.35f) / (planetR + glowOut) to cyan.copy(alpha = 0.12f),
+                    1f to Color.Transparent,
+                ),
+                center = planet, radius = planetR + glowOut,
+            ),
+            planetR + glowOut, planet,
+        )
         clipRect(top = limbY) {
             drawCircle(Halo.ground, planetR, planet)
+            // The lit rim, thin: it fades out well before the frame's bottom edge,
+            // so the body meets the edge as plain dark and not as a cut band.
             drawCircle(
                 brush = Brush.verticalGradient(
-                    listOf(cyan.copy(alpha = 0.16f), Color.Transparent),
-                    startY = limbY, endY = limbY + h * 0.45f,
+                    listOf(cyan.copy(alpha = 0.20f), cyan.copy(alpha = 0.04f), Color.Transparent),
+                    startY = limbY, endY = limbY + w * 0.16f,
                 ),
                 radius = planetR, center = planet,
             )
-            drawCircle(cyan.copy(alpha = 0.45f), planetR, planet, style = Stroke(1.2.dp.toPx()))
+            drawCircle(cyan.copy(alpha = 0.6f), planetR, planet, style = Stroke(1.dp.toPx()))
             // Cities, breathing out of phase. Six points of life, not a grid.
-            for (k in 0 until 6) {
-                val a = -1.15f + k * 0.46f
+            for (k in 0 until 7) {
+                val a = -1.2f + k * 0.4f
                 val lit = 0.25f + 0.75f * (0.5f + 0.5f * sin(slow * 2.1f + k * 1.7f))
-                val p = Offset(planet.x + planetR * sin(a) * 0.62f, limbY + h * (0.04f + 0.05f * ((k % 3) + 1)))
-                drawCircle(cyan.copy(alpha = 0.5f * lit), unit * 0.006f, p)
-                drawCircle(cyan.copy(alpha = 0.14f * lit), unit * 0.018f, p)
+                val p = Offset(planet.x + planetR * sin(a) * 0.62f, limbY + w * (0.015f + 0.02f * ((k % 3) + 1)))
+                drawCircle(cyan.copy(alpha = 0.55f * lit), w * 0.003f, p)
+                drawCircle(cyan.copy(alpha = 0.12f * lit), w * 0.010f, p)
             }
         }
 
@@ -229,7 +277,7 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     }
 }
 
-private class Star(val x: Float, val y: Float, val r: Float, val phase: Float)
+private class Star(val x: Float, val y: Float, val r: Float, val phase: Float, val depth: Int = 0, val pace: Float = 1f)
 
 private class Lane(
     val from: Offset,

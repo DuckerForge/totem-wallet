@@ -537,15 +537,10 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
                 letterSpacing = 3.sp,
             )
         }
-        Spacer(Modifier.height(14.dp))
-        // The sentence sits under the name, above the scene, where nothing crosses
-        // it. It used to sit under a fixed-height strip, on top of the planet's
-        // atmosphere, with half a page of dark under it.
-        Text(
-            stringResource(R.string.door_pitch),
-            fontFamily = Inter, fontSize = 14.sp, color = Halo.muted, lineHeight = 21.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        // The name and nothing else. The sentence that used to sit under it
+        // explained the scene, and a scene that needs explaining is a worse
+        // scene. What is out there arrives, asks, and the liar breaks on the
+        // glass: that is the whole pitch, and it is drawn.
         Spacer(Modifier.height(8.dp))
         // Shown, not told: everything out there comes to this one phone and asks,
         // and the request that lies is stopped at the glass. It is the one thing

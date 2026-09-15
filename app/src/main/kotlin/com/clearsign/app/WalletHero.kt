@@ -114,6 +114,11 @@ internal fun WalletHero(
                             LinkRow(if (showOthers) stringResource(R.string.hero_others_hide) else stringResource(R.string.hero_others, others.size)) { showOthers = !showOthers }
                             if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
                         }
+                        if (view.defi.isNotEmpty()) {
+                            Spacer(Modifier.height(Space.xs))
+                            Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
+                            view.defi.forEach { d -> DefiRow(d, currency) }
+                        }
                     }
                 }
             }
@@ -339,5 +344,32 @@ private fun BigTotal(total: Double, currency: String) {
                 ),
             ),
         )
+    }
+}
+
+/** One thing that is yours outside the token list: what, where, how much, and whether it is live. */
+@Composable
+private fun DefiRow(d: DefiPosition, currency: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        TokenLogo(d.symbol, d.symbol, d.image, 34.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(if (d.kind == DefiPosition.Kind.STAKE) R.string.hero_defi_stake else R.string.hero_defi_lend, d.symbol),
+                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, maxLines = 1,
+            )
+            Text(
+                d.sub + (d.state?.let { st ->
+                    " · " + stringResource(
+                        when (st) { "active" -> R.string.hero_stake_active; "activating" -> R.string.hero_stake_activating; "deactivating" -> R.string.hero_stake_deactivating; else -> R.string.hero_stake_inactive },
+                    )
+                } ?: ""),
+                fontFamily = Inter, fontSize = 11.sp, color = if (d.state == "active" || d.state == null) Halo.mint else Halo.amber, maxLines = 1,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(d.fiat?.let { fmtFiat(it, currency) } ?: "…", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.ink)
+            Text(fmtUi(d.ui) + " " + d.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
+        }
     }
 }

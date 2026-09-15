@@ -734,6 +734,49 @@ object SolanaRpc {
         return false
     }
 
+    /**
+     * SOL parked in native stake accounts, which the token list never shows
+     * and Jupiter's wallet lists under DeFi. Found by the withdraw authority,
+     * which is what "yours" means for a stake account.
+     */
+    data class StakeAccount(
+        val pubkey: String, val lamports: Long, val stakedLamports: Long, val voter: String?,
+        val activationEpoch: Long, val deactivationEpoch: Long,
+    ) {
+        fun state(epoch: Long): String = when {
+            voter == null -> "inactive"
+            deactivationEpoch != Long.MAX_VALUE && epoch > deactivationEpoch -> "inactive"
+            deactivationEpoch != Long.MAX_VALUE -> "deactivating"
+            epoch > activationEpoch -> "active"
+            else -> "activating"
+        }
+    }
+
+    fun epoch(rpcUrl: String): Long? = post(rpcUrl, "getEpochInfo", JSONArray())?.optJSONObject("result")?.optLong("epoch")
+
+    fun stakeAccounts(rpcUrl: String, owner: String): List<StakeAccount> {
+        val params = JSONArray().put("Stake11111111111111111111111111111111111111").put(
+            JSONObject().put("encoding", "jsonParsed").put(
+                "filters", JSONArray().put(JSONObject().put("memcmp", JSONObject().put("offset", 44).put("bytes", owner))),
+            ),
+        )
+        val arr = post(rpcUrl, "getProgramAccounts", params)?.optJSONArray("result") ?: return emptyList()
+        val out = ArrayList<StakeAccount>()
+        for (i in 0 until arr.length()) {
+            val a = arr.optJSONObject(i) ?: continue
+            val info = a.optJSONObject("account")?.optJSONObject("data")?.optJSONObject("parsed")?.optJSONObject("info") ?: continue
+            val d = info.optJSONObject("stake")?.optJSONObject("delegation")
+            fun big(s: String?): Long = s?.toBigIntegerOrNull()?.let { if (it > java.math.BigInteger.valueOf(Long.MAX_VALUE)) Long.MAX_VALUE else it.toLong() } ?: Long.MAX_VALUE
+            out += StakeAccount(
+                pubkey = a.optString("pubkey"), lamports = a.optJSONObject("account")?.optLong("lamports") ?: 0L,
+                stakedLamports = d?.optString("stake")?.toLongOrNull() ?: 0L, voter = d?.optString("voter")?.takeIf { it.isNotEmpty() },
+                activationEpoch = d?.optString("activationEpoch")?.toLongOrNull() ?: Long.MAX_VALUE,
+                deactivationEpoch = big(d?.optString("deactivationEpoch")),
+            )
+        }
+        return out
+    }
+
     // ---- transport -----------------------------------------------------------
 
     private sealed interface Http {

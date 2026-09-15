@@ -103,17 +103,43 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     }
 
     fun closeNow() {
-        val pub = SessionWallet.current(ctx)?.pubkey ?: return
+        val s = SessionWallet.current(ctx) ?: return
+        val pub = s.pubkey
         busy = ctx.getString(R.string.env_closing)
         scope.launch {
             AgentLinkService.revoke(ctx)
             // Empty token accounts first: their rent goes to the wallet while
-            // the key can still sign. Then whatever SOL is left.
-            val rent = if (account != null) runCatching { SessionActions.closeEmpty(ctx, account) }.getOrDefault(0) else 0
+            // the key can still sign. Then whatever SOL is left. The key is
+            // forgotten only once the chain has confirmed both; if anything
+            // did not land, the budget stays open and says so.
+            val rent = if (account != null) runCatching { SessionActions.closeEmpty(ctx, account) }.getOrNull() ?: SessionActions.Closed(0, 1, 0L) else SessionActions.Closed(0, 0, 0L)
+            if (rent.failed > 0) {
+                note = ctx.resources.getQuantityString(R.plurals.env_rent_stuck, rent.failed, rent.failed)
+                busy = null; refresh++
+                return@launch
+            }
             val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() } ?: 0L
             val fee = 5_000L
-            if (account != null && left > fee) SessionActions.sweep(ctx, account, left - fee)?.let { note = it }
-            if (note == null && rent > 0) note = ctx.resources.getQuantityString(R.plurals.env_rent_back, rent, rent)
+            val back = if (left > fee) left - fee else 0L
+            if (account != null && back > 0L) {
+                val err = SessionActions.sweep(ctx, account, back)
+                if (err != null) { note = err; busy = null; refresh++; return@launch }
+            }
+            // The account, in plain words, kept after the key is gone.
+            val rows = runCatching { Ledger.all(ctx) }.getOrDefault(emptyList())
+                .filter { it.kind == "agent" && it.sent && it.at >= s.createdAt && (it.host == "auto" || it.host == "asked") }
+            val close = SessionWallet.Close(
+                fundedLamports = s.fundedLamports, harvestedLamports = s.harvestedLamports,
+                backLamports = back + rent.rentLamports, createdAt = s.createdAt, closedAt = System.currentTimeMillis(),
+                buys = rows.count { r -> r.outflows.any { it.mint == com.clearsign.core.NATIVE_SOL_MINT } },
+                sells = rows.count { r -> r.inflows.any { it.mint == com.clearsign.core.NATIVE_SOL_MINT } },
+            )
+            SessionWallet.recordClose(ctx, close)
+            note = ctx.getString(
+                R.string.env_close_summary, fmtSol(close.fundedLamports, 4), fmtSol(close.backLamports + close.harvestedLamports, 4),
+                (if (close.resultLamports >= 0) "+" else "−") + fmtSol(kotlin.math.abs(close.resultLamports), 4),
+                String.format(java.util.Locale.ROOT, "%+.1f%%", close.resultPct),
+            )
             SessionWallet.forget(ctx)
             busy = null; coins = emptyList(); refresh++
         }
@@ -157,6 +183,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                     if (owner == null) Text(stringResource(R.string.agent_tab_none), style = HaloType.small, color = Halo.amber)
                 }
             }
+            note?.let { Banner(it, Halo.amber, HIcon.INFO) }
+            LastBudget(refresh)
         } else {
             AgentPulse(refresh)
 
@@ -422,6 +450,35 @@ private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false,
  * What the agent did last, five lines. Each is a ledger row, so the receipt
  * behind it is one tab away; here it is the sentence, the sum, and when.
  */
+/** The last budget's account: what went in, what came back, how it went. Shown where the next one is made. */
+@Composable
+private fun LastBudget(refresh: Int) {
+    val ctx = LocalContext.current
+    val c = remember(refresh) { SessionWallet.lastClose(ctx) } ?: return
+    val up = c.resultLamports >= 0
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.env_last_title).uppercase(), style = HaloType.label, color = Halo.muted)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.env_last_in, fmtSol(c.fundedLamports, 4)), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink)
+                    Text(stringResource(R.string.env_last_out, fmtSol(c.backLamports + c.harvestedLamports, 4)), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        (if (up) "+" else "−") + fmtSol(kotlin.math.abs(c.resultLamports), 4) + " SOL",
+                        fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (up) Halo.mint else Halo.red, style = Tabular,
+                    )
+                    Text(String.format(java.util.Locale.ROOT, "%+.1f%%", c.resultPct), fontFamily = Mono, fontSize = 11.5.sp, color = if (up) Halo.mint else Halo.red, style = Tabular)
+                }
+            }
+            val mins = ((c.closedAt - c.createdAt) / 60_000L).coerceAtLeast(0L)
+            val dur = if (mins >= 60) String.format(java.util.Locale.ROOT, "%dh %02dm", mins / 60, mins % 60) else "$mins min"
+            Text(stringResource(R.string.env_last_moves, c.buys, c.sells, dur), style = HaloType.small, color = Halo.muted)
+        }
+    }
+}
+
 /**
  * Copy trading, where the person can see it. The star in Scout follows a
  * wallet; this is the list of what that star did, with each wallet's last buy

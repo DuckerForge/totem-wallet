@@ -1386,6 +1386,16 @@
     <string name="trader_sell_worse">Jupiter promette %1$s SOL, la rete ne dà %2$s (−%3$d%%). Vendere lo stesso?</string>
     <string name="trader_sell_anyway">Vendi lo stesso a %1$s SOL</string>
     <string name="trader_target_unreal">%1$s: l\'obiettivo c\'è sul preventivo, ma la rete dà %2$s SOL (−%3$d%%). Aspetto.</string>
+    <plurals name="env_rent_stuck">
+        <item quantity="one">%1$d account vuoto non si è chiuso. Il rent è ancora dentro, quindi la paghetta resta aperta. Riprova.</item>
+        <item quantity="other">%1$d account vuoti non si sono chiusi. Il rent è ancora dentro, quindi la paghetta resta aperta. Riprova.</item>
+    </plurals>
+    <string name="env_sweep_unconfirmed">Il rientro non è arrivato sulla catena. La paghetta resta aperta. Riprova.</string>
+    <string name="env_close_summary">Messi %1$s SOL, tornati %2$s SOL: %3$s SOL (%4$s).</string>
+    <string name="env_last_title">L\'ultima paghetta</string>
+    <string name="env_last_in">Messi: %1$s SOL</string>
+    <string name="env_last_out">Tornati: %1$s SOL</string>
+    <string name="env_last_moves">%1$d acquisti, %2$d vendite, %3$s</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

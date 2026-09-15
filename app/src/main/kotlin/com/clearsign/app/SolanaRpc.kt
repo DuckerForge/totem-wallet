@@ -712,6 +712,28 @@ object SolanaRpc {
         return SendOutcome(null, msg)
     }
 
+    /**
+     * Wait for [signature] to land. "Sent" is what the node said; "landed" is
+     * what the chain says, and only the second one is true. Polls the status
+     * every second and a half for up to [timeoutMs]. True when confirmed or
+     * finalised without error; false on an error or when time runs out, which
+     * the caller must treat as "not landed", never as "landed".
+     */
+    fun confirmed(rpcUrl: String, signature: String, timeoutMs: Long = 30_000L): Boolean {
+        val until = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < until) {
+            val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", true)))
+            val st = resp?.optJSONObject("result")?.optJSONArray("value")?.optJSONObject(0)
+            if (st != null) {
+                if (!st.isNull("err")) return false
+                val c = st.optString("confirmationStatus")
+                if (c == "confirmed" || c == "finalized") return true
+            }
+            try { Thread.sleep(1_500) } catch (_: InterruptedException) { return false }
+        }
+        return false
+    }
+
     // ---- transport -----------------------------------------------------------
 
     private sealed interface Http {

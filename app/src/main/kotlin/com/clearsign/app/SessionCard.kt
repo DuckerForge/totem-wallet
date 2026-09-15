@@ -142,16 +142,21 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
             // "Prudent" and "Trader" were four hidden fractions of the cap, not two
             // behaviours: both autonomous, both allowed Jupiter, both allowed USDC.
             // Two sliders in real SOL say the same thing and hide nothing.
-            SliderRow(stringResource(R.string.agent_per_tx), "%.4f SOL".format(perTx), perTx, (cap / 50f)..cap, Halo.mint) { perTx = it }
-            SliderRow(stringResource(R.string.agent_daily), "%.4f SOL".format(daily), daily, perTx..cap, Halo.mint) { daily = it }
+            // Clamped at draw time, not only in the effect above: when the budget
+            // slider drops below the per move ceiling, the daily slider's range
+            // was empty for one frame and the app fell over on it.
+            val perTxV = perTx.coerceIn(cap / 50f, cap)
+            val dailyV = daily.coerceIn(perTxV, cap)
+            SliderRow(stringResource(R.string.agent_per_tx), "%.4f SOL".format(perTxV), perTxV, (cap / 50f)..cap, Halo.mint) { perTx = it }
+            SliderRow(stringResource(R.string.agent_daily), "%.4f SOL".format(dailyV), dailyV, perTxV..cap, Halo.mint) { daily = it }
             Text(
-                stringResource(R.string.env_limits_note, "%.4f".format(perTx), "%.4f".format(daily)),
+                stringResource(R.string.env_limits_note, "%.4f".format(perTxV), "%.4f".format(dailyV)),
                 style = HaloType.small, color = Halo.muted,
             )
             // The slice this makes, and whether the chain can guard it, before signing.
             run {
                 val t = TraderLoop.config(ctx)
-                SizingNote((cap * 1e9).toLong(), (perTx * 1e9).toLong(), (perTx * 1e9).toLong(), t.slicePercent, t.maxPositions)
+                SizingNote((cap * 1e9).toLong(), (perTxV * 1e9).toLong(), (perTxV * 1e9).toLong(), t.slicePercent, t.maxPositions)
             }
 
             Text(stringResource(R.string.env_harvest_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
@@ -199,9 +204,9 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                         SessionWallet.setPolicy(
                             ctx,
                             AgentPolicy.prudent(lamports, owner, s.pubkey, contacts, s.expiresAt).copy(
-                                perTxLamports = (perTx * 1e9).toLong(),
-                                dailyLamports = (daily * 1e9).toLong(),
-                                askAboveLamports = (perTx * 1e9).toLong(),
+                                perTxLamports = (perTx.coerceIn(cap / 50f, cap) * 1e9).toLong(),
+                                dailyLamports = (daily.coerceIn(perTx.coerceIn(cap / 50f, cap), cap) * 1e9).toLong(),
+                                askAboveLamports = (perTx.coerceIn(cap / 50f, cap) * 1e9).toLong(),
                             ),
                         )
                         val out = SessionActions.fund(ctx, signer, owner, s.pubkey, lamports)

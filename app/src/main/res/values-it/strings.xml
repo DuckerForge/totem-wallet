@@ -1425,6 +1425,13 @@
     <string name="market_total_followed">Le seguite</string>
     <string name="market_total_wallet">Nel portafoglio</string>
     <string name="market_total_all">Totale</string>
+    <string name="hero_defi">In DeFi</string>
+    <string name="hero_defi_stake">%1$s in staking</string>
+    <string name="hero_defi_lend">%1$s in Jupiter Lend</string>
+    <string name="hero_stake_active">attivo</string>
+    <string name="hero_stake_activating">in attivazione</string>
+    <string name="hero_stake_deactivating">in uscita</string>
+    <string name="hero_stake_inactive">fermo</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

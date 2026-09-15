@@ -1425,6 +1425,13 @@
     <string name="market_total_followed">Followed coins</string>
     <string name="market_total_wallet">In the wallet</string>
     <string name="market_total_all">Total</string>
+    <string name="hero_defi">In DeFi</string>
+    <string name="hero_defi_stake">%1$s staked</string>
+    <string name="hero_defi_lend">%1$s in Jupiter Lend</string>
+    <string name="hero_stake_active">earning</string>
+    <string name="hero_stake_activating">activating</string>
+    <string name="hero_stake_deactivating">unstaking</string>
+    <string name="hero_stake_inactive">not staked</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

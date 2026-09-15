@@ -16,8 +16,23 @@ data class Holding(
     val isMain: Boolean get() = fiat != null || (!isNft && TokenSymbols.isKnown(mint))
 }
 
+/**
+ * Money that is yours and is not a token in the wallet: SOL in a stake
+ * account, a deposit in Jupiter Lend. Jupiter's wallet lists these under
+ * DeFi; the token list alone would say you have less than you do.
+ */
+data class DefiPosition(
+    val kind: Kind, val label: String, val sub: String, val symbol: String, val ui: Double, val fiat: Double?,
+    val image: String? = null, val state: String? = null,
+) {
+    enum class Kind { STAKE, LEND }
+}
+
 /** The wallet's portfolio: total value in [currency] and the holdings behind it. */
-data class PortfolioView(val currency: String, val total: Double, val holdings: List<Holding>, val priced: Int, val unpriced: Int) {
+data class PortfolioView(
+    val currency: String, val total: Double, val holdings: List<Holding>, val priced: Int, val unpriced: Int,
+    val defi: List<DefiPosition> = emptyList(),
+) {
     val main: List<Holding> get() = holdings.filter { it.isMain }
     val others: List<Holding> get() = holdings.filter { !it.isMain }
     /** How much the priced part of the portfolio moved over 24h, in [currency] (null when nothing has a change). */
@@ -46,6 +61,16 @@ object Portfolio {
      * is not a lie; a page that jumps is simply broken.
      */
     @Volatile private var last: Pair<String, PortfolioView>? = null
+
+    /** The validators a Seeker owner is likely to meet, by vote account. Anyone else is shown by address. */
+    private val VALIDATORS = mapOf(
+        "SKRuTecmFDZHjs2DxRTJNEK7m7hunKGTWJiaZ3tMVVA" to "Seeker",
+    )
+    fun validatorName(voter: String?): String = when {
+        voter == null -> "…"
+        VALIDATORS[voter] != null -> VALIDATORS[voter]!!
+        else -> voter.take(4) + "…" + voter.takeLast(4)
+    }
 
     /** What we knew a moment ago, so the page can be drawn at its real size at once. */
     fun cached(owner: String?, currency: String): PortfolioView? =
@@ -77,8 +102,32 @@ object Portfolio {
             )
         }
         holdings.sortWith(compareByDescending<Holding> { it.fiat ?: -1.0 }.thenByDescending { it.ui })
-        val total = holdings.sumOf { it.fiat ?: 0.0 }
-        PortfolioView(currency, total, holdings, holdings.count { it.fiat != null }, holdings.count { it.fiat == null && it.isMain })
+
+        // Outside the token list: stake accounts and Jupiter Lend deposits.
+        val defi = ArrayList<DefiPosition>()
+        runCatching {
+            val stakes = SolanaRpc.stakeAccounts(rpc, owner).filter { it.lamports > 0 }
+            if (stakes.isNotEmpty()) {
+                val epoch = SolanaRpc.epoch(rpc) ?: Long.MAX_VALUE
+                for (st in stakes) {
+                    val ui = st.lamports / 1e9
+                    defi += DefiPosition(
+                        DefiPosition.Kind.STAKE, "SOL", validatorName(st.voter), "SOL", ui, price(NATIVE_SOL_MINT)?.let { it * ui },
+                        image = TokenSymbols.image(NATIVE_SOL_MINT), state = st.state(epoch),
+                    )
+                }
+            }
+        }
+        runCatching {
+            for (d in JupiterLend.deposits(owner)) {
+                val ui = d.raw / 10.0.pow(d.decimals)
+                val usd = d.priceUsd ?: quotes[d.asset]?.usd ?: if (d.asset in STABLES) 1.0 else null
+                defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo)
+            }
+        }
+
+        val total = holdings.sumOf { it.fiat ?: 0.0 } + defi.sumOf { it.fiat ?: 0.0 }
+        PortfolioView(currency, total, holdings, holdings.count { it.fiat != null }, holdings.count { it.fiat == null && it.isMain }, defi)
             .also { last = "$owner|$currency" to it }
     }
 }

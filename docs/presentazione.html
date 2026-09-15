@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apex Wallet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#070b0f; --ground2:#0d141a; --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.06);
+    --stroke:rgba(255,255,255,.09); --ink:#e9eef2; --muted:#8d9aa5; --mint:#4dffd0; --cyan:#5cc8ff;
+    --amber:#ffc65c; --red:#ff6b6b; --violet:#b48cff;
+    --sora:'Sora',system-ui,sans-serif; --inter:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,rgba(77,255,208,.10),transparent 60%),linear-gradient(180deg,var(--ground2),var(--ground) 60%);color:var(--ink);font-family:var(--inter);line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--mint);text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+  header.hero{position:relative;overflow:hidden;padding:96px 0 64px;text-align:center}
+  .stars{position:absolute;inset:0;pointer-events:none}
+  .stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.5;animation:tw 3.2s ease-in-out infinite}
+  @keyframes tw{0%,100%{opacity:.15;transform:scale(1)}50%{opacity:.8;transform:scale(1.6)}}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--mint);text-transform:uppercase}
+  h1{font-family:var(--sora);font-weight:700;font-size:clamp(44px,7vw,84px);letter-spacing:-.03em;margin:14px 0 8px;line-height:1}
+  h1 small{display:block;font-size:.34em;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:14px}
+  .lede{max-width:640px;margin:22px auto 0;color:var(--muted);font-size:18px}
+  .lede b{color:var(--ink);font-weight:600}
+  .stats{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:40px}
+  .stat{padding:14px 20px;border:1px solid var(--stroke);border-radius:16px;background:var(--card);min-width:150px}
+  .stat b{display:block;font-family:var(--sora);font-size:28px;color:var(--mint)}
+  .stat span{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+  nav.toc{position:sticky;top:0;z-index:5;backdrop-filter:blur(14px);background:rgba(7,11,15,.72);border-top:1px solid var(--stroke);border-bottom:1px solid var(--stroke)}
+  nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding:10px 28px;scrollbar-width:none}
+  nav.toc a{white-space:nowrap;font-size:13px;color:var(--muted);padding:6px 12px;border-radius:999px;border:1px solid transparent}
+  nav.toc a:hover{color:var(--ink);border-color:var(--stroke);background:var(--card)}
+  section{padding:72px 0 18px}
+  h2{font-family:var(--sora);font-size:clamp(26px,3.6vw,38px);letter-spacing:-.02em;margin:0 0 8px}
+  .sub{color:var(--muted);max-width:720px;margin:0 0 30px;font-size:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--stroke);border-radius:20px;padding:22px 22px 18px;position:relative;overflow:hidden;transition:transform .25s ease,border-color .25s ease}
+  .card:hover{transform:translateY(-2px);border-color:rgba(77,255,208,.35)}
+  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--tint,var(--mint)),transparent);opacity:.7}
+  .card h3{font-family:var(--sora);font-size:17px;margin:0 0 8px;display:flex;align-items:center;gap:10px}
+  .card h3 .dot{width:9px;height:9px;border-radius:50%;background:var(--tint,var(--mint));box-shadow:0 0 14px var(--tint,var(--mint))}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+  .card p b{color:var(--ink);font-weight:500}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--stroke);border-radius:999px;padding:2px 9px;margin:10px 6px 0 0}
+  .tag.ok{color:var(--mint);border-color:rgba(77,255,208,.3)}
+  .tag.warn{color:var(--amber);border-color:rgba(255,198,92,.3)}
+  .tag.no{color:var(--red);border-color:rgba(255,107,107,.3)}
+  .problem{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
+  .panel{border:1px solid var(--stroke);border-radius:22px;padding:26px;background:var(--card)}
+  .panel.bad{border-color:rgba(255,107,107,.25)} .panel.good{border-color:rgba(77,255,208,.3)}
+  .panel h3{font-family:var(--sora);margin:0 0 10px;font-size:18px}
+  .panel.bad h3{color:var(--red)} .panel.good h3{color:var(--mint)}
+  .panel ul{margin:0;padding-left:18px;color:var(--muted);font-size:14.5px} .panel li{margin:6px 0}
+  .receipt{font-family:var(--mono);font-size:12.5px;background:#05080b;border:1px solid var(--stroke);border-radius:14px;padding:16px;margin-top:16px;color:#c6d0d8}
+  .receipt .r{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+  .receipt .r:last-child{border:0}
+  .receipt .neg{color:var(--red)} .receipt .pos{color:var(--mint)} .receipt .w{color:var(--amber)}
+  .flow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 28px}
+  .flow span{font-family:var(--mono);font-size:12px;padding:8px 12px;border:1px solid var(--stroke);border-radius:12px;background:var(--card2)}
+  .flow i{color:var(--muted);font-style:normal}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--stroke);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  td:first-child{font-weight:600;white-space:nowrap}
+  .pill{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .pill.a{background:rgba(255,198,92,.12);color:var(--amber)} .pill.b{background:rgba(92,200,255,.12);color:var(--cyan)} .pill.c{background:rgba(255,107,107,.12);color:var(--red)} .pill.d{background:rgba(180,140,255,.12);color:var(--violet)}
+  .names{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .name{border:1px solid var(--stroke);border-radius:18px;padding:18px;background:var(--card);cursor:default;transition:border-color .25s,transform .25s}
+  .name:hover{border-color:rgba(77,255,208,.4);transform:translateY(-2px)}
+  .name b{font-family:var(--sora);font-size:24px;display:block;letter-spacing:-.02em}
+  .name em{display:block;color:var(--mint);font-style:normal;font-size:13px;margin:4px 0 8px}
+  .name p{margin:0;color:var(--muted);font-size:13px}
+  .name .n{position:absolute;right:14px;top:10px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .name{position:relative}
+  .stack{display:flex;flex-wrap:wrap;gap:8px}
+  .stack span{font-family:var(--mono);font-size:12px;padding:7px 11px;border:1px solid var(--stroke);border-radius:10px;color:var(--muted)}
+  footer{padding:60px 0 50px;text-align:center;color:var(--muted);font-size:13px}
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (max-width:760px){.problem{grid-template-columns:1fr} td:first-child{white-space:normal}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="stars" id="stars"></div>
+  <div class="wrap">
+    <div class="eyebrow">Solana Seeker · CLOCK IN 2026</div>
+    <h1>Apex<small>Il portafoglio che ti mostra cosa stai firmando. E un agente che compra da solo, col guinzaglio.</small></h1>
+    <p class="lede">Ogni firma passa da uno <b>scontrino vero</b>, simulato sulla rete, prima dell'impronta. Sopra questo strato c'è un <b>agente</b> con una paghetta separata, un collare che non può allargare, e una pagina dove lo <b>guardi lavorare</b>.</p>
+    <div class="stats">
+      <div class="stat"><b>31k</b><span>righe Kotlin</span></div>
+      <div class="stat"><b>247</b><span>test verdi</span></div>
+      <div class="stat"><b>120k</b><span>Seeker censiti</span></div>
+      <div class="stat"><b>0</b><span>server nostri con chiavi</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#problema">Problema</a><a href="#fa">Cosa fa</a><a href="#agente">L'agente</a><a href="#scout">Scout</a><a href="#manca">Cosa manca</a><a href="#meglio">Da migliorare</a><a href="#nomi">10 nomi</a><a href="#stack">Com'è fatto</a>
+</div></nav>
+
+<section id="problema"><div class="wrap">
+  <h2>Il problema, e cosa risolve</h2>
+  <p class="sub">Su un telefono un'app può chiederti una firma mostrando solo il suo nome e "Approva". La firma può svuotare il portafoglio o dare a qualcuno un permesso permanente di prendere i tuoi token. Si chiama firma alla cieca ed è la prima causa di soldi rubati.</p>
+  <div class="problem">
+    <div class="panel bad reveal">
+      <h3>Prima</h3>
+      <ul>
+        <li>Nome dell'app, un bottone, l'impronta.</li>
+        <li>Nessun importo, nessun destinatario, nessun avviso.</li>
+        <li>Un'approvazione illimitata resta lì finché non la revochi, e non sai che c'è.</li>
+        <li>Chi vuole un bot di trading incolla la seed in un sito.</li>
+      </ul>
+    </div>
+    <div class="panel good reveal">
+      <h3>Con Apex</h3>
+      <ul>
+        <li>I byte veri della transazione, <b>simulati dalla rete</b>, diventano uno scontrino in italiano.</li>
+        <li>Ricontrollo un istante prima della firma: se il risultato cambia, rifiuta.</li>
+        <li>L'agente ha una chiave sua e una paghetta piccola. La tua seed non la vede mai.</li>
+        <li>Tutto quello che decide, lo scrive. Tu lo leggi, o lo ascolti.</li>
+      </ul>
+      <div class="receipt">
+        <div class="r"><span>Esce</span><span class="neg">−0,0377 SOL</span></div>
+        <div class="r"><span>Entra</span><span class="pos">+3.204,92 ALL</span></div>
+        <div class="r"><span>A</span><span>Jupiter (aggregatore, noto)</span></div>
+        <div class="r"><span>Commissione</span><span>0,000005 SOL</span></div>
+        <div class="r"><span>Rischio</span><span class="w">destinatario nuovo · intenzione dell'agente ok</span></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section id="fa"><div class="wrap">
+  <h2>Cosa fa oggi</h2>
+  <p class="sub">Tutto quello che c'è nell'app installata sul Seeker adesso. Le etichette dicono se è provato sul telefono o solo nel codice.</p>
+  <div class="grid">
+    <div class="card reveal"><h3><span class="dot"></span>Scontrino prima della firma</h3><p>Decodifica, simulazione, flussi per ogni token, etichetta di fiducia sul destinatario, rischi in chiaro. Vale per le dApp via <b>Mobile Wallet Adapter</b> e per le azioni dell'app.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Invia · Ricevi · Swap</h3><p>Swap con Jupiter e impatto sul prezzo, invio con contatti fidati e blocco anti prosciugamento, <b>Solana Pay</b> da QR con importo e moneta, <b>tocco NFC</b> fra telefoni.</p><span class="tag ok">provato</span><span class="tag warn">NFC senza secondo telefono</span></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Porta biometrica</h3><p>La scena della porta: stelle, il pianeta, il telefono che fa da scudo alle richieste in arrivo. Chiede l'impronta da sola. Solo "Apex Wallet", nessun'altra scritta.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Scontrini e fisco</h3><p>Registro di tutto il firmato, prova firmata per ogni voce, <b>CSV per Koinly e CoinTracker</b>, PDF, profitti e perdite realizzati per moneta (FIFO).</p><span class="tag ok">provato</span></div>
+    <div class="card reveal" style="--tint:var(--amber)"><h3><span class="dot"></span>Salute del portafoglio</h3><p>Deleghe da revocare, account vuoti con rent da recuperare, spazzatura da bruciare, lista nera. Un <b>widget</b> sulla home e il <b>Watchtower</b> che avvisa in sottofondo.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Ordini e avvisi sul conto principale</h3><p><b>Vendi in guadagno</b>, <b>compra sotto</b>, <b>DCA</b> con Jupiter Trigger e Recurring, senza chiave. <b>Avvisami a</b> con un prezzo. Le linee scendono sul grafico.</p><span class="tag ok">modulo verificato</span><span class="tag warn">firma da provare a schermo</span></div>
+    <div class="card reveal" style="--tint:var(--violet)"><h3><span class="dot"></span>Regole tue, in un file .md</h3><p>Carichi le tue regole di trading in Markdown. Le legge il modello che scegli tu (Claude, Gemini, OpenAI, Groq, OpenRouter, xAI) con la tua chiave. <b>Possono solo vietare</b>, mai allargare.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal" style="--tint:var(--violet)"><h3><span class="dot"></span>Chat con l'agente</h3><p>Risposte in streaming, scontrini delle mosse firmate dentro la chat, strumenti veri (saldo, mercato, avvia il ciclo). Chiede poco: una corsia sola.</p><span class="tag ok">provato</span><span class="tag warn">costa i crediti del tuo modello</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Temi e Pro</h3><p>Palette a contrasto verificato dai test, temi premium sbloccati in SKR, editor del tema. Apex Pro è gratis: si guadagna sulla fee dello swap.</p><span class="tag ok">provato</span></div>
+  </div>
+</div></section>
+
+<section id="agente"><div class="wrap">
+  <h2>L'agente</h2>
+  <p class="sub">Compra su tutta Solana con una paghetta separata dal tuo portafoglio. Il collare decide cosa può firmare da solo, cosa deve chiedere, cosa non può proprio. Gira con l'app chiusa.</p>
+  <div class="flow">
+    <span>paghetta 0,10 SOL</span><i>→</i><span>caccia ogni 6 min</span><i>→</i><span>cancelli: mint, freeze, liquidità ≥ 50k $, detentori, rivendibile</span><i>→</i><span>regole .md</span><i>→</i><span>collare</span><i>→</i><span>compra una fetta</span><i>→</i><span>guarda ogni 90 s</span><i>→</i><span>vende a +30 / −15</span><i>→</i><span>manda a casa i guadagni</span>
+  </div>
+  <div class="grid">
+    <div class="card reveal"><h3><span class="dot"></span>Il collare</h3><p>Tetti per mossa e per giorno, soglia silenziosa, programmi e monete ammessi, simulazione obbligatoria. Sopra la soglia chiede l'impronta. Non può essere allargato da nessun file e da nessun modello.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Una corsia, quella sicura</h3><p>Niente "blue chip o degen". I filtri sono quelli con cui vincono GMGN, Photon e Trojan: autorità revocate, liquidità minima 50.000 $, pochi grandi detentori, rivendibile davvero, e <b>Rugcheck</b>: LP bruciata o bloccata, copie di monete verificate, creatori già visti in rug.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Il conto, in chiaro</h3><p>Ogni fetta detta in SOL e dollari prima di firmare, e se la catena può farle la guardia. Alla chiusura: "Messi X, tornati Y: ±Z". La chiave si dimentica solo dopo la conferma della catena.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Take profit sulla catena</h3><p>Sopra i 5 $ per fetta l'obiettivo vive su Jupiter e scatta anche a telefono spento. Sotto, vende il ciclo. Ogni posizione dice a schermo chi la guarda, e quando nessuno.</p><span class="tag ok">provato</span><span class="tag warn">stop loss solo del ciclo</span></div>
+    <div class="card reveal" style="--tint:var(--amber)"><h3><span class="dot"></span>Notifiche con la pista</h3><p>Una scheda silenziosa riscritta a ogni giro. Al passaggio di ogni 10% una notifica con l'immagine della pista (stop, entrata, obiettivo, la moneta come punto acceso), <b>Vendi ora</b> e <b>Ferma</b>, e un ritmo di vibrazione diverso per salita, discesa, fermata.</p><span class="tag ok">scheda vista</span><span class="tag warn">traguardo da vedere</span></div>
+    <div class="card reveal" style="--tint:var(--violet)"><h3><span class="dot"></span>I suoi occhi</h3><p>Schermo che non si spegne: un grafico per moneta con le tre linee, i ragionamenti battuti a macchina, due anelli che si svuotano fino al prossimo sguardo e alla prossima caccia, un anello quando firma. Vendi, Ancora, Vendi e cerca altro. <b>Voce</b> offline che dice "Cerco", "Comprato ALL".</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Chiusura pulita</h3><p>Chiudi e riprendi tutto: guarda cosa c'è dentro, vende o sposta, chiude gli account vuoti mandando il rent al tuo wallet, poi dimentica la chiave. Prima di oggi il rent restava lì per sempre.</p><span class="tag ok">provato</span></div>
+  </div>
+</div></section>
+
+<section id="scout"><div class="wrap">
+  <h2>Scout: cosa comprano i Seeker</h2>
+  <p class="sub">Un censimento di 120.000 portafogli Seeker, un worker Cloudflare gratuito che guarda i più attivi ogni 5 minuti, e l'app che mostra il feed in diretta, le balene e cosa tengono.</p>
+  <div class="grid">
+    <div class="card reveal"><h3><span class="dot"></span>In diretta</h3><p>Le compere dei portafogli più attivi, fresche entro 90 secondi, con l'età che scorre. Una <b>stella</b> per seguire un portafoglio.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal"><h3><span class="dot"></span>Balene</h3><p>Righe che si aprono con quello che tengono davvero, solo monete con un prezzo (gli USDC finti li abbiamo trovati e tolti). Link a Solscan, Segui.</p><span class="tag ok">provato</span></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Cosa tengono i 10.527 attivi</h3><p>Ricontato dalla catena: USDC 48% a 625 $ a testa, SKR 28% a 173 $, JitoSOL 8% a 678 $. Gli airdrop restano a zero. Barre che crescono, non bolle.</p><span class="tag ok">ricontato 15/09</span></div>
+    <div class="card reveal" style="--tint:var(--amber)"><h3><span class="dot"></span>Copy trading</h3><p>Un portafoglio seguito che compra, o due balene sulla stessa moneta nell'ora: la moneta va in cima alla lista del ciclo, con gli stessi cancelli. In Agente, "Copia chi segui".</p><span class="tag ok">provato</span></div>
+  </div>
+</div></section>
+
+<section id="manca"><div class="wrap">
+  <h2>Cosa manca</h2>
+  <p class="sub">Detto chiaro, perché chi valuta se ne accorge comunque. Alcune cose mancano per scelta.</p>
+  <table>
+    <tr><th>Cosa</th><th>Perché</th><th>Peso</th></tr>
+    <tr><td>Stop loss sulla catena</td><td>Jupiter lo dà solo su Trigger v2 con chiave e JWT. Oggi lo stop è del ciclo: serve il telefono acceso.</td><td><span class="pill c">alto</span></td></tr>
+    <tr><td>Staking, nascondi spam, ribilancio, nomi .sol, fiat</td><td>Nella lista di Grok, dopo ordini e avvisi. Non iniziati.</td><td><span class="pill a">medio</span></td></tr>
+    <tr><td>Sniper</td><td>Scelto di no: una gara di latenza che un telefono su Wi‑Fi perde sempre, e i tre repository visti chiedono la seed o vendono la versione a pagamento.</td><td><span class="pill d">per scelta</span></td></tr>
+    <tr><td>Prove mai fatte sul telefono</td><td>Firma dei tre ordini e un avviso; riavvio col ciclo acceso; tocco NFC fra due apparecchi; ritiro di un regalo da un altro telefono.</td><td><span class="pill a">medio</span></td></tr>
+    <tr><td>Worker Scout sotto carico</td><td>Guarito (27 ms CPU per giro), ma visto per un solo giro. Da guardare per una giornata.</td><td><span class="pill b">basso</span></td></tr>
+    <tr><td>Rent durante il ciclo</td><td>Ogni moneta comprata apre un account da 0,002 SOL. Si recupera tutto alla chiusura, non dopo ogni vendita.</td><td><span class="pill b">basso</span></td></tr>
+    <tr><td>Link con un agente sul computer</td><td>Funziona ma vuole un ponte su un computer che non esiste. Da decidere se toglierlo.</td><td><span class="pill b">da decidere</span></td></tr>
+  </table>
+</div></section>
+
+<section id="meglio"><div class="wrap">
+  <h2>Cosa potrebbe migliorare</h2>
+  <p class="sub">Non difetti: cose che renderebbero l'app più forte, in ordine di resa per ora di lavoro.</p>
+  <div class="grid">
+    <div class="card reveal"><h3><span class="dot"></span>Il primo minuto</h3><p>Un percorso guidato: porta, prima paghetta, primo Avvia, cosa aspettarsi. Oggi chi non sa cos'è un agente deve leggere la scheda "verità".</p></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Occhi in orizzontale</h3><p>Grafici a sinistra, pensieri a destra. Sul comodino girato di lato è un monitor.</p></div>
+    <div class="card reveal" style="--tint:var(--cyan)"><h3><span class="dot"></span>Parlagli dagli occhi</h3><p>Una riga di chat in fondo ai pensieri: "perché hai rifiutato X?" con la risposta battuta nello stesso stile.</p></div>
+    <div class="card reveal" style="--tint:var(--amber)"><h3><span class="dot"></span>Paghetta che si chiude da sola</h3><p>Alla scadenza deve restituire i soldi senza che nessuno prema niente. Deciso, non fatto.</p></div>
+    <div class="card reveal" style="--tint:var(--amber)"><h3><span class="dot"></span>Logo della moneta nelle notifiche</h3><p>Icona grande con il logo, un tono diverso per compra e vendi, e un suono opzionale negli occhi.</p></div>
+    <div class="card reveal" style="--tint:var(--violet)"><h3><span class="dot"></span>Materiale da hackathon</h3><p>README con screenshot, video da 60 secondi (porta, Scout, occhi con la voce), build firmata per il dApp Store del Seeker.</p></div>
+    <div class="card reveal" style="--tint:var(--violet)"><h3><span class="dot"></span>Nome definitivo</h3><p>Il package è ancora com.clearsign.app. Il nome è passato da ClearSign a Omni a Geon ad Apex. Vedi sotto.</p></div>
+  </div>
+</div></section>
+
+<section id="nomi"><div class="wrap">
+  <h2>10 nomi</h2>
+  <p class="sub">Corti, pronunciabili in inglese e in italiano, che dicono una cosa dell'app. Il primo è quello di oggi.</p>
+  <div class="names">
+    <div class="name reveal"><span class="n">01</span><b>Apex</b><em>Il punto più alto</em><p>Quello attuale. Forte, neutro, già sulla porta. Dice ambizione, non dice cosa fa.</p></div>
+    <div class="name reveal"><span class="n">02</span><b>Halo</b><em>L'anello che protegge</em><p>È già il nome del sistema grafico dell'app. L'aureola attorno al telefono nella porta. Facile da disegnare.</p></div>
+    <div class="name reveal"><span class="n">03</span><b>Lume</b><em>Vedi chiaro</em><p>Luce, in italiano antico. Lo scontrino che illumina la firma. Corto, dolce, libero quasi ovunque.</p></div>
+    <div class="name reveal"><span class="n">04</span><b>Vedetta</b><em>Chi guarda per te</em><p>Scout, Watchtower, gli occhi dell'agente: la vedetta è quello che fa. Italiano, ma si legge bene ovunque.</p></div>
+    <div class="name reveal"><span class="n">05</span><b>Falco</b><em>Vede lontano, agisce in fretta</em><p>L'agente che caccia. Aggressivo il giusto per il pubblico del trading, resta elegante.</p></div>
+    <div class="name reveal"><span class="n">06</span><b>Scorta</b><em>Ti accompagna fino alla firma</em><p>Il collare, i contatti fidati, la porta: una scorta. In inglese suona come "escort", da valutare.</p></div>
+    <div class="name reveal"><span class="n">07</span><b>Nitido</b><em>Niente sfocato</em><p>Il contrario della firma alla cieca. Italiano puro, suona bene anche detto da un americano.</p></div>
+    <div class="name reveal"><span class="n">08</span><b>Sentry</b><em>La sentinella</em><p>Inglese, immediato per la giuria, dice protezione. Molto usato altrove (c'è Sentry per gli sviluppatori).</p></div>
+    <div class="name reveal"><span class="n">09</span><b>Seer</b><em>Chi vede prima</em><p>Simulare prima di firmare è vedere il futuro. Quattro lettere, gioca con Seeker. Rischia di sembrare magia.</p></div>
+    <div class="name reveal"><span class="n">10</span><b>Clara</b><em>Chiara, come lo scontrino</em><p>Un nome di persona per un'app che ha una voce. "Chiedi a Clara". Caldo, memorabile, femminile per scelta.</p></div>
+  </div>
+</div></section>
+
+<section id="stack"><div class="wrap">
+  <h2>Com'è fatto</h2>
+  <p class="sub">Niente server nostri che tengono chiavi. La sola cosa che gira fuori dal telefono è un worker gratuito che conta cosa comprano i Seeker.</p>
+  <div class="stack">
+    <span>Kotlin · Jetpack Compose</span><span>Seed Vault (firma hardware)</span><span>Mobile Wallet Adapter</span><span>modulo :core puro, testabile</span><span>Jupiter swap · trigger · recurring · price · tokens</span><span>GeckoTerminal (storico prezzi)</span><span>Helius / RPC pubblici</span><span>Cloudflare Worker + KV (Scout)</span><span>WorkManager (keeper 15 min)</span><span>Glance widget · NFC HCE · Solana Pay</span><span>Anthropic · OpenAI‑compatible (streaming SSE)</span><span>TextToSpeech offline</span>
+  </div>
+</div></section>
+
+<footer><div class="wrap">Pagina locale, 15 settembre 2026. Fatta per Oliver, da leggere prima di decidere il nome.</div></footer>
+
+<script>
+  // Stars in the hero, like the door.
+  const s=document.getElementById('stars');for(let i=0;i<70;i++){const e=document.createElement('i');e.style.left=Math.random()*100+'%';e.style.top=Math.random()*100+'%';e.style.animationDelay=(Math.random()*3)+'s';e.style.width=e.style.height=(1+Math.random()*2)+'px';s.appendChild(e)}
+  // Cards arrive as you scroll.
+  const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}}),{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i%6)*60+'ms';io.observe(el)});
+</script>
+</body>
+</html>

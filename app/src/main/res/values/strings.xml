@@ -1376,6 +1376,13 @@
     <string name="eyes_buying">Buying…</string>
     <string name="eyes_loop_off_hunt">Sold. The loop is off, so it is not looking: switch it on from Agent.</string>
     <string name="eyes_hunting">Sold. Looking for another…</string>
+    <string name="eyes_next_look">next look in %1$ss</string>
+    <string name="eyes_next_hunt">next hunt in %1$s</string>
+    <string name="eyes_voice_on">Voice on</string>
+    <string name="eyes_voice_off">Voice off</string>
+    <string name="eyes_guard_chain">Order on Jupiter: sells alone at +%1$d%%, phone off too. The stop is the loop\'s.</string>
+    <string name="eyes_guard_loop">No order on the chain (slice under $5): the loop sells, every 90 s, while it runs.</string>
+    <string name="eyes_guard_none">No order on the chain and the loop is off: nobody sells this, up or down.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

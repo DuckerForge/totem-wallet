@@ -1376,6 +1376,13 @@
     <string name="eyes_buying">Compro…</string>
     <string name="eyes_loop_off_hunt">Venduta. Il ciclo è spento, quindi non cerca: accendilo da Agente.</string>
     <string name="eyes_hunting">Venduta. Cerco altro…</string>
+    <string name="eyes_next_look">guardo fra %1$ss</string>
+    <string name="eyes_next_hunt">caccia fra %1$s</string>
+    <string name="eyes_voice_on">Voce accesa</string>
+    <string name="eyes_voice_off">Voce spenta</string>
+    <string name="eyes_guard_chain">Ordine su Jupiter: vende da solo a +%1$d%%, anche a telefono spento. Lo stop è del ciclo.</string>
+    <string name="eyes_guard_loop">Nessun ordine sulla catena (fetta sotto 5 $): vende il ciclo, ogni 90 s, finché gira.</string>
+    <string name="eyes_guard_none">Nessun ordine sulla catena e ciclo spento: questa non la vende nessuno, né su né giù.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

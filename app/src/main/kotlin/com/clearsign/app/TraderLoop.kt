@@ -171,7 +171,19 @@ object TraderLoop {
     /** One tick at a time, whoever asks: the service on its clock, or a person from the screen. */
     private val gate = kotlinx.coroutines.sync.Mutex()
 
-    suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = gate.withLock { AgentTrace.working { tickInner(ctx, mayHunt) } }
+    /**
+     * When the last look started and when the last hunt ran, for a screen that
+     * shows the clock. In memory and observed by Compose: a window, not a record.
+     */
+    val lookedAt = androidx.compose.runtime.mutableLongStateOf(0L)
+    val huntedAt = androidx.compose.runtime.mutableLongStateOf(0L)
+
+    suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = gate.withLock {
+        val now = System.currentTimeMillis()
+        lookedAt.longValue = now
+        if (mayHunt) huntedAt.longValue = now
+        AgentTrace.working { tickInner(ctx, mayHunt) }
+    }
 
     /**
      * One more slice of a coin already in play, asked by a person looking at

@@ -91,6 +91,10 @@ internal fun EyesScreen(onClose: () -> Unit) {
     val open = remember(refresh) { Positions.open(ctx) }
     val cfg = remember(refresh) { TraderLoop.config(ctx) }
     var tickAt by remember { mutableStateOf(TraderLoop.lastTickAt(ctx)) }
+    // The clock the rings run on, ten times a second: enough for an arc to
+    // look alive, few enough not to redraw the charts for nothing.
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(100) } }
     var solUsd by remember { mutableStateOf<Double?>(null) }
     var spot by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var busy by remember { mutableStateOf<String?>(null) }
@@ -151,7 +155,12 @@ internal fun EyesScreen(onClose: () -> Unit) {
 
     val acted = AgentTrace.lines.count { it.kind == AgentTrace.Kind.ACTED }
     val ring = rememberReveal(acted, durationMs = 1400)
-    val pulse = rememberReveal(tickAt, durationMs = 1600)
+    val looked = TraderLoop.lookedAt.longValue
+    val hunted = TraderLoop.huntedAt.longValue
+    val pulse = rememberReveal(looked, durationMs = 1600)
+    // Time left to the next look and the next hunt, as a share of the wait.
+    val lookLeft = if (looked == 0L) 0L else (looked + TraderLoop.EXIT_EVERY_MS - now).coerceIn(0L, TraderLoop.EXIT_EVERY_MS)
+    val huntLeft = if (hunted == 0L) 0L else (hunted + TraderLoop.HUNT_EVERY_MS - now).coerceIn(0L, TraderLoop.HUNT_EVERY_MS)
     val breathe by rememberInfiniteTransition(label = "eyes").animateFloat(
         0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "breathe",
     )
@@ -170,15 +179,37 @@ internal fun EyesScreen(onClose: () -> Unit) {
 
         Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // The pulse: a dot that breathes, and swells once per tick.
-                Canvas(Modifier.size(22.dp)) {
-                    val base = 3.dp.toPx()
-                    val swell = 1f - pulse
-                    drawCircle(Halo.mint.copy(alpha = 0.10f + 0.10f * (1f - breathe)), base * (2.2f + 2f * breathe), center)
-                    drawCircle(Halo.mint.copy(alpha = 0.55f * swell), base * (2.5f + 4f * pulse), center, style = Stroke(1.5f.dp.toPx()))
-                    drawCircle(if (cfg.on) Halo.mint else Halo.muted, base, center)
+                // The clock: an outer arc that drains to the next look, an inner
+                // arc to the next hunt, and the dot in the middle that breathes
+                // and swells once each time the loop looks.
+                Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val stroke = 3.dp.toPx()
+                        val inset = stroke
+                        val outer = androidx.compose.ui.geometry.Rect(inset, inset, size.width - inset, size.height - inset)
+                        val inner = androidx.compose.ui.geometry.Rect(inset * 3.2f, inset * 3.2f, size.width - inset * 3.2f, size.height - inset * 3.2f)
+                        drawArc(Halo.stroke, -90f, 360f, false, outer.topLeft, outer.size, style = Stroke(stroke))
+                        if (cfg.on && looked > 0L) {
+                            drawArc(
+                                Halo.mint, -90f, 360f * lookLeft / TraderLoop.EXIT_EVERY_MS, false, outer.topLeft, outer.size,
+                                style = Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                            )
+                        }
+                        drawArc(Halo.stroke.copy(alpha = 0.6f), -90f, 360f, false, inner.topLeft, inner.size, style = Stroke(stroke * 0.6f))
+                        if (cfg.on && hunted > 0L) {
+                            drawArc(
+                                Halo.cyan, -90f, 360f * huntLeft / TraderLoop.HUNT_EVERY_MS, false, inner.topLeft, inner.size,
+                                style = Stroke(stroke * 0.6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                            )
+                        }
+                        val base = 2.5f.dp.toPx()
+                        val swell = 1f - pulse
+                        drawCircle(Halo.mint.copy(alpha = 0.10f + 0.10f * (1f - breathe)), base * (1.6f + 1.4f * breathe), center)
+                        drawCircle(Halo.mint.copy(alpha = 0.55f * swell), base * (2f + 3f * pulse), center, style = Stroke(1.5f.dp.toPx()))
+                        drawCircle(if (cfg.on) Halo.mint else Halo.muted, base, center)
+                    }
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.eyes_title).uppercase(), style = HaloType.label, color = Halo.muted)
                     Text(
@@ -187,25 +218,21 @@ internal fun EyesScreen(onClose: () -> Unit) {
                         else stringResource(R.string.eyes_watching, open.size),
                         fontFamily = Inter, fontSize = 12.sp, color = if (cfg.on) Halo.ink else Halo.amber,
                     )
-                }
-                // The voice switch: a speaker that lights when it talks.
-                Box(Modifier.clip(rs(999)).clickable { voice = !voice; Settings.setEyesVoice(ctx, voice); Haptics.tick(ctx) }.padding(8.dp)) {
-                    Text(if (voice) "\uD83D\uDD0A" else "\uD83D\uDD07", fontSize = 15.sp)
+                    if (cfg.on && looked > 0L) {
+                        Row {
+                            Text(stringResource(R.string.eyes_next_look, (lookLeft / 1000).toString()), fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint, style = Tabular)
+                            Spacer(Modifier.width(10.dp))
+                            if (hunted > 0L) Text(
+                                stringResource(R.string.eyes_next_hunt, String.format(Locale.ROOT, "%d:%02d", huntLeft / 60_000, huntLeft / 1000 % 60)),
+                                fontFamily = Mono, fontSize = 10.5.sp, color = Halo.cyan, style = Tabular,
+                            )
+                        }
+                    }
                 }
                 Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp) }
             }
             busy?.let { Working(it) }
             said?.let { Banner(it, Halo.amber, HIcon.INFO) }
-            if (open.size > 1 && busy == null) {
-                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
-                    SmallChip(stringResource(R.string.eyes_sell_all), HIcon.SWAP, tint = Halo.amber) {
-                        run(sellingLabel) {
-                            val stuck = SessionActions.sellAll(ctx)
-                            if (stuck.isEmpty()) ctx.getString(R.string.env_sell_all_done) else ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
-                        }
-                    }
-                }
-            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -234,6 +261,20 @@ internal fun EyesScreen(onClose: () -> Unit) {
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.eyes_since_entry, fmtSol(pos.costLamports, 4)), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                             }
+                            // Who sells this one, said plainly: an order on the chain
+                            // that fires with the phone off, or the loop alone, which
+                            // needs the phone on and the loop running.
+                            val guarded = pos.triggerOrder != null
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                HaloIcon(if (guarded) HIcon.SHIELD_LOCK else HIcon.WARNING, if (guarded) Halo.mint else Halo.amber, 12.dp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (guarded) stringResource(R.string.eyes_guard_chain, pos.takeProfitPct)
+                                    else if (cfg.on) stringResource(R.string.eyes_guard_loop)
+                                    else stringResource(R.string.eyes_guard_none),
+                                    fontFamily = Inter, fontSize = 10.5.sp, color = if (guarded) Halo.mint else Halo.amber, lineHeight = 14.sp,
+                                )
+                            }
                             // Three things a person can do while watching. No more.
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 SmallChip(stringResource(R.string.eyes_sell), HIcon.SWAP, tint = Halo.red) {
@@ -260,11 +301,26 @@ internal fun EyesScreen(onClose: () -> Unit) {
                 // The reasoning, newest at the bottom, typed as it lands.
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(stringResource(R.string.eyes_thoughts).uppercase(), style = HaloType.label, color = Halo.muted)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.eyes_thoughts).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
+                            // The voice, said in words: on or off, and where it belongs, next to the lines it reads.
+                            SmallChip(
+                                stringResource(if (voice) R.string.eyes_voice_on else R.string.eyes_voice_off), HIcon.PIGEON,
+                                tint = if (voice) Halo.mint else Halo.muted,
+                            ) { voice = !voice; Settings.setEyesVoice(ctx, voice); Haptics.tick(ctx) }
+                        }
                         val lines = AgentTrace.lines.takeLast(14)
                         if (lines.isEmpty()) Text(stringResource(R.string.eyes_quiet), style = HaloType.small, color = Halo.muted)
                         lines.forEachIndexed { i, l -> TypedLine(l, last = i == lines.lastIndex) }
                         if (AgentTrace.busy.value) Caret()
+                    }
+                }
+                if (open.size > 1 && busy == null) {
+                    GhostButton(stringResource(R.string.eyes_sell_all), Modifier.fillMaxWidth(), HIcon.SWAP, tint = Halo.amber) {
+                        run(sellingLabel) {
+                            val stuck = SessionActions.sellAll(ctx)
+                            if (stuck.isEmpty()) ctx.getString(R.string.env_sell_all_done) else ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

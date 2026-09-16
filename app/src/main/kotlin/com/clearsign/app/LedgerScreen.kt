@@ -205,7 +205,26 @@ internal fun AnalyticsCard(a: Analytics) {
                         )
                     }
                     if (t.disposals > 0) Text((if (t.realized >= 0) "+" else "") + fmtFiat(t.realized, a.currency), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (t.realized >= 0) Halo.mint else Halo.red, style = Tabular)
+                    if (t.disposals > 0) {
+                        val ctx = LocalContext.current
+                        Spacer(Modifier.width(6.dp))
+                        Box(Modifier.size(28.dp).clip(rs(999)).clickable {
+                            val pct = if (t.costOfHeld + t.realized != 0.0 && t.costOfHeld > 0) t.realized / t.costOfHeld * 100 else null
+                            PnlCard.share(
+                                ctx, PnlCard.Face(t.symbol, ctx.getString(R.string.pnl_card_sub, t.disposals), pct, (if (t.realized >= 0) "+" else "") + fmtFiat(t.realized, a.currency), ctx.getString(R.string.pnl_card_foot)),
+                                "pnl-" + t.symbol.lowercase() + ".png",
+                            )
+                        }, contentAlignment = Alignment.Center) { HaloIcon(HIcon.SHARE, Halo.muted, 14.dp) }
+                    }
                 }
+            }
+            // The whole of it, as one picture.
+            val ctx = LocalContext.current
+            GhostButton(stringResource(R.string.pnl_card_share), Modifier.fillMaxWidth(), HIcon.SHARE, tint = Halo.cyan) {
+                PnlCard.share(
+                    ctx, PnlCard.Face(ctx.getString(R.string.pnl_title), ctx.getString(R.string.pnl_card_all, a.tokens.size), null, (if (a.totalRealized >= 0) "+" else "") + fmtFiat(a.totalRealized, a.currency), ctx.getString(R.string.pnl_card_foot)),
+                    "pnl-total.png",
+                )
             }
         }
     }

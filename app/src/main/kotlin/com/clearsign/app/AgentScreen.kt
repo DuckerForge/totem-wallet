@@ -442,6 +442,15 @@ private fun LastBudget(refresh: Int) {
             val mins = ((c.closedAt - c.createdAt) / 60_000L).coerceAtLeast(0L)
             val dur = if (mins >= 60) String.format(java.util.Locale.ROOT, "%dh %02dm", mins / 60, mins % 60) else "$mins min"
             Text(stringResource(R.string.env_last_moves, c.buys, c.sells, dur), style = HaloType.small, color = Halo.muted)
+            GhostButton(stringResource(R.string.pnl_card_share), Modifier.fillMaxWidth(), HIcon.SHARE, tint = Halo.cyan) {
+                PnlCard.share(
+                    ctx, PnlCard.Face(
+                        ctx.getString(R.string.env_last_title), ctx.getString(R.string.env_last_moves, c.buys, c.sells, dur), c.resultPct,
+                        (if (up) "+" else "−") + fmtSol(kotlin.math.abs(c.resultLamports), 4) + " SOL", ctx.getString(R.string.pnl_card_foot),
+                    ),
+                    "budget-" + c.closedAt + ".png",
+                )
+            }
         }
     }
 }

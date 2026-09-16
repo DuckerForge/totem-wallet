@@ -70,8 +70,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
         }
 
         SettingsGroup(stringResource(R.string.set_g_phone), stringResource(R.string.set_g_phone_sub), HIcon.QR) {
-            WidgetCard()
-            CompanionCard()
+            CompanionLinkCard(owner)
             WatchtowerCard()
             CoverCard()
         }
@@ -270,6 +269,19 @@ private fun CompanionCard() {
             }
         }
     }
+}
+
+/** One row that opens the page of the bubble and the widget. */
+@Composable
+private fun CompanionLinkCard(owner: String?) {
+    var open by remember { mutableStateOf(false) }
+    GlassCard {
+        Row(Modifier.fillMaxWidth().clickable { open = true }, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { SectionTitle(stringResource(R.string.comp_page_title), stringResource(R.string.comp_page_sub), HIcon.SPARK) }
+            HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
+        }
+    }
+    if (open) CompanionPage(owner) { open = false }
 }
 
 /** A hand over the screen hides the numbers. Off for people who hold the phone near the face a lot. */

@@ -53,10 +53,11 @@ class CompanionService : Service() {
 
     private var bubble: ImageView? = null
     private var panel: LinearLayout? = null
-    private var scoreLine: TextView? = null
-    private var balanceLine: TextView? = null
-    private var alertLine: TextView? = null
+    private var totalLine: TextView? = null
     private var agentLine: TextView? = null
+    private var healthLine: TextView? = null
+    private var coinLine: TextView? = null
+    private var ticker: kotlinx.coroutines.Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -88,15 +89,13 @@ class CompanionService : Service() {
     private fun attach() {
         val p = Halo.palette
         val container = FrameLayout(this)
+        val size = CompanionPrefs.size(this).toFloat()
 
-        // Collapsed: the health ring.
-        val ring = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(54f), dp(54f))
-            setImageBitmap(ringBitmap(null, null))
-        }
+        // Collapsed: the face the person chose.
+        val ring = ImageView(this).apply { layoutParams = FrameLayout.LayoutParams(dp(size), dp(size)) }
         container.addView(ring)
 
-        // Expanded: a compact panel.
+        // Expanded: the rows the person switched on, then the two buttons.
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -106,29 +105,30 @@ class CompanionService : Service() {
                 setStroke(dp(1f), p.stroke.toArgb())
             }
             setPadding(dp(14f), dp(12f), dp(14f), dp(12f))
-            layoutParams = FrameLayout.LayoutParams(dp(232f), FrameLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = FrameLayout.LayoutParams(dp(248f), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
-        val title = TextView(this).apply {
-            text = getString(R.string.widget_health)
-            setTextColor(p.muted.toArgb()); textSize = 10f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        fun line(size: Float, tint: Int, bold: Boolean = false, lines: Int = 2) = TextView(this).apply {
+            setTextColor(tint); textSize = size; maxLines = lines
+            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(3f), 0, dp(3f))
         }
-        val score = TextView(this).apply { setTextColor(p.ink.toArgb()); textSize = 18f; setTypeface(typeface, android.graphics.Typeface.BOLD) }
-        val balance = TextView(this).apply { setTextColor(p.accent2.toArgb()); textSize = 13f }
-        val alert = TextView(this).apply { setTextColor(p.amber.toArgb()); textSize = 11f; maxLines = 2 }
-        val agent = TextView(this).apply { setTextColor(p.accent2.toArgb()); textSize = 11f; maxLines = 2; visibility = View.GONE }
-        agentLine = agent
-        val actions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(10f), 0, 0)
-        }
+        val title = line(10f, p.muted.toArgb(), bold = true).apply { text = "APEX" }
+        val total = line(20f, p.ink.toArgb(), bold = true, lines = 1)
+        val agent = line(12f, p.accent.toArgb())
+        val health = line(12f, p.amber.toArgb())
+        val coin = line(13f, p.accent2.toArgb(), bold = true, lines = 1)
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10f), 0, 0) }
         actions.addView(button(getString(R.string.companion_open), p.accent.toArgb()) {
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             collapse()
         })
+        actions.addView(button(getString(R.string.companion_agent), p.accent2.toArgb()) {
+            startActivity(Intent(this, MainActivity::class.java).putExtra("open", "agent").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            collapse()
+        })
         actions.addView(button(getString(R.string.companion_hide), p.muted.toArgb()) { stopSelf() })
 
-        card.addView(title); card.addView(score); card.addView(balance); card.addView(alert); card.addView(agent); card.addView(actions)
+        card.addView(title); card.addView(total); card.addView(agent); card.addView(health); card.addView(coin); card.addView(actions)
         container.addView(card)
 
         val lp = WindowManager.LayoutParams(
@@ -147,7 +147,11 @@ class CompanionService : Service() {
 
         root = container; params = lp
         bubble = ring; panel = card
-        scoreLine = score; balanceLine = balance; alertLine = alert
+        totalLine = total; agentLine = agent; healthLine = health; coinLine = coin
+
+        // Alive on its own: every minute the face and the rows are read again.
+        ticker?.cancel()
+        ticker = scope.launch { while (true) { kotlinx.coroutines.delay(60_000); refresh() } }
     }
 
     private fun button(label: String, tint: Int, onClick: () -> Unit) = TextView(this).apply {
@@ -215,37 +219,62 @@ class CompanionService : Service() {
     // ---- data --------------------------------------------------------------
 
     private fun refresh() {
-        render(HealthWidgetData.load(this))
+        render(HealthWidgetData.load(this), null, null)
         scope.launch {
-            if (HealthWidgetData.isStale(this@CompanionService)) {
-                withContext(Dispatchers.IO) { runCatching { HealthWidgetData.refresh(this@CompanionService, updateWidgets = false) } }
-                render(HealthWidgetData.load(this@CompanionService))
+            // Health, the wallet's total, and the chosen coin, each only when asked for.
+            val ctx = this@CompanionService
+            val owner = Settings.watchWallet(ctx)
+            val currency = Settings.currency.value
+            val health = withContext(Dispatchers.IO) {
+                if (HealthWidgetData.isStale(ctx)) runCatching { HealthWidgetData.refresh(ctx, updateWidgets = false) }
+                HealthWidgetData.load(ctx)
             }
+            val total = if (owner != null && (CompanionPrefs.show(ctx, "total") || CompanionPrefs.face(ctx) == CompanionPrefs.Face.TOTAL)) withContext(Dispatchers.IO) {
+                Portfolio.cached(owner, currency) ?: runCatching { Portfolio.load(owner, currency) }.getOrNull()
+            } else null
+            val mint = CompanionPrefs.coin(ctx)
+            val coin = if (mint != null && (CompanionPrefs.show(ctx, "coin") || CompanionPrefs.face(ctx) == CompanionPrefs.Face.COIN)) withContext(Dispatchers.IO) {
+                runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()?.let { q -> Triple(TokenSymbols.symbol(mint), q.usd, q.change24h) }
+            } else null
+            render(health, total, coin)
         }
     }
 
-    private fun render(d: HealthWidgetData.Snapshot?) {
+    private fun render(d: HealthWidgetData.Snapshot?, total: PortfolioView?, coin: Triple<String, Double?, Double?>?) {
+        val ctx = this
         val p = Halo.palette
-        // While the agent is working, the bubble stops being a health badge and
-        // becomes a state light: a health score you already know does not need
-        // watching, and money moving on its own does.
-        val trading = TraderLoop.config(this).on
-        bubble?.setImageBitmap(ringBitmap(d?.score, if (trading) Positions.open(this).size else null))
-        if (d == null) {
-            scoreLine?.text = getString(R.string.widget_no_wallet)
-            balanceLine?.text = ""
-            alertLine?.text = ""
-            return
+        val trading = TraderLoop.config(ctx).on
+        val open = if (trading) Positions.open(ctx).size else null
+        val totalText = total?.let { fmtFiat(it.total, it.currency) }
+        val faceTotal = total?.let { compact(it.total, it.currency) }
+        bubble?.setImageBitmap(
+            CompanionPrefs.faceBitmap(
+                dp(CompanionPrefs.size(ctx).toFloat()), CompanionPrefs.face(ctx),
+                CompanionPrefs.FaceData(d?.score, open, faceTotal, coin?.first, coin?.third, trading),
+            ),
+        )
+        fun show(v: TextView?, on: Boolean, text: String?) { v?.text = text ?: ""; v?.visibility = if (on && !text.isNullOrEmpty()) View.VISIBLE else View.GONE }
+        show(totalLine, CompanionPrefs.show(ctx, "total"), totalText)
+        val last = if (trading) TraderLoop.lastNote(ctx) ?: getString(R.string.trader_idle) else getString(R.string.companion_agent_off)
+        show(agentLine, CompanionPrefs.show(ctx, "agent"), (open?.let { getString(R.string.companion_agent_line, it) + " · " } ?: "") + last)
+        show(healthLine, CompanionPrefs.show(ctx, "health"), d?.let { getString(R.string.companion_health_line, it.score) + " · " + (it.alert ?: getString(R.string.widget_clean)) })
+        healthLine?.setTextColor((if (d?.alert == null) p.accent else p.amber).toArgb())
+        show(coinLine, CompanionPrefs.show(ctx, "coin"), coin?.let { (sym, usd, ch) ->
+            sym + " " + (usd?.let { fmtPrice(it, "USD") } ?: "…") + (ch?.let { String.format(java.util.Locale.ROOT, "  %+.1f%%", it) } ?: "")
+        })
+        coinLine?.setTextColor((if ((coin?.third ?: 0.0) >= 0) p.accent else p.red).toArgb())
+    }
+
+    /** "80 €", "1,2k €": a total that fits a circle. */
+    private fun compact(v: Double, cur: String): String {
+        val sym = if (cur == "SOL") "SOL" else runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)
+        val n = when {
+            v >= 1_000_000 -> String.format(java.util.Locale.getDefault(), "%.1fM", v / 1e6)
+            v >= 10_000 -> String.format(java.util.Locale.getDefault(), "%.0fk", v / 1e3)
+            v >= 1_000 -> String.format(java.util.Locale.getDefault(), "%.1fk", v / 1e3)
+            else -> String.format(java.util.Locale.getDefault(), "%.0f", v)
         }
-        scoreLine?.text = fmtSol(d.lamports, 4) + " SOL"
-        balanceLine?.text = d.fiat?.let { fmtFiat(it, d.currency) } ?: ""
-        alertLine?.text = d.alert ?: getString(R.string.widget_clean)
-        alertLine?.setTextColor((if (d.alert == null) p.accent else p.amber).toArgb())
-        // The agent's last move rides on the bubble: the "sticker" that tells you it acted.
-        val last = if (trading) TraderLoop.lastNote(this) ?: getString(R.string.trader_idle)
-        else (AgentLink.state.value as? AgentLink.State.On)?.lastAction
-        agentLine?.text = last ?: d.agent ?: ""
-        agentLine?.visibility = if (last != null || d.agent != null) View.VISIBLE else View.GONE
+        return "$n $sym"
     }
 
     /**

@@ -15,7 +15,15 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -254,7 +262,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -268,6 +276,8 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             Text(stringResource(R.string.home_act_more), style = HaloType.title, color = Halo.ink)
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
+            MoreRow(HIcon.SPARK, stringResource(R.string.blink_open), onLink)
+            MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)
             MoreRow(HIcon.WALLET, stringResource(R.string.widget_card_title), onSettings)
@@ -370,5 +380,24 @@ internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
         ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+    }
+}
+
+/** A box to paste a link into: a Blink from a feed, an action link from a chat. */
+@Composable
+internal fun LinkBoxSheet(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var text by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SheetHeader(stringResource(R.string.blink_open), stringResource(R.string.blink_open_sub), HIcon.SPARK, onClose = onDismiss)
+            OutlinedTextField(
+                value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                placeholder = { Text("https://dial.to/?action=…", fontFamily = Mono, fontSize = 12.sp, color = Halo.muted) },
+                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 12.5.sp, color = Halo.ink), colors = pickerField(), shape = rs(12),
+            )
+            PrimaryButton(stringResource(R.string.blink_go), danger = false, enabled = text.trim().length > 8, icon = HIcon.SPARK) { onOpen(text.trim()) }
+            Spacer(Modifier.height(4.dp))
+        }
     }
 }

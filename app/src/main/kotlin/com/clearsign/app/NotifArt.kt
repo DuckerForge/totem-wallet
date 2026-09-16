@@ -89,4 +89,18 @@ object NotifArt {
         }
         return bmp
     }
+
+    /** The coin's logo for the notification's large icon: downloaded once, kept on disk. Null when it cannot be had. */
+    fun logo(ctx: Context, url: String?): Bitmap? {
+        if (url.isNullOrBlank()) return null
+        val f = java.io.File(ctx.cacheDir, "logo-" + url.hashCode().toString(16) + ".png")
+        if (f.exists()) return runCatching { android.graphics.BitmapFactory.decodeFile(f.path) }.getOrNull()
+        return runCatching {
+            val c = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply { connectTimeout = 4000; readTimeout = 6000 }
+            val b = c.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) } ?: return null
+            val sq = Bitmap.createScaledBitmap(b, 192, 192, true)
+            f.outputStream().use { sq.compress(Bitmap.CompressFormat.PNG, 90, it) }
+            sq
+        }.getOrNull()
+    }
 }

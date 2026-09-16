@@ -396,6 +396,7 @@ object TraderLoop {
                             android.app.Notification.Action.Builder(null, ctx.getString(R.string.notif_stop), AgentActionReceiver.stopIntent(ctx)).build(),
                         ),
                         id = AgentBroker.MILESTONE_ID,
+                        largeIcon = runCatching { NotifArt.logo(ctx, TokenSymbols.image(pos.mint)) }.getOrNull(),
                     )
                 }
             }

@@ -271,8 +271,8 @@ object AgentBroker {
      */
     fun warn(
         ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null, color: Int? = null,
-        rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null,
-    ) = notify(ctx, title, body, null, picture = picture, color = color, rhythm = rhythm, actions = actions, id = id)
+        rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null, largeIcon: android.graphics.Bitmap? = null,
+    ) = notify(ctx, title, body, null, picture = picture, color = color, rhythm = rhythm, actions = actions, id = id, largeIcon = largeIcon)
 
     fun dismiss(ctx: Context, id: Int) = ctx.getSystemService(NotificationManager::class.java).cancel(id)
 
@@ -341,7 +341,7 @@ object AgentBroker {
     private fun notify(
         ctx: Context, title: String, body: String, txSig: String?, tap: PendingIntent? = null, heads: Boolean = false,
         picture: android.graphics.Bitmap? = null, color: Int? = null,
-        rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null,
+        rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null, largeIcon: android.graphics.Bitmap? = null,
     ) {
         channel(ctx)
         val open = tap ?: PendingIntent.getActivity(
@@ -359,6 +359,7 @@ object AgentBroker {
             .setContentIntent(open).setAutoCancel(true)
             .apply {
                 if (heads) setCategory(Notification.CATEGORY_CALL)
+                largeIcon?.let { setLargeIcon(it) }
                 actions.forEach { addAction(it) }
             }
             .build()

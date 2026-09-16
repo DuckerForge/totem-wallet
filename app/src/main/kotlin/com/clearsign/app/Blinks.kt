@@ -59,11 +59,21 @@ object Blinks {
         for (i in 0 until rules.length()) {
             val r = rules.optJSONObject(i) ?: continue
             val pat = r.optString("pathPattern"); val api = r.optString("apiPath")
-            val rx = Regex("^" + Regex.escape(pat).replace("\\*\\*", ".*").replace("\\*", "[^/]*") + "$")
-            if (rx.matches(path)) {
-                val star = pat.indexOf('*')
-                return if (star >= 0 && api.contains('*')) api.replace("**", path.drop(star)).replace("*", path.drop(star)) else api
+            // A star is the only special thing in a pattern: one star inside a
+            // segment, two stars across segments. Everything else is literal.
+            val sb = StringBuilder("^")
+            var j = 0
+            while (j < pat.length) {
+                when {
+                    pat.startsWith("**", j) -> { sb.append("(.*)"); j += 2 }
+                    pat[j] == '*' -> { sb.append("([^/]*)"); j++ }
+                    else -> { sb.append(Regex.escape(pat[j].toString())); j++ }
+                }
             }
+            sb.append("$")
+            val m = Regex(sb.toString()).matchEntire(path) ?: continue
+            val captured = m.groupValues.drop(1).firstOrNull() ?: ""
+            return if (api.contains('*')) api.replace("**", captured).replace("*", captured) else api
         }
         return null
     }

@@ -51,8 +51,19 @@ object SkrStake {
      * growing, so two readings far enough apart are the yield, exactly, with
      * nothing assumed. Null until there are two: a number we cannot stand behind
      * is worse than no number on a screen about somebody's money.
+     *
+     * A week between readings, and the reason is the payout rhythm: Solana
+     * Mobile deposits the rewards into the vault **every forty-eight hours**, so
+     * the share price does not drift upward, it steps. A window of a few hours
+     * either sits between two steps and reports nothing earned, or straddles one
+     * and reports two days of rewards as if they were hours. Over a week the
+     * three or four steps inside it average out.
+     *
+     * Checked against two real readings a couple of days apart: 1.138725049 to
+     * 1.139766368, which annualises near the 15.40% the Seeker wallet shows, and
+     * nowhere near the 21.25% the old formula claimed.
      */
-    const val MIN_SAMPLE_MS = 6 * 3_600_000L
+    const val MIN_SAMPLE_MS = 7 * 24 * 3_600_000L
 
     fun growthAprPct(oldPrice: Double, oldAt: Long, newPrice: Double, newAt: Long): Double? {
         val span = newAt - oldAt
@@ -91,12 +102,16 @@ object SkrStake {
     fun observedAprPct(ctx: android.content.Context, price: Double, now: Long = System.currentTimeMillis()): Double? {
         if (price <= 0.0) return null
         val p = ctx.getSharedPreferences("skr_yield", android.content.Context.MODE_PRIVATE)
-        val oldPrice = p.getFloat("price", 0f).toDouble()
+        // Kept the way the chain keeps it, scaled by a billion, because a week of
+        // rewards moves this number in its fourth decimal and a float would spend
+        // its precision on the 1 in front.
+        val oldScaled = p.getLong("price_e9", 0L)
+        val oldPrice = oldScaled / 1e9
         val oldAt = p.getLong("at", 0L)
-        if (oldPrice <= 0.0 || oldAt <= 0L || price < oldPrice) {
+        if (oldScaled <= 0L || oldAt <= 0L || price < oldPrice) {
             // First look, or the price went backwards, which means the pool was
             // reset rather than that it lost money. Start the clock again.
-            p.edit().putFloat("price", price.toFloat()).putLong("at", now).apply()
+            p.edit().putLong("price_e9", (price * 1e9).toLong()).putLong("at", now).apply()
             return null
         }
         return growthAprPct(oldPrice, oldAt, price, now)

@@ -6,3 +6,20 @@ clearsign.heliusRpcUrl=
 
 # Wallet (base58) that receives SKR for ClearSign Pro. Blank = purchases disabled.
 clearsign.skrTreasury=
+
+# RocketX partner key (free at app.rocketx.exchange/partner). Blank = the bridge is off.
+clearsign.rocketxKey=
+
+# Jupiter referral account (made once at referral.jup.ag with the treasury wallet).
+# Blank = no fee is taken on Ultra swaps.
+clearsign.jupReferral=
+
+# Release signing. Without these four lines the release build falls back to the
+# debug key, which still sideloads but cannot be published. Make the key once:
+#   keytool -genkeypair -v -keystore ~/.android/seeker-release.jks \
+#     -alias seeker -keyalg RSA -keysize 4096 -validity 10000
+# Keep that file and its password forever: the store ties the app to this key.
+clearsign.storeFile=
+clearsign.storePassword=
+clearsign.keyAlias=
+clearsign.keyPassword=

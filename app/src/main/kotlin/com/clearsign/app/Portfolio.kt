@@ -24,8 +24,13 @@ data class Holding(
 data class DefiPosition(
     val kind: Kind, val label: String, val sub: String, val symbol: String, val ui: Double, val fiat: Double?,
     val image: String? = null, val state: String? = null,
+    /** What it pays, per year, as a percentage; null when nobody can say. */
+    val aprPct: Double? = null,
 ) {
     enum class Kind { STAKE, LEND }
+    /** Coins earned in a day at that rate. */
+    val perDayUi: Double? get() = aprPct?.let { ui * it / 100.0 / 365.0 }
+    val perDayFiat: Double? get() = if (aprPct != null && fiat != null) fiat * aprPct / 100.0 / 365.0 else null
 }
 
 /** The wallet's portfolio: total value in [currency] and the holdings behind it. */
@@ -109,11 +114,15 @@ object Portfolio {
             val stakes = SolanaRpc.stakeAccounts(rpc, owner).filter { it.lamports > 0 }
             if (stakes.isNotEmpty()) {
                 val epoch = SolanaRpc.epoch(rpc) ?: Long.MAX_VALUE
+                // Inflation goes to stakers: the rate on the whole supply, spread
+                // over the two thirds of it that are staked. An estimate, said so.
+                val apr = runCatching { SolanaRpc.inflationRate(rpc) }.getOrNull()?.let { it / 0.65 * 100.0 }
                 for (st in stakes) {
                     val ui = st.lamports / 1e9
+                    val live = st.state(epoch) == "active"
                     defi += DefiPosition(
                         DefiPosition.Kind.STAKE, "SOL", validatorName(st.voter), "SOL", ui, price(NATIVE_SOL_MINT)?.let { it * ui },
-                        image = TokenSymbols.image(NATIVE_SOL_MINT), state = st.state(epoch),
+                        image = TokenSymbols.image(NATIVE_SOL_MINT), state = st.state(epoch), aprPct = if (live) apr else null,
                     )
                 }
             }
@@ -121,9 +130,11 @@ object Portfolio {
         runCatching {
             SolanaRpc.skrStake(rpc, owner)?.let { st ->
                 val skrUsd = quotes[SkrStake.SKR_MINT]?.usd ?: runCatching { Prices.quotes(listOf(SkrStake.SKR_MINT))[SkrStake.SKR_MINT]?.usd }.getOrNull()
+                val supply = runCatching { SolanaRpc.tokenSupply(rpc, SkrStake.SKR_MINT) }.getOrNull()
                 defi += DefiPosition(
                     DefiPosition.Kind.STAKE, "SKR", "Guardiani Seeker", "SKR", st.ui,
                     skrUsd?.let { p -> fx?.let { p * it * st.ui } }, image = TokenSymbols.image(SkrStake.SKR_MINT), state = "active",
+                    aprPct = supply?.let { st.aprPct(it) },
                 )
             }
         }
@@ -131,7 +142,7 @@ object Portfolio {
             for (d in JupiterLend.deposits(owner)) {
                 val ui = d.raw / 10.0.pow(d.decimals)
                 val usd = d.priceUsd ?: quotes[d.asset]?.usd ?: if (d.asset in STABLES) 1.0 else null
-                defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo)
+                defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo, aprPct = d.aprPct)
             }
         }
 

@@ -10,7 +10,7 @@ import java.net.URL
  * still have; the token list cannot see it, so the portfolio asks here.
  */
 object JupiterLend {
-    data class Deposit(val symbol: String, val asset: String, val decimals: Int, val raw: Long, val priceUsd: Double?, val logo: String?)
+    data class Deposit(val symbol: String, val asset: String, val decimals: Int, val raw: Long, val priceUsd: Double?, val logo: String?, val aprPct: Double?)
 
     fun deposits(owner: String): List<Deposit> {
         val arr = get("https://lite-api.jup.ag/lend/v1/earn/positions?users=$owner") ?: return emptyList()
@@ -23,6 +23,8 @@ object JupiterLend {
             out += Deposit(
                 symbol = asset.optString("symbol"), asset = asset.optString("address"), decimals = asset.optInt("decimals", 6),
                 raw = raw, priceUsd = asset.optString("price").toDoubleOrNull(), logo = asset.optString("logoUrl").takeIf { it.isNotEmpty() },
+                // Basis points a year, straight from the pool.
+                aprPct = p.optJSONObject("token")?.optString("totalRate")?.toDoubleOrNull()?.let { it / 100.0 },
             )
         }
         return out

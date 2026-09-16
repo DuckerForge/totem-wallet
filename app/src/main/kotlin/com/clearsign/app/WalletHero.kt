@@ -118,6 +118,14 @@ internal fun WalletHero(
                             Spacer(Modifier.height(Space.xs))
                             Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
                             view.defi.forEach { d -> DefiRow(d, currency) }
+                            // What the whole of it pays in a day, when anything can say.
+                            val perDay = view.defi.mapNotNull { it.perDayFiat }.sum()
+                            if (perDay > 0) {
+                                Text(
+                                    stringResource(R.string.hero_defi_day, fmtFiat(perDay, currency), fmtFiat(perDay * 30, currency)),
+                                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint, lineHeight = 15.sp,
+                                )
+                            }
                         }
                     }
                 }
@@ -370,6 +378,12 @@ private fun DefiRow(d: DefiPosition, currency: String) {
         Column(horizontalAlignment = Alignment.End) {
             Text(d.fiat?.let { fmtFiat(it, currency) } ?: "…", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.ink)
             Text(fmtUi(d.ui) + " " + d.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
+            d.perDayUi?.let { day ->
+                Text(
+                    "+" + fmtUi(day) + " " + d.symbol + stringResource(R.string.hero_per_day) + d.aprPct?.let { String.format(java.util.Locale.ROOT, " · %.1f%%", it) }.orEmpty(),
+                    fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint,
+                )
+            }
         }
     }
 }

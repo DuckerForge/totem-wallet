@@ -1467,6 +1467,8 @@
     <string name="sticker_locked">Written and locked. Touch it to try.</string>
     <string name="sticker_written">Written. Touch it to try.</string>
     <string name="sticker_failed">Not written: %1$s</string>
+    <string name="hero_per_day">/day</string>
+    <string name="hero_defi_day">DeFi pays about %1$s a day, %2$s a month. Estimated from today\'s rates.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

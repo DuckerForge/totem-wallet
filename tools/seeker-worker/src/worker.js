@@ -111,12 +111,50 @@ function buyOf(tx, addr, whale, at) {
   return { w: addr, b: whale, m: best.mint, at, sol: spent };
 }
 
+/**
+ * Una vendita, o niente: una moneta che cala e soldi che arrivano nella stessa
+ * transazione. Serve a chi copia un portafoglio: uscire quando esce lui.
+ */
+function sellOf(tx, addr, whale, at) {
+  const meta = tx && tx.meta;
+  if (!meta || meta.err) return null;
+  const bal = (key) => {
+    const m = new Map();
+    for (const o of meta[key] || []) {
+      if (o.owner !== addr) continue;
+      m.set(o.mint, Number((o.uiTokenAmount || {}).uiAmountString || 0));
+    }
+    return m;
+  };
+  const pre = bal("preTokenBalances");
+  const post = bal("postTokenBalances");
+  let sol = 0;
+  const keys = ((tx.transaction || {}).message || {}).accountKeys || [];
+  for (let i = 0; i < keys.length; i++) {
+    const pk = typeof keys[i] === "string" ? keys[i] : keys[i].pubkey;
+    if (pk !== addr) continue;
+    sol = ((meta.postBalances || [])[i] - (meta.preBalances || [])[i]) / 1e9;
+    break;
+  }
+  const usdcIn = (post.get(USDC) || 0) - (pre.get(USDC) || 0);
+  const got = sol > 0.001 ? sol : usdcIn > 1 ? usdcIn / 200 : 0;
+  if (got < MIN_SOL) return null;
+  let best = null;
+  for (const [mint, v] of pre) {
+    if (MONEY.has(mint)) continue;
+    const d = v - (post.get(mint) || 0);
+    if (d > 0 && (!best || d > best.d)) best = { mint, d };
+  }
+  if (!best) return null;
+  return { w: addr, b: whale, m: best.mint, at, sol: got, s: 1 };
+}
+
 /** La classifica pubblicata. Pesa chi ha comprato, non quante volte. */
 function rank(buys, now, followed) {
   const cut = now - WINDOW;
   const by = new Map();
   for (const b of buys) {
-    if (b.at < cut || MONEY.has(b.m) || b.sol < MIN_SOL) continue;
+    if (b.s || b.at < cut || MONEY.has(b.m) || b.sol < MIN_SOL) continue;
     if (!by.has(b.m)) by.set(b.m, { wallets: new Map(), buys: 0, sol: 0, last: 0 });
     const g = by.get(b.m);
     g.wallets.set(b.w, b.b);
@@ -148,7 +186,7 @@ function rank(buys, now, followed) {
     .filter((b) => !MONEY.has(b.m) && b.sol >= MIN_SOL)
     .sort((a, b) => b.at - a.at)
     .slice(0, 40)
-    .map((b) => ({ w: b.w, t: b.b ? "b" : "d", m: b.m, at: b.at, sol: Math.round(b.sol * 1000) / 1000 }));
+    .map((b) => ({ w: b.w, t: b.b ? "b" : "d", m: b.m, at: b.at, sol: Math.round(b.sol * 1000) / 1000, s: b.s ? 1 : 0 }));
   return { at: now, followed, window: WINDOW, rows: rows.slice(0, 20), events };
 }
 
@@ -233,7 +271,7 @@ async function sweep(env) {
         s.signature,
         { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
       ]);
-      const b = buyOf(tx, m.a, m.w, at);
+      const b = buyOf(tx, m.a, m.w, at) || sellOf(tx, m.a, m.w, at);
       if (b) buys.push(b);
     }
   }

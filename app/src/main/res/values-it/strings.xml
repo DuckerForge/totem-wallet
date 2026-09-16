@@ -1586,6 +1586,10 @@
     <string name="speed_note">Veloce aggiunge circa 0,00002 SOL a transazione, Turbo circa 0,0002. Gli swap via Jupiter si regolano da soli.</string>
     <string name="env_expired_closed">La paghetta è scaduta e si è chiusa da sola</string>
     <string name="env_expired_open">La paghetta è scaduta ma non si è chiusa</string>
+    <string name="scout_signal_sold">Scout: %1$s, che copi, ha venduto %2$s</string>
+    <string name="trader_sold_mirror">Venduta %1$s: %2$s, che copi, l\'ha venduta</string>
+    <string name="follow_mirror_on">anche le vendite</string>
+    <string name="follow_mirror_off">solo gli acquisti</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

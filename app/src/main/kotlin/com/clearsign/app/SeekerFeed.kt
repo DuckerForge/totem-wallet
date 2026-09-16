@@ -92,6 +92,7 @@ object SeekerFeed {
                 mint = mint,
                 symbol = JupiterTokens.cached(mint)?.symbol ?: mint.take(6),
                 at = e.optLong("at"), solSpent = e.optDouble("sol", 0.0),
+                sell = e.optInt("s", 0) == 1,
             )
         }
         return Feed(o.optLong("at"), o.optInt("followed"), rows, events)

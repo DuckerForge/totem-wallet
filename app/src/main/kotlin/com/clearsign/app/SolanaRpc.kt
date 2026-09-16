@@ -777,6 +777,14 @@ object SolanaRpc {
         return out
     }
 
+    /** The network's inflation, validator share, as a fraction per year. */
+    fun inflationRate(rpcUrl: String): Double? =
+        post(rpcUrl, "getInflationRate", JSONArray())?.optJSONObject("result")?.optDouble("validator")?.takeIf { !it.isNaN() && it > 0 }
+
+    /** Total supply of a mint, raw. */
+    fun tokenSupply(rpcUrl: String, mint: String): Long? =
+        post(rpcUrl, "getTokenSupply", JSONArray().put(mint))?.optJSONObject("result")?.optJSONObject("value")?.optString("amount")?.toLongOrNull()
+
     /** The raw bytes of one account, or null. */
     fun accountBytes(rpcUrl: String, pubkey: String): ByteArray? {
         val v = post(rpcUrl, "getAccountInfo", JSONArray().put(pubkey).put(JSONObject().put("encoding", "base64")))

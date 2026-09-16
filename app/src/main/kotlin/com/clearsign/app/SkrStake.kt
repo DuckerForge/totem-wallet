@@ -26,8 +26,20 @@ object SkrStake {
     const val OWNER_OFFSET = 41
     private val SHARE_SCALE = BigInteger.valueOf(1_000_000_000L)
 
-    data class Position(val guardian: String, val shares: BigInteger, val rawSkr: Long) {
+    data class Position(val guardian: String, val shares: BigInteger, val rawSkr: Long, val totalStakedRaw: Long) {
         val ui: Double get() = rawSkr / 1e6
+        /**
+         * What staking pays, as a yearly rate: the inflation goes to stakers only,
+         * so it is the inflation on the whole supply spread over what is staked.
+         * The published schedule: 10% in the first year, a quarter less each year
+         * after (from the 21st of January 2026).
+         */
+        fun aprPct(supplyRaw: Long, now: Long = System.currentTimeMillis()): Double? {
+            if (totalStakedRaw <= 0 || supplyRaw <= 0) return null
+            val years = ((now - 1_768_953_600_000L) / 31_557_600_000.0).coerceAtLeast(0.0).toInt()
+            val inflation = 0.10 * Math.pow(0.75, years.toDouble())
+            return inflation * supplyRaw / totalStakedRaw * 100.0
+        }
     }
 
     /** Pure: the user's account bytes and the config bytes in, the staked SKR out. */
@@ -37,7 +49,8 @@ object SkrStake {
         val shares = u128(userStake, 105)
         val price = u128(config, 137)
         val raw = shares.multiply(price).divide(SHARE_SCALE)
-        return Position(guardian, shares, raw.min(BigInteger.valueOf(Long.MAX_VALUE)).toLong())
+        val total = u128(config, 121).multiply(price).divide(SHARE_SCALE)
+        return Position(guardian, shares, raw.min(BigInteger.valueOf(Long.MAX_VALUE)).toLong(), total.min(BigInteger.valueOf(Long.MAX_VALUE)).toLong())
     }
 
     private fun u128(b: ByteArray, at: Int): BigInteger {

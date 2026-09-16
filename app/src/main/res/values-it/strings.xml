@@ -1467,6 +1467,8 @@
     <string name="sticker_locked">Scritto e bloccato. Toccalo per provare.</string>
     <string name="sticker_written">Scritto. Toccalo per provare.</string>
     <string name="sticker_failed">Non scritto: %1$s</string>
+    <string name="hero_per_day">/giorno</string>
+    <string name="hero_defi_day">La DeFi rende circa %1$s al giorno, %2$s al mese. Stima sui tassi di oggi.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

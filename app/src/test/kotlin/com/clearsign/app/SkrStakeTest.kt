@@ -16,5 +16,9 @@ class SkrStakeTest {
         assertEquals(java.math.BigInteger("70873360453"), p!!.shares)
         assertEquals(80_705.27, p.ui, 0.01)
         assertEquals("DPJ58trLsF9yPrBa2pk6UaRkvqW8hWUYjawe788WBuqr", p.guardian)
+        // All shares times the price: what the vault holds, give or take the queue.
+        assertEquals(4_981_636_156.0, p.totalStakedRaw / 1e6, 1.0)
+        // 10% inflation on 10.595 billion, spread over 4.98 billion staked: about 21% a year.
+        assertEquals(21.3, p.aprPct(10_595_157_477_710_037L, now = 1_789_500_000_000L)!!, 0.2)
     }
 }

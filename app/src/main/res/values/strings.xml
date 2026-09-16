@@ -1265,6 +1265,13 @@
     <string name="feed_star_note">The star follows a wallet. With alerts on, the phone tells you when it buys. With a budget open, the agent also weighs what it buys, through the usual gates.</string>
     <string name="folw_title">Tell me when they buy</string>
     <string name="folw_sub">A wallet you follow buys, and the phone says so. Checked every fifteen minutes. Works without the agent.</string>
+    <string name="feed_churn">in and out %1$d times in this window</string>
+    <string name="feed_pick">How much? You have %1$s SOL.</string>
+    <string name="feed_out">Out</string>
+    <string name="feed_in">In</string>
+    <string name="feed_fee">Fee</string>
+    <string name="feed_risk">Risks</string>
+    <string name="feed_risk_none">none found</string>
 <string name="feed_title">Live from the Seekers</string>
     <string name="feed_line">%1$s bought %2$s</string>
     <string name="feed_meta">%1$s SOL · %2$s</string>

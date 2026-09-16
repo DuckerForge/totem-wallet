@@ -104,17 +104,14 @@ internal fun FeedBuyPanel(
             }
         }
 
-        // What that person did, and only what we actually know. Their entry price
-        // is not in the feed, so their profit is not ours to print.
-        Text(
-            stringResource(if (sell) R.string.feed_they_sold else R.string.feed_they_put, fmtSol((solSpent * 1e9).toLong(), 3)),
-            style = HaloType.small, color = Halo.muted, lineHeight = 16.sp,
-        )
-
         if (sell) {
             // Offering to buy what somebody is walking away from would be the
             // opposite of what this feed is for.
-            Text(stringResource(R.string.feed_sell_note), style = HaloType.small, color = Halo.amber, lineHeight = 16.sp)
+            Text(
+                stringResource(R.string.feed_they_sold, fmtSol((solSpent * 1e9).toLong(), 3)) + " " +
+                    stringResource(R.string.feed_sell_note),
+                style = HaloType.small, color = Halo.amber, lineHeight = 16.sp,
+            )
             return@Column
         }
         if (owner == null || signer == null || decimals == null) {
@@ -182,6 +179,10 @@ private fun BuyBody(
         return
     }
 
+    Text(
+        stringResource(R.string.feed_pick, fmtSol(balance ?: 0L, 3)),
+        style = HaloType.small, color = Halo.muted,
+    )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         slices.forEach { lam ->
             val afford = balance == null || balance >= lam + reserve
@@ -194,15 +195,39 @@ private fun BuyBody(
             }
         }
     }
-    balance?.let {
-        Text(stringResource(R.string.feed_balance, fmtSol(it, 3)), style = HaloType.small, color = Halo.muted)
-    }
-
     if (working) Text(stringResource(R.string.analyzing), style = HaloType.small, color = Halo.muted)
     error?.let { Text(it, style = HaloType.small, color = Halo.red, lineHeight = 16.sp) }
 
     built?.let { b ->
-        SignReceiptBody(b.analyzed.receipt, null, b.pair, plain = true)
+        // Three lines, not the whole signing sheet.
+        //
+        // The full receipt is right where it is right: on a screen that exists
+        // only to be read before a signature. Dropped into a feed row it buried
+        // the one thing the row is for under distributions, addresses and risk
+        // cards. What is out, what is in, what it costs, and anything the engine
+        // actually flagged. Everything else is one tap away and stays there.
+        Column(
+            Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            ReceiptLine(stringResource(R.string.feed_out), "−" + b.pair.outUi + " " + b.pair.outSymbol, Halo.ink)
+            ReceiptLine(stringResource(R.string.feed_in), "+" + b.outUi + " " + b.outSymbol, Halo.mint)
+            b.analyzed.receipt.feeLamports.takeIf { it > 0 }?.let {
+                ReceiptLine(stringResource(R.string.feed_fee), fmtSol(it, 5) + " SOL", Halo.muted)
+            }
+            val risks = b.analyzed.receipt.risks.filter { it.severity != com.clearsign.core.Severity.INFO }
+            if (risks.isEmpty()) {
+                ReceiptLine(stringResource(R.string.feed_risk), stringResource(R.string.feed_risk_none), Halo.mint)
+            } else {
+                risks.take(2).forEach { r ->
+                    Text(
+                        r.detail ?: r.flag.name,
+                        style = HaloType.small, lineHeight = 16.sp,
+                        color = if (r.severity == com.clearsign.core.Severity.DANGER) Halo.red else Halo.amber,
+                    )
+                }
+            }
+        }
         // The cut, said before the signature and not after. Jupiter Ultra adds it
         // to the route when a referral account exists, so it is already inside the
         // numbers above; this line is so nobody has to work that out.
@@ -237,4 +262,13 @@ private fun fmtPriceUsd(v: Double): String = when {
     v >= 1 -> "$" + java.text.DecimalFormat("#,##0.00").format(v)
     v >= 0.01 -> "$" + java.text.DecimalFormat("0.0000").format(v)
     else -> "$" + java.text.DecimalFormat("0.00000000").format(v)
+}
+
+/** One line of the short receipt: what it is on the left, the number on the right. */
+@Composable
+private fun ReceiptLine(label: String, value: String, tint: androidx.compose.ui.graphics.Color) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f))
+        Text(value, fontFamily = Mono, fontSize = 12.sp, color = tint, style = Tabular)
+    }
 }

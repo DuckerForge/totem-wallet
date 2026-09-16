@@ -224,6 +224,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showTap by remember { mutableStateOf(false) }
         var showMore by remember { mutableStateOf(false) }
         var showBridge by remember { mutableStateOf(false) }
+        var guestNote by remember { mutableStateOf(0L) }
         var showCrowd by remember { mutableStateOf(false) }
         var showHealth by remember { mutableStateOf(false) }
         var showPnl by remember { mutableStateOf(false) }
@@ -363,6 +364,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                         owner, signer, collapse,
                                         reload = reload, onLoaded = { pulling = false },
                                         onAction = { a ->
+                                            // A guest can receive and look; nothing that spends or sets.
+                                            if (Settings.guest.value && a !in setOf(HomeAction.RECEIVE, HomeAction.SCAN, HomeAction.CROWD)) {
+                                                guestNote = System.currentTimeMillis(); return@WalletHero
+                                            }
                                             when (a) {
                                                 HomeAction.SEND -> showSend = true
                                                 HomeAction.RECEIVE -> showReceive = true
@@ -381,6 +386,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                         onPnl = { showPnl = true },
                                         onTotal = { headline = it },
                                     )
+                                    if (guestNote > 0L && Settings.guest.value) Banner(stringResource(R.string.guest_blocked), Halo.amber, HIcon.LOCK)
                                     RecentReceiptsCard { tab = Tab.RECEIPTS }
                                     AgentGlanceCard { tab = Tab.AGENT }
                                 }
@@ -423,7 +429,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
                     } }
                     }
                 }
-                if (accounts.isNotEmpty()) BottomBar(tab, collapse) { tab = it }
+                if (accounts.isNotEmpty()) BottomBar(tab, collapse) { t ->
+                    // Agent and settings stay behind the print for a guest.
+                    if (Settings.guest.value && (t == Tab.AGENT || t == Tab.SETTINGS)) guestNote = System.currentTimeMillis() else tab = t
+                }
             }
             // A page, like Scout: it sits over everything, tab bar included. Inside
             // this Box so it fills the same height the tabs do.

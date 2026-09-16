@@ -121,4 +121,11 @@ object Settings {
     fun setEyesVoice(ctx: Context, on: Boolean) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("eyes_voice", on).apply()
     }
+
+    /**
+     * Guest: the phone in somebody else's hands. Amounts are covered, the
+     * actions that spend are off. In memory only: the door asks the print on
+     * every return anyway, so a restart ends it.
+     */
+    val guest = mutableStateOf(false)
 }

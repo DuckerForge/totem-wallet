@@ -1507,6 +1507,10 @@
     <string name="bridge_past">Bridges opened</string>
     <string name="bridge_status">Status</string>
     <string name="bridge_status_none">No answer yet</string>
+    <string name="guest_on">Guest mode. Tap the number and use the fingerprint to come back.</string>
+    <string name="guest_exit_title">Back from guest mode</string>
+    <string name="guest_exit_sub">Your fingerprint brings the numbers back.</string>
+    <string name="guest_blocked">Guest mode: receiving and looking only. Tap the covered balance to come back.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

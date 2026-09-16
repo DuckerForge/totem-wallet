@@ -1507,6 +1507,10 @@
     <string name="bridge_past">Ponti aperti</string>
     <string name="bridge_status">Stato</string>
     <string name="bridge_status_none">Ancora nessuna risposta</string>
+    <string name="guest_on">Modalità ospite. Tocca il numero e usa l\'impronta per tornare.</string>
+    <string name="guest_exit_title">Fine della modalità ospite</string>
+    <string name="guest_exit_sub">L\'impronta riporta i numeri.</string>
+    <string name="guest_blocked">Modalità ospite: solo ricevere e guardare. Tocca il saldo coperto per tornare.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

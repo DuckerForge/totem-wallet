@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.clearsign.app
 
@@ -30,6 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.draw.clip
@@ -86,7 +90,26 @@ internal fun WalletHero(
             verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
             Text(stringResource(R.string.hero_total), style = HaloType.label, color = Halo.muted)
-            pv?.let { BigTotal(it.total, it.currency) } ?: Text("…", style = HaloType.amount, color = Halo.ink)
+            // A long press covers everything for a guest; a tap on the covered
+            // number asks the print to bring it back.
+            val guest by Settings.guest
+            val ctx = LocalContext.current
+            val scope = rememberCoroutineScope()
+            Box(
+                Modifier.combinedClickable(
+                    onClick = {
+                        if (guest) scope.launch {
+                            val act = ctx as? android.app.Activity ?: return@launch
+                            if (Presence.confirm(act, ctx.getString(R.string.guest_exit_title), ctx.getString(R.string.guest_exit_sub))) { Settings.guest.value = false; Haptics.success(ctx) }
+                        }
+                    },
+                    onLongClick = { if (!guest) { Settings.guest.value = true; Haptics.success(ctx) } },
+                ),
+            ) {
+                if (guest) Text("••••", style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp), color = Halo.muted)
+                else pv?.let { BigTotal(it.total, it.currency) } ?: Text("…", style = HaloType.amount, color = Halo.ink)
+            }
+            if (guest) Text(stringResource(R.string.guest_on), style = HaloType.small, color = Halo.amber)
             pv?.let { v ->
                 val d = v.change24hValue
                 val p = v.change24hPct
@@ -190,7 +213,7 @@ private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
             val move = h.change24h
             Text(
                 buildAnnotatedString {
-                    append(fmtUi(h.ui) + " " + h.symbol)
+                    append((if (Settings.guest.value) "••••" else fmtUi(h.ui)) + " " + h.symbol)
                     if (unit != null) {
                         append(" · ")
                         withStyle(SpanStyle(color = if (move == null) Halo.muted else if (move >= 0) Halo.mint else Halo.red)) {
@@ -377,7 +400,7 @@ private fun DefiRow(d: DefiPosition, currency: String) {
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(d.fiat?.let { fmtFiat(it, currency) } ?: "…", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.ink)
-            Text(fmtUi(d.ui) + " " + d.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
+            Text((if (Settings.guest.value) "••••" else fmtUi(d.ui)) + " " + d.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
             d.perDayUi?.let { day ->
                 Text(
                     "+" + fmtUi(day) + " " + d.symbol + stringResource(R.string.hero_per_day) + d.aprPct?.let { String.format(java.util.Locale.ROOT, " · %.1f%%", it) }.orEmpty(),

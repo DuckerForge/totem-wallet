@@ -151,6 +151,19 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 }
             }
             note?.let { Banner(it, Halo.amber, HIcon.INFO) }
+            // The first minute, said before the first budget: three steps and what to expect.
+            if (SessionWallet.lastClose(ctx) == null) GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.first_title).uppercase(), style = HaloType.label, color = Halo.muted)
+                    listOf(R.string.first_1, R.string.first_2, R.string.first_3).forEachIndexed { i, r ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text((i + 1).toString(), fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.mint, modifier = Modifier.width(18.dp))
+                            Text(stringResource(r), style = HaloType.small, color = Halo.ink, lineHeight = 17.sp)
+                        }
+                    }
+                    Text(stringResource(R.string.first_note), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+                }
+            }
             LastBudget(refresh)
         } else {
             AgentPulse(refresh)

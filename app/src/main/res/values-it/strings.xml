@@ -1594,6 +1594,14 @@
     <string name="pnl_card_sub">%1$d vendite, FIFO sugli scontrini registrati</string>
     <string name="pnl_card_all">%1$d monete, realizzato</string>
     <string name="pnl_card_foot">Ogni numero viene da scontrini firmati. Non è un consiglio.</string>
+    <string name="eyes_ask_hint">Chiedigli qualcosa…</string>
+    <string name="eyes_ask">Chiedi</string>
+    <string name="eyes_you">Tu: %1$s</string>
+    <string name="first_title">Il primo minuto</string>
+    <string name="first_1">Fai una paghetta: soldi separati dal tuo wallet, da 0,15 SOL in su, così ogni acquisto supera i 5 $ che Jupiter chiede per fargli la guardia sulla catena.</string>
+    <string name="first_2">Premi Avvia. Cerca una moneta ogni sei minuti con i cancelli dei bot che vincono più Rugcheck, compra una fetta, vende a +30% o −15%.</string>
+    <string name="first_3">Apri Guardalo lavorare: i grafici, i suoi ragionamenti battuti, una voce se la vuoi. Chiudi e riprendi tutto quando vuoi.</string>
+    <string name="first_note">La tua seed non la vede mai. Sopra i suoi limiti chiede l\'impronta. Quello che ci metti è quello che puoi perdere: parti piccolo.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

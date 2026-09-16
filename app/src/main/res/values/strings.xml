@@ -1594,6 +1594,14 @@
     <string name="pnl_card_sub">%1$d sales, FIFO on recorded receipts</string>
     <string name="pnl_card_all">%1$d coins, realized</string>
     <string name="pnl_card_foot">Every number from signed receipts. Not advice.</string>
+    <string name="eyes_ask_hint">Ask it something…</string>
+    <string name="eyes_ask">Ask</string>
+    <string name="eyes_you">You: %1$s</string>
+    <string name="first_title">The first minute</string>
+    <string name="first_1">Make a budget: money set apart from your wallet, 0.15 SOL or more so every buy clears the 5 $ Jupiter needs to guard it on chain.</string>
+    <string name="first_2">Press Start. It looks for a coin every six minutes with the gates of the winning bots plus Rugcheck, buys a slice, sells at +30% or −15%.</string>
+    <string name="first_3">Open Watch it work: the charts, its reasoning typed out, a voice if you want one. Close it and take everything back whenever you like.</string>
+    <string name="first_note">It never sees your seed. Above its limits it asks for your fingerprint. What you put in is what you can lose: start small.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

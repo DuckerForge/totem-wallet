@@ -102,6 +102,11 @@ internal fun EyesScreen(onClose: () -> Unit) {
     // A sale the chain prices lower than Jupiter's quote: the question stays
     // on screen with the real number until the person answers or moves on.
     var worse by remember { mutableStateOf<Pair<Positions.Position, SessionActions.Sale.Worse>?>(null) }
+    // A question typed under the thoughts, answered in the same stream.
+    var question by remember { mutableStateOf("") }
+    var asking by remember { mutableStateOf(false) }
+    var live by remember { mutableStateOf<String?>(null) }
+    val turns = remember { mutableListOf<Brain.Turn>() }
     var voice by remember { mutableStateOf(Settings.eyesVoice(ctx)) }
     val scope = rememberCoroutineScope()
 
@@ -244,11 +249,13 @@ internal fun EyesScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.height(10.dp))
 
+            // Sideways on the bedside table: two charts per row, the thoughts under them.
+            val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (open.isEmpty()) {
                     GlassCard { Text(stringResource(R.string.eyes_none), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp) }
                 }
-                open.forEach { pos ->
+                open.chunked(if (landscape) 2 else 1).forEach { rowOf -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { rowOf.forEach { pos -> Box(Modifier.weight(1f)) {
                     val entryUsd = pos.entryLamports?.let { e -> solUsd?.let { e / 1e9 * it } }
                     val now = spot[pos.mint]
                     val move = if (entryUsd != null && now != null && entryUsd > 0) (now - entryUsd) / entryUsd * 100 else null
@@ -310,7 +317,7 @@ internal fun EyesScreen(onClose: () -> Unit) {
                             }
                         }
                     }
-                }
+                } } ; if (rowOf.size == 1 && landscape) Spacer(Modifier.weight(1f)) } }
 
                 // The reasoning, newest at the bottom, typed as it lands.
                 GlassCard {
@@ -325,8 +332,34 @@ internal fun EyesScreen(onClose: () -> Unit) {
                         }
                         val lines = AgentTrace.lines.takeLast(14)
                         if (lines.isEmpty()) Text(stringResource(R.string.eyes_quiet), style = HaloType.small, color = Halo.muted)
-                        lines.forEachIndexed { i, l -> TypedLine(l, last = i == lines.lastIndex) }
-                        if (AgentTrace.busy.value) Caret()
+                        lines.forEachIndexed { i, l -> TypedLine(l, last = i == lines.lastIndex && live == null) }
+                        live?.let { TypedLine(AgentTrace.Line(System.currentTimeMillis(), it, AgentTrace.Kind.FOUND), last = true) }
+                        if (AgentTrace.busy.value || asking) Caret()
+                        // Ask it something, here, in the same stream. This one costs your model's credits.
+                        if (Brain.configured(ctx)) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = question, onValueChange = { question = it }, modifier = Modifier.weight(1f), singleLine = true,
+                                    placeholder = { Text(stringResource(R.string.eyes_ask_hint), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted) },
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Inter, fontSize = 13.sp, color = Halo.ink), colors = pickerField(), shape = rs(12),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                SmallChip(stringResource(R.string.eyes_ask), HIcon.SEND, tint = if (question.isBlank() || asking) Halo.muted else Halo.mint) {
+                                    val q = question.trim(); if (q.isEmpty() || asking) return@SmallChip
+                                    question = ""; asking = true
+                                    AgentTrace.say(ctx.getString(R.string.eyes_you, q))
+                                    turns.add(Brain.Turn("user", q))
+                                    scope.launch {
+                                        val r = Brain.ask(ctx, ChatHistory.context(turns.toList()), "Apex eyes") { partial -> live = partial }
+                                        live = null; asking = false
+                                        when (r) {
+                                            is Brain.Reply.Ok -> { turns.addAll(r.turns); r.turns.lastOrNull { it.role == "assistant" }?.text?.let { AgentTrace.say(it, AgentTrace.Kind.FOUND) } }
+                                            is Brain.Reply.Failed -> AgentTrace.say(r.message, AgentTrace.Kind.REFUSED)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 if (open.size > 1 && busy == null) {

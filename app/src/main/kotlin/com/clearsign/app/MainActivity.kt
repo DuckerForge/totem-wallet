@@ -183,12 +183,6 @@ class MainActivity : ComponentActivity() {
             val sm = getSystemService(android.hardware.SensorManager::class.java)
             sm.getDefaultSensor(android.hardware.Sensor.TYPE_PROXIMITY)?.let { sm.registerListener(proximity, it, android.hardware.SensorManager.SENSOR_DELAY_NORMAL) }
         }
-        // Hand the radio back and forth as the tap screen arms and disarms.
-        lifecycleScope.launch {
-            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-                TapService.armed.collect { emitting -> if (emitting) stopReaderMode() else startReaderMode() }
-            }
-        }
         // The widget mirrors what the app knows; refresh it whenever we come to the front.
         lifecycleScope.launch { runCatching { HealthWidgetData.refresh(this@MainActivity) } }
         // A paired agent link should be listening whenever the phone is up.
@@ -207,6 +201,18 @@ class MainActivity : ComponentActivity() {
         Themes.load(this)
         Settings.load(this)
         Pro.load(this)
+        // Hand the radio back and forth as the tap screen arms and disarms.
+        //
+        // Started here and not in onResume. `lifecycleScope` lives until the
+        // activity is destroyed and `repeatOnLifecycle` never returns, so one
+        // started on every resume left a new permanent collector behind each
+        // time: after ten trips to the home screen, ten coroutines racing to
+        // turn the NFC reader on and off at every change.
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                TapService.armed.collect { emitting -> if (emitting) stopReaderMode() else startReaderMode() }
+            }
+        }
         // Must be registered before the Activity is STARTED.
         bridge = ActivityResultBridge(this)
         signer = SeedVaultSigner(this, bridge)

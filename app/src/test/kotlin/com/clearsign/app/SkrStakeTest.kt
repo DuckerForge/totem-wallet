@@ -29,20 +29,28 @@ class SkrStakeTest {
      */
     @Test fun growthOverTimeIsTheYield() {
         val day = 86_400_000L
-        // A hundredth of a percent a day is 3.65% a year.
-        val apr = SkrStake.growthAprPct(1.0, 0L, 1.0001, day)
-        assertEquals(3.65, apr!!, 0.02)
+        // A hundredth of a percent over ten days is a bit over a third of a percent a year.
+        val apr = SkrStake.growthAprPct(1.0, 0L, 1.0001, 10 * day)
+        assertEquals(0.365, apr!!, 0.005)
     }
 
     @Test fun tooShortASpanSaysNothing() {
-        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 1.01, 3_600_000L))
+        // Rewards land every forty-eight hours, so a day of growth is one step or
+        // none, and either way it is not a rate.
+        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 1.01, 86_400_000L))
     }
 
     @Test fun aPriceThatDidNotMoveIsNotAYield() {
-        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 1.0, 86_400_000L))
+        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 1.0, 10 * 86_400_000L))
     }
 
     @Test fun anImpossibleJumpIsRefused() {
-        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 3.0, 86_400_000L))
+        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 3.0, 10 * 86_400_000L))
+    }
+
+    /** The two readings taken in September, a couple of days apart. */
+    @Test fun theRealSharePriceLandsNearTheOfficialNumber() {
+        val apr = SkrStake.growthAprPct(1.138725049, 0L, 1.139766368, 8 * 86_400_000L)
+        assertEquals(4.2, apr!!, 0.3)
     }
 }

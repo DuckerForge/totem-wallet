@@ -115,6 +115,24 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 val id = key.removePrefix("cg:")
                 Market.Coin(id = id, symbol = if (key.startsWith("cg:")) id.uppercase().take(10) else shorten(key, 4), name = id.replaceFirstChar { it.uppercase() }, image = null, priceUsd = null, marketCap = null, rank = null, change24h = null, mint = key.takeIf { !it.startsWith("cg:") })
             }
+        }.let { coins ->
+            // One coin, one key. A coin followed by its CoinGecko name that turns
+            // out to live on Solana is the same coin as the one followed by mint,
+            // and two rows with one key crashed the list. The mint wins: the
+            // amount moves over and the name key goes.
+            var moved = false
+            keys.zip(coins).forEach { (stored, c) ->
+                val mint = c.mint
+                if (stored.startsWith("cg:") && mint != null) {
+                    val amt = Watchlist.amount(ctx, stored)
+                    if (amt > 0 && Watchlist.amount(ctx, mint) <= 0) Watchlist.setAmount(ctx, mint, amt)
+                    if (Watchlist.moves(ctx, stored)) Watchlist.setMoves(ctx, mint, true)
+                    Watchlist.add(ctx, mint); Watchlist.remove(ctx, stored)
+                    moved = true
+                }
+            }
+            if (moved) refresh++
+            coins.distinctBy { it.key }
         }
     }
 

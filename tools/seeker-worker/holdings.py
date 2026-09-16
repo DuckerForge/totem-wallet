@@ -113,8 +113,15 @@ def main():
     limit = None
     if '--limit' in sys.argv:
         limit = int(sys.argv[sys.argv.index('--limit') + 1])
+    # Uno ogni N, non i primi N: il roster è ordinato dal più ricco al più
+    # povero, quindi prendere dalla cima darebbe il censimento delle balene e
+    # tutte le mediane uscirebbero altissime. Un passo costante attraversa tutta
+    # la distribuzione.
+    stride = 1
+    if '--stride' in sys.argv:
+        stride = max(1, int(sys.argv[sys.argv.index('--stride') + 1]))
 
-    wallets = roster()
+    wallets = roster()[::stride]
     if limit:
         wallets = wallets[:limit]
     print(f"portafogli da leggere: {len(wallets):,}")
@@ -128,7 +135,16 @@ def main():
         for prog in (TOKEN, TOKEN22):
             res = call("getTokenAccountsByOwner", [w, {"programId": prog}, {"encoding": "jsonParsed"}])
             for a in (res or {}).get('value', []):
-                info = a['account']['data']['parsed']['info']
+                # Un conto che il nodo non sa interpretare torna in base64, cioè
+                # `data` è una lista e non un oggetto. Succede su qualche
+                # Token-2022 con estensioni che non conosce. Si salta: contarlo
+                # come possesso senza sapere la quantità sarebbe peggio.
+                d = a.get('account', {}).get('data')
+                if not isinstance(d, dict):
+                    continue
+                info = d.get('parsed', {}).get('info')
+                if not isinstance(info, dict):
+                    continue
                 amt = info.get('tokenAmount', {})
                 ui = amt.get('uiAmount')
                 if ui:

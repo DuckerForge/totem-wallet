@@ -1590,6 +1590,10 @@
     <string name="trader_sold_mirror">Venduta %1$s: %2$s, che copi, l\'ha venduta</string>
     <string name="follow_mirror_on">anche le vendite</string>
     <string name="follow_mirror_off">solo gli acquisti</string>
+    <string name="pnl_card_share">Condividi come immagine</string>
+    <string name="pnl_card_sub">%1$d vendite, FIFO sugli scontrini registrati</string>
+    <string name="pnl_card_all">%1$d monete, realizzato</string>
+    <string name="pnl_card_foot">Ogni numero viene da scontrini firmati. Non è un consiglio.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

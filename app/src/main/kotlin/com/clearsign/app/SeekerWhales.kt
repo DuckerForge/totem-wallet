@@ -66,7 +66,7 @@ private fun whales(ctx: Context): Triple<List<Whale>, Int, Long> = runCatching {
 internal fun SeekerWhalesCard(limit: Int = 8) {
     val ctx = LocalContext.current
     val (rows, count, total) = remember { whales(ctx) }
-    if (rows.isEmpty()) return
+    if (rows.isEmpty()) { GlassCard { NothingHere(stringResource(R.string.crowd_no_data)) }; return }
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -89,7 +89,9 @@ internal fun SeekerWhalesCard(limit: Int = 8) {
             )
             // One open at a time: two expanded rows is a list that has stopped
             // being a ranking.
-            var open by remember { mutableStateOf<String?>(null) }
+            // Survives the switch to another Scout tab: reopening a whale you
+            // had already opened should not cost the same three calls again.
+            var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
             rows.take(limit).forEachIndexed { i, w ->
                 WhaleRow(i + 1, w, open == w.address) { open = if (open == w.address) null else w.address }
             }
@@ -144,7 +146,7 @@ private fun holdingsOf(address: String): Holdings? {
 @Composable
 private fun WhaleRow(rank: Int, w: Whale, open: Boolean, onToggle: () -> Unit) {
     val ctx = LocalContext.current
-    var held by remember(w.address) { mutableStateOf<Holdings?>(null) }
+    var held by remember(w.address) { mutableStateOf(heldMemo[w.address]) }
     var failed by remember(w.address) { mutableStateOf(false) }
 
     // Read once per wallet, on the first open. Closing and opening again costs
@@ -152,7 +154,7 @@ private fun WhaleRow(rank: Int, w: Whale, open: Boolean, onToggle: () -> Unit) {
     LaunchedEffect(open, w.address) {
         if (!open || held != null || failed) return@LaunchedEffect
         val got = withContext(Dispatchers.IO) { holdingsOf(w.address) }
-        if (got == null) failed = true else held = got
+        if (got == null) failed = true else { held = got; heldMemo[w.address] = got }
     }
 
     Column(
@@ -298,3 +300,6 @@ private fun fmt(v: Double): String = when {
     v >= 10 -> String.format("%.0f", v)
     else -> String.format("%.1f", v)
 }
+
+/** What each whale holds, kept for as long as the app lives: one wallet, one read. */
+private val heldMemo = java.util.concurrent.ConcurrentHashMap<String, Holdings>()

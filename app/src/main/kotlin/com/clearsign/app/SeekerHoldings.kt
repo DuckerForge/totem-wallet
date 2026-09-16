@@ -80,13 +80,13 @@ private fun load(ctx: Context): Census = runCatching {
 }.getOrElse { Census(emptyList(), 0, 0, null) }
 
 @Composable
-internal fun SeekerHoldingsCard() {
+internal fun SeekerHoldingsCard(animate: Boolean = true) {
     val ctx = LocalContext.current
     val census = remember { load(ctx) }
     val rows = census.rows
     val total = census.total
     val sample = census.sample
-    if (rows.isEmpty()) return
+    if (rows.isEmpty()) { GlassCard { NothingHere(stringResource(R.string.crowd_no_data)) }; return }
     val free = rows.count { it.usdPer < 0.01 }
 
     GlassCard {
@@ -100,7 +100,7 @@ internal fun SeekerHoldingsCard() {
                     color = Halo.mint, modifier = Modifier.weight(1f),
                 )
             }
-            HoldingsField(rows)
+            HoldingsField(rows, animate)
             Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
             Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
             Text(
@@ -157,7 +157,7 @@ private fun Legend(dot: Color, text: String) {
  * a bar that kept growing would say the number was changing.
  */
 @Composable
-private fun HoldingsField(rows: List<SeekerHolding>) {
+private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
     val valued = rows.filter { it.usdPer >= 0.01 }.sortedByDescending { it.pct }
     val gifts = rows.filter { it.usdPer < 0.01 }.sortedByDescending { it.pct }
     val maxPct = (valued.maxOfOrNull { it.pct } ?: 1.0).coerceAtLeast(1.0)
@@ -176,9 +176,15 @@ private fun HoldingsField(rows: List<SeekerHolding>) {
             )
         }
         valued.take(9).forEachIndexed { i, h ->
-            val grow = rememberReveal(key = h.symbol, durationMs = 600 + i * 70)
+            // Grown once, on arrival. Inside the lazy list of Scout this card is
+            // thrown away when it scrolls past the top, and without the flag every
+            // bar would crawl out of zero again on the way back.
+            val grow = if (animate) rememberReveal(key = h.symbol, durationMs = 600 + i * 70) else 1f
             val tint = if (h.usdPer >= 50) Halo.mint else Halo.cyan
-            Row(Modifier.fillMaxWidth().staggeredEntrance(i, key = h.symbol), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().then(if (animate) Modifier.staggeredEntrance(i, key = h.symbol) else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     h.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.ink,
                     modifier = Modifier.width(66.dp), maxLines = 1,

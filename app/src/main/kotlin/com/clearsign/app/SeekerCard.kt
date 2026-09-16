@@ -51,6 +51,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clearsign.core.CrowdBuy
 import com.clearsign.core.CrowdRank
 import kotlin.math.abs
 import kotlin.math.sin
@@ -71,7 +72,10 @@ private const val LANES = 5
 
 @Composable
 internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
-    if (!SeekerScan.available && !SeekerFeed.available) return
+    if (!SeekerScan.available && !SeekerFeed.available) {
+        GlassCard { NothingHere(stringResource(R.string.crowd_no_scan)) }
+        return
+    }
     val ctx = LocalContext.current
     var ranks by remember { mutableStateOf<List<CrowdRank>>(emptyList()) }
     var followed by remember { mutableStateOf(0) }
@@ -106,7 +110,12 @@ internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
             }
         }
     }
-    if (followed == 0) return
+    // A switch chip that opens onto empty ground reads as broken. Since the
+    // ranking became a tab it has to say why it is empty instead of vanishing.
+    if (followed == 0) {
+        GlassCard { NothingHere(stringResource(R.string.crowd_no_roster)) }
+        return
+    }
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -182,11 +191,14 @@ private fun CrowdRow(r: CrowdRank, onOpen: () -> Unit) {
  */
 @Composable
 private fun SeekerFlow(ranks: List<CrowdRank>) {
-    val phase = rememberInfiniteTransition(label = "flow").animateFloat(
+    // The state, not its value. Reading `.value` here recomposed this whole
+    // composable on every frame; read inside the draw lambda it only redraws,
+    // which matters now that the braid is a tab people flick between.
+    val phaseState = rememberInfiniteTransition(label = "flow").animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(3400, easing = LinearEasing), RepeatMode.Restart),
         label = "phase",
-    ).value
+    )
     val cyan = Halo.cyan
     val amber = Halo.amber
     val stroke = Halo.stroke
@@ -194,6 +206,7 @@ private fun SeekerFlow(ranks: List<CrowdRank>) {
     val widest = (ranks.maxOfOrNull { it.wallets } ?: 1).coerceAtLeast(1)
 
     Canvas(Modifier.fillMaxWidth().height(if (ranks.isEmpty()) 92.dp else 136.dp)) {
+        val phase = phaseState.value
         val h = size.height
         val phoneX = 30f * density
         val phoneW = 24f * density
@@ -416,6 +429,12 @@ private fun thousands(v: Int): String =
  * so it sits above the bar and never hides behind a tap. What was three more
  * screens of scrolling is now three words.
  */
+/** One line, said plainly, where a card would otherwise have disappeared. */
+@Composable
+internal fun NothingHere(text: String) {
+    Text(text, style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
+}
+
 private enum class ScoutTab { BUYING, HOLDING, WHALES }
 
 /**
@@ -463,6 +482,15 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
     // past [SeekerFeed.FRESH_MS], and the names it warms are already cached after
     // the first pass.
     var feed by remember { mutableStateOf<SeekerFeed.Feed?>(null) }
+    // Null while the first read is still running: waiting and quiet are not the
+    // same fact and the card says them differently.
+    var events by remember { mutableStateOf<List<CrowdBuy>?>(null) }
+    // Which entrance animations have already played during this visit. Inside a
+    // lazy list a card that scrolls past the top is thrown away, so without this
+    // every bar and every feed row replays its arrival each time it comes back.
+    val played = remember { mutableSetOf<String>() }
+    var feedOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(feed) { events = runCatching { crowdEvents(ctx, feed) }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) {
         // The file first, so the page is never blank while the network answers.
         withContext(Dispatchers.IO) { SeekerFeed.cached(ctx) }?.let { feed = it }
@@ -480,8 +508,14 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
     // sticks to the top has to paint edge to edge, or the cards scrolling
     // underneath it appear in the margins beside it.
     val pad = Modifier.padding(horizontal = 18.dp)
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // Sections differ in height by hundreds of points. With the bar already
+    // pinned, switching to a shorter one would drag the whole list up under the
+    // thumb; this keeps the bar exactly where it was left.
+    LaunchedEffect(tab) { if (listState.firstVisibleItemIndex >= 3) listState.scrollToItem(3) }
     LazyColumn(
         Modifier.fillMaxSize().background(Halo.ground).statusBarsPadding().navigationBarsPadding(),
+        state = listState,
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -505,7 +539,9 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
         item(key = "who") { Box(pad) { WhoWeWatch(feed) } }
         // The reason to open this page goes first and stays whole. It used to be
         // third, under a chart and under a card that apologises on a quiet hour.
-        item(key = "live") { Box(pad) { CrowdFeed(feed, onBuy = onBuy) } }
+        item(key = "live") {
+            Box(pad) { CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, onBuy = onBuy) }
+        }
         stickyHeader(key = "tabs") { ScoutTabs(tab) { tab = it } }
         // Keyed on the tab, so switching builds the new section instead of
         // pouring new data into the old one's remembered state.
@@ -513,7 +549,7 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
             Box(pad) {
                 when (tab) {
                     ScoutTab.BUYING -> SeekerCard(feed) {}
-                    ScoutTab.HOLDING -> SeekerHoldingsCard()
+                    ScoutTab.HOLDING -> SeekerHoldingsCard(animate = remember { played.add("census") })
                     ScoutTab.WHALES -> SeekerWhalesCard()
                 }
             }

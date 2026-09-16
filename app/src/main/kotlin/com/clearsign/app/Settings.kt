@@ -128,4 +128,20 @@ object Settings {
      * every return anyway, so a restart ends it.
      */
     val guest = mutableStateOf(false)
+
+    /** The action circles on the home, in the order chosen. "More" is always last and never in this list. */
+    fun homeActions(ctx: Context): List<String> {
+        val raw = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("home_actions", null)
+        return raw?.split(',')?.filter { it.isNotBlank() } ?: DEFAULT_HOME_ACTIONS
+    }
+    fun setHomeActions(ctx: Context, names: List<String>) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("home_actions", names.joinToString(",")).apply()
+        homeActionsTick.value++
+    }
+    val homeActionsTick = mutableStateOf(0)
+    val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "LINK", "AGENT")
+
+    /** A hand over the screen (the proximity sensor) covers the numbers. On by default. */
+    fun coverToHide(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cover_hide", true)
+    fun setCoverToHide(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("cover_hide", on).apply()
 }

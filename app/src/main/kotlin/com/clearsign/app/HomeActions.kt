@@ -20,6 +20,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.setValue
@@ -37,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 
 /** The eight things you can start from the wallet home. */
-internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AGENT, MORE }
+internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AGENT, BRIDGE, MORE }
 
 /**
  * The action grid: eight round, **neutral** buttons.
@@ -49,32 +53,100 @@ internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AG
  * on this page comes from the balance and the token logos, and the buttons are
  * quiet: a dark circle, a hand-drawn line icon, a label.
  */
+/** Every circle the home can show: its icon and its name. "More" stays out of the list: it is always last. */
+internal fun homeActionIcon(a: HomeAction): HIcon = when (a) {
+    HomeAction.SEND -> HIcon.SEND; HomeAction.RECEIVE -> HIcon.RECEIVE; HomeAction.SWAP -> HIcon.SWAP; HomeAction.SCAN -> HIcon.SCAN
+    HomeAction.CROWD -> HIcon.NFC; HomeAction.TAP -> HIcon.NFC; HomeAction.LINK -> HIcon.SHARE; HomeAction.AGENT -> HIcon.AGENT
+    HomeAction.BRIDGE -> HIcon.BRIDGE; HomeAction.MORE -> HIcon.MORE
+}
+internal fun homeActionLabel(a: HomeAction): Int = when (a) {
+    HomeAction.SEND -> R.string.send_btn; HomeAction.RECEIVE -> R.string.receive_btn; HomeAction.SWAP -> R.string.swap_btn; HomeAction.SCAN -> R.string.send_scan
+    HomeAction.CROWD -> R.string.home_act_crowd; HomeAction.TAP -> R.string.home_act_tap; HomeAction.LINK -> R.string.home_act_link
+    HomeAction.AGENT -> R.string.home_act_agent; HomeAction.BRIDGE -> R.string.bridge_short; HomeAction.MORE -> R.string.home_act_more
+}
+internal val CHOOSABLE_ACTIONS = listOf(HomeAction.SEND, HomeAction.RECEIVE, HomeAction.SWAP, HomeAction.SCAN, HomeAction.CROWD, HomeAction.TAP, HomeAction.LINK, HomeAction.AGENT, HomeAction.BRIDGE)
+
+/** The chosen circles, in order, with More at the end. Rows of four, the last row padded so nothing stretches. */
 @Composable
 internal fun HomeActions(enabled: Boolean, onAction: (HomeAction) -> Unit) {
-    val rows = listOf(
-        listOf(
-            Triple(HomeAction.SEND, HIcon.SEND, R.string.send_btn),
-            Triple(HomeAction.RECEIVE, HIcon.RECEIVE, R.string.receive_btn),
-            Triple(HomeAction.SWAP, HIcon.SWAP, R.string.swap_btn),
-            Triple(HomeAction.SCAN, HIcon.SCAN, R.string.send_scan),
-        ),
-        listOf(
-            // The tap-to-pay button used to live here. It is a fine feature and
-            // almost nobody opens it twice, while what the rest of the Seeker crowd
-            // is buying is worth a look every day. Tap moved into "Altro", intact.
-            Triple(HomeAction.CROWD, HIcon.NFC, R.string.home_act_crowd),
-            Triple(HomeAction.LINK, HIcon.SHARE, R.string.home_act_link),
-            Triple(HomeAction.AGENT, HIcon.AGENT, R.string.home_act_agent),
-            Triple(HomeAction.MORE, HIcon.MORE, R.string.home_act_more),
-        ),
-    )
+    val ctx = LocalContext.current
+    val tick by Settings.homeActionsTick
+    val chosen = remember(tick) {
+        Settings.homeActions(ctx).mapNotNull { n -> runCatching { HomeAction.valueOf(n) }.getOrNull() }
+            .filter { it != HomeAction.MORE && (it != HomeAction.BRIDGE || RocketX.enabled) } + HomeAction.MORE
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.lg)) {
-        rows.forEach { row ->
+        chosen.chunked(4).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                row.forEach { (action, icon, label) ->
-                    ActionButton(icon, stringResource(label), enabled, Modifier.weight(1f)) { onAction(action) }
+                row.forEach { action ->
+                    ActionButton(homeActionIcon(action), stringResource(homeActionLabel(action)), enabled, Modifier.weight(1f)) { onAction(action) }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** Which circles, and in what order. Switch one on or off, move it up or down. */
+@Composable
+internal fun HomeActionsSheet(onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var chosen by remember { mutableStateOf(Settings.homeActions(ctx).mapNotNull { n -> runCatching { HomeAction.valueOf(n) }.getOrNull() }.filter { it != HomeAction.MORE }) }
+    fun save(list: List<HomeAction>) { chosen = list; Settings.setHomeActions(ctx, list.map { it.name }) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SheetHeader(stringResource(R.string.home_customize), stringResource(R.string.home_customize_sub), HIcon.SETTINGS, onClose = onDismiss)
+            val all = chosen + CHOOSABLE_ACTIONS.filter { it !in chosen }
+            all.forEach { a ->
+                val on = a in chosen
+                val idx = chosen.indexOf(a)
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    HaloIcon(homeActionIcon(a), if (on) Halo.ink else Halo.muted, 20.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(homeActionLabel(a)), style = HaloType.body, color = if (on) Halo.ink else Halo.muted, modifier = Modifier.weight(1f))
+                    if (on) {
+                        SmallChip("▲", null, tint = if (idx > 0) Halo.cyan else Halo.stroke) { if (idx > 0) save(chosen.toMutableList().also { it.add(idx - 1, it.removeAt(idx)) }) }
+                        Spacer(Modifier.width(6.dp))
+                        SmallChip("▼", null, tint = if (idx < chosen.lastIndex) Halo.cyan else Halo.stroke) { if (idx < chosen.lastIndex) save(chosen.toMutableList().also { it.add(idx + 1, it.removeAt(idx)) }) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    androidx.compose.material3.Switch(checked = on, onCheckedChange = { want -> save(if (want) chosen + a else chosen - a) })
                 }
             }
+            Text(stringResource(R.string.home_customize_note), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
+            GhostButton(stringResource(R.string.home_customize_reset), Modifier.fillMaxWidth(), HIcon.HISTORY, tint = Halo.muted) {
+                save(Settings.DEFAULT_HOME_ACTIONS.mapNotNull { n -> runCatching { HomeAction.valueOf(n) }.getOrNull() })
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+/** The wallet chip, opened: the address, and the three things people look for there. */
+@Composable
+internal fun WalletChipSheet(address: String, onSettings: () -> Unit, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Avatar(address, 40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.chip_title), style = HaloType.title, color = Halo.ink)
+                    Text(address, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp)
+                }
+            }
+            MoreRow(HIcon.COPY, stringResource(R.string.copy_address)) { copyText(ctx, address); Haptics.tick(ctx); onDismiss() }
+            MoreRow(HIcon.SHARE, stringResource(R.string.share)) {
+                val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, address)
+                runCatching { ctx.startActivity(android.content.Intent.createChooser(i, null)) }; onDismiss()
+            }
+            MoreRow(HIcon.EXTERNAL, "Solscan") { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://solscan.io/account/$address"))) } }
+            MoreRow(HIcon.SETTINGS, stringResource(R.string.tab_settings)) { onSettings(); onDismiss() }
+            Text(stringResource(R.string.chip_info), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
+            Spacer(Modifier.height(4.dp))
         }
     }
 }
@@ -262,7 +334,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onCustomize: () -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -277,6 +349,7 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
             MoreRow(HIcon.SPARK, stringResource(R.string.blink_open), onLink)
+            MoreRow(HIcon.PALETTE, stringResource(R.string.home_customize), onCustomize)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)

@@ -1541,6 +1541,15 @@
     <string name="ctap_saved">Salvato, verificato col tocco.</string>
     <string name="ctap_verified">verificato col tocco</string>
     <string name="ctap_truth">Viaggiano un indirizzo, un nome e una firma. Niente chiavi, niente soldi. Il controllo dimostra che un telefono qui presente ha dichiarato quell\'indirizzo; non dice chi tiene il telefono.</string>
+    <string name="bridge_short">Ponte</string>
+    <string name="home_customize">Scegli i cerchi</string>
+    <string name="home_customize_sub">Quali azioni stanno in home, e in che ordine. Altro resta ultimo.</string>
+    <string name="home_customize_note">Spegnine una e finisce dentro Altro. Le frecce cambiano l\'ordine.</string>
+    <string name="home_customize_reset">Torna a com\'era</string>
+    <string name="chip_title">Il tuo wallet</string>
+    <string name="chip_info">È il conto del Seed Vault che Apex legge. La chiave non esce mai dal vault; ogni firma chiede la tua impronta.</string>
+    <string name="cover_title">Una mano sullo schermo nasconde i numeri</string>
+    <string name="cover_sub">Copri la parte alta dello schermo e le cifre si coprono fino alla tua impronta.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

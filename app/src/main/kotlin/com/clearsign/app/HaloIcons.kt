@@ -43,6 +43,8 @@ enum class HIcon {
     CHART, CHART_DOWN,
     /** The agent: a small head with an antenna. Something that thinks, in a box you can see. */
     AGENT,
+    /** A bridge: two piers and the arc between them. */
+    BRIDGE,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
 }
@@ -272,6 +274,13 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 dot(12f, 4f, 1.4f)
                 dot(9.2f, 13.2f, 1.5f); dot(14.8f, 13.2f, 1.5f)
                 path { moveTo(9f, 16.6f); quadTo(12f, 18.2f, 15f, 16.6f) }
+            }
+            HIcon.BRIDGE -> {
+                path { moveTo(3f, 17f); lineTo(21f, 17f) }
+                path { moveTo(4.5f, 17f); quadTo(12f, 5f, 19.5f, 17f) }
+                path { moveTo(8f, 17f); lineTo(8f, 12.2f) }
+                path { moveTo(12f, 17f); lineTo(12f, 10.4f) }
+                path { moveTo(16f, 17f); lineTo(16f, 12.2f) }
             }
             HIcon.GEM -> {
                 path(fill = true) { moveTo(12f, 2.5f); lineTo(21.5f, 12f); lineTo(12f, 21.5f); lineTo(2.5f, 12f); close() }

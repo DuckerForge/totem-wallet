@@ -296,22 +296,18 @@ private fun fmtSol(v: Double): String = when {
  * twenty thousand actually hold.
  */
 /**
- * Who is actually being watched, before any chart says anything.
+ * Who we watch and when we last looked, on one line under the title.
  *
- * There are 120,520 Seekers on chain and they are mostly asleep: the median one
- * holds 0.032 SOL and last moved 209 days ago, around when the airdrops landed.
- * Following all of them would be following nobody, so the roster is the 10,527
- * holding at least one SOL. Every number on this page means *those*, and saying
- * so once here is cheaper than a footnote under each chart.
+ * The full card said the same thing over four lines and a divider, and those
+ * four lines were the reason the switch bar started life below the fold. The
+ * count still counts up on arrival, because a number that lands says measured
+ * and a number that is simply there says typed, and the sweep clock still ticks.
  */
 @Composable
-private fun WhoWeWatch(feed: SeekerFeed.Feed?) {
+private fun WhoLine(feed: SeekerFeed.Feed?) {
     val ctx = LocalContext.current
     val followed = remember { SeekerScan.roster(ctx).size }
-    // Ticks once a second, so "next in 2m" is a clock and not a number that was
-    // true when the screen opened.
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    // Only for the fallback, when nobody publishes a feed and this phone sweeps.
     var scanAt by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { scanAt = SeekerScan.lastPassAt(ctx) }
@@ -320,46 +316,24 @@ private fun WhoWeWatch(feed: SeekerFeed.Feed?) {
             kotlinx.coroutines.delay(1000)
         }
     }
-    // The clock used to fetch for itself, but only once a sweep was already
-    // overdue: by then the ring had been spinning for half a minute. The page
-    // polls on its own schedule now and this just reads the answer.
     val at = feed?.at ?: scanAt
-    if (followed == 0) return
-    Row(
-        Modifier.fillMaxWidth().clip(rs(Radius.row)).background(Halo.cardSoft)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            // Counts up on arrival: a number that lands says "measured", a number
-            // that is just there says "typed".
-            val shown = rememberCountUp(followed.toFloat(), durationMs = 900).toInt()
-            Text(
-                thousands(shown), fontFamily = Sora, fontWeight = FontWeight.Bold,
-                fontSize = 21.sp, color = Halo.mint, style = Tabular,
-            )
-            Text(
-                stringResource(R.string.who_active),
-                fontFamily = Inter, fontSize = 11.sp, color = Halo.muted,
-            )
-        }
-        Box(Modifier.width(1.dp).height(40.dp).background(Halo.stroke))
-        Column(Modifier.weight(1.45f).padding(start = 14.dp)) {
-            Text(
-                stringResource(R.string.who_total, thousands(120_520)),
-                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.ink,
-            )
-            Text(
-                stringResource(R.string.who_focus),
-                fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
-            )
-            if (at > 0) {
-                Spacer(Modifier.height(4.dp))
-                SweepClock(at = at, now = now)
-            }
+    if (followed == 0) {
+        Text(stringResource(R.string.crowd_page_sub), style = HaloType.small, color = Halo.muted)
+        return
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        val shown = rememberCountUp(followed.toFloat(), durationMs = 900).toInt()
+        Text(
+            stringResource(R.string.who_line, thousands(shown)),
+            fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint, style = Tabular,
+        )
+        if (at > 0) {
+            Spacer(Modifier.width(8.dp))
+            SweepClock(at = at, now = now)
         }
     }
 }
+
 
 /** The scanner's own cadence: every four minutes, and the page says so out loud. */
 private const val PERIOD_MS = 4 * 60_000L
@@ -436,7 +410,7 @@ internal fun NothingHere(text: String) {
     Text(text, style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
 }
 
-private enum class ScoutTab { BUYING, HOLDING, WHALES }
+private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES }
 
 /**
  * The switch, in the app's own language rather than Material's.
@@ -450,11 +424,14 @@ private enum class ScoutTab { BUYING, HOLDING, WHALES }
 private fun ScoutTabs(selected: ScoutTab, onPick: (ScoutTab) -> Unit) {
     val ctx = LocalContext.current
     Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 18.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ModeChip(stringResource(R.string.crowd_tab_live), selected == ScoutTab.LIVE, Halo.cyan, Modifier.weight(1f)) {
+                Haptics.tick(ctx); onPick(ScoutTab.LIVE)
+            }
             ModeChip(stringResource(R.string.crowd_tab_buying), selected == ScoutTab.BUYING, Halo.mint, Modifier.weight(1f)) {
                 Haptics.tick(ctx); onPick(ScoutTab.BUYING)
             }
-            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.cyan, Modifier.weight(1f)) {
+            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.mint, Modifier.weight(1.15f)) {
                 Haptics.tick(ctx); onPick(ScoutTab.HOLDING)
             }
             ModeChip(stringResource(R.string.crowd_tab_whales), selected == ScoutTab.WHALES, Halo.amber, Modifier.weight(1f)) {
@@ -503,57 +480,45 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
     }
     // Which of the three the bar is showing. Kept across a rotation, because
     // turning the phone is not a request to go back to the start.
-    var tab by rememberSaveable { mutableStateOf(ScoutTab.BUYING) }
+    var tab by rememberSaveable { mutableStateOf(ScoutTab.LIVE) }
 
-    // The horizontal inset moved off the list and onto each row: the bar that
-    // sticks to the top has to paint edge to edge, or the cards scrolling
-    // underneath it appear in the margins beside it.
     val pad = Modifier.padding(horizontal = 18.dp)
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val scroller = androidx.compose.runtime.rememberCoroutineScope()
-    // Pressing a word on the bar has to show the thing that word names.
+
+    // Nothing scrolls to make the bar work.
     //
-    // It did not. The bar sits under the live feed, so on arrival it lands near
-    // the bottom edge with the section it controls entirely below the screen:
-    // you tapped, the chip lit up, and nothing you could see changed. Now any
-    // tap pulls the bar to the top of the page, which puts its section in the
-    // whole space underneath. Index three is the bar itself.
-    fun showSection() = scroller.launch { runCatching { listState.animateScrollToItem(3) } }
-    LazyColumn(
+    // It used to be pinned inside the scrolling list, under the live feed, which
+    // put it near the bottom edge with the section it names entirely off screen:
+    // you pressed a word and the only thing that changed was the word. Pulling
+    // the page to it afterwards fixed the visibility and bought a jump, which is
+    // worse. So the bar simply lives at the top, above everything it controls,
+    // and the section under it gets the rest of the screen and its own scroll.
+    Column(
         Modifier.fillMaxSize().background(Halo.ground).statusBarsPadding().navigationBarsPadding(),
-        state = listState,
-        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item(key = "head") {
-            Row(pad, verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(38.dp).clip(rs(12)).background(Halo.cardSoft)
-                        .clickable { onBack() },
-                    contentAlignment = Alignment.Center,
-                ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp) }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(stringResource(R.string.crowd_sheet), style = HaloType.screen, color = Halo.ink)
-                    Text(stringResource(R.string.crowd_page_sub), style = HaloType.small, color = Halo.muted)
-                }
+        Row(pad.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(38.dp).clip(rs(12)).background(Halo.cardSoft).clickable { onBack() },
+                contentAlignment = Alignment.Center,
+            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.crowd_sheet), style = HaloType.screen, color = Halo.ink)
+                // Who we are actually looking at, said once, at the top, before any
+                // chart. "What the Seekers are buying" invites you to assume all of
+                // them, and the truth is a tenth: the rest have been still for months.
+                WhoLine(feed)
             }
         }
-        // Who we are actually looking at, said once, at the top, before any chart.
-        // "What the Seekers are buying" invites you to assume all of them, and the
-        // truth is a tenth of them: the rest have been still for seven months.
-        item(key = "who") { Box(pad) { WhoWeWatch(feed) } }
-        // The reason to open this page goes first and stays whole. It used to be
-        // third, under a chart and under a card that apologises on a quiet hour.
-        item(key = "live") {
-            Box(pad) { CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy) }
-        }
-        stickyHeader(key = "tabs") { ScoutTabs(tab) { tab = it; showSection() } }
-        // Keyed on the tab, so switching builds the new section instead of
-        // pouring new data into the old one's remembered state.
-        item(key = tab.name) {
+        Spacer(Modifier.height(10.dp))
+        ScoutTabs(tab) { tab = it }
+        Column(
+            Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Box(pad) {
                 when (tab) {
+                    ScoutTab.LIVE -> CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy)
                     ScoutTab.BUYING -> SeekerCard(feed) {}
                     ScoutTab.HOLDING -> SeekerHoldingsCard(animate = remember { played.add("census") })
                     ScoutTab.WHALES -> SeekerWhalesCard()

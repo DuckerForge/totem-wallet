@@ -97,6 +97,22 @@ internal fun HomeActionsSheet(onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SheetHeader(stringResource(R.string.home_customize), stringResource(R.string.home_customize_sub), HIcon.SETTINGS, onClose = onDismiss)
+            // The home itself, above the switches. Every change lands here
+            // first, so nobody has to close the sheet to see what they did.
+            Text(stringResource(R.string.home_customize_preview).uppercase(), style = HaloType.label, color = Halo.muted)
+            Column(
+                Modifier.fillMaxWidth().clip(rs(18)).background(Halo.ground).padding(horizontal = 14.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(Space.lg),
+            ) {
+                val shown = chosen.filter { it != HomeAction.BRIDGE || RocketX.enabled } + HomeAction.MORE
+                shown.chunked(4).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        row.forEach { a -> ActionButton(homeActionIcon(a), stringResource(homeActionLabel(a)), true, Modifier.weight(1f)) {} }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
             val all = chosen + CHOOSABLE_ACTIONS.filter { it !in chosen }
             all.forEach { a ->
                 val on = a in chosen
@@ -334,7 +350,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onCustomize: () -> Unit = {}, onCompanion: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -349,7 +365,6 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
             MoreRow(HIcon.SPARK, stringResource(R.string.blink_open), onLink)
-            MoreRow(HIcon.PALETTE, stringResource(R.string.home_customize), onCustomize)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)

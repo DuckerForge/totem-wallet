@@ -1552,7 +1552,8 @@
     <string name="ctap_truth">What travels is an address, a name and a signature. No key, no money. The check proves a phone that was here declared that address; it does not tell you who holds the phone.</string>
     <string name="bridge_short">Bridge</string>
     <string name="home_customize">Choose the circles</string>
-    <string name="home_customize_sub">Which actions sit on the home, and in what order. More stays last.</string>
+        <string name="home_customize_preview">How the home will look</string>
+<string name="home_customize_sub">Which actions sit on the home, and in what order. More stays last.</string>
     <string name="home_customize_note">Switch one off and it moves to More. Up and down change the order.</string>
     <string name="home_customize_reset">Back to the default</string>
     <string name="chip_title">Your wallet</string>

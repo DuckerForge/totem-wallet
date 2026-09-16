@@ -505,13 +505,15 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onBridge = { showMore = false; showBridge = true },
                 onLink = { showMore = false; showLinkBox = true },
                 onContactTap = { showMore = false; showContactTap = true },
-                onCustomize = { showMore = false; showCustomize = true },
                 onCompanion = { showMore = false; showCompanion = true },
             ) { showMore = false }
-            if (showCustomize) HomeActionsSheet { showCustomize = false }
-        if (showCompanion) CompanionPage(owner) { showCompanion = false }
-            if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
         }
+        // These three used to live inside the block above, which meant closing
+        // the More sheet to open one of them took the new sheet out of the tree
+        // with it: nothing appeared until More was opened a second time.
+        if (showCustomize) HomeActionsSheet { showCustomize = false }
+        if (showCompanion) CompanionPage(owner) { showCompanion = false }
+        if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
         if (showBridge && owner != null) {
             BridgeSheet(owner, onSend = { req, memo -> showBridge = false; bridgeMemo = memo; (ctx as? MainActivity)?.incoming = req; showSend = true }) { showBridge = false }
         }

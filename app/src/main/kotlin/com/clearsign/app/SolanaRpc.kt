@@ -793,6 +793,22 @@ object SolanaRpc {
         return runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
     }
 
+    /** The raw bytes of many accounts at once, missing ones left out. Blocking: call on IO. */
+    fun accountsBytes(rpcUrl: String, pubkeys: List<String>): Map<String, ByteArray> {
+        if (pubkeys.isEmpty()) return emptyMap()
+        val out = HashMap<String, ByteArray>()
+        pubkeys.distinct().chunked(64).forEach { chunk ->
+            val addrArr = JSONArray(); chunk.forEach { addrArr.put(it) }
+            val params = JSONArray().put(addrArr).put(JSONObject().put("encoding", "base64"))
+            val arr = post(rpcUrl, "getMultipleAccounts", params)?.optJSONObject("result")?.optJSONArray("value") ?: return@forEach
+            for (i in chunk.indices) {
+                val b64 = arr.optJSONObject(i)?.optJSONArray("data")?.optString(0) ?: continue
+                runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()?.let { out[chunk[i]] = it }
+            }
+        }
+        return out
+    }
+
     /** The SKR this wallet has staked with the Seeker Guardians, or null when it has none or the node did not answer. */
     fun skrStake(rpcUrl: String, owner: String): SkrStake.Position? {
         val params = JSONArray().put(SkrStake.PROGRAM).put(

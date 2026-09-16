@@ -506,7 +506,13 @@
     <string name="pro_f2">Watchtower — avvisi in background sui tuoi indirizzi</string>
     <string name="pro_f3">Scan profondi attività indirizzi</string>
     <string name="pro_f4">Export fiscali illimitati</string>
-    <string name="health_title">SALUTE WALLET</string>
+        <string name="lp_title">Soldi dimenticati</string>
+    <string name="lp_none">Controllati Orca e Raydium: nessuna commissione ferma in una posizione.</string>
+    <string name="lp_owed">Almeno %1$s %2$s e %3$s %4$s mai riscossi.</string>
+    <string name="lp_abandoned">Questa posizione non ha più liquidità. Chiuderla restituisce anche il suo rent.</string>
+    <string name="lp_atleast">Dice almeno perché nel conto stanno solo le commissioni contate all\'ultimo tocco della posizione. Quelle guadagnate dopo sono ancora nel pool.</string>
+    <string name="lp_open">Riscuoti su %1$s</string>
+<string name="health_title">SALUTE WALLET</string>
     <string name="health_great">Il tuo wallet è pulito</string>
     <string name="health_ok">Abbastanza sicuro</string>
     <string name="health_weak">Da sistemare</string>

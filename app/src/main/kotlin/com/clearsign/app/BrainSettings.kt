@@ -53,7 +53,7 @@ internal fun BrainFields(compact: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.mint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                HaloIcon(HIcon.PIGEON, Halo.mint, 18.dp)
+                HaloIcon(HIcon.AGENT, Halo.mint, 18.dp)
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {

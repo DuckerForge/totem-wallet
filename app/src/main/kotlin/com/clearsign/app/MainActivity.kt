@@ -590,10 +590,17 @@ private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
         Modifier.fillMaxWidth().background(Halo.card).border(androidx.compose.foundation.BorderStroke(1.dp, Halo.stroke)).padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
+        // The market icon says how the market is: a line going up in the accent
+        // when the big coins are up over the day, going down in red when they
+        // are down. Weighted by size, so one small coin cannot turn it.
+        val marketUp = remember(tab) {
+            val top = Market.cachedTop().take(20).filter { it.marketCap != null && it.change24h != null }
+            if (top.isEmpty()) true else top.sumOf { it.marketCap!! * it.change24h!! } >= 0
+        }
         listOf(
             Tab.WALLET to (HIcon.WALLET to R.string.tab_wallet),
-            Tab.MARKET to (HIcon.CHART to R.string.tab_market),
-            Tab.AGENT to (HIcon.PIGEON to R.string.tab_agent),
+            Tab.MARKET to ((if (marketUp) HIcon.CHART else HIcon.CHART_DOWN) to R.string.tab_market),
+            Tab.AGENT to (HIcon.AGENT to R.string.tab_agent),
             Tab.RECEIPTS to (HIcon.RECEIPT to R.string.tab_receipts),
             Tab.SETTINGS to (HIcon.SETTINGS to R.string.tab_settings),
         ).forEach { (t, v) ->
@@ -606,7 +613,13 @@ private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                HaloIcon(icon, if (active) Halo.mint else Halo.muted, 22.dp)
+                val tint = when {
+                    t == Tab.MARKET && !marketUp -> if (active) Halo.red else Halo.red.copy(alpha = 0.75f)
+                    t == Tab.MARKET -> if (active) Halo.mint else Halo.mint.copy(alpha = 0.7f)
+                    active -> Halo.mint
+                    else -> Halo.muted
+                }
+                HaloIcon(icon, tint, 22.dp)
                 // Scrolling down hands the screen back to the content: the labels
                 // fade and the bar closes up. Coming back up brings them out again.
                 if (collapse < 0.98f) {

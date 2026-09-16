@@ -39,8 +39,10 @@ enum class HIcon {
     SWAP,
     /** Following a coin. Outline while you are not, filled once you are. */
     STAR, STAR_FILLED,
-    /** The market: a line that has been going up. */
-    CHART,
+    /** The market: a line that has been going up, or one that has been going down. */
+    CHART, CHART_DOWN,
+    /** The agent: a small head with an antenna. Something that thinks, in a box you can see. */
+    AGENT,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
 }
@@ -259,6 +261,17 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.CHART -> {
                 path { moveTo(3f, 18f); lineTo(8.5f, 11.5f); lineTo(12.5f, 15f); lineTo(21f, 6f) }
                 path { moveTo(16f, 6f); lineTo(21f, 6f); lineTo(21f, 11f) }
+            }
+            HIcon.CHART_DOWN -> {
+                path { moveTo(3f, 6f); lineTo(8.5f, 12.5f); lineTo(12.5f, 9f); lineTo(21f, 18f) }
+                path { moveTo(16f, 18f); lineTo(21f, 18f); lineTo(21f, 13f) }
+            }
+            HIcon.AGENT -> {
+                path(close = true) { moveTo(7f, 8.5f); lineTo(17f, 8.5f); quadTo(19.5f, 8.5f, 19.5f, 11f); lineTo(19.5f, 17f); quadTo(19.5f, 19.5f, 17f, 19.5f); lineTo(7f, 19.5f); quadTo(4.5f, 19.5f, 4.5f, 17f); lineTo(4.5f, 11f); quadTo(4.5f, 8.5f, 7f, 8.5f) }
+                path { moveTo(12f, 8.5f); lineTo(12f, 5.2f) }
+                dot(12f, 4f, 1.4f)
+                dot(9.2f, 13.2f, 1.5f); dot(14.8f, 13.2f, 1.5f)
+                path { moveTo(9f, 16.6f); quadTo(12f, 18.2f, 15f, 16.6f) }
             }
             HIcon.GEM -> {
                 path(fill = true) { moveTo(12f, 2.5f); lineTo(21.5f, 12f); lineTo(12f, 21.5f); lineTo(2.5f, 12f); close() }

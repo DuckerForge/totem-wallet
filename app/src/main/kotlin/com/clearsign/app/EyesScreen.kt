@@ -319,7 +319,7 @@ internal fun EyesScreen(onClose: () -> Unit) {
                             Text(stringResource(R.string.eyes_thoughts).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
                             // The voice, said in words: on or off, and where it belongs, next to the lines it reads.
                             SmallChip(
-                                stringResource(if (voice) R.string.eyes_voice_on else R.string.eyes_voice_off), HIcon.PIGEON,
+                                stringResource(if (voice) R.string.eyes_voice_on else R.string.eyes_voice_off), HIcon.AGENT,
                                 tint = if (voice) Halo.mint else Halo.muted,
                             ) { voice = !voice; Settings.setEyesVoice(ctx, voice); Haptics.tick(ctx) }
                         }

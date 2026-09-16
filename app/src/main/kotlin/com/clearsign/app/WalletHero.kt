@@ -142,11 +142,15 @@ internal fun WalletHero(
                             Spacer(Modifier.height(Space.xs))
                             Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
                             view.defi.forEach { d -> DefiRow(d, currency) }
-                            // What the whole of it pays in a day, when anything can say.
+                            // What the whole of it pays, over a stretch long enough
+                            // to be worth printing. "About 0.00 a day" was true and
+                            // said nothing; at these sizes the month is the number a
+                            // person can actually picture.
                             val perDay = view.defi.mapNotNull { it.perDayFiat }.sum()
                             if (perDay > 0) {
                                 Text(
-                                    stringResource(R.string.hero_defi_day, fmtFiat(perDay, currency), fmtFiat(perDay * 30, currency)),
+                                    if (perDay >= 0.01) stringResource(R.string.hero_defi_day, fmtFiat(perDay, currency), fmtFiat(perDay * 30, currency))
+                                    else stringResource(R.string.hero_defi_month, fmtFiat(perDay * 30, currency), fmtFiat(perDay * 365, currency)),
                                     fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint, lineHeight = 15.sp,
                                 )
                             }
@@ -402,9 +406,17 @@ private fun DefiRow(d: DefiPosition, currency: String) {
         Column(horizontalAlignment = Alignment.End) {
             Text(d.fiat?.let { fmtFiat(it, currency) } ?: "…", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.ink)
             Text((if (Settings.guest.value) "••••" else fmtUi(d.ui)) + " " + d.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
-            d.perDayUi?.let { day ->
+            // What it pays, in money when we can and in coins otherwise. A line
+            // reading "+0.000002 SOL/day" is arithmetic, not information.
+            d.aprPct?.let { apr ->
+                val perDay = d.perDayFiat
+                val say = when {
+                    perDay != null && perDay >= 0.01 -> "+" + fmtFiat(perDay, currency) + stringResource(R.string.hero_per_day)
+                    perDay != null -> "+" + fmtFiat(perDay * 30, currency) + stringResource(R.string.hero_per_month)
+                    else -> "+" + fmtUi(d.perDayUi ?: 0.0) + " " + d.symbol + stringResource(R.string.hero_per_day)
+                }
                 Text(
-                    "+" + fmtUi(day) + " " + d.symbol + stringResource(R.string.hero_per_day) + d.aprPct?.let { String.format(java.util.Locale.ROOT, " · %.1f%%", it) }.orEmpty(),
+                    say + String.format(java.util.Locale.ROOT, " · %.1f%%", apr),
                     fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint,
                 )
             }

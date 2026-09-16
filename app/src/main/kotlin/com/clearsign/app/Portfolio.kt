@@ -140,7 +140,7 @@ object Portfolio {
             SolanaRpc.skrStake(rpc, owner)?.let { st ->
                 val skrUsd = quotes[SkrStake.SKR_MINT]?.usd ?: runCatching { Prices.quotes(listOf(SkrStake.SKR_MINT))[SkrStake.SKR_MINT]?.usd }.getOrNull()
                 defi += DefiPosition(
-                    DefiPosition.Kind.STAKE, "SKR", "Guardiani Seeker", "SKR", st.ui,
+                    DefiPosition.Kind.STAKE, "SKR", ctx?.getString(R.string.defi_guardians) ?: "Seeker Guardians", "SKR", st.ui,
                     skrUsd?.let { p -> fx?.let { p * it * st.ui } }, image = TokenSymbols.image(SkrStake.SKR_MINT), state = "active",
                     aprPct = ctx?.let { c -> runCatching { SkrStake.observedAprPct(c, st.sharePrice) }.getOrNull() },
                 )

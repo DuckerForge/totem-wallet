@@ -1510,7 +1510,10 @@
     <string name="sticker_written">Scritto. Toccalo per provare.</string>
     <string name="sticker_failed">Non scritto: %1$s</string>
     <string name="hero_per_day">/giorno</string>
-    <string name="hero_defi_day">La DeFi rende circa %1$s al giorno, %2$s al mese. Stima sui tassi di oggi.</string>
+        <string name="defi_guardians">Guardiani Seeker</string>
+    <string name="hero_per_month">/mese</string>
+    <string name="hero_defi_month">La DeFi rende circa %1$s al mese, %2$s all\'anno. Stima sui tassi di oggi.</string>
+<string name="hero_defi_day">La DeFi rende circa %1$s al giorno, %2$s al mese. Stima sui tassi di oggi.</string>
     <string name="proof_show">Mostra la prova</string>
     <string name="proof_title">Prova di pagamento</string>
     <string name="proof_sub">Fai leggere questo all\'altro telefono.</string>

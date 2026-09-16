@@ -96,6 +96,9 @@ class MainActivity : ComponentActivity() {
      * phone reads the request straight into the send form. It is only a read —
      * nothing is signed, and the ordinary receipt still has to be approved.
      */
+    /** The sticker writer borrows the radio; this is how it gives it back. */
+    internal fun resumeReader() = startReaderMode()
+
     private fun startReaderMode() {
         // Reading and pretending to be a tag are the same radio, and reader mode
         // wins: with it on, this phone polls for tags and emulates nothing. So

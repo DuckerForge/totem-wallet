@@ -29,6 +29,50 @@
   .truth { margin: 22px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
   footer { margin-top: 26px; color: var(--muted); font-size: 12px; text-align: center; }
   footer a { color: var(--mint); text-decoration: none; }
+
+  /* ---- the sky behind everything: the same stars as the door ---- */
+  body { position: relative; overflow-x: hidden; }
+  #sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  #sky i { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: #fff; opacity: .4; animation: tw 3.6s ease-in-out infinite; }
+  #sky i.b { width: 3px; height: 3px; box-shadow: 0 0 8px rgba(77,255,208,.8); background: var(--mint); }
+  @keyframes tw { 0%,100% { opacity: .12; transform: scale(1) } 50% { opacity: .9; transform: scale(1.6) } }
+  .neb { position: fixed; z-index: -1; width: 60vw; height: 60vw; border-radius: 50%; filter: blur(80px); opacity: .18; pointer-events: none; }
+  .neb.a { background: var(--mint); top: -20vw; left: -20vw; animation: drift 24s ease-in-out infinite alternate; }
+  .neb.b { background: var(--cyan); bottom: -25vw; right: -20vw; animation: drift 30s ease-in-out infinite alternate-reverse; }
+  @keyframes drift { from { transform: translate(0,0) } to { transform: translate(8vw, 6vw) } }
+  .hero h1 { background: linear-gradient(90deg, var(--ink), var(--mint) 55%, var(--ink)); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 6s linear infinite; }
+  @keyframes sheen { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+  /* ---- the phone: a Seeker with the app on its screen ---- */
+  .phone-wrap { display: flex; justify-content: center; margin: 26px 0 6px; perspective: 1200px; }
+  .phone { width: 250px; height: 520px; border-radius: 38px; background: #0b1218; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 0 0 6px #05080c, 0 30px 80px rgba(0,0,0,.6), 0 0 60px rgba(77,255,208,.18); position: relative; overflow: hidden; animation: hover 7s ease-in-out infinite; transform-style: preserve-3d; }
+  @keyframes hover { 0%,100% { transform: rotateY(-8deg) rotateX(4deg) translateY(0) } 50% { transform: rotateY(6deg) rotateX(-3deg) translateY(-8px) } }
+  .phone .cam { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 12px; height: 12px; border-radius: 50%; background: #05080c; border: 1px solid rgba(255,255,255,.15); }
+  .phone .scr { position: absolute; inset: 30px 14px 22px; border-radius: 22px; background: linear-gradient(180deg, #0d141a, #070b0f); padding: 14px 12px; font-size: 11px; color: var(--muted); overflow: hidden; }
+  .scr .top { display: flex; justify-content: space-between; align-items: center; font-size: 10px; }
+  .scr .chip { border: 1px solid var(--stroke); border-radius: 999px; padding: 2px 8px; font-size: 9px; }
+  .scr .lbl { margin-top: 26px; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; text-align: center; }
+  .scr .tot { text-align: center; font-size: 30px; font-weight: 700; color: var(--ink); margin-top: 4px; letter-spacing: -.02em; text-shadow: 0 0 24px rgba(77,255,208,.35); }
+  .scr .pill { margin: 8px auto 0; width: max-content; font-size: 9px; color: var(--mint); background: rgba(77,255,208,.12); border-radius: 999px; padding: 3px 9px; }
+  .scr .acts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 22px; }
+  .scr .acts i { display: block; height: 40px; border-radius: 50%; border: 1px solid var(--stroke); background: var(--card); position: relative; }
+  .scr .acts i::after { content: ""; position: absolute; inset: 14px; border-radius: 3px; background: var(--muted); opacity: .6; }
+  .scr .acts b { display: block; font-size: 8px; font-weight: 400; text-align: center; margin-top: 4px; color: var(--muted); }
+  .scr .rc { position: absolute; left: 12px; right: 12px; bottom: 14px; background: #05080b; border: 1px solid rgba(77,255,208,.35); border-radius: 12px; padding: 9px 10px; font-family: ui-monospace, Menlo, monospace; font-size: 9.5px; color: #c6d0d8; transform: translateY(140%); animation: rise 9s ease-in-out infinite; box-shadow: 0 -10px 40px rgba(0,0,0,.5); }
+  .scr .rc .r { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,.07); }
+  .scr .rc .neg { color: var(--red) } .scr .rc .pos { color: var(--mint) } .scr .rc .w { color: var(--amber) }
+  .scr .rc .hold { margin-top: 8px; height: 22px; border-radius: 999px; background: linear-gradient(90deg, var(--mint) 0%, var(--mint) var(--p, 0%), rgba(77,255,208,.15) var(--p, 0%)); color: #05080c; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; animation: fillup 9s ease-in-out infinite; }
+  @keyframes rise { 0%, 20% { transform: translateY(140%) } 32%, 82% { transform: translateY(0) } 94%, 100% { transform: translateY(140%) } }
+  @keyframes fillup { 0%, 45% { --p: 0% } 75%, 82% { --p: 100% } 100% { --p: 0% } }
+  @property --p { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
+  .scr .ring { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--mint); transform: translate(-50%,-50%) scale(1); opacity: 0; animation: ringout 9s ease-out infinite; }
+  @keyframes ringout { 0%, 80% { opacity: 0; transform: translate(-50%,-50%) scale(1) } 84% { opacity: .9 } 100% { opacity: 0; transform: translate(-50%,-50%) scale(28) } }
+  .phone .bar { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); width: 70px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.4); }
+
+  /* ---- cards: arrive as you scroll, glow when touched ---- */
+  .t, .ace { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease, border-color .25s, box-shadow .25s; }
+  .t.in, .ace.in { opacity: 1; transform: none; }
+  .t:hover, .ace:hover { border-color: rgba(77,255,208,.45); box-shadow: 0 0 30px rgba(77,255,208,.12); }
 </style>
 </head>
 <body>
@@ -41,6 +85,31 @@
     <p class="lede">Every signature is preceded by a receipt read off the real transaction bytes and simulated by the network. On top of that layer: an autonomous trading agent on a leash, MEV‑protected swaps, a bridge to 200 chains, NFC payments, and live data on what Seeker owners are buying.</p>
     <div class="btns">
       <a class="btn primary" href="mailto:infernaytb@gmail.com">Contact</a>
+    </div>
+  </div>
+
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="cam"></div>
+      <div class="scr">
+        <div class="top"><span>09:41</span><span class="chip">cHAH…VZjQ</span></div>
+        <div class="lbl">Total balance</div>
+        <div class="tot" id="tot">€ 0,00</div>
+        <div class="pill">+2,4 % today</div>
+        <div class="acts">
+          <span><i></i><b>Send</b></span><span><i></i><b>Receive</b></span><span><i></i><b>Swap</b></span><span><i></i><b>Scan</b></span>
+          <span><i></i><b>Scout</b></span><span><i></i><b>Bridge</b></span><span><i></i><b>Agent</b></span><span><i></i><b>More</b></span>
+        </div>
+        <div class="ring"></div>
+        <div class="rc">
+          <div class="r"><span>Out</span><span class="neg">−0,0377 SOL</span></div>
+          <div class="r"><span>In</span><span class="pos">+3.204,92 ALL</span></div>
+          <div class="r"><span>To</span><span>Jupiter Ultra · MEV</span></div>
+          <div class="r"><span>Risk</span><span class="w">new recipient</span></div>
+          <div class="hold">Hold to sign</div>
+        </div>
+      </div>
+      <div class="bar"></div>
     </div>
   </div>
 
@@ -75,5 +144,18 @@
   <p class="truth">English by default, Italian when the phone is. Free. The app earns on the swap fee, nothing else.</p>
   <footer><span>Came here from a payment link or a gift? Open that link again once the app is installed.</span><br><a href="https://github.com/DuckerForge">DuckerForge</a> · built for the Solana Mobile Seeker · 2026 · "Seeker Wallet" is a working name, not the final one</footer>
 </main>
+<div id="sky"></div><div class="neb a"></div><div class="neb b"></div>
+<script>
+  // Stars, three depths, a few in the accent.
+  const sky = document.getElementById('sky');
+  for (let i = 0; i < 90; i++) { const e = document.createElement('i'); if (i % 9 === 0) e.className = 'b'; e.style.left = Math.random()*100+'%'; e.style.top = Math.random()*100+'%'; e.style.animationDelay = (Math.random()*3.6)+'s'; e.style.opacity = (0.2+Math.random()*0.6); sky.appendChild(e); }
+  // Cards arrive as you scroll.
+  const io = new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting) { x.target.classList.add('in'); io.unobserve(x.target); } }), { threshold: .12 });
+  document.querySelectorAll('.t, .ace').forEach((el, i) => { el.style.transitionDelay = (i % 4) * 70 + 'ms'; io.observe(el); });
+  // The balance on the phone counts up, then breathes.
+  const tot = document.getElementById('tot'); const target = 1284.5; let t0 = null;
+  function count(ts) { if (!t0) t0 = ts; const k = Math.min(1, (ts - t0) / 1600); const v = target * (1 - Math.pow(1 - k, 3)); tot.textContent = '€ ' + v.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (k < 1) requestAnimationFrame(count); }
+  requestAnimationFrame(count);
+</script>
 </body>
 </html>

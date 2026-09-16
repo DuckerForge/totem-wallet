@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.clearsign.app
 
 import androidx.compose.animation.core.LinearEasing
@@ -8,6 +10,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -404,6 +409,41 @@ private fun mmss(seconds: Long): String {
 private fun thousands(v: Int): String =
     v.toString().reversed().chunked(3).joinToString(".").reversed()
 
+/**
+ * The three things the page holds besides the live feed.
+ *
+ * The live feed is not one of them on purpose: it is the reason to open Scout,
+ * so it sits above the bar and never hides behind a tap. What was three more
+ * screens of scrolling is now three words.
+ */
+private enum class ScoutTab { BUYING, HOLDING, WHALES }
+
+/**
+ * The switch, in the app's own language rather than Material's.
+ *
+ * Each word wears the colour of the card it opens, so the lit chip and the
+ * heading underneath it agree without anybody reading either. It paints its own
+ * ground because it sticks to the top of the list: without it the rows would
+ * show through while they slide past.
+ */
+@Composable
+private fun ScoutTabs(selected: ScoutTab, onPick: (ScoutTab) -> Unit) {
+    val ctx = LocalContext.current
+    Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 18.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModeChip(stringResource(R.string.crowd_tab_buying), selected == ScoutTab.BUYING, Halo.mint, Modifier.weight(1f)) {
+                Haptics.tick(ctx); onPick(ScoutTab.BUYING)
+            }
+            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.cyan, Modifier.weight(1f)) {
+                Haptics.tick(ctx); onPick(ScoutTab.HOLDING)
+            }
+            ModeChip(stringResource(R.string.crowd_tab_whales), selected == ScoutTab.WHALES, Halo.amber, Modifier.weight(1f)) {
+                Haptics.tick(ctx); onPick(ScoutTab.WHALES)
+            }
+        }
+    }
+}
+
 @Composable
 internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
@@ -432,40 +472,51 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
             kotlinx.coroutines.delay(150_000)
         }
     }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Halo.ground)
-            .verticalScroll(androidx.compose.foundation.rememberScrollState())
-            .padding(horizontal = 18.dp)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
+    // Which of the three the bar is showing. Kept across a rotation, because
+    // turning the phone is not a request to go back to the start.
+    var tab by rememberSaveable { mutableStateOf(ScoutTab.BUYING) }
+
+    // The horizontal inset moved off the list and onto each row: the bar that
+    // sticks to the top has to paint edge to edge, or the cards scrolling
+    // underneath it appear in the margins beside it.
+    val pad = Modifier.padding(horizontal = 18.dp)
+    LazyColumn(
+        Modifier.fillMaxSize().background(Halo.ground).statusBarsPadding().navigationBarsPadding(),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(38.dp).clip(rs(12)).background(Halo.cardSoft)
-                    .clickable { onBack() },
-                contentAlignment = Alignment.Center,
-            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp) }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(stringResource(R.string.crowd_sheet), style = HaloType.screen, color = Halo.ink)
-                Text(stringResource(R.string.crowd_page_sub), style = HaloType.small, color = Halo.muted)
+        item(key = "head") {
+            Row(pad, verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(38.dp).clip(rs(12)).background(Halo.cardSoft)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center,
+                ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp) }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(stringResource(R.string.crowd_sheet), style = HaloType.screen, color = Halo.ink)
+                    Text(stringResource(R.string.crowd_page_sub), style = HaloType.small, color = Halo.muted)
+                }
             }
         }
         // Who we are actually looking at, said once, at the top, before any chart.
         // "What the Seekers are buying" invites you to assume all of them, and the
         // truth is a tenth of them: the rest have been still for seven months.
-        WhoWeWatch(feed)
-        // The picture that is always there goes first. The crowd ranking needs three
-        // separate buyers to say anything at all, so on a quiet hour it is a card
-        // apologising, and a card that apologises does not belong at the top.
-        SeekerHoldingsCard()
-        CrowdFeed(feed, onBuy)
-        SeekerCard(feed) {}
-        SeekerWhalesCard()
-        Spacer(Modifier.height(24.dp))
+        item(key = "who") { Box(pad) { WhoWeWatch(feed) } }
+        // The reason to open this page goes first and stays whole. It used to be
+        // third, under a chart and under a card that apologises on a quiet hour.
+        item(key = "live") { Box(pad) { CrowdFeed(feed, onBuy = onBuy) } }
+        stickyHeader(key = "tabs") { ScoutTabs(tab) { tab = it } }
+        // Keyed on the tab, so switching builds the new section instead of
+        // pouring new data into the old one's remembered state.
+        item(key = tab.name) {
+            Box(pad) {
+                when (tab) {
+                    ScoutTab.BUYING -> SeekerCard(feed) {}
+                    ScoutTab.HOLDING -> SeekerHoldingsCard()
+                    ScoutTab.WHALES -> SeekerWhalesCard()
+                }
+            }
+        }
     }
 }

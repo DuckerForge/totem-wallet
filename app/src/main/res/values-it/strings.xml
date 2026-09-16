@@ -1234,7 +1234,13 @@
     <string name="crowd_page_sub">Cosa comprano e cosa tengono i Seeker attivi</string>
     <string name="hold_axis_up">%1$d valgono soldi: più in alto vuol dire che la quota di uno vale di più</string>
     <string name="hold_axis_down">↓ %1$d arrivate col telefono, valgono zero</string>
-    <string name="feed_title">In diretta dai Seeker</string>
+        <string name="crowd_tab_buying">Comprano</string>
+    <string name="crowd_tab_holding">Tengono</string>
+    <string name="crowd_tab_whales">Balene</string>
+    <string name="feed_show_all">Mostra tutto</string>
+    <string name="feed_show_less">Mostra meno</string>
+    <string name="feed_empty">Niente comprato nelle ultime ore. Appena uno di loro compra, arriva qui.</string>
+<string name="feed_title">In diretta dai Seeker</string>
     <string name="feed_line">%1$s ha comprato %2$s</string>
     <string name="feed_meta">%1$s SOL · %2$s</string>
     <string name="feed_buy">Compra</string>

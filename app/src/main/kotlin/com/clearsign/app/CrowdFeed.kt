@@ -1,5 +1,11 @@
 package com.clearsign.app
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,7 +58,7 @@ import kotlinx.coroutines.withContext
  * a "live" feed seven hours behind. One reader at the top, everybody reads it.
  */
 @Composable
-internal fun CrowdFeed(feed: SeekerFeed.Feed?, onBuy: (String) -> Unit) {
+internal fun CrowdFeed(feed: SeekerFeed.Feed?, compactRows: Int = 5, onBuy: (String) -> Unit) {
     val ctx = LocalContext.current
     var events by remember { mutableStateOf<List<CrowdBuy>>(emptyList()) }
 
@@ -71,8 +77,6 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, onBuy: (String) -> Unit) {
             }
         }
     }
-    if (events.isEmpty()) return
-
     // The ages tick on their own rather than waiting for new data. The page hands
     // this a fresh feed every minute, but an identical feed is an equal one and
     // recomposes nothing, so on a quiet stretch "1m" would sit there saying 1m.
@@ -84,6 +88,13 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, onBuy: (String) -> Unit) {
         }
     }
 
+    // Five rows, not twelve. This card sits at the top of Scout and the switch
+    // for the other three sections sits under it: at twelve rows the switch
+    // starts off the bottom of the screen, which is the problem this layout
+    // exists to solve. The rest is one tap away and nothing is lost.
+    var all by remember { mutableStateOf(false) }
+    val fresh = events.firstOrNull()?.let { now - it.at < 5 * 60_000L } == true
+
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -94,16 +105,47 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, onBuy: (String) -> Unit) {
                     fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                     color = Halo.cyan, modifier = Modifier.weight(1f),
                 )
+                // A purchase in the last five minutes: the dot breathes. It says
+                // "this is happening now" without spending a word on it.
+                if (fresh) LiveDot()
+            }
+            if (events.isEmpty()) {
+                // The card stays even with nothing in it. Vanishing read as broken,
+                // and "nobody has bought anything for a while" is itself a fact.
+                Text(stringResource(R.string.feed_empty), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 16.sp)
+                return@Column
             }
             // Each row slides in once, keyed on the purchase itself, so a new
             // buy landing at the top arrives rather than being suddenly there.
-            events.take(12).forEachIndexed { i, e -> Box(Modifier.staggeredEntrance(i, key = e.wallet + e.at)) { FeedRow(e, now, onBuy) } }
+            events.take(if (all) 12 else compactRows).forEachIndexed { i, e ->
+                Box(Modifier.staggeredEntrance(i, key = e.wallet + e.at)) { FeedRow(e, now, onBuy) }
+            }
+            if (events.size > compactRows) {
+                SmallChip(
+                    stringResource(if (all) R.string.feed_show_less else R.string.feed_show_all),
+                    if (all) null else HIcon.CHEVRON_DOWN,
+                    tint = Halo.muted,
+                ) { all = !all; Haptics.tick(ctx) }
+            }
             Text(
                 stringResource(R.string.feed_note) + " " + stringResource(R.string.feed_follow_note),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
             )
         }
     }
+}
+
+/** A dot that breathes while the crowd is moving. */
+@Composable
+private fun LiveDot() {
+    val t = rememberInfiniteTransition(label = "live")
+    val a by t.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Reverse),
+        label = "pulse",
+    )
+    Box(Modifier.size(7.dp).clip(rs(999)).background(Halo.cyan.copy(alpha = a)))
 }
 
 @Composable

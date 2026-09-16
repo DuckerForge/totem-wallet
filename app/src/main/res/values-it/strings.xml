@@ -1215,7 +1215,10 @@
     <string name="crowd_looking">Sto guardando…</string>
     <string name="theme_flow">Solana Flow</string>
     <string name="hold_title">Cosa tengono i %1$,d Seeker attivi</string>
-    <string name="hold_note">%1$d delle %2$d cose più diffuse valgono zero: sono arrivate col telefono. Campione di %3$d portafogli fra i seguiti, quelli con almeno 1 SOL.</string>
+    <string name="hold_staked_title">E metà di loro non dorme: il %1$s%% tiene SKR in staking</string>
+    <string name="hold_staked_body">Gli SKR in staking stanno dentro il programma dei Guardiani, non nel portafoglio, quindi nessun saldo li mostra. In media %1$s SKR a testa.</string>
+    <string name="hold_staked_body_usd">Gli SKR in staking stanno dentro il programma dei Guardiani, non nel portafoglio, quindi nessun saldo li mostra. In media %1$s SKR a testa, circa %2$s.</string>
+<string name="hold_note">%1$d delle %2$d cose più diffuse valgono zero: sono arrivate col telefono. Campione di %3$d portafogli fra i seguiti, quelli con almeno 1 SOL.</string>
     <string name="home_act_crowd">Scout</string>
     <string name="whales_title">Le balene Seeker</string>
     <string name="whales_count">%1$d portafogli</string>

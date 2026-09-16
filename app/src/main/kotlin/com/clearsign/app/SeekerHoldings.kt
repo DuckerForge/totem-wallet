@@ -61,20 +61,31 @@ import kotlin.math.sqrt
  */
 private class SeekerHolding(val symbol: String, val pct: Double, val usdPer: Double)
 
-private fun load(ctx: Context): Triple<List<SeekerHolding>, Int, Int> = runCatching {
+/** What the staking program holds for this crowd, which no wallet balance shows. */
+private class SkrStaked(val pct: Double, val avg: Double, val usdPer: Double?)
+
+private class Census(val rows: List<SeekerHolding>, val total: Int, val sample: Int, val staked: SkrStaked?)
+
+private fun load(ctx: Context): Census = runCatching {
     val o = JSONObject(ctx.assets.open("seeker_holdings.json").bufferedReader().use { it.readText() })
     val a = o.getJSONArray("rows")
     val rows = (0 until a.length()).map { i ->
         val r = a.getJSONObject(i)
         SeekerHolding(r.getString("s"), r.getDouble("p"), r.getDouble("u"))
     }
-    Triple(rows, o.optInt("total"), o.optInt("sample"))
-}.getOrElse { Triple(emptyList(), 0, 0) }
+    val st = o.optJSONObject("skrStaked")?.let {
+        SkrStaked(it.optDouble("pct"), it.optDouble("avg"), it.optDouble("usdPer").takeIf { u -> !u.isNaN() && u > 0 })
+    }
+    Census(rows, o.optInt("total"), o.optInt("sample"), st)
+}.getOrElse { Census(emptyList(), 0, 0, null) }
 
 @Composable
 internal fun SeekerHoldingsCard() {
     val ctx = LocalContext.current
-    val (rows, total, sample) = remember { load(ctx) }
+    val census = remember { load(ctx) }
+    val rows = census.rows
+    val total = census.total
+    val sample = census.sample
     if (rows.isEmpty()) return
     val free = rows.count { it.usdPer < 0.01 }
 
@@ -96,6 +107,26 @@ internal fun SeekerHoldingsCard() {
                 stringResource(R.string.hold_note, free, rows.size, sample),
                 fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
             )
+            // The half of this crowd that looks asleep. Their SKR are not in
+            // the wallet at all: they are inside the staking program, earning.
+            // A census that reads token accounts cannot see them, so it calls
+            // these people empty. They are not.
+            census.staked?.let { st ->
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Halo.stroke))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HaloIcon(HIcon.SHIELD_LOCK, Halo.cyan, 14.dp)
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        stringResource(R.string.hold_staked_title, fmtPct(st.pct)),
+                        fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.cyan,
+                    )
+                }
+                Text(
+                    st.usdPer?.let { u -> stringResource(R.string.hold_staked_body_usd, fmtInt(st.avg), fmtUsd(u)) }
+                        ?: stringResource(R.string.hold_staked_body, fmtInt(st.avg)),
+                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
+                )
+            }
         }
     }
 }
@@ -198,3 +229,7 @@ private fun HoldingsField(rows: List<SeekerHolding>) {
         }
     }
 }
+
+private fun fmtPct(v: Double) = java.text.DecimalFormat("#.#").format(v)
+private fun fmtInt(v: Double) = java.text.NumberFormat.getIntegerInstance().format(v)
+private fun fmtUsd(v: Double) = "$" + java.text.DecimalFormat("#,##0").format(v)

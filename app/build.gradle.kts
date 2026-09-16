@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.File
 
 plugins {
     id("com.android.application") version "8.10.0"
@@ -34,8 +35,8 @@ android {
         applicationId = "com.clearsign.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "1.0"
         buildConfigField("String", "HELIUS_RPC_URL", "\"$heliusRpcUrl\"")
         buildConfigField("String", "SCAN_RPC_URL", "\"$scanRpcUrl\"")
         buildConfigField("String", "CROWD_URL", "\"$crowdUrl\"")
@@ -44,9 +45,22 @@ android {
         buildConfigField("String", "JUP_REFERRAL", "\"$jupReferral\"")
     }
 
-    // Debug-key signing for release too, so a shrunken (R8) APK can be sideloaded on
-    // the Seeker without a keystore ceremony. Replace with a real key for the store.
-    signingConfigs { getByName("debug") }
+    // The store wants a key that stays the same for the life of the app: the
+    // first upload decides it, and every update has to match it. It lives
+    // outside the repository, named in local.properties, so it is never
+    // committed and never printed. Without those four lines release falls back
+    // to the debug key, which still sideloads onto the Seeker.
+    val storeFilePath = localProps.getProperty("clearsign.storeFile", "")
+    val hasRealKey = storeFilePath.isNotBlank() && File(storeFilePath).exists()
+    signingConfigs {
+        getByName("debug")
+        if (hasRealKey) create("release") {
+            storeFile = File(storeFilePath)
+            storePassword = localProps.getProperty("clearsign.storePassword", "")
+            keyAlias = localProps.getProperty("clearsign.keyAlias", "")
+            keyPassword = localProps.getProperty("clearsign.keyPassword", "")
+        }
+    }
 
     buildTypes {
         release {
@@ -54,7 +68,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasRealKey) "release" else "debug")
         }
     }
 

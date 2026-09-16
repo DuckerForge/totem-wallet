@@ -1215,7 +1215,10 @@
     <string name="crowd_looking">Looking…</string>
     <string name="theme_flow">Solana Flow</string>
     <string name="hold_title">What the %1$,d active Seekers hold</string>
-    <string name="hold_note">%1$d of the %2$d most widely held things are worth nothing: they came with the phone. Sample of %3$d of the followed wallets, the ones holding at least 1 SOL.</string>
+    <string name="hold_staked_title">And half of them are not asleep: %1$s%% keep SKR staked</string>
+    <string name="hold_staked_body">Staked SKR sit inside the Guardians\' program, not in the wallet, so no balance shows them. On average %1$s SKR each.</string>
+    <string name="hold_staked_body_usd">Staked SKR sit inside the Guardians\' program, not in the wallet, so no balance shows them. On average %1$s SKR each, about %2$s.</string>
+<string name="hold_note">%1$d of the %2$d most widely held things are worth nothing: they came with the phone. Sample of %3$d of the followed wallets, the ones holding at least 1 SOL.</string>
     <string name="home_act_crowd">Scout</string>
     <string name="whales_title">Seeker whales</string>
     <string name="whales_count">%1$d wallets</string>

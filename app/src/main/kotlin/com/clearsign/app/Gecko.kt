@@ -67,18 +67,18 @@ object Gecko {
      * shorter than the candle itself on every span we draw.
      */
     private const val FRESH_MS = 5 * 60_000L
-    private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Double>>>()
+    private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Candle>>>()
     private val poolCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
 
-    /** Closes for [mint] on [span], from memory when they are fresh enough. */
-    fun series(mint: String, span: Span): List<Double> {
+    /** Candles for [mint] on [span], from memory when they are fresh enough. */
+    fun series(mint: String, span: Span): List<Candle> {
         val key = "$mint|${span.name}"
         val now = System.currentTimeMillis()
         seriesCache[key]?.let { (at, v) -> if (now - at < FRESH_MS) return v }
         val pool = poolCache[mint]?.takeIf { now - it.first < 30 * 60_000L }?.second
             ?: topPool(mint)?.also { poolCache[mint] = now to it }
             ?: return emptyList()
-        val v = closes(pool, span)
+        val v = candles(pool, span)
         // An empty answer is not cached: the pool may simply be a minute too young,
         // and a coin bought right now is exactly the one somebody wants to see.
         if (v.isNotEmpty()) seriesCache[key] = now to v
@@ -104,15 +104,29 @@ object Gecko {
      * the API is unreachable — and an empty chart is drawn as nothing at all,
      * never as a flat line, which would read as a price that did not move.
      */
-    fun closes(pool: String, span: Span): List<Double> {
+    fun closes(pool: String, span: Span): List<Double> = candles(pool, span).map { it.close }
+
+    /**
+     * One candle, with the hour it belongs to.
+     *
+     * The timestamp used to be thrown away, and it is the thing that turns a
+     * price line into a story: knowing *when* somebody bought puts a mark on the
+     * line at the moment they did it. The price under that mark is read off the
+     * chart, never off a claim about what they paid, which nobody published.
+     */
+    data class Candle(val at: Long, val close: Double)
+
+    fun candles(pool: String, span: Span): List<Candle> {
         val url = "$BASE/pools/$pool/ohlcv/${span.path}?aggregate=${span.aggregate}&limit=${span.limit}"
         val list = get(url)?.optJSONObject("data")?.optJSONObject("attributes")
             ?.optJSONArray("ohlcv_list") ?: return emptyList()
-        val out = ArrayList<Double>(list.length())
+        val out = ArrayList<Candle>(list.length())
         for (i in 0 until list.length()) {
             // [timestamp, open, high, low, close, volume]
-            val c = list.optJSONArray(i)?.optDouble(4) ?: continue
-            if (!c.isNaN() && c > 0) out += c
+            val row = list.optJSONArray(i) ?: continue
+            val c = row.optDouble(4)
+            val t = row.optLong(0)
+            if (!c.isNaN() && c > 0 && t > 0) out += Candle(t * 1000L, c)
         }
         // The API answers newest first; a chart reads left to right.
         return out.asReversed()

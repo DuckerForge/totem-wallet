@@ -49,15 +49,18 @@ import kotlinx.coroutines.withContext
 internal fun FeedBuyPanel(
     mint: String,
     symbol: String,
-    solSpent: Double,
-    sell: Boolean,
+    /** Every move this wallet made on this coin inside the window, oldest first. */
+    moves: List<com.clearsign.core.CrowdBuy>,
     owner: String?,
     signer: SeedVaultSigner?,
     onDone: () -> Unit,
 ) {
+    val last = moves.lastOrNull() ?: return
+    val sell = last.sell
+    val solSpent = last.solSpent
     val ctx = LocalContext.current
     var px by remember(mint) { mutableStateOf<Prices.Px?>(null) }
-    var series by remember(mint) { mutableStateOf<List<Double>>(emptyList()) }
+    var series by remember(mint) { mutableStateOf<List<Gecko.Candle>>(emptyList()) }
     var decimals by remember(mint) { mutableStateOf<Int?>(null) }
     var balance by remember(owner) { mutableStateOf<Long?>(null) }
 
@@ -96,11 +99,38 @@ internal fun FeedBuyPanel(
             }
         }
 
-        // Two days of hourly closes. Drawn as nothing when the pool is too young,
-        // never as a flat line, which would read as a price that did not move.
+        // Two days of hourly closes, with this wallet's moves marked on them.
+        //
+        // This is the whole point of the panel. A row saying "somebody bought
+        // BONK" is a name and a coin; the same row with a ring on the line where
+        // they went in, and the line's shape since, is a thing you can have an
+        // opinion about. Drawn as nothing when the pool is too young, never as a
+        // flat line, which would read as a price that did not move.
         if (series.size > 2) {
-            Box(Modifier.fillMaxWidth().height(58.dp)) {
-                Spark(series, if ((px?.change24h ?: 0.0) >= 0) Halo.mint else Halo.red)
+            val from = series.first().at
+            val to = series.last().at
+            val span = (to - from).coerceAtLeast(1L).toFloat()
+            val marks = moves
+                .filter { it.at in from..to }
+                .map { SparkMark(((it.at - from) / span).coerceIn(0f, 1f), it.sell) }
+            Box(Modifier.fillMaxWidth().height(if (marks.isEmpty()) 58.dp else 72.dp)) {
+                Spark(series.map { it.close }, if ((px?.change24h ?: 0.0) >= 0) Halo.mint else Halo.red, marks = marks)
+            }
+            // What the price has done since they went in. Read off the chart, so
+            // it is the coin's move over that stretch and not a claim about the
+            // money they made, which nobody can see from here.
+            moves.firstOrNull { !it.sell && it.at in from..to }?.let { entry ->
+                val i = (((entry.at - from) / span) * (series.size - 1)).toInt().coerceIn(0, series.lastIndex)
+                val then = series[i].close
+                val nowPx = series.last().close
+                if (then > 0) {
+                    val move = (nowPx - then) / then * 100
+                    Text(
+                        stringResource(R.string.feed_since, String.format(java.util.Locale.ROOT, "%+.1f%%", move), ago(entry.at)),
+                        style = HaloType.small, lineHeight = 16.sp,
+                        color = if (move >= 0) Halo.mint else Halo.red,
+                    )
+                }
             }
         }
 
@@ -270,5 +300,15 @@ private fun ReceiptLine(label: String, value: String, tint: androidx.compose.ui.
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f))
         Text(value, fontFamily = Mono, fontSize = 12.sp, color = tint, style = Tabular)
+    }
+}
+
+/** "3h ago", short, for the line under the chart. */
+private fun ago(at: Long): String {
+    val m = ((System.currentTimeMillis() - at) / 60_000L).coerceAtLeast(0)
+    return when {
+        m < 60 -> m.toString() + "m"
+        m < 1440 -> (m / 60).toString() + "h"
+        else -> (m / 1440).toString() + "d"
     }
 }

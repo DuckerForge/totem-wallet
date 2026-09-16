@@ -119,9 +119,24 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
     }
 }
 
+/**
+ * A moment on the line: somebody was in or out of this coin right here.
+ *
+ * [at] is a fraction of the chart's width, zero at the oldest candle and one at
+ * the newest, so the mark lands at the time it happened. The price under it is
+ * whatever the line is doing there. Nobody publishes the price a wallet
+ * actually paid, so nothing here claims to know it.
+ */
+internal class SparkMark(val at: Float, val sell: Boolean)
+
 /** The line, with the ground under it shaded so the direction reads at a glance. */
 @Composable
-internal fun Spark(values: List<Double>, tint: Color, targets: List<ChartTarget> = emptyList()) {
+internal fun Spark(
+    values: List<Double>,
+    tint: Color,
+    targets: List<ChartTarget> = emptyList(),
+    marks: List<SparkMark> = emptyList(),
+) {
     // The scale stretches to fit the targets, so a line at +30% is on the
     // picture and not off the top of it. Capped at four times the range of the
     // prices themselves: a target at +300% would flatten the whole story.
@@ -178,6 +193,19 @@ internal fun Spark(values: List<Double>, tint: Color, targets: List<ChartTarget>
                 androidx.compose.ui.geometry.CornerRadius(4f * density),
             )
             drawText(lay, topLeft = Offset(6f * density, ty))
+        }
+
+        // Where somebody was in or out. A ring on the line rather than a dot,
+        // so it reads as a moment on the price and not as a data point of its
+        // own, with a faint stem down to the floor to say "at this time".
+        marks.forEach { m ->
+            val x = (size.width * m.at).coerceIn(0f, size.width)
+            val idx = ((n - 1) * m.at).toInt().coerceIn(0, n - 1)
+            val my = y(values[idx])
+            val c = if (m.sell) Halo.red else Halo.mint
+            drawLine(c.copy(alpha = 0.28f), Offset(x, my), Offset(x, size.height), strokeWidth = 1.2f * density)
+            drawCircle(Halo.ground, 5.5f * density, Offset(x, my))
+            drawCircle(c, 5.5f * density, Offset(x, my), style = Stroke(width = 2f * density))
         }
     }
 }

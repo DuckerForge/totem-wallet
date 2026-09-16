@@ -1,5 +1,7 @@
 package com.clearsign.app
 
+import android.content.Context
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -57,26 +59,37 @@ import kotlinx.coroutines.withContext
  * whatever was last written to disk, which on a phone opened in the morning meant
  * a "live" feed seven hours behind. One reader at the top, everybody reads it.
  */
-@Composable
-internal fun CrowdFeed(feed: SeekerFeed.Feed?, compactRows: Int = 5, onBuy: (String) -> Unit) {
-    val ctx = LocalContext.current
-    var events by remember { mutableStateOf<List<CrowdBuy>>(emptyList()) }
-
-    LaunchedEffect(feed) {
-        withContext(Dispatchers.IO) {
-            // Both sources, not one or the other. The published feed is the long
-            // memory; anything this phone caught itself while the feed was still
-            // filling up is just as real. Same purchase seen twice is one line.
-            val got = (feed?.events.orEmpty() + SeekerScan.events(ctx))
-                .distinctBy { Triple(it.wallet, it.mint, it.at) }
-                .sortedByDescending { it.at }
-            // Same reason as the feed: an address is not a name.
-            runCatching { JupiterTokens.warm(got.map { it.mint }) }
-            events = got.map { e ->
-                e.copy(symbol = JupiterTokens.cached(e.mint)?.symbol ?: e.symbol)
-            }
-        }
+/**
+ * The two sources merged, read off the main thread.
+ *
+ * This used to live inside the card. Inside a lazy list that was a trap: the
+ * card is thrown away when it scrolls past the top, so scrolling back re-ran
+ * the whole thing, network warm included. The page reads it once now and hands
+ * the answer down.
+ */
+internal suspend fun crowdEvents(ctx: Context, feed: SeekerFeed.Feed?): List<CrowdBuy> =
+    withContext(Dispatchers.IO) {
+        // Both sources, not one or the other. The published feed is the long
+        // memory; anything this phone caught itself while the feed was still
+        // filling up is just as real. Same purchase seen twice is one line.
+        val got = (feed?.events.orEmpty() + SeekerScan.events(ctx))
+            .distinctBy { Triple(it.wallet, it.mint, it.at) }
+            .sortedByDescending { it.at }
+        // Same reason as the feed: an address is not a name.
+        runCatching { JupiterTokens.warm(got.map { it.mint }) }
+        got.map { e -> e.copy(symbol = JupiterTokens.cached(e.mint)?.symbol ?: e.symbol) }
     }
+
+@Composable
+internal fun CrowdFeed(
+    events: List<CrowdBuy>?,
+    open: Boolean,
+    onToggle: () -> Unit,
+    played: MutableSet<String>,
+    compactRows: Int = 4,
+    onBuy: (String) -> Unit,
+) {
+    val ctx = LocalContext.current
     // The ages tick on their own rather than waiting for new data. The page hands
     // this a fresh feed every minute, but an identical feed is an equal one and
     // recomposes nothing, so on a quiet stretch "1m" would sit there saying 1m.
@@ -88,12 +101,12 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, compactRows: Int = 5, onBuy: (Str
         }
     }
 
-    // Five rows, not twelve. This card sits at the top of Scout and the switch
+    // Four rows, not twelve. This card sits at the top of Scout and the switch
     // for the other three sections sits under it: at twelve rows the switch
     // starts off the bottom of the screen, which is the problem this layout
     // exists to solve. The rest is one tap away and nothing is lost.
-    var all by remember { mutableStateOf(false) }
-    val fresh = events.firstOrNull()?.let { now - it.at < 5 * 60_000L } == true
+    val rows = events.orEmpty()
+    val fresh = rows.firstOrNull()?.let { now - it.at < 5 * 60_000L } == true
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -109,25 +122,37 @@ internal fun CrowdFeed(feed: SeekerFeed.Feed?, compactRows: Int = 5, onBuy: (Str
                 // "this is happening now" without spending a word on it.
                 if (fresh) LiveDot()
             }
-            if (events.isEmpty()) {
-                // The card stays even with nothing in it. Vanishing read as broken,
-                // and "nobody has bought anything for a while" is itself a fact.
+            // The card stays whatever happens. Vanishing read as broken, and it
+            // moved the switch bar under the reader's thumb. Waiting and quiet
+            // are different facts, so they get different words.
+            if (events == null) {
+                Text(stringResource(R.string.feed_waiting), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 16.sp)
+                return@Column
+            }
+            if (rows.isEmpty()) {
                 Text(stringResource(R.string.feed_empty), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 16.sp)
                 return@Column
             }
-            // Each row slides in once, keyed on the purchase itself, so a new
-            // buy landing at the top arrives rather than being suddenly there.
-            events.take(if (all) 12 else compactRows).forEachIndexed { i, e ->
-                Box(Modifier.staggeredEntrance(i, key = e.wallet + e.at)) { FeedRow(e, now, onBuy) }
+            // Each row slides in once and once only. The entrance is keyed on the
+            // purchase, and the page remembers which ones have already played, so
+            // scrolling the card away and back does not replay the cascade. A buy
+            // that lands while you are looking still slides in on its own.
+            rows.take(if (open) 12 else compactRows).forEachIndexed { i, e ->
+                val id = "feed:" + e.wallet + e.at
+                val first = remember(id) { played.add(id) }
+                Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) { FeedRow(e, now, onBuy) }
             }
-            if (events.size > compactRows) {
+            if (rows.size > compactRows) {
                 SmallChip(
-                    stringResource(if (all) R.string.feed_show_less else R.string.feed_show_all),
-                    if (all) null else HIcon.CHEVRON_DOWN,
+                    if (open) stringResource(R.string.feed_show_less)
+                    else stringResource(R.string.feed_show_more, minOf(12, rows.size) - compactRows),
+                    if (open) null else HIcon.CHEVRON_DOWN,
                     tint = Halo.muted,
-                ) { all = !all; Haptics.tick(ctx) }
+                ) { onToggle(); Haptics.tick(ctx) }
             }
-            Text(
+            // Four lines of explanation nobody rereads, kept behind the toggle so
+            // the switch bar stays above the fold.
+            if (open) Text(
                 stringResource(R.string.feed_note) + " " + stringResource(R.string.feed_follow_note),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
             )

@@ -1275,7 +1275,8 @@
     <string name="who_active">portafogli attivi seguiti</string>
     <string name="who_total">su %1$s Seeker sulla catena</string>
     <string name="who_focus">Sono i più attivi del censimento. Insieme tengono 101.821 SOL.</string>
-    <string name="feed_meta2">%1$s · ha speso %2$s SOL · %3$s</string>
+        <string name="feed_meta_sell">%1$s · ha tirato fuori %2$s SOL · %3$s</string>
+<string name="feed_meta2">%1$s · ha speso %2$s SOL · %3$s</string>
     <string name="span_minutes">5 ore</string>
     <string name="span_hours">2 giorni</string>
     <string name="span_days">3 mesi</string>

@@ -1275,7 +1275,8 @@
     <string name="who_active">active wallets we follow</string>
     <string name="who_total">out of %1$s Seekers on chain</string>
     <string name="who_focus">The most active of the census. Between them they hold 101,821 SOL.</string>
-    <string name="feed_meta2">%1$s · spent %2$s SOL · %3$s</string>
+        <string name="feed_meta_sell">%1$s · took out %2$s SOL · %3$s</string>
+<string name="feed_meta2">%1$s · spent %2$s SOL · %3$s</string>
     <string name="span_minutes">5h</string>
     <string name="span_hours">2d</string>
     <string name="span_days">3mo</string>

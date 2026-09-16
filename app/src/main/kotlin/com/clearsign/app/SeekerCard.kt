@@ -410,7 +410,7 @@ internal fun NothingHere(text: String) {
     Text(text, style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
 }
 
-private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES }
+private enum class ScoutTab { LIVE, HOLDING, WHALES }
 
 /**
  * The switch, in the app's own language rather than Material's.
@@ -424,14 +424,11 @@ private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES }
 private fun ScoutTabs(selected: ScoutTab, onPick: (ScoutTab) -> Unit) {
     val ctx = LocalContext.current
     Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 18.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             ModeChip(stringResource(R.string.crowd_tab_live), selected == ScoutTab.LIVE, Halo.cyan, Modifier.weight(1f)) {
                 Haptics.tick(ctx); onPick(ScoutTab.LIVE)
             }
-            ModeChip(stringResource(R.string.crowd_tab_buying), selected == ScoutTab.BUYING, Halo.mint, Modifier.weight(1f)) {
-                Haptics.tick(ctx); onPick(ScoutTab.BUYING)
-            }
-            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.mint, Modifier.weight(1.15f)) {
+            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.mint, Modifier.weight(1f)) {
                 Haptics.tick(ctx); onPick(ScoutTab.HOLDING)
             }
             ModeChip(stringResource(R.string.crowd_tab_whales), selected == ScoutTab.WHALES, Halo.amber, Modifier.weight(1f)) {
@@ -518,8 +515,15 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
         ) {
             Box(pad) {
                 when (tab) {
-                    ScoutTab.LIVE -> CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy)
-                    ScoutTab.BUYING -> SeekerCard(feed) {}
+                    // The ranking rides on top of the stream rather than living in
+                    // a tab of its own. They answer the same question at two
+                    // speeds, what is being bought right now and what has been
+                    // bought all day, and on separate tabs each looked thin while
+                    // the other left half the screen empty.
+                    ScoutTab.LIVE -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SeekerCard(feed) {}
+                        CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy)
+                    }
                     ScoutTab.HOLDING -> SeekerHoldingsCard(animate = remember { played.add("census") })
                     ScoutTab.WHALES -> SeekerWhalesCard()
                 }

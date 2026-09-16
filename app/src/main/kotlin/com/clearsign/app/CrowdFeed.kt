@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -105,32 +106,35 @@ internal fun CrowdFeed(
         }
     }
 
-    // Four rows, not twelve. This card sits at the top of Scout and the switch
-    // for the other three sections sits under it: at twelve rows the switch
-    // starts off the bottom of the screen, which is the problem this layout
-    // exists to solve. The rest is one tap away and nothing is lost.
-    val rows = events.orEmpty()
-    val fresh = rows.firstOrNull()?.let { now - it.at < 5 * 60_000L } == true
+    // The same wallet round-tripping the same coin is one line, not four.
+    //
+    // A bot that buys and sells USDe every few minutes filled the whole screen
+    // with itself: four rows, one wallet, one coin, the same five SOL going back
+    // and forth. What a reader wants from that is "this wallet is churning this
+    // coin", once. So the newest move per wallet and coin survives and the rest
+    // fold into it, with a count when there were several.
+    val rows = remember(events) {
+        events.orEmpty()
+            .groupBy { it.wallet to it.mint }
+            .values
+            .map { group -> group.maxByOrNull { it.at }!! to group.size }
+            .sortedByDescending { it.first.at }
+    }
+    val fresh = rows.firstOrNull()?.let { now - it.first.at < 5 * 60_000L } == true
     // One row open at a time. Two open rows is an accordion, and it also means two
     // quotes running against Jupiter for coins nobody is looking at any more.
     var openRow by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(openMint) { openMint?.let { openRow = it } }
 
-    GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HaloIcon(HIcon.MEGAPHONE, Halo.cyan, 16.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.feed_title),
-                    fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                    color = Halo.cyan, modifier = Modifier.weight(1f),
-                )
-                // A purchase in the last five minutes: the dot breathes. It says
-                // "this is happening now" without spending a word on it.
-                if (fresh) LiveDot()
-            }
-            // The card stays whatever happens. Vanishing read as broken, and it
+    // No card around it and no title above it.
+    //
+    // Both were right when this was one panel among four on a scrolling page.
+    // As its own tab the frame is a box drawn around the whole screen and the
+    // title repeats the word already lit in the bar above it, while the rows
+    // themselves were squeezed into a third of the height.
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        run {
+            // The list says something whatever happens. Vanishing read as broken, and it
             // moved the switch bar under the reader's thumb. Waiting and quiet
             // are different facts, so they get different words.
             if (events == null) {
@@ -145,13 +149,13 @@ internal fun CrowdFeed(
             // purchase, and the page remembers which ones have already played, so
             // scrolling the card away and back does not replay the cascade. A buy
             // that lands while you are looking still slides in on its own.
-            rows.take(if (open) 12 else compactRows).forEachIndexed { i, e ->
+            rows.forEachIndexed { i, (e, times) ->
                 val id = "feed:" + e.wallet + e.at
                 val first = remember(id) { played.add(id) }
                 val mine = openRow == e.mint
                 Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FeedRow(e, now, mine) { openRow = if (mine) null else e.mint }
+                        FeedRow(e, times, now, mine) { openRow = if (mine) null else e.mint }
                         // The terminal, under the row that made you want it. Nobody
                         // leaves the feed to trade any more.
                         if (mine) {
@@ -160,17 +164,8 @@ internal fun CrowdFeed(
                     }
                 }
             }
-            if (rows.size > compactRows) {
-                SmallChip(
-                    if (open) stringResource(R.string.feed_show_less)
-                    else stringResource(R.string.feed_show_more, minOf(12, rows.size) - compactRows),
-                    if (open) null else HIcon.CHEVRON_DOWN,
-                    tint = Halo.muted,
-                ) { onToggle(); Haptics.tick(ctx) }
-            }
-            // Four lines of explanation nobody rereads, kept behind the toggle so
-            // the switch bar stays above the fold.
-            if (open) Text(
+            Spacer(Modifier.height(2.dp))
+            Text(
                 stringResource(R.string.feed_note) + " " + stringResource(R.string.feed_star_note),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
             )
@@ -192,7 +187,7 @@ private fun LiveDot() {
 }
 
 @Composable
-private fun FeedRow(e: CrowdBuy, now: Long, open: Boolean, onOpen: () -> Unit) {
+private fun FeedRow(e: CrowdBuy, times: Int, now: Long, open: Boolean, onOpen: () -> Unit) {
     val whale = e.tier == SeekerTier.WHALE
     // A sale reads red whoever made it: the size of the wallet matters less than
     // the direction when somebody is on the way out.
@@ -239,6 +234,7 @@ private fun FeedRow(e: CrowdBuy, now: Long, open: Boolean, onOpen: () -> Unit) {
             Text(
                 stringResource(if (e.sell) R.string.feed_line_sell else R.string.feed_line, name, e.symbol),
                 fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, lineHeight = 17.sp,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
             Text(
                 stringResource(
@@ -250,7 +246,14 @@ private fun FeedRow(e: CrowdBuy, now: Long, open: Boolean, onOpen: () -> Unit) {
                 ),
                 fontFamily = Mono, fontSize = 10.5.sp,
                 color = if (e.sell) Halo.red.copy(alpha = 0.8f) else if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted,
-                style = Tabular,
+                style = Tabular, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            // Said once, quietly: this wallet has been in and out of this coin
+            // several times in the window. That is a fact about the wallet, and
+            // usually the most useful one on the row.
+            if (times > 1) Text(
+                stringResource(R.string.feed_churn, times),
+                fontFamily = Inter, fontSize = 10.5.sp, color = Halo.amber, maxLines = 1,
             )
         }
         Spacer(Modifier.width(6.dp))

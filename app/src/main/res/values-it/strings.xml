@@ -1265,6 +1265,13 @@
     <string name="feed_star_note">La stella segue un portafoglio. Con gli avvisi accesi il telefono ti dice quando compra. Con una paghetta aperta l\'agente valuta anche quello che compra, dai soliti cancelli.</string>
     <string name="folw_title">Dimmi quando comprano</string>
     <string name="folw_sub">Un portafoglio che segui compra e il telefono te lo dice. Controlla ogni quindici minuti. Funziona anche senza agente.</string>
+    <string name="feed_churn">dentro e fuori %1$d volte in questa finestra</string>
+    <string name="feed_pick">Quanto? Hai %1$s SOL.</string>
+    <string name="feed_out">Esce</string>
+    <string name="feed_in">Entra</string>
+    <string name="feed_fee">Commissione</string>
+    <string name="feed_risk">Rischi</string>
+    <string name="feed_risk_none">nessuno trovato</string>
 <string name="feed_title">In diretta dai Seeker</string>
     <string name="feed_line">%1$s ha comprato %2$s</string>
     <string name="feed_meta">%1$s SOL · %2$s</string>

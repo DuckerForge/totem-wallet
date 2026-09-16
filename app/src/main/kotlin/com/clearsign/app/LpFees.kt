@@ -33,14 +33,19 @@ import java.nio.ByteOrder
 object LpFees {
     const val ORCA_PROGRAM = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
     const val RAY_PROGRAM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+    const val METEORA_PROGRAM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 
-    /** Orca `Position`, 216 bytes. Raydium `PersonalPositionState`, 281. */
+    /** Orca `Position`, 216 bytes. Raydium `PersonalPositionState`, 281. Meteora `PositionV2`, 8120. */
     const val ORCA_POSITION_SIZE = 216
     const val RAY_POSITION_SIZE = 281
+    const val METEORA_POSITION_SIZE = 8120
+    /** `PositionV2.owner`, the field a getProgramAccounts filter matches on. */
+    const val METEORA_OWNER_OFFSET = 40
 
     enum class Venue(val label: String, val site: String) {
         ORCA("Orca", "https://www.orca.so/portfolio"),
         RAYDIUM("Raydium", "https://raydium.io/portfolio"),
+        METEORA("Meteora", "https://app.meteora.ag/portfolio"),
     }
 
     /** One position with something owed in it. Amounts are raw units of the pool's two mints. */
@@ -84,6 +89,32 @@ object LpFees {
         if (a <= 0L && bb <= 0L) return null
         return Owed(Venue.RAYDIUM, address, base58(b, 41), u128(b, 81), a, bb)
     }
+
+    /**
+     * Meteora `PositionV2`: pair at 8, owner at 40, then seventy bins of fee
+     * accounting from 4552, forty-eight bytes each, with the two pending
+     * amounts at plus thirty-two and plus forty. Unlike the other two this
+     * account names its owner, so it is found by a filter and not by deriving
+     * anything from an NFT.
+     */
+    fun decodeMeteora(address: String, b: ByteArray): Owed? {
+        if (b.size < METEORA_POSITION_SIZE) return null
+        var x = 0L
+        var y = 0L
+        var shares = BigInteger.ZERO
+        for (i in 0 until 70) {
+            val at = 4552 + i * 48
+            x += u64(b, at + 32)
+            y += u64(b, at + 40)
+            shares = shares.add(u128(b, 72 + i * 16))
+        }
+        if (x <= 0L && y <= 0L) return null
+        return Owed(Venue.METEORA, address, base58(b, 8), shares, x, y)
+    }
+
+    /** Meteora `LbPair`: mint X at 88, mint Y at 120. Decimals are not in the account. */
+    fun poolMeteora(b: ByteArray): Pool? =
+        if (b.size < 152) null else Pool(base58(b, 88), base58(b, 120), null, null)
 
     /** Orca `Whirlpool`: mint A at 101, mint B at 181. Decimals are not in the account. */
     fun poolOrca(b: ByteArray): Pool? =
@@ -138,30 +169,38 @@ object LpFees {
      * which is the common case, and it costs one getMultipleAccounts to learn.
      */
     fun of(rpcUrl: String, owner: String): List<Found> {
-        val accounts = runCatching { SolanaRpc.tokenAccountsOf(rpcUrl, owner) }.getOrNull() ?: return emptyList()
+        val accounts = runCatching { SolanaRpc.tokenAccountsOf(rpcUrl, owner) }.getOrNull().orEmpty()
         val mints = candidateMints(accounts)
-        if (mints.isEmpty()) return emptyList()
 
         val wanted = HashMap<String, Venue>()
         mints.forEach { m ->
             positionOf(Venue.ORCA, m)?.let { wanted[it] = Venue.ORCA }
             positionOf(Venue.RAYDIUM, m)?.let { wanted[it] = Venue.RAYDIUM }
         }
-        val raw = runCatching { SolanaRpc.accountsBytes(rpcUrl, wanted.keys.toList()) }.getOrNull() ?: return emptyList()
+        val raw = if (wanted.isEmpty()) emptyMap() else runCatching { SolanaRpc.accountsBytes(rpcUrl, wanted.keys.toList()) }.getOrNull().orEmpty()
 
         val owed = raw.mapNotNull { (addr, bytes) ->
             when (wanted[addr]) {
                 Venue.ORCA -> decodeOrca(addr, bytes)
                 Venue.RAYDIUM -> decodeRaydium(addr, bytes)
-                null -> null
+                else -> null
             }
-        }
+        } + runCatching {
+            SolanaRpc.programAccountsSized(rpcUrl, METEORA_PROGRAM, METEORA_POSITION_SIZE, METEORA_OWNER_OFFSET, owner)
+                .mapNotNull { (addr, bytes) -> decodeMeteora(addr, bytes) }
+        }.getOrDefault(emptyList())
         if (owed.isEmpty()) return emptyList()
 
         val poolBytes = runCatching { SolanaRpc.accountsBytes(rpcUrl, owed.map { it.pool }) }.getOrNull() ?: emptyMap()
         val pools = owed.associate { o ->
             val b = poolBytes[o.pool]
-            o.pool to (b?.let { if (o.venue == Venue.ORCA) poolOrca(it) else poolRaydium(it) })
+            o.pool to b?.let {
+                when (o.venue) {
+                    Venue.ORCA -> poolOrca(it)
+                    Venue.RAYDIUM -> poolRaydium(it)
+                    Venue.METEORA -> poolMeteora(it)
+                }
+            }
         }
 
         val coins = pools.values.filterNotNull().flatMap { listOf(it.mintA, it.mintB) }.distinct()

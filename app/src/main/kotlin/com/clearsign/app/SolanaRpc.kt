@@ -809,6 +809,26 @@ object SolanaRpc {
         return out
     }
 
+    /** Every account of [programId] of exactly [size] bytes whose field at [offset] is [valueBase58], as pubkey to bytes. */
+    fun programAccountsSized(rpcUrl: String, programId: String, size: Int, offset: Int, valueBase58: String): Map<String, ByteArray> {
+        val params = JSONArray().put(programId).put(
+            JSONObject().put("encoding", "base64").put(
+                "filters",
+                JSONArray().put(JSONObject().put("dataSize", size))
+                    .put(JSONObject().put("memcmp", JSONObject().put("offset", offset).put("bytes", valueBase58))),
+            ),
+        )
+        val arr = post(rpcUrl, "getProgramAccounts", params)?.optJSONArray("result") ?: return emptyMap()
+        val out = HashMap<String, ByteArray>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val key = o.optString("pubkey").takeIf { it.isNotEmpty() } ?: continue
+            val b64 = o.optJSONObject("account")?.optJSONArray("data")?.optString(0) ?: continue
+            runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()?.let { out[key] = it }
+        }
+        return out
+    }
+
     /** The SKR this wallet has staked with the Seeker Guardians, or null when it has none or the node did not answer. */
     fun skrStake(rpcUrl: String, owner: String): SkrStake.Position? {
         val params = JSONArray().put(SkrStake.PROGRAM).put(

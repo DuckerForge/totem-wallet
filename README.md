@@ -1,110 +1,67 @@
-# ClearSign — What you see is what you sign
+# Seeker Wallet (working name)
 
-**A safety layer for the Solana Seeker. Every signature comes with a
-plain-language receipt built from the *real* transaction — how much leaves your
-wallet, to whom, at which address (with a trust badge), the fee, and any risk —
-so you never blind-sign again.**
+**A wallet for the Solana Seeker that reads every transaction before you sign it, and an agent that trades a small budget on its own, inside a collar you set.**
 
-Built for **Clock In · Solana Mobile Hackathon**. Android-native (Jetpack
-Compose), integrates the **Solana Mobile Stack** and **Mobile Wallet Adapter**,
-and signs with the **Seed Vault**.
+Built for **Clock In, the Solana Mobile hackathon** (deadline 8 October 2026). Android native, Jetpack Compose, Seed Vault, Mobile Wallet Adapter. The name is provisional. Public page: https://duckerforge.github.io/apex/
 
 ---
 
-## The problem
+## What it does
 
-The single biggest cause of crypto losses is **blind signing**: you tap
-"Approve" without seeing what you actually authorize. On the Seeker, an app that
-talks straight to the signing service can obtain a signature over a transaction
-that empties your wallet while showing you only its own name — no amount, no
-recipient, no warning. An *unlimited approval* hidden behind a friendly label is
-a standing drain right the attacker reuses until you revoke it.
+**Receipt before signature.** Every transaction, from a dApp over Mobile Wallet Adapter or from the wallet's own Send, Swap, Blink or bridge flow, is simulated on chain and turned into a receipt: what leaves, to whom, the fee, the risks, the address's trust badge, look‑alike detection against your own contacts. Then hold to confirm, then the fingerprint. Nothing is signed blind.
 
-## What ClearSign does
+**The agent.** You set a budget apart from your wallet (a session wallet, never your seed). The agent looks for a coin every few minutes on all of Solana, with the gates of the winning bots (mint and freeze authority, holders, liquidity, sellability, honeypot check) plus Rugcheck and Jupiter Shield. It buys a slice, sells at your take profit or stop loss, mirrors the sells of the wallets you follow, recovers rent after every sale, and closes the whole budget when it expires. Every action passes a policy engine: above its limits it stops and asks for your fingerprint.
 
-Every request — from an external dApp over Mobile Wallet Adapter, or from the
-wallet's own Send flow — is turned into a receipt you can read **before** the
-Seed Vault biometric:
+**Watch it work.** A live screen with the charts of the open positions, the entry, target and stop drawn on them, the agent's reasoning typed as it lands, a voice that says what it does (offline text to speech), a timer ring for the next look, and Sell, Buy more, Sell all, Ask. Notifications carry a picture of where every coin sits between its stop and its target, with their own vibration rhythms.
 
-- **Real effects, not claims.** The transaction is simulated on-chain (v0 +
-  address-lookup-tables + SPL programs), so the receipt shows the true balance
-  changes, including hidden splits to fee/referral wallets.
-- **A risk engine** that flags drains, unlimited approvals, authority changes,
-  wallet-takeover (`Assign`), foreign fee payers, address-poisoning look-alikes,
-  brand-new recipients, excessive priority fees, and **transactions that need
-  signatures other than yours**. A DANGER risk blocks one-tap approval.
-- **Anti-TOCTOU:** the transaction is re-simulated in the instant before signing
-  and aborted if the outcome drifted from what you saw.
-- **Attested receipts:** each approved receipt is signed by a hardware key of
-  the app (Android Keystore, StrongBox when available) — exportable,
-  independently-verifiable proof of exactly what you were shown.
-- **On-chain decoding:** unknown programs are decoded from their published
-  Anchor IDL ("Jupiter v6 · route · in_amount …") instead of opaque bytes.
-- **A ledger** of everything you sign, with fiat value at signing time and
-  one-tap **CSV (Koinly / CoinTracker) / PDF / JSON** export for taxes.
+**Scout.** A census of what Seeker holders buy, computed by a small Cloudflare Worker, so the agent and the Market tab can say "the crowd is buying this" and "the wallet you follow sold this".
 
-It works both as a wallet (Send / Receive, revoke approvals, close empty
-accounts and reclaim rent) and as the signing device for any dApp via MWA — the
-phone as a hardware signer.
+**Market.** Favourites with prices, logos and total value, price alerts on 5% moves, a "what if this coin had that coin's market cap" ladder, verified BTC and ETH bridged to Solana, a chart in every sheet.
 
-## Why it's mobile-first
+**Portfolio and DeFi.** Tokens, native stake, SKR staked with the Guardians, Jupiter Lend and Jupiter positions, with the yield per day. Realized P&L per token, and a shareable P&L card.
 
-Seed Vault (hardware-backed keys + biometrics), Mobile Wallet Adapter as the
-wallet endpoint, per-app language, haptics, hold-to-sign, and a design system
-(Halo) with three additional themes that restyle typography, shape and the whole
-**receipt layout** — a glass card, a paper till-receipt, or a green terminal.
+**Seeker specific.** Pay by touch (NFC host card emulation), write a Solana Pay request on an NFC sticker, exchange contacts by touching two Seekers (signed with the phone's attestation key), proof of payment as a QR signed by the phone, guest mode (cover the screen or long press the balance, fingerprint to come back), a floating companion bubble and a widget you can customise.
+
+**Bridge.** Move SOL or USDC to and from other chains through RocketX, with the receipt before the signature and a plain line on what privacy it does and does not give.
+
+**Blinks.** Open a Solana Action link from X, Discord or a QR: the card, the buttons, the receipt, the signature. Dialect's registry is checked; blocked hosts are refused.
+
+Everything is in English by default and in Italian when the phone is Italian.
 
 ## Modules
 
-| Module | What |
+| Module | What it is |
 |---|---|
-| `:core` | Pure-Kotlin clear-signing engine — `RiskEngine`, `AddressTrust` (look-alike detection), `ReceiptBuilder`, `SimulationGuard` (anti-TOCTOU), localized (EN/IT/ES). Device- and network-independent, fully unit-tested. |
-| `:app` | Jetpack Compose wallet + MWA endpoint, Seed Vault signer, on-chain simulation (Helius/public RPC), ledger + tax exports, themes, attestation. |
-| `:testdapp` | An on-device "attacker" dApp: drain-all, unlimited approve, gasless, bundle, burn-address, unexpected-signer — to exercise every defense live. |
-| `reputation/` | An Anchor program for stake-weighted on-chain address reputation (future work). |
+| `:core` | Pure Kotlin. Risk engine, address trust and look‑alikes, receipt builder, simulation guard, policy engine, NFC tap protocol, contact tap, Scout signals, budget math. Unit tested with kotlin.test. |
+| `:app` | The Compose wallet: Seed Vault signer, MWA endpoint, simulation over RPC, agent loop, Jupiter Ultra and Trigger, RocketX, Rugcheck, NFC reader and writer, Blinks, proof, companion service, themes, ledger and exports. |
+| `:testdapp` | An on‑device attacker dApp: drain all, unlimited approve, gasless, bundle, burn address, unexpected signer. |
+| `tools/seeker-worker` | The Cloudflare Worker behind Scout. |
+| `web/apex` | The public page, mirrored on GitHub Pages. |
 
-## Build & run
+## Build and run
 
-Requires Android SDK and a JDK 17–21 toolchain. Configure secrets locally:
+Android SDK and a JDK 17 to 21.
 
 ```bash
 cp local.properties.example local.properties
-# set sdk.dir, and optionally clearsign.heliusRpcUrl (blank → public RPC)
+# sdk.dir, and optionally:
+#   clearsign.heliusRpcUrl   (blank means the public RPC)
+#   clearsign.rocketxKey     (the RocketX partner key, for the bridge)
+#   clearsign.jupReferral    (a Jupiter referral account, for the Ultra fee)
 ```
-
-Then:
 
 ```bash
-gradle :core:test :app:testDebugUnitTest      # unit tests (core + app, JVM)
-gradle :app:assembleRelease                   # → app/build/outputs/apk/release/app-release.apk
-adb install -r app/build/outputs/apk/release/app-release.apk
+gradle :core:test :app:testDebugUnitTest      # unit tests, JVM
+gradle :app:assembleDebug                     # app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The app runs on the Seeker (or any Android device with the Seed Vault, or the
-Seed Vault Simulator). `local.properties` holds machine-local secrets and is
-git-ignored — nothing sensitive is committed.
+`local.properties` is git ignored. Nothing secret is in the repository. The agent's session wallet lives in the app's private storage and never sees the seed.
 
-## Architecture
+## Security in one paragraph
 
-The safety brain (`:core`) depends only on interfaces (`Simulator`,
-`TransactionDecoder`, `TransactionScanner`, `HardwareSigner`), so the entire
-risk/receipt logic is testable off-device. The Android app supplies the real
-implementations. See `core/src/main/kotlin/com/clearsign/core/Ports.kt`.
+The user's keys stay in the Seed Vault. The agent has its own small wallet, funded from a receipt the user signed, and every move it makes goes through the same simulation and the same policy engine as a human signature: amount caps, allowed programs, allowed destinations, a kill switch, a budget expiry that closes everything and sends the money back. What the model says is advice; what the policy engine says is law. Unknown never blocks a coin check; only a clear "no" does, and the trace says which one.
 
-## SKR
+## Documentation
 
-ClearSign Pro (deep address scan, premium themes, background Watchtower alerts,
-unlimited exports) is unlocked with a real **SKR** payment on mainnet, signed by
-the Seed Vault through the same clear-signing receipt.
-
-## Demo (3 min)
-
-1. A malicious dApp offers a "🎁 free airdrop" that is actually a drain →
-   ClearSign shows the real amount and recipient and the risk → **Reject**.
-2. An unlimited approval → **DANGER**, one-tap approval is blocked.
-3. A transaction that needs another signer → **warning**.
-4. A legitimate Send → readable receipt → hold-to-sign with the Seed Vault →
-   the entry lands in the ledger with its € value and an exportable attested
-   proof.
-5. Switch themes live — glass, paper receipt, green terminal.
-6. Unlock Pro by paying SKR.
+`docs/` holds the internal notes: how the agent gate works, the demo script, the hackathon plan, the pitch. Most are in Italian.

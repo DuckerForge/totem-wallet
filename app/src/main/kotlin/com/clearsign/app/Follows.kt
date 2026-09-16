@@ -50,4 +50,14 @@ object Follows {
         val next = if (on) mirrors(ctx) + wallet else mirrors(ctx) - wallet
         prefs(ctx).edit().putString("mirror", JSONArray(next.toList()).toString()).apply()
     }
+
+    /**
+     * The newest event the alerts have already spoken about.
+     *
+     * Zero means "never looked": the first round after switching alerts on sets
+     * this and stays quiet, because announcing a whole window at once is how a
+     * useful notification becomes one you turn off.
+     */
+    fun lastSeenAt(ctx: Context): Long = prefs(ctx).getLong("seen_at", 0L)
+    fun setLastSeenAt(ctx: Context, at: Long) { prefs(ctx).edit().putLong("seen_at", at).apply() }
 }

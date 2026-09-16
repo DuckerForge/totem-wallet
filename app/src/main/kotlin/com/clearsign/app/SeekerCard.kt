@@ -464,7 +464,7 @@ private fun ScoutTabs(selected: ScoutTab, onPick: (ScoutTab) -> Unit) {
 }
 
 @Composable
-internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
+internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: String? = null, onBuy: (String) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     // One reader for the whole page.
     //
@@ -540,7 +540,7 @@ internal fun CrowdPage(onBuy: (String) -> Unit, onBack: () -> Unit) {
         // The reason to open this page goes first and stays whole. It used to be
         // third, under a chart and under a card that apologises on a quiet hour.
         item(key = "live") {
-            Box(pad) { CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, onBuy = onBuy) }
+            Box(pad) { CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy) }
         }
         stickyHeader(key = "tabs") { ScoutTabs(tab) { tab = it } }
         // Keyed on the tab, so switching builds the new section instead of

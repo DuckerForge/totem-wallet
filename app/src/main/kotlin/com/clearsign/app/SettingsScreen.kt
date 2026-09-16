@@ -65,6 +65,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
 
         SettingsGroup(stringResource(R.string.set_g_agent), stringResource(R.string.set_g_agent_sub), HIcon.SPARK) {
             AgentGateCard()
+            FollowAlertsCard()
             BrainCard()
             WebCheckCard()
         }
@@ -363,6 +364,28 @@ private fun WidgetCard() {
                 }
                 Text(stringResource(R.string.widget_card_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
             }
+        }
+    }
+}
+
+/** The phone speaks up when a wallet you follow moves. Off until asked for. */
+@Composable
+private fun FollowAlertsCard() {
+    val ctx = LocalContext.current
+    var on by remember { mutableStateOf(FollowWatch.enabled(ctx)) }
+    val following = remember { Follows.all(ctx).size }
+    GlassCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                SectionTitle(stringResource(R.string.folw_title), stringResource(R.string.folw_sub), HIcon.MEGAPHONE)
+                if (on && following == 0) {
+                    Text(stringResource(R.string.watch_nobody), style = HaloType.small, color = Halo.amber, lineHeight = 16.sp)
+                }
+            }
+            androidx.compose.material3.Switch(
+                checked = on,
+                onCheckedChange = { want -> on = want; FollowWatch.setEnabled(ctx, want); Haptics.tick(ctx) },
+            )
         }
     }
 }

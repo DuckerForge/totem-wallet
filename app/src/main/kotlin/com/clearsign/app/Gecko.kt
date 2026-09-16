@@ -57,6 +57,34 @@ object Gecko {
         DAYS("day", 1, 90, R.string.span_days),            // three months, daily
     }
 
+    /**
+     * The series, kept for a few minutes per coin.
+     *
+     * There was no cache at all, and it did not show while one chart was open in
+     * one sheet. A feed where every row can open a chart is a different animal:
+     * without this, scrolling a list would fire two uncached calls per row at a
+     * public API with no key, and get everybody rate limited. Five minutes is
+     * shorter than the candle itself on every span we draw.
+     */
+    private const val FRESH_MS = 5 * 60_000L
+    private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Double>>>()
+    private val poolCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
+
+    /** Closes for [mint] on [span], from memory when they are fresh enough. */
+    fun series(mint: String, span: Span): List<Double> {
+        val key = "$mint|${span.name}"
+        val now = System.currentTimeMillis()
+        seriesCache[key]?.let { (at, v) -> if (now - at < FRESH_MS) return v }
+        val pool = poolCache[mint]?.takeIf { now - it.first < 30 * 60_000L }?.second
+            ?: topPool(mint)?.also { poolCache[mint] = now to it }
+            ?: return emptyList()
+        val v = closes(pool, span)
+        // An empty answer is not cached: the pool may simply be a minute too young,
+        // and a coin bought right now is exactly the one somebody wants to see.
+        if (v.isNotEmpty()) seriesCache[key] = now to v
+        return v
+    }
+
     /** The busiest pool for [mint], which is the one a price should come from. */
     fun topPool(mint: String): String? {
         val data = get("$BASE/tokens/$mint/pools?page=1")?.optJSONArray("data") ?: return null

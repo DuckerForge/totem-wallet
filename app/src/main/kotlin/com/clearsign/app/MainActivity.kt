@@ -256,7 +256,11 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showCompanion by remember { mutableStateOf(false) }
         var showChip by remember { mutableStateOf(false) }
         var guestNote by remember { mutableStateOf(0L) }
-        var showCrowd by remember { mutableStateOf(false) }
+        // A notification about somebody you follow opens the feed straight on that
+        // coin, with the receipt already building. The alert is the start of the
+        // loop, not a link to somewhere you then have to navigate.
+        var showCrowd by remember { mutableStateOf(requested == "crowd") }
+        var crowdMint by remember { mutableStateOf((ctx as? android.app.Activity)?.intent?.getStringExtra("mint")) }
         var showHealth by remember { mutableStateOf(false) }
         var showPnl by remember { mutableStateOf(false) }
         var headline by remember { mutableStateOf<String?>(null) }
@@ -491,9 +495,12 @@ fun HomeScreen(signer: SeedVaultSigner) {
         // A page, not a sheet: it sits over everything, tab bar included, because
         // it is somewhere you go rather than something you peek at.
         if (showCrowd) {
+            // The feed is the terminal now: `onBuy` is only the way out for the
+            // cases the panel cannot serve, and the panel serves nearly all of them.
             CrowdPage(
+                owner = owner, signer = signer, openMint = crowdMint,
                 onBuy = { mint -> showCrowd = false; swapMint = mint; showSwap = true },
-            ) { showCrowd = false }
+            ) { showCrowd = false; crowdMint = null }
         }
 
         if (showMore) {

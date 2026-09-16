@@ -74,19 +74,45 @@ object SolanaTx {
      * signature array. This is what an ed25519 signature must cover — the Seed
      * Vault signs exactly the bytes it is handed, so it must be handed this.
      */
+    /**
+     * A transaction can declare at most this many signatures. The wire format
+     * allows a much larger number, and `count * 64` on a large one overflows to
+     * a negative offset that slips past a `<= size` check and blows up inside
+     * the copy. The limit is not arbitrary: a Solana message cannot hold more
+     * signers than it has accounts, and an account list is a single byte.
+     */
+    private const val MAX_SIGNATURES = 255
+
     fun messageBytes(tx: ByteArray): ByteArray {
         val r = Reader(tx)
         val count = r.shortVec()
+        require(count in 0..MAX_SIGNATURES) { "signature count out of range" }
         val start = r.pos + count * 64
         require(start <= tx.size) { "truncated transaction" }
         return tx.copyOfRange(start, tx.size)
     }
+
+    /**
+     * The transaction's own first signature, base58, which is its id on chain.
+     *
+     * Worth having when a send gets no answer: the bytes were already signed, so
+     * the id is knowable without the node telling us, and the chain can be asked
+     * whether it landed.
+     */
+    fun firstSignature(signedTx: ByteArray): String? = runCatching {
+        val r = Reader(signedTx)
+        val count = r.shortVec()
+        if (count < 1 || r.pos + 64 > signedTx.size) return null
+        val sig = signedTx.copyOfRange(r.pos, r.pos + 64)
+        if (sig.all { it == 0.toByte() }) null else Base58.encode(sig)
+    }.getOrNull()
 
     /** Splice a 64-byte signature into the transaction's signature array. */
     fun attachSignature(tx: ByteArray, signerIndex: Int, signature: ByteArray): ByteArray {
         require(signature.size == 64) { "signature must be 64 bytes" }
         val r = Reader(tx)
         val count = r.shortVec()
+        require(count in 0..MAX_SIGNATURES) { "signature count out of range" }
         val sigStart = r.pos
         require(signerIndex in 0 until count) { "signer index out of range" }
         val out = tx.copyOf()

@@ -57,9 +57,25 @@ object BudgetMath {
         val slice = ceiling * slicePct / 100
         val usd = solUsd?.takeIf { it > 0 }?.let { slice / 1e9 * it }
         val fits = if (slice > 0) (capLamports / (slice + ATA_RENT)).toInt().coerceIn(0, slots) else 0
-        val needed = solUsd?.takeIf { it > 0 }?.let { ((ORDER_MIN_USD / it * 1e9) * 100 / slicePct).toLong() + 1 }
+        // A slice of zero percent means there is no slice, not a slice so small
+        // that the ceiling it would need overflows a Long and comes back negative.
+        val needed = solUsd?.takeIf { it > 0 && slicePct > 0 }?.let { ((ORDER_MIN_USD / it * 1e9) * 100 / slicePct).toLong() + 1 }
         return Sizing(slice, usd, usd?.let { it >= ORDER_MIN_USD }, fits, needed)
     }
+
+    /** What the fee reserve leaves behind, so the last transaction can still pay for itself. */
+    const val FEE_RESERVE = 5_000L
+
+    /**
+     * How much of the budget goes home when it is closed.
+     *
+     * Null in, null out, and that is the whole point. A balance that could not
+     * be read is not a balance of zero: reading it as zero means sending nothing
+     * home and then forgetting the key, which loses everything still sitting
+     * there. Paid for once, with a node that was rate-limiting.
+     */
+    fun sweepBack(balanceLamports: Long?, reserve: Long = FEE_RESERVE): Long? =
+        balanceLamports?.let { if (it > reserve) it - reserve else 0L }
 }
 
 /** The sentence, with the SOL price fetched once. Amounts in lamports. */

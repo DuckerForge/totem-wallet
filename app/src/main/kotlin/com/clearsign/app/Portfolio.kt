@@ -1,5 +1,7 @@
 package com.clearsign.app
 
+import android.content.Context
+
 import com.clearsign.core.NATIVE_SOL_MINT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,9 +44,16 @@ data class PortfolioView(
     val others: List<Holding> get() = holdings.filter { !it.isMain }
     /** How much the priced part of the portfolio moved over 24h, in [currency] (null when nothing has a change). */
     val change24hValue: Double? get() {
-        val parts = holdings.filter { it.fiat != null && it.change24h != null }
+        // A coin down a hundred percent divides by zero and poisons the whole
+        // sum with an infinity, so the header reads NaN in exactly the case this
+        // app exists for. Yesterday's price of something now worth nothing is not
+        // knowable from a percentage, so that coin is left out of the sum.
+        val parts = holdings.filter { h ->
+            h.fiat != null && h.change24h != null && (1 + h.change24h / 100.0) > 0.0
+        }
         if (parts.isEmpty()) return null
         return parts.sumOf { h -> h.fiat!! - h.fiat / (1 + h.change24h!! / 100.0) }
+            .takeIf { it.isFinite() }
     }
     val change24hPct: Double? get() = change24hValue?.let { d -> (total - d).takeIf { it > 0 }?.let { d / it * 100.0 } }
 }
@@ -81,7 +90,7 @@ object Portfolio {
     fun cached(owner: String?, currency: String): PortfolioView? =
         last?.takeIf { it.first == "$owner|$currency" }?.second
 
-    suspend fun load(owner: String, currency: String): PortfolioView = withContext(Dispatchers.IO) {
+    suspend fun load(ctx: Context?, owner: String, currency: String): PortfolioView = withContext(Dispatchers.IO) {
         val rpc = SolanaRpc.urlFor(null)
         val lam = runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() ?: 0L
         val toks = runCatching { SolanaRpc.tokenAccountsOf(rpc, owner) }.getOrDefault(emptyList()).filter { it.amount > 0 && !it.isFrozen }
@@ -130,11 +139,10 @@ object Portfolio {
         runCatching {
             SolanaRpc.skrStake(rpc, owner)?.let { st ->
                 val skrUsd = quotes[SkrStake.SKR_MINT]?.usd ?: runCatching { Prices.quotes(listOf(SkrStake.SKR_MINT))[SkrStake.SKR_MINT]?.usd }.getOrNull()
-                val supply = runCatching { SolanaRpc.tokenSupply(rpc, SkrStake.SKR_MINT) }.getOrNull()
                 defi += DefiPosition(
                     DefiPosition.Kind.STAKE, "SKR", "Guardiani Seeker", "SKR", st.ui,
                     skrUsd?.let { p -> fx?.let { p * it * st.ui } }, image = TokenSymbols.image(SkrStake.SKR_MINT), state = "active",
-                    aprPct = supply?.let { st.aprPct(it) },
+                    aprPct = ctx?.let { c -> runCatching { SkrStake.observedAprPct(c, st.sharePrice) }.getOrNull() },
                 )
             }
         }

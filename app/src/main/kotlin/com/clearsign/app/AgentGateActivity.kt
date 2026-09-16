@@ -83,7 +83,19 @@ class AgentGateActivity : ComponentActivity() {
         // Two pockets. "envelope": the agent's capped key, which this app holds and
         // signs with after the collar said "ask" — presence is proved with the
         // device biometrics. Otherwise: the Seed Vault account, as always.
-        envelopeJob = intent?.getStringExtra("job")?.takeIf { intent.getStringExtra("signer") == "envelope" }
+        // The envelope branch signs with the budget key after the collar has
+        // already decided, so the only thing allowed onto it is a job the collar
+        // itself is waiting on. Without that check any installed app could send
+        // `apex://agent/sign` with `signer=envelope` and a transaction of its
+        // own, and reach the budget key with no cap, no allowed destination and
+        // no rate limit between it and the money. The activity is exported: the
+        // extras are whatever the caller typed.
+        val askedEnvelope = intent?.getStringExtra("signer") == "envelope"
+        envelopeJob = intent?.getStringExtra("job")?.takeIf { askedEnvelope && AgentBroker.isPending(it) }
+        // Asked for the budget key and the collar knows nothing about it: refuse
+        // outright rather than quietly falling back to the Seed Vault, so the
+        // caller cannot use this screen to get a signature it did not ask for.
+        if (askedEnvelope && envelopeJob == null) { fail(getString(R.string.agent_bad_link)); return }
         val envelope = envelopeJob?.let { SessionWallet.current(this)?.pubkey }
         if (envelopeJob != null && envelope == null) { fail(getString(R.string.env_none_short)); return }
         val owner = envelope ?: data.getQueryParameter("account")?.takeIf { it.isNotBlank() } ?: Settings.watchWallet(this)
@@ -161,6 +173,21 @@ class AgentGateActivity : ComponentActivity() {
                             record(receipt, owner, dApp.name, callerPkg, cluster, tx, txSig, send, how = if (envelopeJob != null) "asked" else null)
                             val signedB64 = Base64.encodeToString(signed, Base64.NO_WRAP)
                             envelopeJob?.let { j ->
+                                // A move the collar stopped and a person waved
+                                // through is still a move the budget paid for. It
+                                // was never written to the spend log, and the daily
+                                // cap and the hourly limit are computed from that
+                                // log alone, so anything that went through "ask"
+                                // was invisible to both of them. The exact price is
+                                // the broker's business; here the honest bound is
+                                // the ceiling the collar allows for one move.
+                                runCatching {
+                                    val out = receipt.outflows.filter { it.rawAmount < 0 }
+                                    val allSol = out.isNotEmpty() && out.all { it.mint == com.clearsign.core.NATIVE_SOL_MINT }
+                                    val spent = if (allSol) out.sumOf { kotlin.math.abs(it.rawAmount) }
+                                    else SessionWallet.policy(this@AgentGateActivity)?.perTxLamports ?: 0L
+                                    SessionWallet.recordSpend(this@AgentGateActivity, spent)
+                                }
                                 AgentBroker.complete(j, AgentBroker.Verdict.Confirmed(txSig))
                                 AgentLink.noteAction(this@AgentGateActivity, getString(R.string.agent_last_confirmed, IntentGuard.summary(agentIntent, deviceLocaleTag() == "it")))
                                 envelopeJob = null

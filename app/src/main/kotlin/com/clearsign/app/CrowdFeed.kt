@@ -242,12 +242,15 @@ private fun FeedRow(e: CrowdBuy, now: Long, open: Boolean, onOpen: () -> Unit) {
             )
             Text(
                 stringResource(
-                    R.string.feed_meta2,
+                    // "spent" on a sale said the opposite of what happened: money
+                    // came out of the coin, it did not go into it.
+                    if (e.sell) R.string.feed_meta_sell else R.string.feed_meta2,
                     stringResource(if (whale) R.string.feed_whale else R.string.feed_dolphin),
                     sol(e.solSpent), ago(e.at, now),
                 ),
                 fontFamily = Mono, fontSize = 10.5.sp,
-                color = if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted, style = Tabular,
+                color = if (e.sell) Halo.red.copy(alpha = 0.8f) else if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted,
+                style = Tabular,
             )
         }
         Spacer(Modifier.width(6.dp))

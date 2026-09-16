@@ -103,44 +103,11 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     }
 
     fun closeNow() {
-        val s = SessionWallet.current(ctx) ?: return
-        val pub = s.pubkey
+        if (SessionWallet.current(ctx) == null || account == null) return
         busy = ctx.getString(R.string.env_closing)
         scope.launch {
-            AgentLinkService.revoke(ctx)
-            // Empty token accounts first: their rent goes to the wallet while
-            // the key can still sign. Then whatever SOL is left. The key is
-            // forgotten only once the chain has confirmed both; if anything
-            // did not land, the budget stays open and says so.
-            val rent = if (account != null) runCatching { SessionActions.closeEmpty(ctx, account) }.getOrNull() ?: SessionActions.Closed(0, 1, 0L) else SessionActions.Closed(0, 0, 0L)
-            if (rent.failed > 0) {
-                note = ctx.resources.getQuantityString(R.plurals.env_rent_stuck, rent.failed, rent.failed)
-                busy = null; refresh++
-                return@launch
-            }
-            val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() } ?: 0L
-            val fee = 5_000L
-            val back = if (left > fee) left - fee else 0L
-            if (account != null && back > 0L) {
-                val err = SessionActions.sweep(ctx, account, back)
-                if (err != null) { note = err; busy = null; refresh++; return@launch }
-            }
-            // The account, in plain words, kept after the key is gone.
-            val rows = runCatching { Ledger.all(ctx) }.getOrDefault(emptyList())
-                .filter { it.kind == "agent" && it.sent && it.at >= s.createdAt && (it.host == "auto" || it.host == "asked") }
-            val close = SessionWallet.Close(
-                fundedLamports = s.fundedLamports, harvestedLamports = s.harvestedLamports,
-                backLamports = back + rent.rentLamports, createdAt = s.createdAt, closedAt = System.currentTimeMillis(),
-                buys = rows.count { r -> r.outflows.any { it.mint == com.clearsign.core.NATIVE_SOL_MINT } },
-                sells = rows.count { r -> r.inflows.any { it.mint == com.clearsign.core.NATIVE_SOL_MINT } },
-            )
-            SessionWallet.recordClose(ctx, close)
-            note = ctx.getString(
-                R.string.env_close_summary, fmtSol(close.fundedLamports, 4), fmtSol(close.backLamports + close.harvestedLamports, 4),
-                (if (close.resultLamports >= 0) "+" else "−") + fmtSol(kotlin.math.abs(close.resultLamports), 4),
-                String.format(java.util.Locale.ROOT, "%+.1f%%", close.resultPct),
-            )
-            SessionWallet.forget(ctx)
+            val (_, said) = runCatching { SessionActions.closeBudget(ctx, account) }.getOrDefault(false to ctx.getString(R.string.trader_net_down))
+            note = said
             busy = null; coins = emptyList(); refresh++
         }
     }

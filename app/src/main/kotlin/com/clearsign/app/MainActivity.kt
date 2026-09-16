@@ -249,6 +249,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showTap by remember { mutableStateOf(false) }
         var showMore by remember { mutableStateOf(false) }
         var showBridge by remember { mutableStateOf(false) }
+        var bridgeMemo by remember { mutableStateOf<String?>(null) }
         var showContactTap by remember { mutableStateOf(false) }
         var showLinkBox by remember { mutableStateOf(false) }
         var showCustomize by remember { mutableStateOf(false) }
@@ -482,8 +483,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 signer, first.pubkeyBase58,
                 prefillTo = request?.recipient, prefillAmount = request?.amount?.let { fmtUi(it) },
                 prefillMint = request?.let { it.mint ?: com.clearsign.core.NATIVE_SOL_MINT },
+                prefillMemo = bridgeMemo,
                 onGift = { showSend = false; showGift = true },
-            ) { showSend = false; (ctx as? MainActivity)?.incoming = null }
+            ) { showSend = false; bridgeMemo = null; (ctx as? MainActivity)?.incoming = null }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
         // A page, not a sheet: it sits over everything, tab bar included, because
@@ -511,7 +513,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
             if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
         }
         if (showBridge && owner != null) {
-            BridgeSheet(owner, onSend = { req -> showBridge = false; (ctx as? MainActivity)?.incoming = req; showSend = true }) { showBridge = false }
+            BridgeSheet(owner, onSend = { req, memo -> showBridge = false; bridgeMemo = memo; (ctx as? MainActivity)?.incoming = req; showSend = true }) { showBridge = false }
         }
         if (showHealth) HealthSheet(owner) { showHealth = false }
         if (showPnl) PnlSheet { showPnl = false }

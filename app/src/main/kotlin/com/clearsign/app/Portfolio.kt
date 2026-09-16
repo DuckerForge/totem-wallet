@@ -146,6 +146,13 @@ object Portfolio {
             }
         }
 
+        runCatching {
+            for (j in JupiterPortfolio.positions(owner)) {
+                if (j.platformId() == "native-stake") continue   // already read from the chain above
+                defi += DefiPosition(DefiPosition.Kind.LEND, j.name ?: j.label, "Jupiter · " + j.label, "$", j.valueUsd, fx?.let { j.valueUsd * it }, aprPct = j.apy)
+            }
+        }
+
         val total = holdings.sumOf { it.fiat ?: 0.0 } + defi.sumOf { it.fiat ?: 0.0 }
         PortfolioView(currency, total, holdings, holdings.count { it.fiat != null }, holdings.count { it.fiat == null && it.isMain }, defi)
             .also { last = "$owner|$currency" to it }

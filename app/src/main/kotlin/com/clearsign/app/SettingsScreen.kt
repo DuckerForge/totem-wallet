@@ -87,6 +87,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
         }
 
         SettingsGroup(stringResource(R.string.set_g_adv), stringResource(R.string.set_g_adv_sub), HIcon.KEY) {
+            SpeedCard()
             AttestationCard()
             SwapFeesCard(signer, owner)
         }
@@ -267,6 +268,24 @@ private fun CompanionCard() {
                 }
                 Text(stringResource(R.string.companion_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
             }
+        }
+    }
+}
+
+/** Priority fee for what we send ourselves: none, some, a lot. Said in what it costs. */
+@Composable
+private fun SpeedCard() {
+    val ctx = LocalContext.current
+    var v by remember { mutableStateOf(Settings.speed(ctx)) }
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle(stringResource(R.string.speed_title), stringResource(R.string.speed_sub), HIcon.SPARK)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModeChip(stringResource(R.string.speed_normal), v == 0L, Halo.muted, Modifier.weight(1f)) { v = 0L; Settings.setSpeed(ctx, 0L) }
+                ModeChip(stringResource(R.string.speed_fast), v == 10_000L, Halo.cyan, Modifier.weight(1f)) { v = 10_000L; Settings.setSpeed(ctx, 10_000L) }
+                ModeChip(stringResource(R.string.speed_turbo), v == 100_000L, Halo.mint, Modifier.weight(1f)) { v = 100_000L; Settings.setSpeed(ctx, 100_000L) }
+            }
+            Text(stringResource(R.string.speed_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
         }
     }
 }

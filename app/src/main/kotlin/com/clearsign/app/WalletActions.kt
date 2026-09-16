@@ -76,7 +76,10 @@ object WalletActions {
         val bh = withContext(Dispatchers.IO) { SolanaRpc.latestBlockhash(rpc) }
             ?: return Result.Failed(ctx.getString(R.string.wa_no_blockhash))
         val ownerKey = Base58.decodePubkey(owner) ?: return Result.Failed(ctx.getString(R.string.wa_bad_address))
-        val tx = WalletTx.build(ownerKey, Base58.decode(bh.hash), instructions)
+        // The person's chosen priority, in front of everything we build ourselves.
+        val speed = Settings.speed(ctx)
+        val withPriority = if (speed > 0) listOf(WalletTx.setComputeUnitPrice(speed)) + instructions else instructions
+        val tx = WalletTx.build(ownerKey, Base58.decode(bh.hash), withPriority)
 
         val sim = withContext(Dispatchers.IO) { SolanaRpc.simulate(rpc, tx) }
         if (sim != null && !sim.ok) {

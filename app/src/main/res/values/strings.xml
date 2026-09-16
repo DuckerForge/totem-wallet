@@ -1577,6 +1577,15 @@
     <string name="companion_agent_off">agent off</string>
     <string name="companion_agent_line">%1$d in play</string>
     <string name="companion_health_line">Health %1$d</string>
+    <string name="send_memo_line">Memo in the transaction: %1$s</string>
+    <string name="speed_title">Speed of what you send</string>
+    <string name="speed_sub">A priority fee on transfers, orders and closes we build ourselves.</string>
+    <string name="speed_normal">Normal</string>
+    <string name="speed_fast">Fast</string>
+    <string name="speed_turbo">Turbo</string>
+    <string name="speed_note">Fast adds about 0.00002 SOL per transaction, Turbo about 0.0002. Swaps through Jupiter set their own.</string>
+    <string name="env_expired_closed">The budget expired and closed itself</string>
+    <string name="env_expired_open">The budget expired but could not close</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

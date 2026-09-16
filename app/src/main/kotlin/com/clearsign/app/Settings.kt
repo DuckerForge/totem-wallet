@@ -144,4 +144,8 @@ object Settings {
     /** A hand over the screen (the proximity sensor) covers the numbers. On by default. */
     fun coverToHide(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cover_hide", true)
     fun setCoverToHide(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("cover_hide", on).apply()
+
+    /** Priority fee for the transactions we build ourselves, in micro‑lamports per compute unit. 0 = none. */
+    fun speed(ctx: Context): Long = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("speed", 0L)
+    fun setSpeed(ctx: Context, microLamports: Long) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong("speed", microLamports).apply()
 }

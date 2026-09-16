@@ -109,6 +109,8 @@ internal fun SendSheet(
     prefillAmount: String? = null,
     /** The coin the request asks for, when it asks for one. Null means SOL. */
     prefillMint: String? = null,
+    /** A memo the recipient needs (an exchange deposit, a bridge). Written into the transaction, shown on the receipt. */
+    prefillMemo: String? = null,
     onGift: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
@@ -210,6 +212,7 @@ internal fun SendSheet(
                             colors = fieldColors(if (to.isBlank()) Halo.stroke else if (destValid) Halo.mint else Halo.red),
                             shape = rs(14),
                         )
+                        prefillMemo?.takeIf { it.isNotBlank() }?.let { m -> Text(stringResource(R.string.send_memo_line, m), style = HaloType.small, color = Halo.cyan) }
                         lookalike?.let { l ->
                             Column(
                                 Modifier.fillMaxWidth().clip(rs(14)).background(Halo.red.copy(alpha = 0.10f)).border(1.dp, Halo.red.copy(alpha = 0.45f), rs(14)).padding(12.dp),
@@ -355,7 +358,7 @@ internal fun SendSheet(
                                 state = SendState.Analyzing
                                 scope.launch {
                                     state = try {
-                                        val (ixs, analyzed) = buildAndAnalyze(ctx, owner, dest, a, raw)
+                                        val (ixs, analyzed) = buildAndAnalyze(ctx, owner, dest, a, raw, prefillMemo)
                                         SendState.Review(analyzed, ixs, dest, fmtUnits(raw, a.decimals) + " " + a.symbol)
                                     } catch (e: Exception) { SendState.Error(e.message ?: ctx.getString(R.string.wa_no_blockhash)) }
                                 }
@@ -423,10 +426,10 @@ internal fun SendSheet(
 /** Keep a little SOL back for fees + rent-exempt minimum when sending "MAX". */
 private const val SOL_RESERVE = 1_500_000L
 
-private suspend fun buildAndAnalyze(ctx: Context, owner: String, dest: String, asset: Asset, raw: Long): Pair<List<WalletTx.Instruction>, ReceiptEngine.Analyzed> {
+private suspend fun buildAndAnalyze(ctx: Context, owner: String, dest: String, asset: Asset, raw: Long, memo: String? = null): Pair<List<WalletTx.Instruction>, ReceiptEngine.Analyzed> {
     val rpc = SolanaRpc.urlFor(null)
     val ownerKey = Base58.decode(owner); val destKey = Base58.decode(dest)
-    val ixs: List<WalletTx.Instruction> = when (asset) {
+    val base: List<WalletTx.Instruction> = when (asset) {
         is Asset.Sol -> listOf(WalletTx.systemTransfer(ownerKey, destKey, raw))
         is Asset.Token -> withContext(Dispatchers.IO) {
             val mint = Base58.decode(asset.acct.mint)
@@ -439,6 +442,7 @@ private suspend fun buildAndAnalyze(ctx: Context, owner: String, dest: String, a
             }
         }
     }
+    val ixs = if (memo.isNullOrBlank()) base else base + WalletTx.memo(memo.trim().take(120))
     val bh = withContext(Dispatchers.IO) { SolanaRpc.latestBlockhash(rpc) } ?: throw IllegalStateException(ctx.getString(R.string.wa_no_blockhash))
     val payload = WalletTx.build(ownerKey, Base58.decode(bh.hash), ixs)
     val analyzed = ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), payload, owner, null, requireSim = true)

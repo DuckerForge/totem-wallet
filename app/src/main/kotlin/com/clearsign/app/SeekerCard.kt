@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -509,10 +510,15 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
     // underneath it appear in the margins beside it.
     val pad = Modifier.padding(horizontal = 18.dp)
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    // Sections differ in height by hundreds of points. With the bar already
-    // pinned, switching to a shorter one would drag the whole list up under the
-    // thumb; this keeps the bar exactly where it was left.
-    LaunchedEffect(tab) { if (listState.firstVisibleItemIndex >= 3) listState.scrollToItem(3) }
+    val scroller = androidx.compose.runtime.rememberCoroutineScope()
+    // Pressing a word on the bar has to show the thing that word names.
+    //
+    // It did not. The bar sits under the live feed, so on arrival it lands near
+    // the bottom edge with the section it controls entirely below the screen:
+    // you tapped, the chip lit up, and nothing you could see changed. Now any
+    // tap pulls the bar to the top of the page, which puts its section in the
+    // whole space underneath. Index three is the bar itself.
+    fun showSection() = scroller.launch { runCatching { listState.animateScrollToItem(3) } }
     LazyColumn(
         Modifier.fillMaxSize().background(Halo.ground).statusBarsPadding().navigationBarsPadding(),
         state = listState,
@@ -542,7 +548,7 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
         item(key = "live") {
             Box(pad) { CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy) }
         }
-        stickyHeader(key = "tabs") { ScoutTabs(tab) { tab = it } }
+        stickyHeader(key = "tabs") { ScoutTabs(tab) { tab = it; showSection() } }
         // Keyed on the tab, so switching builds the new section instead of
         // pouring new data into the old one's remembered state.
         item(key = tab.name) {

@@ -537,6 +537,7 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 // ---- Wallet health (the score) --------------------------------
                 WalletHealthCard(owner)
+                ForgottenMoneyCard(owner)
 
                 // ---- Delegations & accounts (the one-tap fixes) ---------------
                 AccountsCard(signer, owner)

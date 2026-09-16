@@ -423,6 +423,7 @@ internal fun HealthSheet(owner: String?, onDismiss: () -> Unit) {
         ) {
             Text(stringResource(R.string.health_title), style = HaloType.title, color = Halo.ink)
             WalletHealthCard(owner)
+            ForgottenMoneyCard(owner)
             androidx.compose.foundation.layout.Spacer(Modifier.size(Space.sm))
         }
     }

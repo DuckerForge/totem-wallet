@@ -27,6 +27,8 @@ android {
     val skrTreasury = localProps.getProperty("clearsign.skrTreasury", "")
     // RocketX partner key (free, from app.rocketx.exchange/partner): the bridge. Blank → the bridge is off.
     val rocketxKey = localProps.getProperty("clearsign.rocketxKey", "")
+    // Jupiter referral account (made once at referral.jup.ag with the treasury wallet): the fee on Ultra swaps. Blank → no fee.
+    val jupReferral = localProps.getProperty("clearsign.jupReferral", "")
 
     defaultConfig {
         applicationId = "com.clearsign.app"
@@ -39,6 +41,7 @@ android {
         buildConfigField("String", "CROWD_URL", "\"$crowdUrl\"")
         buildConfigField("String", "SKR_TREASURY", "\"$skrTreasury\"")
         buildConfigField("String", "ROCKETX_KEY", "\"$rocketxKey\"")
+        buildConfigField("String", "JUP_REFERRAL", "\"$jupReferral\"")
     }
 
     // Debug-key signing for release too, so a shrunken (R8) APK can be sideloaded on

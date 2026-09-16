@@ -415,6 +415,41 @@ object SessionActions {
     }
 
     /**
+     * Close the budget for good: sell what it holds, close the empty accounts,
+     * bring the SOL home, write the account, forget the key. Every step waits
+     * for the chain; if one does not land the budget stays open and the
+     * message says why. Used by the Close button and by the expiry.
+     * Returns (closed, what to say).
+     */
+    suspend fun closeBudget(ctx: Context, owner: String): Pair<Boolean, String> {
+        val s = SessionWallet.current(ctx) ?: return false to ctx.getString(R.string.trader_stop_nobudget)
+        runCatching { AgentLinkService.revoke(ctx) }
+        val stuck = runCatching { sellAll(ctx) }.getOrDefault(listOf("?"))
+        if (stuck.isNotEmpty()) return false to ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
+        val rent = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)
+        if (rent.failed > 0) return false to ctx.resources.getQuantityString(R.plurals.env_rent_stuck, rent.failed, rent.failed)
+        val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() } ?: 0L
+        val back = if (left > 5_000L) left - 5_000L else 0L
+        if (back > 0L) sweep(ctx, owner, back)?.let { return false to it }
+        val rows = runCatching { Ledger.all(ctx) }.getOrDefault(emptyList())
+            .filter { it.kind == "agent" && it.sent && it.at >= s.createdAt && (it.host == "auto" || it.host == "asked") }
+        val close = SessionWallet.Close(
+            fundedLamports = s.fundedLamports, harvestedLamports = s.harvestedLamports,
+            backLamports = back + rent.rentLamports, createdAt = s.createdAt, closedAt = System.currentTimeMillis(),
+            buys = rows.count { r -> r.outflows.any { it.mint == com.clearsign.core.NATIVE_SOL_MINT } },
+            sells = rows.count { r -> r.inflows.any { it.mint == com.clearsign.core.NATIVE_SOL_MINT } },
+        )
+        SessionWallet.recordClose(ctx, close)
+        val said = ctx.getString(
+            R.string.env_close_summary, fmtSol(close.fundedLamports, 4), fmtSol(close.backLamports + close.harvestedLamports, 4),
+            (if (close.resultLamports >= 0) "+" else "−") + fmtSol(kotlin.math.abs(close.resultLamports), 4),
+            String.format(java.util.Locale.ROOT, "%+.1f%%", close.resultPct),
+        )
+        SessionWallet.forget(ctx)
+        return true to said
+    }
+
+    /**
      * Sweep [lamports] from the envelope back to [owner], signed with the
      * envelope key. Returns an error, or null when it landed.
      */

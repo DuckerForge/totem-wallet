@@ -240,8 +240,11 @@ object TraderLoop {
             return Tick(ctx.getString(R.string.trader_stop_nobudget), acted = false, stopped = true)
         }
         if (s.expired) {
-            stopSelf(ctx, ctx.getString(R.string.trader_stop_closed))
-            return Tick(ctx.getString(R.string.trader_stop_closed), acted = false, stopped = true)
+            // The budget's time is up: sell, close, bring everything home, and say the account.
+            val owner = Settings.watchWallet(ctx)
+            val said = if (owner != null) runCatching { SessionActions.closeBudget(ctx, owner) }.getOrNull() else null
+            stopSelf(ctx, said?.second ?: ctx.getString(R.string.trader_stop_closed))
+            return Tick(said?.second ?: ctx.getString(R.string.trader_stop_closed), acted = false, stopped = true)
         }
         // Paused is not stopped. The notification's Pause button sets the mode
         // to OFF and its Resume button sets it back, and this used to switch
@@ -477,6 +480,8 @@ object TraderLoop {
             val v = (sale as? SessionActions.Sale.Judged)?.verdict
             if (v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed) {
                 Positions.remove(ctx, pos.mint)
+                // The emptied account's rent goes back into the budget now, not at the end.
+                runCatching { SessionActions.closeEmpty(ctx, envelope) }
                 return ExitOutcome(
                     did = ctx.getString(
                         if (exit.why == Positions.Exit.Why.TARGET) R.string.trader_sold_target else R.string.trader_sold_stop,

@@ -45,8 +45,12 @@ object JupiterUltra {
 
     data class Exec(val signature: String?, val status: String, val error: String?)
 
+    /** Our cut on Ultra, in basis points, when a referral account exists. Jupiter keeps a fifth of it. */
+    const val REFERRAL_FEE_BPS = 50
+
     fun order(inputMint: String, outputMint: String, amount: Long, taker: String, slippageBps: Int? = null): Order? {
-        val q = "inputMint=$inputMint&outputMint=$outputMint&amount=$amount&taker=$taker" + (slippageBps?.let { "&slippageBps=$it" } ?: "")
+        val q = "inputMint=$inputMint&outputMint=$outputMint&amount=$amount&taker=$taker" + (slippageBps?.let { "&slippageBps=$it" } ?: "") +
+            (BuildConfig.JUP_REFERRAL.takeIf { it.isNotBlank() }?.let { "&referralAccount=$it&referralFee=$REFERRAL_FEE_BPS" } ?: "")
         val o = HOSTS.firstNotNullOfOrNull { getJson("$it/order?$q") } ?: return null
         return parse(o)
     }

@@ -54,7 +54,7 @@ import java.util.Locale
  * says what this is and what it is not.
  */
 @Composable
-internal fun BridgeSheet(owner: String, onSend: (PayRequest) -> Unit, onDismiss: () -> Unit) {
+internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -92,7 +92,7 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest) -> Unit, onDismiss:
         quoting = true
         quotes = withContext(Dispatchers.IO) {
             runCatching { RocketX.quote(fromMint, "solana", if (usdc && sameCoin) toToken?.contract else null, t.id, amt) }.getOrDefault(emptyList())
-        }.filter { it.walletLess && !it.memoRequired }
+        }.filter { it.walletLess }
         quoting = false
         if (quotes.isEmpty()) error = ctx.getString(R.string.bridge_no_route)
     }
@@ -180,11 +180,10 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest) -> Unit, onDismiss:
                     val deposit = order?.depositAddress
                     when {
                         order == null || deposit == null -> error = ctx.getString(R.string.bridge_open_failed)
-                        order.memo != null -> error = ctx.getString(R.string.bridge_memo)
                         else -> {
-                            // The deposit is a payment like any other: Send, receipt, print.
+                            // The deposit is a payment like any other: Send, receipt, print. A memo, when the route wants one, rides in the transaction.
                             RocketX.remember(ctx, RocketX.Bridge(order.requestId, "", fromSym, if (usdc && sameCoin) "USDC" else t.native, t.name, System.currentTimeMillis(), order.exchange, deposit))
-                            onSend(PayRequest(deposit, amt, fromMint, ctx.getString(R.string.bridge_memo_line, t.name, order.exchange), "RocketX"))
+                            onSend(PayRequest(deposit, amt, fromMint, ctx.getString(R.string.bridge_memo_line, t.name, order.exchange), "RocketX"), order.memo)
                         }
                     }
                 }

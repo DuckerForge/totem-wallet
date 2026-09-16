@@ -35,3 +35,26 @@ object JupiterLend {
         if (c.responseCode in 200..299) JSONArray(c.inputStream.bufferedReader().readText()) else null
     } catch (e: Exception) { null }
 }
+
+/**
+ * Jupiter's own positions for a wallet (governance stake, perps, launchpad,
+ * offerbook, prediction markets): the Portfolio API, no key. Only Jupiter's
+ * platforms are listed there; the rest of DeFi is read from the chain.
+ */
+object JupiterPortfolio {
+    data class Position(val platform: String, val label: String, val name: String?, val valueUsd: Double, val apy: Double?) { fun platformId() = platform }
+
+    fun positions(owner: String): List<Position> {
+        val o = runCatching {
+            val c = (java.net.URL("https://api.jup.ag/portfolio/v1/positions/$owner").openConnection() as java.net.HttpURLConnection)
+                .apply { connectTimeout = 6_000; readTimeout = 20_000; setRequestProperty("Accept", "application/json") }
+            if (c.responseCode in 200..299) org.json.JSONObject(c.inputStream.bufferedReader().readText()) else null
+        }.getOrNull() ?: return emptyList()
+        val arr = o.optJSONArray("elements") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val e = arr.optJSONObject(i) ?: return@mapNotNull null
+            val v = e.optDouble("value").takeIf { !it.isNaN() && it > 0 } ?: return@mapNotNull null
+            Position(e.optString("platformId"), e.optString("label"), e.optString("name").takeIf { it.isNotEmpty() }, v, e.optDouble("netApy").takeIf { !it.isNaN() }?.let { it * 100 })
+        }
+    }
+}

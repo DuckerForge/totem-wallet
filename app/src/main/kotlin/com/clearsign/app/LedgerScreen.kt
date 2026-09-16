@@ -258,7 +258,27 @@ internal fun monthLabel(ym: String): String = runCatching {
 
 private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(at))
 
-internal fun fmtUi(v: Double): String = String.format(Locale.ROOT, "%,.6f", v).replace(',', ' ').trimEnd('0').trimEnd('.')
+/**
+ * A token amount, with as many decimals as the size of it deserves.
+ *
+ * It used to be six decimals for everything, with the thousands separator
+ * swapped for a space, so eighty thousand SKR read "80 779.072631": a number
+ * nobody groups that way, carrying four digits of noise. How much of a coin you
+ * hold is not measured to the millionth once you hold thousands of it, and the
+ * grouping belongs to the reader's own language.
+ */
+internal fun fmtUi(v: Double): String {
+    val a = kotlin.math.abs(v)
+    val pattern = when {
+        a >= 1_000 -> "%,.0f"
+        a >= 1 -> "%,.2f"
+        a >= 0.01 -> "%,.4f"
+        else -> "%,.6f"
+    }
+    return String.format(Locale.getDefault(), pattern, v).let {
+        if (pattern == "%,.0f") it else it.trimEnd('0').trimEnd { c -> !c.isDigit() }
+    }
+}
 internal fun fmtFiat(v: Double, cur: String): String =
     if (Settings.guest.value) "••••"
     else if (cur == "SOL") String.format(Locale.getDefault(), if (kotlin.math.abs(v) < 1) "%,.4f" else "%,.3f", v) + " SOL"

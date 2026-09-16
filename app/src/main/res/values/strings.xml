@@ -1510,7 +1510,10 @@
     <string name="sticker_written">Written. Touch it to try.</string>
     <string name="sticker_failed">Not written: %1$s</string>
     <string name="hero_per_day">/day</string>
-    <string name="hero_defi_day">DeFi pays about %1$s a day, %2$s a month. Estimated from today\'s rates.</string>
+        <string name="defi_guardians">Seeker Guardians</string>
+    <string name="hero_per_month">/month</string>
+    <string name="hero_defi_month">DeFi pays about %1$s a month, %2$s a year. Estimated from today\'s rates.</string>
+<string name="hero_defi_day">DeFi pays about %1$s a day, %2$s a month. Estimated from today\'s rates.</string>
     <string name="proof_show">Show the proof</string>
     <string name="proof_title">Proof of payment</string>
     <string name="proof_sub">Let the other phone read this.</string>

@@ -1238,6 +1238,8 @@
             <string name="crowd_no_roster">The Seeker census did not load, so there is nobody to follow yet.</string>
     <string name="crowd_no_scan">This build has no scanner, so there is no ranking yet. The census and the whales are measured and still true.</string>
     <string name="crowd_no_data">Nothing to show here.</string>
+    <string name="who_line">%1$s active wallets watched</string>
+    <string name="crowd_tab_live">Live</string>
 <string name="crowd_tab_buying">Buying</string>
     <string name="crowd_tab_holding">Holding</string>
     <string name="crowd_tab_whales">Whales</string>

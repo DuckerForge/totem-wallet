@@ -1238,6 +1238,8 @@
             <string name="crowd_no_roster">Il censimento dei Seeker non si è caricato, quindi non c\'è ancora nessuno da seguire.</string>
     <string name="crowd_no_scan">Questa versione non ha lo scanner, quindi non c\'è ancora una classifica. Il censimento e le balene sono misurati e restano veri.</string>
     <string name="crowd_no_data">Qui non c\'è niente da mostrare.</string>
+    <string name="who_line">%1$s portafogli attivi seguiti</string>
+    <string name="crowd_tab_live">Diretta</string>
 <string name="crowd_tab_buying">Comprano</string>
     <string name="crowd_tab_holding">Tengono</string>
     <string name="crowd_tab_whales">Balene</string>

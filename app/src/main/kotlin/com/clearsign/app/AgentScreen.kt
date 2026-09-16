@@ -480,6 +480,13 @@ private fun FollowsSection(refresh: Int) {
                             fontFamily = Inter, fontSize = 10.5.sp, color = if (last != null) Halo.mint else Halo.muted, maxLines = 1,
                         )
                     }
+                    // Mirror: leave a coin when this wallet leaves it. Off by default.
+                    var mirror by remember(w) { mutableStateOf(Follows.mirrors(ctx, w)) }
+                    Text(
+                        stringResource(if (mirror) R.string.follow_mirror_on else R.string.follow_mirror_off), fontFamily = Inter, fontSize = 10.5.sp,
+                        color = if (mirror) Halo.mint else Halo.muted,
+                        modifier = Modifier.clip(rs(8)).clickable { mirror = !mirror; Follows.setMirror(ctx, w, mirror); Haptics.tick(ctx) }.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
                     Text(
                         stringResource(R.string.follow_on), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber,
                         modifier = Modifier.clip(rs(8)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) }.padding(horizontal = 8.dp, vertical = 4.dp),

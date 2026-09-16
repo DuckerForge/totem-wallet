@@ -36,4 +36,18 @@ object Follows {
         prefs(ctx).edit().putString(KEY, JSONArray(next.toList()).toString()).apply()
         return wallet in next
     }
+
+    // ---- mirror: leave when they leave ----------------------------------------
+
+    fun mirrors(ctx: Context): Set<String> = runCatching {
+        val a = JSONArray(prefs(ctx).getString("mirror", "[]") ?: "[]")
+        (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotEmpty() } }.toSet()
+    }.getOrDefault(emptySet())
+
+    fun mirrors(ctx: Context, wallet: String) = wallet in mirrors(ctx)
+
+    fun setMirror(ctx: Context, wallet: String, on: Boolean) {
+        val next = if (on) mirrors(ctx) + wallet else mirrors(ctx) - wallet
+        prefs(ctx).edit().putString("mirror", JSONArray(next.toList()).toString()).apply()
+    }
 }

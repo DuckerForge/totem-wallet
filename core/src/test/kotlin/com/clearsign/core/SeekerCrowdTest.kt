@@ -148,4 +148,18 @@ class SeekerCrowdTest {
         assertEquals(1, s.size)
         assertTrue(s[0] is CrowdSignal.Followed)
     }
+
+    @Test
+    fun aFollowedWalletSellingIsItsOwnSignal() {
+        val now = 1_000_000_000_000L
+        val buys = listOf(
+            fbuy("W1", "MINTA", now - 10 * 60_000L, sol = 0.5),
+            CrowdBuy("W1", SeekerTier.DOLPHIN, "MINTB", "B", now - 5 * 60_000L, 0.4, sell = true),
+            CrowdBuy("W2", SeekerTier.WHALE, "MINTC", "C", now - 5 * 60_000L, 0.4, sell = true),
+        )
+        val out = SeekerCrowd.signals(buys, setOf("W1"), now)
+        assertTrue(out.any { it is CrowdSignal.Followed && it.mint == "MINTA" })
+        assertTrue(out.any { it is CrowdSignal.FollowedSell && it.mint == "MINTB" })
+        assertTrue(out.none { it.mint == "MINTC" })
+    }
 }

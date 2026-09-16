@@ -425,12 +425,35 @@ object TraderLoop {
         val at = System.currentTimeMillis()
         var problem: String? = null
         val moves = LinkedHashMap<String, Double>()
+        // Wallets the person mirrors: when one of them sold a coin we hold in
+        // the last hour, we leave too, before any price rule.
+        val mirrored = Follows.mirrors(ctx)
+        val soldByMirror: Map<String, com.clearsign.core.CrowdSignal.FollowedSell> = if (mirrored.isEmpty()) emptyMap() else runCatching {
+            val feed = SeekerFeed.cached(ctx) ?: return@runCatching emptyMap()
+            com.clearsign.core.SeekerCrowd.signals(feed.events, mirrored, at).filterIsInstance<com.clearsign.core.CrowdSignal.FollowedSell>().associateBy { it.mint }
+        }.getOrDefault(emptyMap())
         for (pos in Positions.open(ctx)) {
             // Failed three times already: it gets a slower lane, not the same
             // ninety seconds forever.
             if (at < pos.readyAt) continue
             val now = unitPriceLamports(pos) ?: continue
             pos.entryLamports?.takeIf { it > 0 }?.let { moves[pos.mint] = (now - it) / it * 100.0 }
+            soldByMirror[pos.mint]?.takeIf { it.at > pos.openedAt }?.let { sig ->
+                val why = ctx.getString(R.string.scout_signal_sold, com.clearsign.core.SeekerCrowd.nickname(sig.wallet), pos.symbol)
+                AgentTrace.say(why, AgentTrace.Kind.FOUND)
+                Positions.markClosing(ctx, pos.mint)
+                val sale = SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.LINK, acceptReal = true)
+                val v = (sale as? SessionActions.Sale.Judged)?.verdict
+                if (v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed) {
+                    Positions.remove(ctx, pos.mint)
+                    runCatching { SessionActions.closeEmpty(ctx, envelope) }
+                    return ExitOutcome(did = ctx.getString(R.string.trader_sold_mirror, pos.symbol, com.clearsign.core.SeekerCrowd.nickname(sig.wallet)), moves = moves)
+                }
+                val whyNot = v?.reason ?: ctx.getString(R.string.trader_net_down)
+                Positions.noteFailure(ctx, pos.mint, whyNot)
+                problem = ctx.getString(R.string.trader_sell_failed, pos.symbol, whyNot)
+                continue
+            }
             val exit = pos.verdict(now) ?: continue
 
             // The coins are in Jupiter's escrow, held by a take-profit order, so
@@ -800,6 +823,8 @@ object TraderLoop {
                     ((System.currentTimeMillis() - sig.at) / 60_000L).coerceAtLeast(0L),
                 )
                 is com.clearsign.core.CrowdSignal.Crowd -> ctx.getString(R.string.scout_signal_crowd, sig.whales, c.symbol)
+                // A sale is a reason to leave, not to enter: the exits read those.
+                is com.clearsign.core.CrowdSignal.FollowedSell -> continue
             }
             val graded = com.clearsign.core.scanMarket(listOf(c), cfg.gate, limit = 1)
             val pick = graded.picks.firstOrNull()

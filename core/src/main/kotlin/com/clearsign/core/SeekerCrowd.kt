@@ -35,6 +35,8 @@ data class CrowdBuy(
     val symbol: String,
     val at: Long,
     val solSpent: Double,
+    /** A sale, not a buy: the coin left and money came in. */
+    val sell: Boolean = false,
 )
 
 /** One coin in the ranking, with the numbers the card has to be able to show. */
@@ -56,6 +58,8 @@ sealed class CrowdSignal(val mint: String, val at: Long) {
     class Followed(mint: String, at: Long, val wallet: String, val solSpent: Double) : CrowdSignal(mint, at)
     /** Several whales bought it inside the window, independently of each other. */
     class Crowd(mint: String, at: Long, val whales: Int) : CrowdSignal(mint, at)
+    /** A wallet the person follows sold it: for whoever mirrors that wallet, a reason to leave. */
+    class FollowedSell(mint: String, at: Long, val wallet: String) : CrowdSignal(mint, at)
 }
 
 object SeekerCrowd {
@@ -71,11 +75,16 @@ object SeekerCrowd {
      * buying ten times is still one wallet.
      */
     fun signals(buys: List<CrowdBuy>, follows: Set<String>, now: Long, windowMs: Long = 60 * 60_000L, minWhales: Int = 2): List<CrowdSignal> {
-        val recent = buys.filter { it.at > now - windowMs && it.mint !in MONEY && it.solSpent >= MIN_SPEND_SOL }
+        val fresh = buys.filter { it.at > now - windowMs && it.mint !in MONEY && it.solSpent >= MIN_SPEND_SOL }
+        val recent = fresh.filter { !it.sell }
         val out = ArrayList<CrowdSignal>()
         val seen = HashSet<String>()
         for (b in recent.sortedByDescending { it.at }) {
             if (b.wallet in follows && seen.add(b.mint)) out += CrowdSignal.Followed(b.mint, b.at, b.wallet, b.solSpent)
+        }
+        val sold = HashSet<String>()
+        for (b in fresh.filter { it.sell }.sortedByDescending { it.at }) {
+            if (b.wallet in follows && sold.add(b.mint)) out += CrowdSignal.FollowedSell(b.mint, b.at, b.wallet)
         }
         recent.filter { it.tier == SeekerTier.WHALE }.groupBy { it.mint }.forEach { (mint, list) ->
             val whales = list.map { it.wallet }.toSet().size

@@ -1586,6 +1586,10 @@
     <string name="speed_note">Fast adds about 0.00002 SOL per transaction, Turbo about 0.0002. Swaps through Jupiter set their own.</string>
     <string name="env_expired_closed">The budget expired and closed itself</string>
     <string name="env_expired_open">The budget expired but could not close</string>
+    <string name="scout_signal_sold">Scout: %1$s, who you mirror, sold %2$s</string>
+    <string name="trader_sold_mirror">Sold %1$s: %2$s, who you mirror, sold it</string>
+    <string name="follow_mirror_on">sells too</string>
+    <string name="follow_mirror_off">buys only</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

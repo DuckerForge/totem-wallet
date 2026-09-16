@@ -55,13 +55,12 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
     ) {
         Text(stringResource(R.string.tab_settings), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Halo.ink)
 
-        var showPro by remember { mutableStateOf(false) }
-        ProCard { showPro = true }
-        if (showPro) ProSheet(signer, owner) { showPro = false }
-
-        SettingsGroup(stringResource(R.string.set_g_look), stringResource(R.string.set_g_look_sub), HIcon.PALETTE) {
-            ThemesCard(signer, owner) { showPro = true }
-            CrtCard()
+        // What people touch most, first. Everything is included: there is no
+        // plan to buy and no card to say so.
+        SettingsGroup(stringResource(R.string.set_g_wallet), stringResource(R.string.set_g_wallet_sub), HIcon.WALLET) {
+            tools()
+            ConnectionsCard()
+            ProtectionsCard()
         }
 
         SettingsGroup(stringResource(R.string.set_g_agent), stringResource(R.string.set_g_agent_sub), HIcon.SPARK) {
@@ -70,24 +69,26 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
             WebCheckCard()
         }
 
-        SettingsGroup(stringResource(R.string.set_g_wallet), stringResource(R.string.set_g_wallet_sub), HIcon.WALLET) {
-            ConnectionsCard()
-            tools()
-            ProtectionsCard()
-            AttestationCard()
-            SwapFeesCard(signer, owner)
-        }
-
         SettingsGroup(stringResource(R.string.set_g_phone), stringResource(R.string.set_g_phone_sub), HIcon.QR) {
             WidgetCard()
             CompanionCard()
             WatchtowerCard()
         }
 
+        SettingsGroup(stringResource(R.string.set_g_look), stringResource(R.string.set_g_look_sub), HIcon.PALETTE) {
+            ThemesCard(signer, owner) {}
+            CrtCard()
+        }
+
         SettingsGroup(stringResource(R.string.set_g_general), stringResource(R.string.set_g_general_sub), HIcon.INFO) {
             LanguageCard()
             CurrencyCard()
             AboutCard()
+        }
+
+        SettingsGroup(stringResource(R.string.set_g_adv), stringResource(R.string.set_g_adv_sub), HIcon.KEY) {
+            AttestationCard()
+            SwapFeesCard(signer, owner)
         }
         Spacer(Modifier.height(8.dp))
     }

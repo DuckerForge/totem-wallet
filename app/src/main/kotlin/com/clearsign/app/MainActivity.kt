@@ -252,6 +252,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showContactTap by remember { mutableStateOf(false) }
         var showLinkBox by remember { mutableStateOf(false) }
         var showCustomize by remember { mutableStateOf(false) }
+        var showCompanion by remember { mutableStateOf(false) }
         var showChip by remember { mutableStateOf(false) }
         var guestNote by remember { mutableStateOf(0L) }
         var showCrowd by remember { mutableStateOf(false) }
@@ -304,6 +305,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
             onDispose { lifecycle.removeObserver(obs) }
         }
         val owner = accounts.firstOrNull()?.account?.pubkeyBase58
+        // The bubble comes back on its own when asked to.
+        LaunchedEffect(owner) { if (owner != null && CompanionPrefs.autoStart(ctx) && CompanionService.canRun(ctx)) CompanionService.start(ctx) }
 
         fun connect() {
             busy = true; status = null
@@ -501,8 +504,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onLink = { showMore = false; showLinkBox = true },
                 onContactTap = { showMore = false; showContactTap = true },
                 onCustomize = { showMore = false; showCustomize = true },
+                onCompanion = { showMore = false; showCompanion = true },
             ) { showMore = false }
             if (showCustomize) HomeActionsSheet { showCustomize = false }
+        if (showCompanion) CompanionPage(owner) { showCompanion = false }
             if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
         }
         if (showBridge && owner != null) {

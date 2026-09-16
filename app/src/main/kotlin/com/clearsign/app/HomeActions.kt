@@ -334,7 +334,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onCustomize: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onCustomize: () -> Unit = {}, onCompanion: () -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -353,7 +353,7 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)
-            MoreRow(HIcon.WALLET, stringResource(R.string.widget_card_title), onSettings)
+            MoreRow(HIcon.SPARK, stringResource(R.string.comp_page_title), onCompanion)
             MoreRow(HIcon.SETTINGS, stringResource(R.string.tab_settings), onSettings)
             androidx.compose.foundation.layout.Spacer(Modifier.size(Space.sm))
         }

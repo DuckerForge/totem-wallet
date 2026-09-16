@@ -243,7 +243,7 @@
     <string name="theme_free">Gratis</string>
     <string name="theme_owned">Tuo</string>
     <string name="theme_price">%1$d SKR</string>
-    <string name="theme_note_free">Halo è gratis. I temi premium si sbloccano con un pagamento unico in SKR, firmato dal Seed Vault.</string>
+    <string name="theme_note_free">Tocca una tessera per cambiare stile. Tutti i temi sono inclusi.</string>
     <string name="theme_note_paid">%1$s — sbloccato con SKR. Tocca un\'altra tessera per cambiare.</string>
     <string name="theme_unlock_title">Sblocca %1$s</string>
     <string name="theme_unlock_note">Pagamento unico in SKR, on-chain.</string>
@@ -492,7 +492,7 @@
     <string name="onb_next">Avanti</string>
     <string name="onb_start">Collega il Seed Vault</string>
     <string name="onb_skip">Salta</string>
-    <string name="theme_note_pro">Tocca una tessera per cambiare stile. I temi premium sono inclusi in Apex Pro.</string>
+    <string name="theme_note_pro">Tocca una tessera per cambiare stile. Tutti i temi sono inclusi.</string>
     <string name="theme_pro_tag">Pro</string>
     <string name="pro_title">Apex Pro</string>
     <string name="pro_active">Attivo — grazie</string>
@@ -559,7 +559,7 @@
     <string name="swapfees_log">Attiva account fee swap</string>
     <string name="watch_channel">Avvisi Watchtower</string>
     <string name="watch_title">Watchtower</string>
-    <string name="watch_pro">Avvisi in background — funzione Apex Pro</string>
+    <string name="watch_pro">Avvisi in background</string>
     <string name="watch_on">Attivo — sto sorvegliando il wallet</string>
     <string name="watch_off">Spento</string>
     <string name="watch_enable">Attiva</string>
@@ -961,7 +961,7 @@
     <string name="set_g_look">Grafica</string>
     <string name="set_g_look_sub">Temi, colori, effetto TV</string>
     <string name="set_g_agent">Agente</string>
-    <string name="set_g_agent_sub">Agent Gate e modello della chat</string>
+    <string name="set_g_agent_sub">Agent Gate, modello della chat, controllo sul web</string>
     <string name="set_g_wallet">Portafoglio e sicurezza</string>
     <string name="set_g_wallet_sub">Salute, conti, contatti, protezioni</string>
     <string name="set_g_phone">Su questo telefono</string>
@@ -1449,6 +1449,8 @@
     <string name="send_poison_this">Questo:</string>
     <string name="send_poison_ack">Ho controllato, è un altro indirizzo</string>
     <string name="send_poison_acked">Preso nota. Puoi andare avanti.</string>
+    <string name="set_g_adv">Avanzate</string>
+    <string name="set_g_adv_sub">Chiave degli scontrini, conti delle commissioni swap</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 moneta in corsa</item>

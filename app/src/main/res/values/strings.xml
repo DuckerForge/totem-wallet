@@ -243,7 +243,7 @@
     <string name="theme_free">Free</string>
     <string name="theme_owned">Owned</string>
     <string name="theme_price">%1$d SKR</string>
-    <string name="theme_note_free">Halo is free. Premium themes unlock with a one-time SKR payment, signed by your Seed Vault.</string>
+    <string name="theme_note_free">Tap a tile to change the look. Every theme is included.</string>
     <string name="theme_note_paid">%1$s — unlocked with SKR. Tap another tile to switch.</string>
     <string name="theme_unlock_title">Unlock %1$s</string>
     <string name="theme_unlock_note">One-time payment in SKR, on-chain.</string>
@@ -492,7 +492,7 @@
     <string name="onb_next">Next</string>
     <string name="onb_start">Connect the Seed Vault</string>
     <string name="onb_skip">Skip</string>
-    <string name="theme_note_pro">Tap a tile to change the look. Premium themes come with Apex Pro.</string>
+    <string name="theme_note_pro">Tap a tile to change the look. Every theme is included.</string>
     <string name="theme_pro_tag">Pro</string>
     <string name="pro_title">Apex Pro</string>
     <string name="pro_active">Active — thank you</string>
@@ -559,7 +559,7 @@
     <string name="swapfees_log">Activate swap fee accounts</string>
     <string name="watch_channel">Watchtower alerts</string>
     <string name="watch_title">Watchtower</string>
-    <string name="watch_pro">Background alerts — a Apex Pro feature</string>
+    <string name="watch_pro">Background alerts</string>
     <string name="watch_on">On — watching your wallet</string>
     <string name="watch_off">Off</string>
     <string name="watch_enable">Enable</string>
@@ -961,7 +961,7 @@
     <string name="set_g_look">Look</string>
     <string name="set_g_look_sub">Themes, colours, old-TV effect</string>
     <string name="set_g_agent">Agent</string>
-    <string name="set_g_agent_sub">Agent Gate and the chat model</string>
+    <string name="set_g_agent_sub">Agent Gate, chat model, web check before buying</string>
     <string name="set_g_wallet">Wallet and safety</string>
     <string name="set_g_wallet_sub">Health, accounts, contacts, protections</string>
     <string name="set_g_phone">On this phone</string>
@@ -1449,6 +1449,8 @@
     <string name="send_poison_this">This one:</string>
     <string name="send_poison_ack">I checked, it is a different address</string>
     <string name="send_poison_acked">Noted. You can go on.</string>
+    <string name="set_g_adv">Advanced</string>
+    <string name="set_g_adv_sub">Receipt signing key, swap fee accounts</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
     <plurals name="trader_progress_title">
         <item quantity="one">1 coin running</item>

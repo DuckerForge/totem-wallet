@@ -153,7 +153,7 @@ private fun WalletMoves(mint: String, list: List<CrowdBuy>) {
     val symbol = list.first().symbol
     var series by remember(mint) { mutableStateOf<List<Gecko.Candle>>(emptyList()) }
     LaunchedEffect(mint) {
-        series = withContext(Dispatchers.IO) { runCatching { Gecko.series(mint, Gecko.Span.HOURS) }.getOrDefault(emptyList()) }
+        series = withContext(Dispatchers.IO) { runCatching { Gecko.series(mint, spanFor(list)) }.getOrDefault(emptyList()) }
     }
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -172,7 +172,11 @@ private fun WalletMoves(mint: String, list: List<CrowdBuy>) {
                 val from = series.first().at
                 val to = series.last().at
                 val span = (to - from).coerceAtLeast(1L).toFloat()
-                val marks = list.filter { it.at in from..to }
+                // A move newer than the last candle belongs at the right edge, not
+                // nowhere. The last candle starts at the top of the current hour,
+                // so anything bought in the last hour was falling outside the
+                // range and the card then claimed the move was two days old.
+                val marks = list.filter { it.at >= from }
                     .map { SparkMark(((it.at - from) / span).coerceIn(0f, 1f), it.sell) }
                 Box(Modifier.fillMaxWidth().height(72.dp)) {
                     Spark(series.map { it.close }, Halo.cyan, marks = marks)
@@ -185,4 +189,23 @@ private fun WalletMoves(mint: String, list: List<CrowdBuy>) {
             }
         }
     }
+}
+
+/**
+ * Which chart makes the moves readable.
+ *
+ * Two days of hourly candles is right for "where is this coin going". It is
+ * useless for a wallet that bought and sold inside twenty minutes: both rings
+ * land on the same pixel and the picture says nothing. When everything happened
+ * recently and close together, five-minute candles over five hours pull the two
+ * apart.
+ */
+internal fun spanFor(moves: List<com.clearsign.core.CrowdBuy>): Gecko.Span {
+    if (moves.isEmpty()) return Gecko.Span.HOURS
+    val now = System.currentTimeMillis()
+    val oldest = moves.minOf { it.at }
+    val tight = moves.maxOf { it.at } - oldest
+    // Inside the window the short chart can actually cover, and tight enough
+    // that the long one would stack them.
+    return if (now - oldest < 4 * 3_600_000L && tight < 3 * 3_600_000L) Gecko.Span.MINUTES else Gecko.Span.HOURS
 }

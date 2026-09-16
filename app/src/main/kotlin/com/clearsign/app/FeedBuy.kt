@@ -68,7 +68,7 @@ internal fun FeedBuyPanel(
         withContext(Dispatchers.IO) {
             px = runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()
             decimals = runCatching { JupiterTokens.byMints(listOf(mint))[mint]?.decimals }.getOrNull()
-            series = runCatching { Gecko.series(mint, Gecko.Span.HOURS) }.getOrDefault(emptyList())
+            series = runCatching { Gecko.series(mint, spanFor(moves)) }.getOrDefault(emptyList())
         }
     }
     LaunchedEffect(owner) {
@@ -110,8 +110,11 @@ internal fun FeedBuyPanel(
             val from = series.first().at
             val to = series.last().at
             val span = (to - from).coerceAtLeast(1L).toFloat()
+            // Anything after the last candle sits at the right edge: the last
+            // candle opens at the top of the hour, so a purchase from ten minutes
+            // ago is newer than it and would otherwise vanish from the line.
             val marks = moves
-                .filter { it.at in from..to }
+                .filter { it.at >= from }
                 .map { SparkMark(((it.at - from) / span).coerceIn(0f, 1f), it.sell) }
             Box(Modifier.fillMaxWidth().height(if (marks.isEmpty()) 58.dp else 72.dp)) {
                 Spark(series.map { it.close }, if ((px?.change24h ?: 0.0) >= 0) Halo.mint else Halo.red, marks = marks)
@@ -119,7 +122,7 @@ internal fun FeedBuyPanel(
             // What the price has done since they went in. Read off the chart, so
             // it is the coin's move over that stretch and not a claim about the
             // money they made, which nobody can see from here.
-            moves.firstOrNull { !it.sell && it.at in from..to }?.let { entry ->
+            moves.firstOrNull { !it.sell && it.at >= from }?.let { entry ->
                 val i = (((entry.at - from) / span) * (series.size - 1)).toInt().coerceIn(0, series.lastIndex)
                 val then = series[i].close
                 val nowPx = series.last().close

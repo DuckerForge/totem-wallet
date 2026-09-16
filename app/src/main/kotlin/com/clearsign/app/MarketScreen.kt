@@ -501,6 +501,7 @@ private fun CoinRow(c: Market.Coin, followed: Boolean, amount: Double, onOpen: (
  */
 @Composable
 private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String?, onBuy: (String) -> Unit, onSaved: () -> Unit, onDismiss: () -> Unit) {
+
     val ctx = LocalContext.current
     var qty by remember(coin.key) { mutableStateOf(Watchlist.amount(ctx, coin.key).takeIf { it > 0 }?.let { fmtUi(it) } ?: "") }
     var mint by remember(coin.key) { mutableStateOf(coin.mint) }
@@ -535,6 +536,22 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 coin.priceUsd?.let {
                     Text(fmtPrice(it, "USD"), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink)
                 }
+                Spacer(Modifier.width(10.dp))
+                // The star was missing here, so opening a coin you already follow
+                // showed nothing that said so: the sheet looked like it had
+                // forgotten. It is the same star as the row behind it, and it
+                // means the same thing.
+                var starred by remember(coin.key) { mutableStateOf(coin.key in Watchlist.all(ctx)) }
+                Box(
+                    Modifier.size(38.dp).clip(rs(999))
+                        .background(if (starred) Halo.amber.copy(alpha = 0.16f) else Halo.cardSoft)
+                        .clickable {
+                            if (starred) Watchlist.remove(ctx, coin.key) else Watchlist.add(ctx, coin.key)
+                            starred = !starred
+                            Haptics.tick(ctx); onSaved()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) { HaloIcon(if (starred) HIcon.STAR_FILLED else HIcon.STAR, if (starred) Halo.amber else Halo.muted, 19.dp) }
             }
 
             Text(stringResource(R.string.market_qty_title), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)

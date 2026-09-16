@@ -151,6 +151,11 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                         scope.launch { val b = withContext(Dispatchers.IO) { ReceiptPdf(ctx).receipt(e, currency) }; save("clearsign-receipt-${e.id.take(8)}.pdf", b) }
                     }
                 }
+                if (e.attestation != null && e.attestationSig != null) {
+                    var showProof by remember { mutableStateOf(false) }
+                    GhostButton(stringResource(R.string.proof_show), icon = HIcon.QR, tint = Halo.mint) { showProof = true }
+                    if (showProof) ProofSheet(e) { showProof = false }
+                }
                 if (e.attestation != null && e.attestationSig != null) GhostButton(stringResource(R.string.detail_share_proof), icon = HIcon.SHIELD_LOCK, tint = Halo.cyan) {
                     scope.launch {
                         val f = withContext(Dispatchers.IO) { Exports.write(ctx, "clearsign-proof-${e.id.take(8)}.json", Attestation.exportBundle(e.attestation!!, e.attestationSig!!).toByteArray()) }

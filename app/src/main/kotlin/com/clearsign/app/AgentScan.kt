@@ -28,6 +28,8 @@ internal fun rememberAgentScan(onError: (String) -> Unit = {}): () -> Unit {
     val notARequest = stringResource(R.string.gate_not_a_request)
     val launcher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents?.trim() ?: return@rememberLauncherForActivityResult
+        // A proof of payment held up by somebody: not an agent request, but ours to read.
+        if (Proof.looksLike(text)) { Proof.incoming.value = text; return@rememberLauncherForActivityResult }
         if (!text.startsWith("apex://agent", ignoreCase = true) && !text.startsWith("omni://agent", ignoreCase = true)) { onError(notARequest); return@rememberLauncherForActivityResult }
         val uri = runCatching { Uri.parse(text) }.getOrNull()
             ?: return@rememberLauncherForActivityResult onError(notARequest)

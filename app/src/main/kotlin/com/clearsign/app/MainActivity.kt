@@ -428,6 +428,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
             // this Box so it fills the same height the tabs do.
             if (showChat) ChatScreen { showChat = false }
         }
+        Proof.incoming.value?.let { text -> ProofCheckSheet(text, owner) { Proof.incoming.value = null } }
         val first = accounts.firstOrNull()?.account
         if (showSend && first != null) {
             SendSheet(

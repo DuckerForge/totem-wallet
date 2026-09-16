@@ -122,8 +122,19 @@ internal class Holdings(val top: List<Held>, val unpriced: Int)
  * On the scanner's key, never the agent's, and never for all sixty at once: the
  * card still refuses to reprice a list nobody is looking at.
  */
-/** What one wallet is holding right now, priced. Shared with the wallet page. */
+/**
+ * What one wallet is holding right now, priced, read by the service and shared.
+ *
+ * It used to be read by the phone, with the scanner key compiled into the APK.
+ * Two mistakes in one: the quota was spent by users one at a time, and the key
+ * travelled inside the application where anybody can pull it out. The crowd scan
+ * has not made that mistake for months and this is the same shape: one reads,
+ * everybody gets the same answer, and a thousand people opening the same whale
+ * is one read. The phone falls back to its own key only when no service is
+ * configured, which is a build for one person.
+ */
 internal fun holdingsOf(address: String, take: Int = 3): Holdings? {
+    shared(address, take)?.let { return it }
     val rpc = BuildConfig.SCAN_RPC_URL
     if (rpc.isBlank()) return null
     val accounts = runCatching { SolanaRpc.tokensOf(rpc, address) }.getOrNull() ?: return null
@@ -304,3 +315,25 @@ private fun fmt(v: Double): String = when {
 
 /** What each whale holds, kept for as long as the app lives: one wallet, one read. */
 private val heldMemo = java.util.concurrent.ConcurrentHashMap<String, Holdings>()
+
+/** The service's answer, already priced. Null when there is no service or it did not answer. */
+private fun shared(address: String, take: Int): Holdings? {
+    val base = BuildConfig.CROWD_URL.takeIf { it.isNotBlank() } ?: return null
+    val body = runCatching {
+        val c = (java.net.URL(base.trimEnd('/') + "/?w=" + address).openConnection() as java.net.HttpURLConnection)
+            .apply { connectTimeout = 6_000; readTimeout = 12_000; setRequestProperty("Accept", "application/json") }
+        if (c.responseCode !in 200..299) null else c.inputStream.bufferedReader().use { it.readText() }
+    }.getOrNull() ?: return null
+    return runCatching {
+        val o = org.json.JSONObject(body)
+        val arr = o.optJSONArray("top") ?: return null
+        val list = ArrayList<Held>(arr.length())
+        for (i in 0 until arr.length()) {
+            val r = arr.optJSONObject(i) ?: continue
+            val mint = r.optString("m").takeIf { it.isNotEmpty() } ?: continue
+            list += Held(mint, JupiterTokens.cached(mint)?.symbol ?: mint.take(4), r.optDouble("q"), r.optDouble("u"))
+        }
+        runCatching { JupiterTokens.warm(list.map { it.mint }) }
+        Holdings(list.take(take), o.optInt("unpriced"))
+    }.getOrNull()
+}

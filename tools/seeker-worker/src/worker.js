@@ -342,11 +342,79 @@ function b64ToBuf(b64) {
   return bytes.buffer;
 }
 
+const TOKEN = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN22 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+/** Un portafoglio letto una volta vale per tutti per mezz'ora. */
+const HOLD_TTL = 30 * 60;
+
+/**
+ * Cosa tiene un portafoglio, letto qui e condiviso con tutti.
+ *
+ * Lo leggeva il telefono, con la chiave dello scanner compilata dentro l'APK.
+ * Due sbagli in uno: la quota se la mangiavano gli utenti uno alla volta, e la
+ * chiave viaggiava dentro l'applicazione, dove chiunque può tirarla fuori. È lo
+ * stesso errore che la scansione della folla non fa da mesi, ed è tutto il
+ * motivo per cui questo servizio esiste: uno legge, tutti leggono la stessa
+ * cosa. Mille persone che aprono la stessa balena sono una lettura, non mille.
+ */
+async function holdingsOf(env, addr) {
+  const key = "h:" + addr;
+  const cached = await env.SEEKER.get(key);
+  if (cached) return cached;
+
+  const amounts = new Map();
+  for (const program of [TOKEN, TOKEN22]) {
+    const res = await rpc(env, "getTokenAccountsByOwner", [
+      addr, { programId: program }, { encoding: "jsonParsed" },
+    ]);
+    for (const a of (res && res.value) || []) {
+      const d = a.account && a.account.data;
+      const info = d && d.parsed && d.parsed.info;
+      if (!info) continue;
+      const ui = info.tokenAmount && info.tokenAmount.uiAmount;
+      if (!ui) continue;
+      amounts.set(info.mint, (amounts.get(info.mint) || 0) + ui);
+    }
+  }
+  const mints = [...amounts.keys()];
+  const px = {};
+  // I prezzi vengono da Jupiter, che non chiede chiavi, cinquanta alla volta.
+  for (let i = 0; i < mints.length && i < 150; i += 50) {
+    const r = await fetch("https://lite-api.jup.ag/price/v3?ids=" + mints.slice(i, i + 50).join(","));
+    const j = r.ok ? await r.json().catch(() => null) : null;
+    for (const m in j || {}) if (j[m] && j[m].usdPrice) px[m] = j[m].usdPrice;
+  }
+  const priced = [];
+  let unpriced = 0;
+  for (const [mint, amount] of amounts) {
+    const usd = (px[mint] || 0) * amount;
+    if (usd >= 1) priced.push({ m: mint, q: amount, u: Math.round(usd * 100) / 100 });
+    else unpriced++;
+  }
+  priced.sort((a, b) => b.u - a.u);
+  const body = JSON.stringify({ at: Date.now(), top: priced.slice(0, 12), unpriced });
+  await env.SEEKER.put(key, body, { expirationTtl: HOLD_TTL });
+  return body;
+}
+
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweep(env));
   },
   async fetch(request, env) {
+    // Un portafoglio solo, per chi ha aperto la pagina di una persona.
+    const url = new URL(request.url);
+    const who = url.searchParams.get("w");
+    if (who && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(who)) {
+      const body = await holdingsOf(env, who).catch(() => null);
+      return new Response(body || '{"at":0,"top":[],"unpriced":0}', {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=900",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
     const body = (await env.SEEKER.get("crowd")) || '{"at":0,"followed":0,"rows":[]}';
     return new Response(body, {
       headers: {

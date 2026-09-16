@@ -55,7 +55,12 @@ const KEEP = 3 * 24 * 3600_000;
  */
 const BUDGET = 45;
 /** Le balene si leggono tutte a ogni giro (tredici blocchi); i delfini a turno, cinque blocchi. */
-const DOLPHIN_CHUNKS_PER_RUN = 5;
+// Dodici blocchi da cento, non cinque. Con 93 blocchi un giro completo dei
+// delfini scende da tre ore e dieci a un'ora e venti, e le volte al giorno
+// salgono da sette a diciotto. Più su non si va: il piano gratuito dà cinquanta
+// sotto-richieste per esecuzione, BUDGET ne prende 45, le balene ne occupano già
+// tredici, e quello che resta serve a leggere le firme di chi si è mosso.
+const DOLPHIN_CHUNKS_PER_RUN = 12;
 
 async function rpc(env, method, params) {
   const r = await fetch(env.HELIUS_URL, {
@@ -206,16 +211,38 @@ async function sweep(env) {
   const state = JSON.parse((await env.SEEKER.get("state2")) || "{}");
   let buys = state.buys || [];
   let cursor = state.cursor || 0;
-  // Mezz'ora di sovrapposizione: abbastanza da non perdere niente fra un giro e
-  // l'altro, poca abbastanza da non rileggere le stesse transazioni per un'ora.
-  const since = state.since || Date.now() - 2 * 3600_000;
+  // Da quando guardare le firme, per ogni portafoglio, e non una soglia sola.
+  //
+  // Era una sola: mezz'ora prima del giro, riscritta a ogni giro. Per le balene
+  // andava bene, perché si rileggono ogni dieci minuti. Per i delfini era una
+  // trappola: il loro blocco torna sotto gli occhi ogni tre ore, quindi quando
+  // uno risultava "mosso" le sue firme erano quasi sempre più vecchie di mezz'ora
+  // e venivano buttate tutte, mentre il suo saldo era già stato sovrascritto e
+  // quel movimento non si poteva più ritrovare. Sparivano così quasi tutti gli
+  // acquisti dei nove Seeker su dieci che non sono balene, ed è il motivo per cui
+  // la classifica diceva "tredici su quattordici sono balene": non comprano di
+  // più, li guardavamo soltanto noi.
+  //
+  // Adesso ogni blocco ricorda quando è stato letto l'ultima volta, e la soglia
+  // di un portafoglio è quella del suo blocco. Le balene tengono la loro.
+  const seen = state.seen || {};
+  const nowStart = Date.now();
+  const FALLBACK = nowStart - 2 * 3600_000;
+  const whaleSince = state.since || FALLBACK;
 
   const chunks = [];
+  const chunkIds = [];
   for (let k = 0; k < DOLPHIN_CHUNKS_PER_RUN && rw.nd > 0; k++) {
-    const raw = await env.SEEKER.get("rd:" + ((cursor + k) % rw.nd));
-    if (raw) chunks.push(JSON.parse(raw));
+    const id = (cursor + k) % rw.nd;
+    const raw = await env.SEEKER.get("rd:" + id);
+    if (raw) { chunks.push(JSON.parse(raw)); chunkIds.push(id); }
   }
   cursor = (cursor + DOLPHIN_CHUNKS_PER_RUN) % Math.max(rw.nd, 1);
+  // Quanto tempo fa questo blocco è stato guardato l'ultima volta. Alla prima
+  // passata non lo sappiamo, e due ore è un compromesso onesto: abbastanza
+  // indietro da prendere qualcosa, non tanto da rileggere mezza giornata.
+  const chunkSince = new Map();
+  chunkIds.forEach((id) => chunkSince.set(id, seen[id] || FALLBACK));
 
   // I saldi: un array di numeri, dentro lo stato come base64. Prima stavano in
   // una chiave a parte, letta e scritta a ogni giro: due scritture per giro,
@@ -235,7 +262,7 @@ async function sweep(env) {
   };
 
   const movers = [];
-  const read = async (list, whale) => {
+  const read = async (list, whale, since) => {
     // list: [[addr, idx], ...] di al più cento
     const res = await call("getMultipleAccounts", [
       list.map((x) => x[0]),
@@ -247,13 +274,15 @@ async function sweep(env) {
       const was = bal[x[1]];
       // Alla primissima lettura non c'è un prima: si registra e basta, perché
       // inventare un movimento da un confronto che non esiste segnerebbe tutti.
-      if (was !== 0 && was !== lam) movers.push({ a: x[0], w: whale });
+      // La soglia viaggia con il portafoglio: quella del suo blocco per un
+      // delfino, quella del giro per una balena.
+      if (was !== 0 && was !== lam) movers.push({ a: x[0], w: whale, since });
       bal[x[1]] = lam;
     });
   };
 
-  for (let i = 0; i < rw.w.length; i += 100) await read(rw.w.slice(i, i + 100), true);
-  for (const c of chunks) await read(c, false);
+  for (let i = 0; i < rw.w.length; i += 100) await read(rw.w.slice(i, i + 100), true, whaleSince);
+  for (let k = 0; k < chunks.length; k++) await read(chunks[k], false, chunkSince.get(chunkIds[k]) || FALLBACK);
 
   // Balene per prime: se la riserva finisce, deve finire sui più piccoli.
   movers.sort((a, b) => (b.w ? 1 : 0) - (a.w ? 1 : 0));
@@ -261,12 +290,15 @@ async function sweep(env) {
     // Una firma più qualche transazione: senza questo margine l'ultimo
     // portafoglio della lista farebbe saltare l'intera esecuzione.
     if (left < 5) break;
-    const sigs = await call("getSignaturesForAddress", [m.a, { limit: 5 }]);
+    // Dieci firme e non cinque: un portafoglio che si è mosso dopo tre ore ne ha
+    // spesso più di cinque, e tagliare a cinque buttava via proprio le più vecchie,
+    // cioè quelle che spiegano il movimento che ci ha fatto guardare.
+    const sigs = await call("getSignaturesForAddress", [m.a, { limit: 10 }]);
     for (const s of sigs || []) {
       if (left <= 1) break;
       if (s.err || !s.blockTime) continue;
       const at = s.blockTime * 1000;
-      if (at <= since) continue;
+      if (at <= m.since) continue;
       const tx = await call("getTransaction", [
         s.signature,
         { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
@@ -288,6 +320,9 @@ async function sweep(env) {
     "state2",
     JSON.stringify({
       buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length, crowd: fp, at: now,
+      // Quando abbiamo guardato ciascun blocco, così il prossimo giro che lo
+      // riprende sa da dove leggere le firme invece di buttarle.
+      seen: Object.assign({}, seen, Object.fromEntries(chunkIds.map((id) => [id, now]))),
       bal: bufToB64(bal.buffer),
     }),
   );

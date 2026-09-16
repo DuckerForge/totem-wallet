@@ -87,6 +87,8 @@ internal fun CrowdFeed(
     open: Boolean,
     onToggle: () -> Unit,
     played: MutableSet<String>,
+    /** Tapping the name opens the person, not the coin. */
+    onWallet: (String) -> Unit = {},
     owner: String? = null,
     signer: SeedVaultSigner? = null,
     /** A coin to open on arrival, when a notification brought us here. */
@@ -156,7 +158,7 @@ internal fun CrowdFeed(
                 val mine = openRow == e.mint
                 Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FeedRow(e, moves.size, now, mine) { openRow = if (mine) null else e.mint }
+                        FeedRow(e, moves.size, now, mine, onWallet = { onWallet(e.wallet) }) { openRow = if (mine) null else e.mint }
                         // The terminal, under the row that made you want it. Nobody
                         // leaves the feed to trade any more.
                         if (mine) FeedBuyPanel(e.mint, e.symbol, moves, owner, signer) { openRow = null }
@@ -186,7 +188,7 @@ private fun LiveDot() {
 }
 
 @Composable
-private fun FeedRow(e: CrowdBuy, times: Int, now: Long, open: Boolean, onOpen: () -> Unit) {
+private fun FeedRow(e: CrowdBuy, times: Int, now: Long, open: Boolean, onWallet: () -> Unit, onOpen: () -> Unit) {
     val whale = e.tier == SeekerTier.WHALE
     // A sale reads red whoever made it: the size of the wallet matters less than
     // the direction when somebody is on the way out.
@@ -206,7 +208,10 @@ private fun FeedRow(e: CrowdBuy, times: Int, now: Long, open: Boolean, onOpen: (
         // The level, on the left, where a reading belongs. It used to sit next to
         // the coin name, where "balena · 97 SOL" read as if they had bought 97 of
         // the coin — the number was right and in exactly the wrong place.
-        Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(42.dp).clickable { onWallet(); Haptics.tick(ctx) },
+            contentAlignment = Alignment.Center,
+        ) {
             Box(
                 Modifier.size(36.dp).align(Alignment.TopStart).clip(rs(999)).background(tint.copy(alpha = 0.13f))
                     .border(1.2.dp, tint.copy(alpha = 0.55f), rs(999)),

@@ -9,6 +9,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
@@ -129,12 +131,22 @@ internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
                     color = Halo.cyan, modifier = Modifier.weight(1f),
                 )
                 Text(
-                    if (looking) stringResource(R.string.crowd_looking)
-                    else stringResource(R.string.crowd_followed, followed),
+                    if (looking) stringResource(R.string.crowd_looking) else stringResource(R.string.crowd_window),
                     fontFamily = Mono, fontSize = 11.sp,
                     color = if (looking) Halo.cyan else Halo.muted, style = Tabular,
                 )
             }
+            // What the rows are counted over, before the rows.
+            //
+            // The header used to say "10,527 wallets" right above numbers like
+            // "14 different wallets", and the two are not on the same scale: the
+            // first is the roster, the second is what the scanner actually
+            // managed to watch buy something that day, which is a hundred or so.
+            // Putting the roster next to the rows made every row look broken.
+            Text(
+                stringResource(R.string.crowd_basis, followed),
+                fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
+            )
 
             // The braid is only drawn when there is something to braid. Empty, it was
             // a tall box with a phone and a flat line in it, which looks like a
@@ -151,9 +163,22 @@ internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
                 )
             } else if (ranks.isNotEmpty()) {
                 ranks.take(LANES).forEach { r -> CrowdRow(r, onOpen) }
+                if (ranks.size > LANES) Text(
+                    stringResource(R.string.crowd_more, ranks.size - LANES),
+                    fontFamily = Inter, fontSize = 11.sp, color = Halo.muted,
+                )
                 Text(
                     stringResource(R.string.crowd_note),
                     fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
+                )
+                // The bias, admitted on the card that carries it. Whales are
+                // re-read every ten minutes and the rest every hour and twenty,
+                // so a whale's purchase is far likelier to be caught than
+                // anybody else's, and the whale count on each row is partly a
+                // fact about our own scanning and not only about the crowd.
+                Text(
+                    stringResource(R.string.crowd_bias),
+                    fontFamily = Inter, fontSize = 11.sp, color = Halo.amber, lineHeight = 15.sp,
                 )
             }
         }
@@ -410,7 +435,7 @@ internal fun NothingHere(text: String) {
     Text(text, style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
 }
 
-private enum class ScoutTab { LIVE, HOLDING, WHALES }
+private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES, FOLLOWED }
 
 /**
  * The switch, in the app's own language rather than Material's.
@@ -421,18 +446,33 @@ private enum class ScoutTab { LIVE, HOLDING, WHALES }
  * show through while they slide past.
  */
 @Composable
-private fun ScoutTabs(selected: ScoutTab, onPick: (ScoutTab) -> Unit) {
+private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Unit) {
     val ctx = LocalContext.current
     Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 18.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            ModeChip(stringResource(R.string.crowd_tab_live), selected == ScoutTab.LIVE, Halo.cyan, Modifier.weight(1f)) {
+        // Scrollable, because with somebody followed there are five words and a
+        // phone is not wide enough for five equal chips that stay readable.
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            val w = Modifier.width(92.dp)
+            ModeChip(stringResource(R.string.crowd_tab_live), selected == ScoutTab.LIVE, Halo.cyan, w) {
                 Haptics.tick(ctx); onPick(ScoutTab.LIVE)
             }
-            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.mint, Modifier.weight(1f)) {
+            ModeChip(stringResource(R.string.crowd_tab_buying), selected == ScoutTab.BUYING, Halo.mint, w) {
+                Haptics.tick(ctx); onPick(ScoutTab.BUYING)
+            }
+            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.mint, w) {
                 Haptics.tick(ctx); onPick(ScoutTab.HOLDING)
             }
-            ModeChip(stringResource(R.string.crowd_tab_whales), selected == ScoutTab.WHALES, Halo.amber, Modifier.weight(1f)) {
+            ModeChip(stringResource(R.string.crowd_tab_whales), selected == ScoutTab.WHALES, Halo.amber, w) {
                 Haptics.tick(ctx); onPick(ScoutTab.WHALES)
+            }
+            // Only once there is somebody to put in it.
+            if (follows > 0) {
+                ModeChip(stringResource(R.string.crowd_tab_followed, follows), selected == ScoutTab.FOLLOWED, Halo.amber, Modifier.width(112.dp)) {
+                    Haptics.tick(ctx); onPick(ScoutTab.FOLLOWED)
+                }
             }
         }
     }
@@ -478,6 +518,13 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
     // Which of the three the bar is showing. Kept across a rotation, because
     // turning the phone is not a request to go back to the start.
     var tab by rememberSaveable { mutableStateOf(ScoutTab.LIVE) }
+    // Read once per visit: following somebody is not something that changes
+    // under you while you look at the bar.
+    val follows = remember { Follows.all(ctx).toList() }
+    var person by remember { mutableStateOf<String?>(null) }
+    person?.let { addr ->
+        WalletPage(addr, events.orEmpty().filter { it.wallet == addr }.sortedBy { it.at }) { person = null }
+    }
 
     val pad = Modifier.padding(horizontal = 18.dp)
 
@@ -507,7 +554,7 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
             }
         }
         Spacer(Modifier.height(10.dp))
-        ScoutTabs(tab) { tab = it }
+        ScoutTabs(tab, follows.size) { tab = it }
         Column(
             Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState())
                 .padding(bottom = 24.dp),
@@ -520,14 +567,61 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
                     // speeds, what is being bought right now and what has been
                     // bought all day, and on separate tabs each looked thin while
                     // the other left half the screen empty.
-                    ScoutTab.LIVE -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SeekerCard(feed) {}
-                        CrowdFeed(events, feedOpen, { feedOpen = !feedOpen }, played, owner, signer, openMint, onBuy = onBuy)
-                    }
+                    ScoutTab.LIVE -> CrowdFeed(
+                        events, feedOpen, { feedOpen = !feedOpen }, played,
+                        onWallet = { person = it }, owner = owner, signer = signer, openMint = openMint, onBuy = onBuy,
+                    )
+                    ScoutTab.BUYING -> SeekerCard(feed) {}
                     ScoutTab.HOLDING -> SeekerHoldingsCard(animate = remember { played.add("census") })
                     ScoutTab.WHALES -> SeekerWhalesCard()
+                    ScoutTab.FOLLOWED -> FollowedList(follows, events) { person = it }
                 }
             }
         }
+    }
+}
+
+/**
+ * The wallets you follow, where somebody can actually find them.
+ *
+ * The list existed, inside the agent page, behind an open budget: with no
+ * budget the star did something invisible and said nothing about it. It belongs
+ * next to the feed where the star lives, and it says what the star does, which
+ * nowhere in the app did before.
+ */
+@Composable
+private fun FollowedList(follows: List<String>, events: List<CrowdBuy>?, onOpen: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val now = System.currentTimeMillis()
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        follows.forEach { addr ->
+            val last = events.orEmpty().filter { it.wallet == addr }.maxByOrNull { it.at }
+            GlassCard {
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpen(addr); Haptics.tick(ctx) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Avatar(addr, 34.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(com.clearsign.core.SeekerCrowd.nickname(addr), style = HaloType.body, color = Halo.ink, maxLines = 1)
+                        Text(
+                            last?.let {
+                                stringResource(
+                                    if (it.sell) R.string.folw_last_sell else R.string.folw_last_buy,
+                                    it.symbol, mmss((now - it.at) / 1000),
+                                )
+                            } ?: stringResource(R.string.folw_quiet),
+                            style = HaloType.small, color = if (last == null) Halo.muted else Halo.mint, maxLines = 1,
+                        )
+                    }
+                    HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
+                }
+            }
+        }
+        // What the star actually does, in three lines, once.
+        Text(stringResource(R.string.folw_what_1), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
+        Text(stringResource(R.string.folw_what_2), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
+        Text(stringResource(R.string.folw_what_3), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
     }
 }

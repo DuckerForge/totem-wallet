@@ -45,6 +45,16 @@ object Contacts {
         prefs(ctx).edit().putString(KEY_ALLOW, o.toString()).apply()
     }
 
+    /** Contacts that came in by touch, signed by the other phone. A different kind of known. */
+    fun markVerified(ctx: Context, address: String) {
+        val set = verified(ctx).toMutableSet(); set.add(address)
+        prefs(ctx).edit().putString("verified", JSONArray(set.toList()).toString()).apply()
+    }
+    fun verified(ctx: Context): Set<String> = runCatching {
+        val a = JSONArray(prefs(ctx).getString("verified", null) ?: return emptySet())
+        buildSet { for (i in 0 until a.length()) add(a.getString(i)) }
+    }.getOrDefault(emptySet())
+
     fun addHistory(ctx: Context, address: String) {
         val set = history(ctx).toMutableSet()
         if (set.add(address)) {

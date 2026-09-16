@@ -120,9 +120,14 @@ class MainActivity : ComponentActivity() {
                     runCatching { com.clearsign.core.Ndef.uriOf(r.payload.let { byteArrayOf() } + r.toByteArray()) }.getOrNull()
                         ?: runCatching { r.toUri()?.toString() }.getOrNull()
                 }
-                val parsed = uri?.let { com.clearsign.core.SolanaPay.parse(it) }
+                val contact = uri?.let { com.clearsign.core.ContactTap.parse(it) }
+                val parsed = if (contact == null) uri?.let { com.clearsign.core.SolanaPay.parse(it) } else null
                 runOnUiThread {
-                    if (parsed != null) { Haptics.tick(this); incoming = parsed } else { tapMiss = System.currentTimeMillis() }
+                    when {
+                        contact != null -> { Haptics.tick(this); ContactInbox.incoming.value = contact }
+                        parsed != null -> { Haptics.tick(this); incoming = parsed }
+                        else -> tapMiss = System.currentTimeMillis()
+                    }
                 }
             },
             android.nfc.NfcAdapter.FLAG_READER_NFC_A or android.nfc.NfcAdapter.FLAG_READER_NFC_B or
@@ -141,6 +146,8 @@ class MainActivity : ComponentActivity() {
         val scheme = data.scheme ?: return
         // `solana:` from a tag or a chat, and the web form of the same request from a
         // link somebody tapped. Both end up in the send form, neither signs anything.
+        // A Blink: its own scheme, or a dial.to link, or any link carrying ?action=.
+        if (scheme.equals("solana-action", ignoreCase = true) || Blinks.looksLike(data.toString())) { Blinks.incoming.value = data.toString(); return }
         if (!scheme.equals("solana", ignoreCase = true) && !scheme.equals("https", ignoreCase = true)) return
         incoming = com.clearsign.core.SolanaPay.parse(data.toString()) ?: return
     }
@@ -224,6 +231,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showTap by remember { mutableStateOf(false) }
         var showMore by remember { mutableStateOf(false) }
         var showBridge by remember { mutableStateOf(false) }
+        var showContactTap by remember { mutableStateOf(false) }
+        var showLinkBox by remember { mutableStateOf(false) }
         var guestNote by remember { mutableStateOf(0L) }
         var showCrowd by remember { mutableStateOf(false) }
         var showHealth by remember { mutableStateOf(false) }
@@ -439,6 +448,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
             if (showChat) ChatScreen { showChat = false }
         }
         Proof.incoming.value?.let { text -> ProofCheckSheet(text, owner) { Proof.incoming.value = null } }
+        Blinks.incoming.value?.let { link -> if (owner != null) BlinkSheet(link, signer, owner) { Blinks.incoming.value = null } }
+        if (showLinkBox) LinkBoxSheet(onOpen = { showLinkBox = false; Blinks.incoming.value = it }) { showLinkBox = false }
+        if (ContactInbox.incoming.value != null && owner != null && !showContactTap) showContactTap = true
+        if (showContactTap && owner != null) ContactTapSheet(owner, onSaved = { contacts = Contacts.allowlist(ctx) }) { showContactTap = false; ContactInbox.incoming.value = null }
         val first = accounts.firstOrNull()?.account
         if (showSend && first != null) {
             SendSheet(
@@ -464,6 +477,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onContacts = { showMore = false; tab = Tab.SETTINGS },
                 onSettings = { showMore = false; tab = Tab.SETTINGS },
                 onBridge = { showMore = false; showBridge = true },
+                onLink = { showMore = false; showLinkBox = true },
+                onContactTap = { showMore = false; showContactTap = true },
             ) { showMore = false }
         }
         if (showBridge && owner != null) {
@@ -502,16 +517,23 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
                         if (contacts.isEmpty()) {
                             Text(stringResource(R.string.contacts_empty_note), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted)
                         }
+                        val vctx = LocalContext.current
+                        val verified = remember(contacts) { Contacts.verified(vctx) }
                         contacts.entries.take(20).forEach { (addr, label) ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Avatar(addr, 30.dp)
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Halo.ink)
-                                    Text(shorten(addr, 6), fontFamily = FontFamily.Monospace, fontSize = 11.5.sp, color = Halo.muted)
+                                    Text(shorten(addr, 6) + (if (addr in verified) " · " + stringResource(R.string.ctap_verified) else ""), fontFamily = FontFamily.Monospace, fontSize = 11.5.sp, color = if (addr in verified) Halo.mint else Halo.muted)
                                 }
                                 TrustChip(TrustLevel.TRUSTED)
                             }
+                        }
+                        if (owner != null) {
+                            var showTapX by remember { mutableStateOf(false) }
+                            GhostButton(stringResource(R.string.ctap_open), Modifier.fillMaxWidth(), HIcon.NFC, tint = Halo.cyan) { showTapX = true }
+                            if (showTapX) ContactTapSheet(owner, onSaved = {}) { showTapX = false; ContactInbox.incoming.value = null }
                         }
                     }
                 }

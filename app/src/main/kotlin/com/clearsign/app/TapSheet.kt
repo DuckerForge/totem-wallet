@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +59,14 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var armed by remember { mutableStateOf(false) }
+    // Two ways to be paid by touch: this phone as the tag, or a real sticker
+    // written once and left on the counter.
+    var sticker by remember { mutableStateOf(false) }
+    var shop by remember { mutableStateOf("") }
+    var lock by remember { mutableStateOf(true) }
+    var webForm by remember { mutableStateOf(false) }
+    var writing by remember { mutableStateOf(false) }
+    var outcome by remember { mutableStateOf<NfcWriter.Outcome?>(null) }
     val supported = remember { TapService.isSupported(ctx) }
     val tapped by TapService.tapped.collectAsState()
     var seenAt by remember { mutableStateOf(0L) }
@@ -80,6 +89,18 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
     }
     if (armed && tapped > seenAt) seenAt = tapped
 
+    // The sticker: the radio listens for a tag only while the person asked for it.
+    val stickerUri = remember(address, amount, note, shop, webForm) {
+        val a = amount.replace(',', '.').toDoubleOrNull()
+        if (webForm) MoneyLinks.request(address, a, shop.ifBlank { null }, note.ifBlank { null })
+        else MoneyLinks.solanaPay(address, a, shop.ifBlank { null }, note.ifBlank { null })
+    }
+    DisposableEffect(writing, stickerUri, lock) {
+        if (writing) NfcWriter.start(ctx, stickerUri, lock) { o -> outcome = o; writing = false; Haptics.success(ctx) }
+        onDispose { if (writing) NfcWriter.stop(ctx) }
+    }
+    LaunchedEffect(writing) { if (!writing) NfcWriter.stop(ctx) }
+
     ModalBottomSheet(onDismissRequest = { TapService.disarm(); onDismiss() }, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
             Modifier.fillMaxWidth().fillMaxHeight(0.95f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
@@ -97,8 +118,25 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
                 }
             }
 
-            if (!supported) {
+            if (!supported && !sticker) {
                 Banner(stringResource(R.string.tap_unsupported), Halo.amber, HIcon.WARNING)
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModeChip(stringResource(R.string.tap_mode_phone), !sticker, Halo.cyan, Modifier.weight(1f)) { if (!armed) sticker = false }
+                ModeChip(stringResource(R.string.tap_mode_sticker), sticker, Halo.mint, Modifier.weight(1f)) { if (!armed) sticker = true }
+            }
+
+            if (sticker) {
+                StickerBody(
+                    amount = amount, onAmount = { amount = it }, note = note, onNote = { note = it }, shop = shop, onShop = { shop = it },
+                    lock = lock, onLock = { lock = it }, webForm = webForm, onWebForm = { webForm = it },
+                    writing = writing, onWrite = { outcome = null; writing = true }, onCancel = { writing = false },
+                    outcome = outcome, uri = stickerUri,
+                )
+                Spacer(Modifier.height(2.dp))
+                GhostButton(stringResource(R.string.close), Modifier.fillMaxWidth()) { writing = false; onDismiss() }
+                return@Column
             }
 
             if (!armed) TapAnimation(active = false)
@@ -165,5 +203,72 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
             Spacer(Modifier.height(2.dp))
             GhostButton(stringResource(R.string.close), Modifier.fillMaxWidth()) { TapService.disarm(); onDismiss() }
         }
+    }
+}
+
+/** The sticker half of the tap sheet: what to write, whether to lock it, and the moment of writing. */
+@Composable
+private fun StickerBody(
+    amount: String, onAmount: (String) -> Unit, note: String, onNote: (String) -> Unit, shop: String, onShop: (String) -> Unit,
+    lock: Boolean, onLock: (Boolean) -> Unit, webForm: Boolean, onWebForm: (Boolean) -> Unit,
+    writing: Boolean, onWrite: () -> Unit, onCancel: () -> Unit, outcome: NfcWriter.Outcome?, uri: String,
+) {
+    val ctx = LocalContext.current
+    val colors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = Halo.mint, unfocusedBorderColor = Halo.stroke,
+        focusedContainerColor = Halo.cardSoft, unfocusedContainerColor = Halo.cardSoft, cursorColor = Halo.mint,
+    )
+    Text(stringResource(R.string.sticker_how), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    if (!NfcWriter.isAvailable(ctx)) Banner(stringResource(R.string.sticker_no_nfc), Halo.amber, HIcon.WARNING)
+
+    if (!writing) {
+        OutlinedTextField(
+            value = shop, onValueChange = { onShop(it.take(30)) }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.sticker_shop), fontFamily = Inter, fontSize = 11.sp) },
+            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Halo.ink), colors = colors, shape = rs(12),
+        )
+        OutlinedTextField(
+            value = amount, onValueChange = { onAmount(it.filter { c -> c.isDigit() || c == '.' || c == ',' }) },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.sticker_amount), fontFamily = Inter, fontSize = 11.sp) },
+            suffix = { Text("SOL", fontFamily = Mono, fontSize = 12.sp, color = Halo.muted) },
+            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 18.sp, color = Halo.ink),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+            colors = colors, shape = rs(12),
+        )
+        OutlinedTextField(
+            value = note, onValueChange = { onNote(it.take(40)) }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.tap_note), fontFamily = Inter, fontSize = 11.sp) },
+            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Halo.ink), colors = colors, shape = rs(12),
+        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.sticker_lock), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                Text(stringResource(R.string.sticker_lock_sub), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp)
+            }
+            androidx.compose.material3.Switch(checked = lock, onCheckedChange = onLock)
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.sticker_web), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                Text(stringResource(if (webForm) R.string.sticker_web_on else R.string.sticker_web_off), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp)
+            }
+            androidx.compose.material3.Switch(checked = webForm, onCheckedChange = onWebForm)
+        }
+        Text(uri, fontFamily = Mono, fontSize = 10.sp, color = Halo.muted, lineHeight = 14.sp)
+        outcome?.let { o ->
+            when (o) {
+                NfcWriter.Outcome.Locked -> Banner(stringResource(R.string.sticker_locked), Halo.mint, HIcon.SHIELD_LOCK)
+                NfcWriter.Outcome.Written -> Banner(stringResource(R.string.sticker_written), Halo.mint, HIcon.CHECK)
+                is NfcWriter.Outcome.Failed -> Banner(stringResource(R.string.sticker_failed, o.why), Halo.red, HIcon.WARNING)
+            }
+        }
+        PrimaryButton(stringResource(R.string.sticker_write), danger = false, enabled = NfcWriter.isAvailable(ctx), icon = HIcon.NFC) { onWrite() }
+    } else {
+        val pulse = rememberInfiniteTransition(label = "write")
+        val glow by pulse.animateFloat(initialValue = 0.35f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "glow")
+        Box(Modifier.alpha(0.55f + glow * 0.45f)) { TapAnimation(active = true) }
+        Text(stringResource(R.string.sticker_hold), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.mint, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        GhostButton(stringResource(R.string.cancel), Modifier.fillMaxWidth(), HIcon.BLOCK, tint = Halo.amber) { onCancel() }
     }
 }

@@ -118,7 +118,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
 
     val currency = Settings.currency.value
     LaunchedEffect(owner, currency) {
-        val view = runCatching { Portfolio.load(owner, currency) }.getOrNull() ?: return@LaunchedEffect
+        val view = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull() ?: return@LaunchedEffect
         val holdings = view.holdings.filter { !it.isNft && it.raw > 0 }
         // Jupiter names and prices the ones DAS could not describe, and gives us
         // their decimals — which is what a "to" token needs to be swappable at all.

@@ -67,12 +67,22 @@ object Ndef {
             repeat(4) { v = (v shl 8) or (message[i++].toInt() and 0xFF) }
             v
         }
-        if ((header and 0x08) != 0) i++            // an ID field, if present
-        if (message.size < i + typeLen + payloadLen) return null
+        // The IL flag means the record carries an id: one length byte here, and
+        // the id bytes themselves after the type. Skipping only the length byte
+        // left the id sitting where the payload was expected, so a tag written
+        // with an id handed back an address with a few stray characters on the
+        // front. The person would have seen it, but nobody types an address they
+        // got by touching something.
+        val idLen = if ((header and 0x08) != 0) {
+            if (message.size < i + 1) return null
+            message[i++].toInt() and 0xFF
+        } else {
+            0
+        }
+        if (typeLen < 0 || payloadLen < 1 || message.size < i + typeLen + idLen + payloadLen) return null
         val type = String(message, i, typeLen, Charsets.UTF_8)
         if (type != "U") return null
-        i += typeLen
-        if (payloadLen < 1) return null
+        i += typeLen + idLen
         return String(message, i + 1, payloadLen - 1, Charsets.UTF_8)
     }
 }

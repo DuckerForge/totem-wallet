@@ -230,7 +230,7 @@ class CompanionService : Service() {
                 HealthWidgetData.load(ctx)
             }
             val total = if (owner != null && (CompanionPrefs.show(ctx, "total") || CompanionPrefs.face(ctx) == CompanionPrefs.Face.TOTAL)) withContext(Dispatchers.IO) {
-                Portfolio.cached(owner, currency) ?: runCatching { Portfolio.load(owner, currency) }.getOrNull()
+                Portfolio.cached(owner, currency) ?: runCatching { Portfolio.load(this@CompanionService, owner, currency) }.getOrNull()
             } else null
             val mint = CompanionPrefs.coin(ctx)
             val coin = if (mint != null && (CompanionPrefs.show(ctx, "coin") || CompanionPrefs.face(ctx) == CompanionPrefs.Face.COIN)) withContext(Dispatchers.IO) {

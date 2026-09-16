@@ -159,8 +159,16 @@ object AgentBroker {
                 // are counting. A sale loses nothing: the coin becomes SOL in the
                 // same pocket. Counting it as spending used to burn the daily cap
                 // twice per round trip and then refuse the next sale.
-                val value = if (PolicyEngine.isUnwind(policy, receipt)) 0L
-                else receipt.outflows.filter { it.rawAmount < 0 }.sumOf { prices(it) ?: 0L }
+                // A leg nobody can price used to count as zero, which is the one
+                // answer that is certainly wrong: the caps are there to bound what
+                // is unknown. The collar already refused anything above the per
+                // move ceiling, so that ceiling is the honest worst case.
+                val legs = receipt.outflows.filter { it.rawAmount < 0 }.map { prices(it) }
+                val value = when {
+                    PolicyEngine.isUnwind(policy, receipt) -> 0L
+                    legs.any { it == null } -> policy.perTxLamports
+                    else -> legs.sumOf { it ?: 0L }
+                }
                 signAndSend(ctx, job, session.pubkey, receipt, value, what).explained()
             }
         }
@@ -174,8 +182,19 @@ object AgentBroker {
             val ex = withContext(Dispatchers.IO) { JupiterUltra.execute(signed, job.ultraRequestId) }
             ex.signature?.takeIf { ex.error == null } ?: return Verdict.Refused(ctx.getString(R.string.err_send, ex.error ?: ex.status))
         } else {
-            val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(job.cluster), signed) }
-            out.signature ?: return Verdict.Refused(ctx.getString(R.string.err_send, out.error ?: "?"))
+            val rpc = SolanaRpc.urlFor(job.cluster)
+            val out = withContext(Dispatchers.IO) { SolanaRpc.send(rpc, signed) }
+            // No answer is not the same as no transaction. A read timeout after
+            // the node already forwarded the bytes used to come back as "refused",
+            // and then the coin the budget now held had no position row, so no
+            // target, no stop, and nothing counted against the day's cap. The
+            // signature is in the bytes we signed, so the chain can be asked.
+            out.signature ?: run {
+                val own = SolanaTx.firstSignature(signed)
+                val landed = own != null && withContext(Dispatchers.IO) { SolanaRpc.confirmed(rpc, own) }
+                if (!landed) return Verdict.Refused(ctx.getString(R.string.err_send, out.error ?: "?"))
+                own
+            }
         }
         SessionWallet.recordSpend(ctx, valueLamports)
         // The book of what the agent is holding, and what it paid. Kept here and

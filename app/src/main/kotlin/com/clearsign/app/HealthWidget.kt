@@ -320,7 +320,7 @@ object HealthWidgetData {
             usd * fx * lamports / 1e9
         }.getOrNull()
         // The whole portfolio (tokens included) and its day move, from the same engine as the app.
-        val pv = runCatching { Portfolio.load(owner, currency) }.getOrNull()
+        val pv = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull()
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt("score", health.score)
             .putLong("lamports", lamports)

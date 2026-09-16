@@ -1410,7 +1410,8 @@
         <item quantity="other">%1$d account vuoti non si sono chiusi. Il rent è ancora dentro, quindi la paghetta resta aperta. Riprova.</item>
     </plurals>
     <string name="env_sweep_unconfirmed">Il rientro non è arrivato sulla catena. La paghetta resta aperta. Riprova.</string>
-    <string name="env_close_summary">Messi %1$s SOL, tornati %2$s SOL: %3$s SOL (%4$s).</string>
+        <string name="env_balance_unknown">Non sono riuscito a leggere il saldo della paghetta, quindi non ho rimandato niente e la paghetta resta aperta. Riprova quando la rete risponde.</string>
+<string name="env_close_summary">Messi %1$s SOL, tornati %2$s SOL: %3$s SOL (%4$s).</string>
     <string name="env_last_title">L\'ultima paghetta</string>
     <string name="env_last_in">Messi: %1$s SOL</string>
     <string name="env_last_out">Tornati: %1$s SOL</string>

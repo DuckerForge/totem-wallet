@@ -317,7 +317,7 @@ object BrainTools {
     private suspend fun portfolio(ctx: Context): JSONObject {
         val owner = Settings.watchWallet(ctx) ?: return JSONObject().put("error", "No main account connected.")
         val currency = Settings.currency.value
-        val view = runCatching { Portfolio.load(owner, currency) }.getOrNull()
+        val view = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull()
             ?: return JSONObject().put("error", "Could not read the account right now.")
         val coins = JSONArray()
         // Eight, by value. The free model tiers meter tokens per minute, and a

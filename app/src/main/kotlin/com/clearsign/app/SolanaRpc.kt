@@ -40,8 +40,20 @@ object SolanaRpc {
     private const val COMMITMENT = "processed"
 
     /** Small pool for the fan-out reads; bounded so a 10-tx bundle can't spawn 60 threads. */
-    private val pool = Executors.newFixedThreadPool(6)
+    private val pool = Executors.newFixedThreadPool(6) { r ->
+        Thread(r, "apex-rpc").apply { isDaemon = true }
+    }
     private fun <T> async(block: () -> T): Future<T> = pool.submit(Callable(block))
+
+    /**
+     * Wait for one of those reads, but never forever.
+     *
+     * Every timeout inside the HTTP layer is already bounded, so a get that has
+     * not come back in a minute means the task never started. Waiting on it with
+     * no deadline is how a stuck pool became a stuck app.
+     */
+    private fun <T> Future<T>.await(): T? =
+        runCatching { get(60, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull()
 
     fun urlFor(cluster: String?): String = when (cluster?.lowercase()) {
         "devnet", "solana:devnet" -> "https://api.devnet.solana.com"
@@ -258,7 +270,7 @@ object SolanaRpc {
             trackedDests = emptyList(); trackedFresh = emptyList()
             value = simulateValue(rpcUrl, txBytes, listOf(owner))
         }
-        val pre = runCatching { preF.get() }.getOrDefault(emptyMap())
+        val pre = preF.await() ?: emptyMap()
         if (value == null) { Log.i(TAG, "simulate Unavailable"); return SimOutcome.Unavailable }
         if (!value.isNull("err")) { Log.i(TAG, "simulate Failed: ${value.get("err")}"); return SimOutcome.Failed(value.get("err").toString()) }
 
@@ -434,7 +446,7 @@ object SolanaRpc {
     fun assetsSummary(rpcUrl: String, pubkey: String): Pair<Long?, Int> {
         val lamF = async { getBalance(rpcUrl, pubkey) }
         val tokens = tokenAccountsOf(rpcUrl, pubkey).count { it.amount > 0 }
-        return runCatching { lamF.get() }.getOrNull() to tokens
+        return lamF.await() to tokens
     }
 
     /**
@@ -445,8 +457,8 @@ object SolanaRpc {
     fun assetsSummaryMulti(rpcUrl: String, pubkeys: List<String>): Map<String, Pair<Long?, Int>> {
         val lamF = async { getAccountsMulti(rpcUrl, pubkeys) }
         val tokF = pubkeys.map { pk -> pk to async { tokenAccountsOf(rpcUrl, pk).count { it.amount > 0 } } }
-        val lam = runCatching { lamF.get() }.getOrDefault(emptyMap())
-        return tokF.associate { (pk, f) -> pk to (lam[pk]?.lamports to runCatching { f.get() }.getOrDefault(0)) }
+        val lam = lamF.await() ?: emptyMap()
+        return tokF.associate { (pk, f) -> pk to (lam[pk]?.lamports to (f.await() ?: 0)) }
     }
 
     fun getBalance(rpcUrl: String, pubkey: String): Long? {
@@ -488,8 +500,8 @@ object SolanaRpc {
 
         val sigF = async { getSignatures(rpcUrl, address, 1000) }
         val acctF = async { getAccountInfo(rpcUrl, address) }
-        val sigs = runCatching { sigF.get() }.getOrNull()
-        val acct = runCatching { acctF.get() }.getOrNull()
+        val sigs = sigF.await()
+        val acct = acctF.await()
 
         val n = sigs?.length() ?: 0
         val oldest = sigs?.let { arr ->
@@ -585,23 +597,30 @@ object SolanaRpc {
 
     /** One list per token program, in order; null for a program whose call did not come back. */
     private fun readTokenAccounts(rpcUrl: String, owner: String): List<List<TokenAccountInfo>?> {
-        val futures = listOf(TOKEN_PROGRAM, TOKEN_2022).map { program ->
-            async {
+        // Read the two token programs in a row, on whatever thread called us.
+        //
+        // These used to be two more tasks handed to the same fixed pool, waited
+        // on with a blocking get. The callers of this function are themselves
+        // tasks on that pool, so with six wallets in the Seed Vault all six
+        // threads sat waiting for work that could never be scheduled, and from
+        // then on every simulation in the process hung too. Two sequential HTTP
+        // calls are slower by one round trip and cannot deadlock.
+        return listOf(TOKEN_PROGRAM, TOKEN_2022).map { program ->
+            runCatching {
                 val params = JSONArray()
                     .put(owner)
                     .put(JSONObject().put("programId", program))
                     .put(JSONObject().put("encoding", "jsonParsed").put("commitment", COMMITMENT))
-                val resp = post(rpcUrl, "getTokenAccountsByOwner", params) ?: return@async null
-                val arr = resp.optJSONObject("result")?.optJSONArray("value") ?: return@async null
+                val resp = post(rpcUrl, "getTokenAccountsByOwner", params) ?: return@runCatching null
+                val arr = resp.optJSONObject("result")?.optJSONArray("value") ?: return@runCatching null
                 val out = ArrayList<TokenAccountInfo>()
                 for (i in 0 until arr.length()) {
                     val obj = arr.optJSONObject(i) ?: continue
                     parseTokenAccount(obj)?.let { out.add(it) }
                 }
                 out
-            }
+            }.getOrNull()
         }
-        return futures.map { runCatching { it.get() }.getOrNull() }
     }
 
     /**

@@ -117,12 +117,16 @@ object MoneyLinks {
             recipient = pubkey,
             recipientLabel = ctx.getString(R.string.gift_log),
         )
+        // Sealed before the signature, not after. The key that will hold the money
+        // existed only in this local variable: a send whose answer got lost on the
+        // way back, or the process being killed in between, left the SOL sitting
+        // at an address whose seed had just gone out of scope. Writing it first
+        // costs one file; the gift is dropped again if the send really failed.
+        val gift = Gift(pubkey, lamports, note, System.currentTimeMillis())
+        remember(ctx, gift, seed)
         return when (val r = WalletActions.signAndSend(ctx, signer, owner, listOf(WalletTx.systemTransfer(from, to, lamports)), log)) {
-            is WalletActions.Result.Sent -> {
-                remember(ctx, Gift(pubkey, lamports, note, System.currentTimeMillis()), seed)
-                claimUrl(seed, note) to null
-            }
-            is WalletActions.Result.Failed -> null to r.message
+            is WalletActions.Result.Sent -> claimUrl(seed, note) to null
+            is WalletActions.Result.Failed -> { runCatching { forget(ctx, pubkey) }; null to r.message }
         }
     }
 
@@ -162,6 +166,12 @@ object MoneyLinks {
         val list = all(ctx) + gift
         save(ctx, list)
         prefs(ctx).edit().putString("seed_" + gift.pubkey, Secrets.seal(seed)).apply()
+    }
+
+    /** Drop a gift that never left: the send failed, so the key holds nothing. */
+    private fun forget(ctx: Context, pubkey: String) {
+        save(ctx, all(ctx).filterNot { it.pubkey == pubkey })
+        prefs(ctx).edit().remove("seed_$pubkey").apply()
     }
 
     private fun seedOf(ctx: Context, pubkey: String): ByteArray? =

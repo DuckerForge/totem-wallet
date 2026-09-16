@@ -1410,7 +1410,8 @@
         <item quantity="other">%1$d empty accounts did not close. The rent is still inside, so the budget stays open. Try again.</item>
     </plurals>
     <string name="env_sweep_unconfirmed">The return did not land on the chain. The budget stays open. Try again.</string>
-    <string name="env_close_summary">Put in %1$s SOL, got back %2$s SOL: %3$s SOL (%4$s).</string>
+        <string name="env_balance_unknown">Could not read the budget balance, so nothing was sent back and the budget stays open. Try again when the network answers.</string>
+<string name="env_close_summary">Put in %1$s SOL, got back %2$s SOL: %3$s SOL (%4$s).</string>
     <string name="env_last_title">The last budget</string>
     <string name="env_last_in">Put in: %1$s SOL</string>
     <string name="env_last_out">Got back: %1$s SOL</string>

@@ -64,10 +64,11 @@ internal fun WalletHero(
     onLoaded: () -> Unit = {},
 ) {
     val currency by Settings.currency
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var refreshKey by remember { mutableStateOf(0) }
     // Starts from what we already knew, not from nothing: see Portfolio.cached.
     val pv by produceState<PortfolioView?>(Portfolio.cached(owner, currency), owner, currency, refreshKey, reload) {
-        val fresh = owner?.let { runCatching { Portfolio.load(it, currency) }.getOrNull() }
+        val fresh = owner?.let { runCatching { Portfolio.load(ctx, it, currency) }.getOrNull() }
         // A failed refresh keeps the last good view rather than blanking the page.
         if (fresh != null) value = fresh
         onLoaded()

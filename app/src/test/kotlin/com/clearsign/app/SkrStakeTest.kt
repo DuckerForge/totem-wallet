@@ -18,7 +18,31 @@ class SkrStakeTest {
         assertEquals("DPJ58trLsF9yPrBa2pk6UaRkvqW8hWUYjawe788WBuqr", p.guardian)
         // All shares times the price: what the vault holds, give or take the queue.
         assertEquals(4_981_636_156.0, p.totalStakedRaw / 1e6, 1.0)
-        // 10% inflation on 10.595 billion, spread over 4.98 billion staked: about 21% a year.
-        assertEquals(21.3, p.aprPct(10_595_157_477_710_037L, now = 1_789_500_000_000L)!!, 0.2)
+        assertEquals(1.138725, p.sharePrice, 0.000001)
+    }
+
+    /**
+     * The yield is read off the share price, because the tokenomics guess was
+     * wrong: it gave 21.3% where the Seeker wallet shows 15.40% for the same
+     * stake. Two readings of a number that only goes up cannot be wrong in that
+     * way.
+     */
+    @Test fun growthOverTimeIsTheYield() {
+        val day = 86_400_000L
+        // A hundredth of a percent a day is 3.65% a year.
+        val apr = SkrStake.growthAprPct(1.0, 0L, 1.0001, day)
+        assertEquals(3.65, apr!!, 0.02)
+    }
+
+    @Test fun tooShortASpanSaysNothing() {
+        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 1.01, 3_600_000L))
+    }
+
+    @Test fun aPriceThatDidNotMoveIsNotAYield() {
+        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 1.0, 86_400_000L))
+    }
+
+    @Test fun anImpossibleJumpIsRefused() {
+        assertEquals(null, SkrStake.growthAprPct(1.0, 0L, 3.0, 86_400_000L))
     }
 }

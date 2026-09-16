@@ -165,20 +165,20 @@ object TraderLoop {
     data class Tick(val summary: String, val acted: Boolean, val stopped: Boolean = false)
 
     /**
-     * One round. Safe to call as often as you like: it does its own checks and
-     * returns without touching the network when there is nothing to do.
-     */
-    /** One tick at a time, whoever asks: the service on its clock, or a person from the screen. */
-    private val gate = kotlinx.coroutines.sync.Mutex()
-
-    /**
      * When the last look started and when the last hunt ran, for a screen that
      * shows the clock. In memory and observed by Compose: a window, not a record.
      */
+
     val lookedAt = androidx.compose.runtime.mutableLongStateOf(0L)
     val huntedAt = androidx.compose.runtime.mutableLongStateOf(0L)
 
-    suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = gate.withLock {
+    /**
+     * One round. Safe to call as often as you like: it does its own checks and
+     * returns without touching the network when there is nothing to do. One at a
+     * time, whoever asks, and the lock is shared with every other action that
+     * signs with the budget key.
+     */
+    suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = EnvelopeLock.withLock {
         val now = System.currentTimeMillis()
         lookedAt.longValue = now
         if (mayHunt) huntedAt.longValue = now
@@ -191,7 +191,7 @@ object TraderLoop {
      * the receipt records it, and the row merges into the one already open.
      * Returns what to tell the person.
      */
-    suspend fun buyMore(ctx: Context, mint: String): String = gate.withLock {
+    suspend fun buyMore(ctx: Context, mint: String): String = EnvelopeLock.withLock {
         AgentTrace.working {
             val cfg = config(ctx)
             val s = SessionWallet.current(ctx) ?: return@working ctx.getString(R.string.trader_stop_nobudget)
@@ -242,7 +242,7 @@ object TraderLoop {
         if (s.expired) {
             // The budget's time is up: sell, close, bring everything home, and say the account.
             val owner = Settings.watchWallet(ctx)
-            val said = if (owner != null) runCatching { SessionActions.closeBudget(ctx, owner) }.getOrNull() else null
+            val said = if (owner != null) runCatching { SessionActions.closeBudgetInner(ctx, owner) }.getOrNull() else null
             stopSelf(ctx, said?.second ?: ctx.getString(R.string.trader_stop_closed))
             return Tick(said?.second ?: ctx.getString(R.string.trader_stop_closed), acted = false, stopped = true)
         }
@@ -298,7 +298,7 @@ object TraderLoop {
         }
 
         Settings.watchWallet(ctx)?.let { owner ->
-            val took = runCatching { SessionActions.harvest(ctx, owner) }.getOrNull()
+            val took = runCatching { SessionActions.harvestInner(ctx, owner) }.getOrNull()
             if (took != null && took > 0) {
                 val m = ctx.getString(R.string.trader_harvested, fmtSol(took, 5))
                 note(ctx, m)

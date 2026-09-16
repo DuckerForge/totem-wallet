@@ -2,6 +2,7 @@ package com.clearsign.app
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -13,6 +14,24 @@ import org.json.JSONObject
  * by the envelope key itself, which this app holds, so it needs no biometrics —
  * the point of the button is that ending the agent's power must be instant.
  */
+/**
+ * One hand on the budget key at a time.
+ *
+ * The trading loop had a lock of its own, and it covered the loop. Everything
+ * else that signs with the same key did not go through it: sell from a
+ * notification, sell everything from the screen, harvest, and the keeper that
+ * closes an expired budget on its own schedule. The way that ends is the keeper
+ * selling and forgetting the key while the loop is halfway through a sale with
+ * it. Held here, next to the actions, because this is where the key is used.
+ *
+ * Not reentrant, which is why each public action has a private twin: anything
+ * already running under the lock calls the twin.
+ */
+internal object EnvelopeLock {
+    private val m = kotlinx.coroutines.sync.Mutex()
+    suspend fun <T> withLock(block: suspend () -> T): T = m.withLock { block() }
+}
+
 object SessionActions {
 
     /** Move [lamports] from the main account into the envelope. Returns an error, or null. */
@@ -71,7 +90,10 @@ object SessionActions {
      */
     class Said(val ok: Boolean, val text: String, val worse: Sale.Worse? = null)
 
-    suspend fun sellSaid(ctx: Context, pos: Positions.Position, source: AgentBroker.Job.Source, acceptReal: Boolean = false): Said {
+    suspend fun sellSaid(ctx: Context, pos: Positions.Position, source: AgentBroker.Job.Source, acceptReal: Boolean = false): Said =
+        EnvelopeLock.withLock { sellSaidInner(ctx, pos, source, acceptReal) }
+
+    private suspend fun sellSaidInner(ctx: Context, pos: Positions.Position, source: AgentBroker.Job.Source, acceptReal: Boolean): Said {
         val why = ctx.getString(R.string.trader_why_you, pos.symbol)
         val sale = runCatching { sellNow(ctx, pos, why, source, acceptReal) }.getOrNull()
         val v = (sale as? Sale.Judged)?.verdict
@@ -253,22 +275,30 @@ object SessionActions {
      * Returns the symbols that would not sell, which is not always a failure: a
      * coin with no route out cannot be sold by anybody.
      */
-    suspend fun sellAll(ctx: Context, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<String> {
+    suspend fun sellAll(ctx: Context, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<String> =
+        EnvelopeLock.withLock { sellAllInner(ctx, onProgress) }
+
+    internal suspend fun sellAllInner(ctx: Context, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<String> {
         val s = SessionWallet.current(ctx) ?: return emptyList()
         var left = holdings(ctx)
         val total = left.size
         var done = 0
+        // Keyed by mint, never by symbol. Two different mints calling themselves
+        // USDC is the oldest trick on this chain, and this app has a whole module
+        // about it: keyed by symbol they overwrite each other, one gets sold, the
+        // other quietly leaves the stuck list, and the caller is told the budget
+        // is empty when it is not. What gets shown to a person is still the
+        // symbol; what the code counts is the mint.
         val stuck = LinkedHashMap<String, SolanaRpc.TokenAccountInfo>()
 
         repeat(2) { pass ->
             if (left.isEmpty()) return@repeat
             for ((i, h) in left.withIndex()) {
-                val sym = TokenSymbols.symbol(h.mint)
                 if (sellOne(ctx, s.pubkey, h)) {
                     done++
-                    stuck.remove(sym)
+                    stuck.remove(h.mint)
                 } else {
-                    stuck[sym] = h
+                    stuck[h.mint] = h
                 }
                 onProgress(done, total)
                 // Jupiter rate-limits a burst from one client, and this loop is a
@@ -281,11 +311,11 @@ object SessionActions {
             // Between passes, believe the chain rather than our own list: a coin
             // that did land is gone from it, and one that did not is still there.
             kotlinx.coroutines.delay(1_500)
-            val onChain = holdings(ctx).associateBy { TokenSymbols.symbol(it.mint) }
+            val onChain = holdings(ctx).associateBy { it.mint }
             left = stuck.keys.mapNotNull { onChain[it] }
             stuck.keys.retainAll(onChain.keys)
         }
-        return stuck.keys.toList()
+        return stuck.keys.map { TokenSymbols.symbol(it) }
     }
 
     /**
@@ -296,7 +326,10 @@ object SessionActions {
      * somewhere you can reach it, which is the difference between a bad trade
      * and a lost one.
      */
-    suspend fun moveTokensTo(ctx: Context, owner: String): List<String> {
+    suspend fun moveTokensTo(ctx: Context, owner: String): List<String> =
+        EnvelopeLock.withLock { moveTokensToInner(ctx, owner) }
+
+    private suspend fun moveTokensToInner(ctx: Context, owner: String): List<String> {
         val s = SessionWallet.current(ctx) ?: return emptyList()
         val ownerKey = Base58.decodePubkey(owner) ?: return listOf(owner)
         val fromKey = Base58.decodePubkey(s.pubkey) ?: return listOf(s.pubkey)
@@ -335,7 +368,10 @@ object SessionActions {
      * Returns the lamports harvested (0 when there was nothing to take), or null
      * on failure.
      */
-    suspend fun harvest(ctx: Context, owner: String, force: Boolean = false): Long? {
+    suspend fun harvest(ctx: Context, owner: String, force: Boolean = false): Long? =
+        EnvelopeLock.withLock { harvestInner(ctx, owner, force) }
+
+    internal suspend fun harvestInner(ctx: Context, owner: String, force: Boolean = false): Long? {
         val s = SessionWallet.current(ctx) ?: return 0L
         val threshold = s.harvestLamports
         if (!force && threshold <= 0L) return 0L
@@ -371,7 +407,13 @@ object SessionActions {
         val from = Base58.decodePubkey(session.pubkey) ?: return@withContext Closed(0, 0, 0L)
         val to = Base58.decodePubkey(owner) ?: return@withContext Closed(0, 0, 0L)
         val rpc = SolanaRpc.urlFor(null)
-        val empty = runCatching { SolanaRpc.tokenAccountsOf(rpc, session.pubkey, force = true) }.getOrDefault(emptyList())
+        // A read that did not come back is not an empty wallet. Saying "nothing to
+        // close" here lets the caller go on and forget the key with the rent still
+        // locked inside the accounts, so an unreadable list counts as one failure
+        // and the close stops.
+        val accounts = runCatching { SolanaRpc.tokenAccountsOf(rpc, session.pubkey, force = true) }.getOrNull()
+            ?: return@withContext Closed(0, 1, 0L)
+        val empty = accounts
             .filter { it.amount == 0L && it.state != "frozen" && (it.closeAuthority == null || it.closeAuthority == session.pubkey) }
         if (empty.isEmpty()) return@withContext Closed(0, 0, 0L)
         var closed = 0
@@ -395,8 +437,12 @@ object SessionActions {
             // forgotten with the rent still inside. The ledger row and the
             // count wait for the chain's word.
             if (out.signature == null || !SolanaRpc.confirmed(rpc, out.signature)) { failed += batch.size; continue }
+            // Count the rent of the accounts this transaction actually closed.
+            // Summing the whole batch overstated it whenever a pubkey would not
+            // decode and its instruction was dropped.
             closed += ixs.size
-            rent += batch.sumOf { it.lamports }
+            rent += batch.take(ixs.size).sumOf { it.lamports }
+            if (ixs.size < batch.size) failed += batch.size - ixs.size
             val receipt = runCatching {
                 ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), signed, owner, null, requireSim = false).receipt
             }.getOrNull()
@@ -421,15 +467,22 @@ object SessionActions {
      * message says why. Used by the Close button and by the expiry.
      * Returns (closed, what to say).
      */
-    suspend fun closeBudget(ctx: Context, owner: String): Pair<Boolean, String> {
+    suspend fun closeBudget(ctx: Context, owner: String): Pair<Boolean, String> =
+        EnvelopeLock.withLock { closeBudgetInner(ctx, owner) }
+
+    internal suspend fun closeBudgetInner(ctx: Context, owner: String): Pair<Boolean, String> {
         val s = SessionWallet.current(ctx) ?: return false to ctx.getString(R.string.trader_stop_nobudget)
         runCatching { AgentLinkService.revoke(ctx) }
-        val stuck = runCatching { sellAll(ctx) }.getOrDefault(listOf("?"))
+        val stuck = runCatching { sellAllInner(ctx) }.getOrDefault(listOf("?"))
         if (stuck.isNotEmpty()) return false to ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
         val rent = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)
         if (rent.failed > 0) return false to ctx.resources.getQuantityString(R.plurals.env_rent_stuck, rent.failed, rent.failed)
-        val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() } ?: 0L
-        val back = if (left > 5_000L) left - 5_000L else 0L
+        // Fail closed here too. This used to read an unreadable balance as zero,
+        // which sent nothing home and then forgot the key with the money still on
+        // the chain. Every other step of this close already refuses to finish on
+        // a maybe; this one was the hole.
+        val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() }
+        val back = BudgetMath.sweepBack(left) ?: return false to ctx.getString(R.string.env_balance_unknown)
         if (back > 0L) sweep(ctx, owner, back)?.let { return false to it }
         val rows = runCatching { Ledger.all(ctx) }.getOrDefault(emptyList())
             .filter { it.kind == "agent" && it.sent && it.at >= s.createdAt && (it.host == "auto" || it.host == "asked") }

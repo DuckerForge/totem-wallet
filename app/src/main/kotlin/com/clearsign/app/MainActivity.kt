@@ -155,6 +155,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         stopReaderMode()
+        runCatching { getSystemService(android.hardware.SensorManager::class.java).unregisterListener(proximity) }
     }
 
     override fun onDestroy() {
@@ -162,9 +163,26 @@ class MainActivity : ComponentActivity() {
         Voice.release()
     }
 
+    // A hand over the top of the screen, where the proximity sensor is, covers
+    // the numbers: the same guest mode, with the print to come back.
+    private val proximity = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            val near = e.values.firstOrNull()?.let { it < (e.sensor.maximumRange.coerceAtLeast(1f) / 2f) } ?: false
+            if (near && Settings.coverToHide(this@MainActivity) && !Settings.guest.value && Settings.watchWallet(this@MainActivity) != null) {
+                Settings.guest.value = true
+                Haptics.success(this@MainActivity)
+            }
+        }
+        override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+    }
+
     override fun onResume() {
         super.onResume()
         startReaderMode()
+        runCatching {
+            val sm = getSystemService(android.hardware.SensorManager::class.java)
+            sm.getDefaultSensor(android.hardware.Sensor.TYPE_PROXIMITY)?.let { sm.registerListener(proximity, it, android.hardware.SensorManager.SENSOR_DELAY_NORMAL) }
+        }
         // Hand the radio back and forth as the tap screen arms and disarms.
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
@@ -233,6 +251,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showBridge by remember { mutableStateOf(false) }
         var showContactTap by remember { mutableStateOf(false) }
         var showLinkBox by remember { mutableStateOf(false) }
+        var showCustomize by remember { mutableStateOf(false) }
+        var showChip by remember { mutableStateOf(false) }
         var guestNote by remember { mutableStateOf(0L) }
         var showCrowd by remember { mutableStateOf(false) }
         var showHealth by remember { mutableStateOf(false) }
@@ -365,7 +385,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                 Modifier.fillMaxSize().verticalScroll(walletScroll).padding(horizontal = 20.dp, vertical = 14.dp),
                                 verticalArrangement = Arrangement.spacedBy(20.dp),
                             ) {
-                                HomeHeader(accounts.firstOrNull()?.account, headline, collapse, onScan = { scanHome() })
+                                HomeHeader(accounts.firstOrNull()?.account, headline, collapse, onScan = { scanHome() }, onChip = { showChip = true })
 
                                 // ---- the balance, the eight actions, the holdings --------------
                                 if (accounts.isNotEmpty()) {
@@ -389,6 +409,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                                 // chat directly, which with no key is a grey paragraph
                                                 // and a Close button, and never mentions the budget.
                                                 HomeAction.AGENT -> tab = Tab.AGENT
+                                                HomeAction.BRIDGE -> showBridge = true
                                                 HomeAction.MORE -> showMore = true
                                             }
                                         },
@@ -479,7 +500,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onBridge = { showMore = false; showBridge = true },
                 onLink = { showMore = false; showLinkBox = true },
                 onContactTap = { showMore = false; showContactTap = true },
+                onCustomize = { showMore = false; showCustomize = true },
             ) { showMore = false }
+            if (showCustomize) HomeActionsSheet { showCustomize = false }
+            if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
         }
         if (showBridge && owner != null) {
             BridgeSheet(owner, onSend = { req -> showBridge = false; (ctx as? MainActivity)?.incoming = req; showSend = true }) { showBridge = false }
@@ -679,7 +703,7 @@ private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
 }
 
 @Composable
-private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: Float = 0f, onScan: (() -> Unit)? = null) {
+private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: Float = 0f, onScan: (() -> Unit)? = null, onChip: () -> Unit = {}) {
     // Scanning an Agent Gate request lives here, where wallets put the scanner.
     var scanError by remember { mutableStateOf<String?>(null) }
     val ownScan = rememberAgentScan { scanError = it }
@@ -710,7 +734,7 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
         }
         if (account != null) {
             Row(
-                Modifier.clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999)).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                Modifier.clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999)).clickable(onClick = onChip).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(account.pubkeyBase58, 20.dp)

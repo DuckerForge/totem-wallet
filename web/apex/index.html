@@ -1,38 +1,84 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Apex · il portafoglio che ti fa capire cosa firmi</title>
+<title>Apex · the Solana wallet for the Seeker that shows you what you sign</title>
+<meta name="description" content="Apex is a Solana wallet for the Seeker phone: a receipt before every signature, an agent that trades on a leash, a bridge to 200 chains, and Scout, what Seeker owners are buying.">
 <meta name="theme-color" content="#070b12">
 <link rel="icon" href="icon.png">
 <link rel="stylesheet" href="style.css">
+<style>
+  main { max-width: 760px; }
+  .hero { text-align: center; padding: 8px 0 22px; }
+  .hero img { width: 84px; height: 84px; border-radius: 24px; box-shadow: 0 0 40px rgba(77,255,208,.25); }
+  .hero h1 { font-size: 40px; letter-spacing: -.02em; margin: 14px 0 6px; }
+  .hero .lede { color: var(--muted); font-size: 16px; max-width: 560px; margin: 0 auto; }
+  .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+  .ace { background: var(--card); border: 1px solid var(--stroke); border-radius: 18px; padding: 16px; }
+  .ace b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .ace span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .k { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mint); display: block; margin-bottom: 4px; }
+  .truth { margin: 22px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+  .stack { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; }
+  .stack i { font-style: normal; font-size: 11px; color: var(--muted); border: 1px solid var(--stroke); border-radius: 999px; padding: 4px 9px; }
+  footer { margin-top: 26px; color: var(--muted); font-size: 12px; text-align: center; }
+  footer a { color: var(--mint); text-decoration: none; }
+</style>
 </head>
 <body>
 <main>
-  <div class="brand" id="brand"></div>
-  <div class="card">
-    <h1 id="h"></h1>
-    <p id="p1"></p>
-    <p id="p2"></p>
-    <a class="btn primary" id="store" href="solanadappstore://details?id=com.clearsign.app"></a>
-    <p class="small" id="foot"></p>
+  <div class="hero">
+    <img src="icon.png" alt="Apex">
+    <h1>Apex</h1>
+    <p class="lede" id="lede"></p>
+    <div class="btns">
+      <a class="btn primary" id="store" href="solanadappstore://details?id=com.clearsign.app"></a>
+      <a class="btn" id="mail" href="mailto:infernaytb@gmail.com"></a>
+    </div>
   </div>
+
+  <div class="grid">
+    <div class="ace"><span class="k" id="k1"></span><b id="t1"></b><span id="d1"></span></div>
+    <div class="ace"><span class="k" id="k2"></span><b id="t2"></b><span id="d2"></span></div>
+    <div class="ace"><span class="k" id="k3"></span><b id="t3"></b><span id="d3"></span></div>
+    <div class="ace"><span class="k" id="k4"></span><b id="t4"></b><span id="d4"></span></div>
+    <div class="ace"><span class="k" id="k5"></span><b id="t5"></b><span id="d5"></span></div>
+    <div class="ace"><span class="k" id="k6"></span><b id="t6"></b><span id="d6"></span></div>
+    <div class="ace"><span class="k" id="k7"></span><b id="t7"></b><span id="d7"></span></div>
+    <div class="ace"><span class="k" id="k8"></span><b id="t8"></b><span id="d8"></span></div>
+  </div>
+
+  <p class="truth" id="truth"></p>
+  <div class="stack">
+    <i>Seed Vault</i><i>Mobile Wallet Adapter</i><i>Jupiter Ultra</i><i>RocketX</i><i>Rugcheck</i><i>Solana Actions</i><i>NFC</i><i>Cloudflare Workers</i>
+  </div>
+  <footer><span id="foot"></span><br><a href="https://github.com/DuckerForge">DuckerForge</a> · <span id="built"></span></footer>
 </main>
 <script src="i18n.js"></script>
 <script>
-brand(T('Firma sapendo cosa firmi', 'Sign knowing what you sign'));
-document.getElementById('h').textContent = T('Apex', 'Apex');
-document.getElementById('p1').textContent = T(
-  'Un portafoglio Solana per il Seeker: prima di ogni firma simula la transazione e ti dice, in italiano, cosa esce, a chi va e quanto costa.',
-  'A Solana wallet for the Seeker: before every signature it simulates the transaction and tells you, in plain words, what leaves, where it goes and what it costs.');
-document.getElementById('p2').textContent = T(
-  'Le chiavi restano nel Seed Vault del telefono. Chi propone una transazione — una dApp, uno script, un modello — non firma mai.',
-  'Keys stay in the phone’s Seed Vault. Whoever proposes a transaction — a dApp, a script, a model — never signs it.');
-document.getElementById('store').textContent = T('Apri nel dApp Store', 'Open in the dApp Store');
-document.getElementById('foot').textContent = T(
-  'Sei arrivato qui da un link di pagamento o da un regalo? Apri di nuovo quel link dopo aver installato l’app.',
+const set = (id, it, en) => { document.getElementById(id).textContent = T(it, en); };
+set('lede', 'Un portafoglio Solana per il Seeker. Prima di ogni firma vedi uno scontrino vero, simulato dalla rete. Sopra, un agente che compra da solo col guinzaglio, un ponte verso 200 catene, e Scout: cosa comprano i Seeker.',
+  'A Solana wallet for the Seeker phone. Before every signature you see a real receipt, simulated by the network. On top: an agent that trades on a leash, a bridge to 200 chains, and Scout, what Seeker owners are buying.');
+set('store', 'Apri nel dApp Store', 'Open in the dApp Store');
+set('mail', 'Scrivici', 'Contact');
+const aces = [
+  ['Scontrino', 'Receipt', 'Vedi prima di firmare', 'See before you sign', 'I byte veri della transazione, simulati: quanto esce, quanto entra, a chi, con quali rischi. Poi tieni premuto, poi l\'impronta. Vale per le dApp, lo swap, l\'agente.', 'The real transaction bytes, simulated: what leaves, what comes in, to whom, with which risks. Then hold, then the fingerprint. For dApps, swaps, the agent.'],
+  ['Agente', 'Agent', 'Compra da solo, col guinzaglio', 'Trades alone, on a leash', 'Un secondo conto con una paghetta, cancelli da bot professionale più Rugcheck, obiettivo e stop, i guadagni tornano a casa. La tua seed non la vede mai.', 'A second account with an allowance, pro-bot gates plus Rugcheck, target and stop, gains sent home. It never sees your seed.'],
+  ['Scout', 'Scout', 'Cosa comprano i Seeker', 'What Seeker owners buy', 'Censimento di 120.000 telefoni Seeker, i più attivi guardati ogni dieci minuti. La diretta, le balene, cosa tengono. Una stella e l\'agente copia chi segui.', 'A census of 120,000 Seeker phones, the most active watched every ten minutes. Live buys, whales, what they hold. A star and the agent copies who you follow.'],
+  ['Ponte', 'Bridge', 'Verso 200 catene', 'To 200 chains', 'SOL o USDC verso Ethereum, Arbitrum, Base, Bitcoin e altre con RocketX: rotte a confronto, l\'indirizzo di deposito nel normale Invia, scontrino e impronta compresi.', 'SOL or USDC to Ethereum, Arbitrum, Base, Bitcoin and more via RocketX: routes compared, the deposit address inside the ordinary Send, receipt and fingerprint included.'],
+  ['Mercato', 'Market', 'CoinGecko e marketcapof insieme', 'CoinGecko and marketcapof, together', 'Classifica, seguite con quello che hai altrove, "e se fosse grande come…" con la scala ×2 ×10 ×100, la campanella a ogni 5%.', 'Rankings, followed coins with what you hold elsewhere, "what if it were as big as…" with the ×2 ×10 ×100 ladder, a bell at every 5%.'],
+  ['Tocco', 'Tap', 'Paga, scambia contatti, scrivi adesivi', 'Pay, swap contacts, write stickers', 'Due telefoni che si toccano: uno chiede, l\'altro vede lo scontrino e firma. Contatti scambiati col tocco, firmati dal telefono. Un adesivo NFC che scrivi tu per farti pagare al banco.', 'Two phones touching: one asks, the other sees the receipt and signs. Contacts exchanged by touch, signed by the phone. An NFC sticker you write yourself to get paid at the counter.'],
+  ['Link', 'Link', 'Soldi con un link, a chiunque', 'Money by link, to anyone', 'Un portafoglino usa e getta con la cifra dentro e un link. Lo mandi a chi vuoi, anche senza wallet: chi lo apre porta i soldi nel suo.', 'A throwaway wallet with the amount inside and a link. Send it to anyone, even without a wallet: whoever opens it brings the money into theirs.'],
+  ['I suoi occhi', 'Its eyes', 'Guarda l\'agente lavorare', 'Watch the agent work', 'Uno schermo che non si spegne: un grafico per moneta con entrata, obiettivo e stop, i ragionamenti battuti a macchina, una voce che dice "Cerco", "Comprato".', 'A screen that never sleeps: a chart per coin with entry, target and stop, its reasoning typed out, a voice that says "Looking", "Bought".'],
+];
+aces.forEach((a, i) => { set('k' + (i + 1), a[0], a[1]); set('t' + (i + 1), a[2], a[3]); set('d' + (i + 1), a[4], a[5]); });
+set('truth', 'Le chiavi restano nel Seed Vault del telefono. Chi propone una transazione, una dApp, uno script, un modello, non firma mai. Inglese di base, italiano se il telefono è in italiano.',
+  'Keys stay in the phone\'s Seed Vault. Whoever proposes a transaction, a dApp, a script, a model, never signs it. English by default, Italian when the phone is.');
+set('foot', 'Sei arrivato qui da un link di pagamento o da un regalo? Apri di nuovo quel link dopo aver installato l\'app.',
   'Came here from a payment link or a gift? Open that link again once the app is installed.');
+set('built', 'Costruito per il Solana Mobile Seeker · 2026', 'Built for the Solana Mobile Seeker · 2026');
 </script>
 </body>
 </html>

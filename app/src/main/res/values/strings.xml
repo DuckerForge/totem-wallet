@@ -1272,6 +1272,7 @@
     <string name="feed_fee">Fee</string>
     <string name="feed_risk">Risks</string>
     <string name="feed_risk_none">none found</string>
+    <string name="feed_since">%1$s since they went in, %2$s ago</string>
 <string name="feed_title">Live from the Seekers</string>
     <string name="feed_line">%1$s bought %2$s</string>
     <string name="feed_meta">%1$s SOL · %2$s</string>

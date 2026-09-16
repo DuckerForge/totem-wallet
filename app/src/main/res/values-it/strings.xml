@@ -1272,6 +1272,7 @@
     <string name="feed_fee">Commissione</string>
     <string name="feed_risk">Rischi</string>
     <string name="feed_risk_none">nessuno trovato</string>
+    <string name="feed_since">%1$s da quando è entrato lui, %2$s fa</string>
 <string name="feed_title">In diretta dai Seeker</string>
     <string name="feed_line">%1$s ha comprato %2$s</string>
     <string name="feed_meta">%1$s SOL · %2$s</string>

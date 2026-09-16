@@ -117,10 +117,10 @@ internal fun CrowdFeed(
         events.orEmpty()
             .groupBy { it.wallet to it.mint }
             .values
-            .map { group -> group.maxByOrNull { it.at }!! to group.size }
-            .sortedByDescending { it.first.at }
+            .map { group -> group.sortedBy { it.at } }
+            .sortedByDescending { it.last().at }
     }
-    val fresh = rows.firstOrNull()?.let { now - it.first.at < 5 * 60_000L } == true
+    val fresh = rows.firstOrNull()?.let { now - it.last().at < 5 * 60_000L } == true
     // One row open at a time. Two open rows is an accordion, and it also means two
     // quotes running against Jupiter for coins nobody is looking at any more.
     var openRow by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
@@ -149,18 +149,17 @@ internal fun CrowdFeed(
             // purchase, and the page remembers which ones have already played, so
             // scrolling the card away and back does not replay the cascade. A buy
             // that lands while you are looking still slides in on its own.
-            rows.forEachIndexed { i, (e, times) ->
+            rows.forEachIndexed { i, moves ->
+                val e = moves.last()
                 val id = "feed:" + e.wallet + e.at
                 val first = remember(id) { played.add(id) }
                 val mine = openRow == e.mint
                 Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FeedRow(e, times, now, mine) { openRow = if (mine) null else e.mint }
+                        FeedRow(e, moves.size, now, mine) { openRow = if (mine) null else e.mint }
                         // The terminal, under the row that made you want it. Nobody
                         // leaves the feed to trade any more.
-                        if (mine) {
-                            FeedBuyPanel(e.mint, e.symbol, e.solSpent, e.sell, owner, signer) { openRow = null }
-                        }
+                        if (mine) FeedBuyPanel(e.mint, e.symbol, moves, owner, signer) { openRow = null }
                     }
                 }
             }

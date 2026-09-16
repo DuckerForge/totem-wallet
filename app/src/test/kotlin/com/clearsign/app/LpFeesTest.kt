@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Base64
+import java.util.zip.Inflater
 
 /**
  * Real accounts, read from mainnet on the 16th of September 2026.
@@ -63,6 +64,40 @@ class LpFeesTest {
             "4GkPbQ8V5ti1Y5jTzwACbSbVZQAhY7VJc5oi43Z7U4U3",
             LpFees.positionOf(LpFees.Venue.RAYDIUM, "GTm3sPWckSbP4QPjCMRjrfU7FqwurRx6RynfHYwCa2VW"),
         )
+    }
+
+    /**
+     * Meteora's position is eight kilobytes of bin accounting, nearly all of it
+     * zeroes, so the real account rides here deflated rather than as eleven
+     * kilobytes of base64.
+     */
+    private fun inflate(s: String): ByteArray {
+        val inf = Inflater(); inf.setInput(Base64.getDecoder().decode(s))
+        val out = ByteArray(16384); val n = inf.inflate(out); inf.end()
+        return out.copyOf(n)
+    }
+
+    private val metPos = inflate("eNor3XDl+Nctrdv+/9GRWO7SeWXCDO3A7YnBNeeOXbnzKvTbRLsJj2O3Rq650Sv8SW7r7n926/xVp/hbLr3SXJi/9szeSL/ywp7z/kt/5TKMglEwCkbBKBgFo2AUjIJRMApGwSgYBaNgFIwCmoLnJ4KO3WP5xAvjX/q2ysE9Swkuv8hYjxFEn3zJNBpYo2AUjIJRMApGwSgYBaNgFIyCYQ10/v3/7wPE5e+a0ulqMSNtjAUAfIE89g==")
+    private val metPair = b("IQsxYrVlsQ0gTiwBsASIE0wdAADwSQIA3u7//yIRAADoAwAAAAAAAAAAAAAAAAAALP7//wAAAAA/hYJnAAAAAAAAAAAAAAAA/2QAAI/+//9kAAABIE4AAAw1ENcb/hDu+EaqP/hXBBLvwhIuGSC2PvRXJRJGBO4FBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAHPnjJw8M9mtA==")
+
+    @Test fun `meteora position adds up the pending fees of every bin`() {
+        val o = LpFees.decodeMeteora("B9ouHFKEGp7BPmegpi7shEZWwiC9Bsxsot1UyBbWYCRm", metPos)!!
+        assertEquals(LpFees.METEORA_POSITION_SIZE, metPos.size)
+        assertEquals(LpFees.Venue.METEORA, o.venue)
+        assertEquals("JEFz9hupKysKAFPkySe7oubHzQ88xk87Eu3J92Ho1vnK", o.pool)
+        assertEquals(19805090L, o.rawA)
+        assertEquals(190921L, o.rawB)
+    }
+
+    @Test fun `meteora names its owner where the filter looks for it`() {
+        val owner = metPos.copyOfRange(LpFees.METEORA_OWNER_OFFSET, LpFees.METEORA_OWNER_OFFSET + 32)
+        assertEquals("AVi8HJEqZksYWoarp9JZiK1PRrbvjEvF3Qzv9UoP69MW", Base58.encode(owner))
+    }
+
+    @Test fun `meteora pair names its two coins`() {
+        val pool = LpFees.poolMeteora(metPair)!!
+        assertEquals("pepo1CFNU2RXf7yXX7HNXazXwxsq8WrPvDHpHriwoLY", pool.mintA)
+        assertEquals("So11111111111111111111111111111111111111112", pool.mintB)
     }
 
     @Test fun `a position owed nothing is not a finding`() {

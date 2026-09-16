@@ -507,7 +507,7 @@
     <string name="pro_f3">Deep address activity scans</string>
     <string name="pro_f4">Unlimited tax exports</string>
         <string name="lp_title">Forgotten money</string>
-    <string name="lp_none">Checked Orca and Raydium: no fees waiting in a pool position.</string>
+    <string name="lp_none">Checked Orca, Raydium and Meteora: no fees waiting in a pool position.</string>
     <string name="lp_owed">At least %1$s %2$s and %3$s %4$s never collected.</string>
     <string name="lp_abandoned">This position has no liquidity left. Closing it also gives back its rent.</string>
     <string name="lp_atleast">It says at least because only the fees counted at the position\'s last touch live in the account. Anything earned since is still in the pool.</string>

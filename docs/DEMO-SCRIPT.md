@@ -1,56 +1,56 @@
-# ClearSign — 3-minute demo video script
+# Three minute demo, Clock In
 
-Shot on a real Seeker (rule: must run on device). Screen-record + voiceover.
-Keep it fast; the app does the talking. Target ~2:50.
+Shot on a real Seeker. Screen recording plus voice. English only. Target 2:50.
+The name is provisional: say "this wallet" rather than a name until the name is chosen.
 
-## Setup (before recording)
-- Seeker with ClearSign installed (release APK) and Seed Vault set up with a test wallet holding a little SOL + some SKR.
-- The attacker dApp: `:testdapp` installed, and/or the Solana Pay bench
-  (`~/Scrivania/bounty-hunting/solana-pay-wallet-test`) reachable over LAN/HTTPS.
-- Treasury wallet configured (`clearsign.skrTreasury`) so the SKR unlock is real.
-- Clean home screen; pick the Halo theme to start.
+## Before recording
+
+- Release build installed, signed with the real key, Seed Vault set up.
+- A test wallet with a little SOL, some SKR, and at least one dead token account so wallet health has something to find.
+- `:testdapp` installed for the attack beats.
+- The agent stopped, no open budget, so the first minute card shows.
+- Two NFC stickers and, if a second phone is there, the contact tap beat.
+- Airplane mode off, battery saver off, notifications allowed.
 
 ## Beat sheet
 
-**0:00–0:15 — Hook**
-Voice: "This is the Seeker. When an app asks it to sign, it can show you just a
-name and Approve. ClearSign fixes that."
-Show: app icon → open ClearSign → the onboarding line "See what you sign".
+**0:00 to 0:12, the hook**
+Voice: "A phone can ask you to sign something and show you nothing but a name and a button."
+Show: the attacker dApp asking to sign. Cut to our receipt appearing over it.
 
-**0:15–0:50 — Attack #1: hidden drain**
-Open the attacker dApp, tap "🎁 Free airdrop". It routes to ClearSign.
-Voice: "The label says free airdrop. The receipt says the truth."
-Show: receipt reveals real recipient + amount + risk; the DANGER card; hold-to-sign
-is blocked / you tap **Reject**.
+**0:12 to 0:45, the receipt**
+Voice: "Every transaction is simulated on chain first. The receipt is built from what the network says will happen, not from what the app claims."
+Show: the drain attempt. The receipt says the real amount and the real recipient, and the risk in red. Reject.
+Then the unlimited approval: danger, one tap approval blocked.
 
-**0:50–1:15 — Attack #2 & #3**
-Trigger the unlimited-approval scenario → DANGER "unlimited approval".
-Trigger a tx that needs another signer → amber "extra signatures required".
-Voice: "Unlimited approvals and unexpected co-signers — flagged before you sign."
+**0:45 to 1:05, signing something real**
+Voice: "A real payment reads the same way. Hold to confirm, then the Seed Vault."
+Show: Send, the receipt, the address trust badge, hold, fingerprint, the entry landing in the ledger.
+Then tap "Show the proof": a QR signed by this phone, verified by the other device on screen.
 
-**1:15–1:55 — The good path**
-From ClearSign, Send 0.001 SOL to a contact.
-Voice: "The same receipt for your own payments." → hold-to-sign → Seed Vault
-biometric → Done.
-Open the **Scontrini/Receipts** tab: the entry with its € value; open it → the
-attested proof; tap **Share proof** and **Export → Koinly CSV**.
-Voice: "Every signature becomes a receipt with its value — and a signed proof.
-Export for your taxes in one tap."
+**1:05 to 1:45, the agent**
+Voice: "A budget kept apart from the wallet. It never sees the seed. It looks for a coin, buys a slice, sells at a target or a stop, and asks for a fingerprint above its limits."
+Show: the first minute card, make a budget, the sizing line in dollars, the full screen payment.
+Then "Watch it work": the timer ring, the charts with entry, target and stop drawn, the reasoning typed out, the voice saying what it does. Turn the phone sideways for the two chart layout.
 
-**1:55–2:20 — X-factor: themes**
-In Settings, switch theme: Halo → Ember (paper receipt) → Phosphor (green
-terminal). Re-open a receipt to show the layout change.
-Voice: "One app, three ways to read your money."
+**1:45 to 2:05, what nobody else has**
+Voice: "It also reads the crowd it lives in."
+Show: the census card, half the Seekers keep SKR staked with the Guardians, a fact no wallet balance shows.
+Then wallet health: forgotten money, unclaimed pool fees on Orca, Raydium and Meteora, read straight from the chain with no key.
 
-**2:20–2:45 — SKR**
-Tap a locked Pro feature → pay SKR sheet → hold-to-pay → the SKR transfer signs
-through the same clear receipt → Pro unlocked (Watchtower + deep scan on).
-Voice: "Pro is unlocked with SKR, on mainnet, signed the safe way."
+**2:05 to 2:30, the phone itself**
+Voice: "It uses the hardware the Seeker actually has."
+Show: pay by touch between two phones, or write a payment request on an NFC sticker and tap it.
+Show: a hand over the screen, the numbers vanish, the fingerprint brings them back.
 
-**2:45–2:55 — Close**
-Voice: "ClearSign. Stop signing blind." → logo.
+**2:30 to 2:50, the close**
+Voice: "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, and on everything the agent does."
+Show: the bridge quote, then the ledger with the day's entries, then the app icon.
+Last line: "What you see is what you sign."
 
-## Capture tips
-- `adb exec-out screenrecord --output-format=h264 - > demo.h264` or use the
-  Seeker's built-in screen recorder for audio; add voiceover in edit.
-- Portrait, 1080p. Keep cuts tight. Show real numbers, never a mock.
+## Rules for the cut
+
+- No stock footage, no slides. The phone screen is the whole video.
+- Every number on screen is real money on mainnet, however small.
+- Never show a seed phrase, the RPC key, or the partner keys.
+- Subtitles burned in, because the room at judging will be loud.

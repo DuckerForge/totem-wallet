@@ -319,6 +319,8 @@ internal fun SendSheet(
                     is SendState.Done -> {
                         Banner(stringResource(R.string.send_done), Halo.mint, HIcon.CHECK)
                         Text(s.signature, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, maxLines = 2)
+                        // A bridge deposit: the order learns its chain signature, so its status can be asked.
+                        LaunchedEffect(s.signature) { prefillTo?.let { RocketX.attachSignature(ctx, it, s.signature) } }
                         // The proof: the receipt this phone just signed, as a QR for the person paid.
                         var showProof by remember { mutableStateOf(false) }
                         val entry = remember(s.signature) { runCatching { Ledger.all(ctx).firstOrNull { it.signature == s.signature } }.getOrNull() }

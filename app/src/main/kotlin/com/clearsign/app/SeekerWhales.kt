@@ -100,10 +100,10 @@ internal fun SeekerWhalesCard(limit: Int = 8) {
 }
 
 /** One coin a whale is sitting on, and what that pile is worth. */
-private class Held(val mint: String, val symbol: String, val amount: Double, val usd: Double)
+internal class Held(val mint: String, val symbol: String, val amount: Double, val usd: Double)
 
 /** The three that hold the money, and how many things were left out for having no price. */
-private class Holdings(val top: List<Held>, val unpriced: Int)
+internal class Holdings(val top: List<Held>, val unpriced: Int)
 
 /**
  * What one wallet actually holds, read when somebody asks and not before.
@@ -122,7 +122,8 @@ private class Holdings(val top: List<Held>, val unpriced: Int)
  * On the scanner's key, never the agent's, and never for all sixty at once: the
  * card still refuses to reprice a list nobody is looking at.
  */
-private fun holdingsOf(address: String): Holdings? {
+/** What one wallet is holding right now, priced. Shared with the wallet page. */
+internal fun holdingsOf(address: String, take: Int = 3): Holdings? {
     val rpc = BuildConfig.SCAN_RPC_URL
     if (rpc.isBlank()) return null
     val accounts = runCatching { SolanaRpc.tokensOf(rpc, address) }.getOrNull() ?: return null
@@ -140,7 +141,7 @@ private fun holdingsOf(address: String): Holdings? {
         val usd = px[mint]?.times(amount)?.takeIf { it >= 1 } ?: return@mapNotNull null
         Held(mint, JupiterTokens.cached(mint)?.symbol ?: mint.take(4), amount, usd)
     }.sortedByDescending { it.usd }
-    return Holdings(priced.take(3), amounts.size - priced.size)
+    return Holdings(priced.take(take), amounts.size - priced.size)
 }
 
 @Composable

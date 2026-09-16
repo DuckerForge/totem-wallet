@@ -25,6 +25,8 @@ android {
     val crowdUrl = localProps.getProperty("clearsign.crowdUrl", "")
     // Wallet that receives SKR for premium themes. Blank → purchases disabled in the UI.
     val skrTreasury = localProps.getProperty("clearsign.skrTreasury", "")
+    // RocketX partner key (free, from app.rocketx.exchange/partner): the bridge. Blank → the bridge is off.
+    val rocketxKey = localProps.getProperty("clearsign.rocketxKey", "")
 
     defaultConfig {
         applicationId = "com.clearsign.app"
@@ -36,6 +38,7 @@ android {
         buildConfigField("String", "SCAN_RPC_URL", "\"$scanRpcUrl\"")
         buildConfigField("String", "CROWD_URL", "\"$crowdUrl\"")
         buildConfigField("String", "SKR_TREASURY", "\"$skrTreasury\"")
+        buildConfigField("String", "ROCKETX_KEY", "\"$rocketxKey\"")
     }
 
     // Debug-key signing for release too, so a shrunken (R8) APK can be sideloaded on

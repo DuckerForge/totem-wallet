@@ -254,7 +254,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -267,6 +267,7 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
         ) {
             Text(stringResource(R.string.home_act_more), style = HaloType.title, color = Halo.ink)
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
+            if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)
             MoreRow(HIcon.WALLET, stringResource(R.string.widget_card_title), onSettings)

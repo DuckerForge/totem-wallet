@@ -223,6 +223,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showGift by remember { mutableStateOf(false) }
         var showTap by remember { mutableStateOf(false) }
         var showMore by remember { mutableStateOf(false) }
+        var showBridge by remember { mutableStateOf(false) }
         var showCrowd by remember { mutableStateOf(false) }
         var showHealth by remember { mutableStateOf(false) }
         var showPnl by remember { mutableStateOf(false) }
@@ -453,7 +454,11 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onHealth = { showMore = false; showHealth = true },
                 onContacts = { showMore = false; tab = Tab.SETTINGS },
                 onSettings = { showMore = false; tab = Tab.SETTINGS },
+                onBridge = { showMore = false; showBridge = true },
             ) { showMore = false }
+        }
+        if (showBridge && owner != null) {
+            BridgeSheet(owner, onSend = { req -> showBridge = false; (ctx as? MainActivity)?.incoming = req; showSend = true }) { showBridge = false }
         }
         if (showHealth) HealthSheet(owner) { showHealth = false }
         if (showPnl) PnlSheet { showPnl = false }

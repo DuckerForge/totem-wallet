@@ -94,16 +94,16 @@
       <div class="scr">
         <div class="top"><span>09:41</span><span class="chip">cHAH…VZjQ</span></div>
         <div class="lbl">Total balance</div>
-        <div class="tot" id="tot">€ 0,00</div>
-        <div class="pill">+2,4 % today</div>
+        <div class="tot" id="tot">$ 0.00</div>
+        <div class="pill">+2.4% today</div>
         <div class="acts">
           <span><i></i><b>Send</b></span><span><i></i><b>Receive</b></span><span><i></i><b>Swap</b></span><span><i></i><b>Scan</b></span>
           <span><i></i><b>Scout</b></span><span><i></i><b>Bridge</b></span><span><i></i><b>Agent</b></span><span><i></i><b>More</b></span>
         </div>
         <div class="ring"></div>
         <div class="rc">
-          <div class="r"><span>Out</span><span class="neg">−0,0377 SOL</span></div>
-          <div class="r"><span>In</span><span class="pos">+3.204,92 ALL</span></div>
+          <div class="r"><span>Out</span><span class="neg">−0.0377 SOL</span></div>
+          <div class="r"><span>In</span><span class="pos">+3,204.92 ALL</span></div>
           <div class="r"><span>To</span><span>Jupiter Ultra · MEV</span></div>
           <div class="r"><span>Risk</span><span class="w">new recipient</span></div>
           <div class="hold">Hold to sign</div>
@@ -141,7 +141,7 @@
     <div class="ace"><span class="k">Receipts</span><b>Tax‑ready</b><span>Every signature recorded, CSV for Koinly and CoinTracker, PDF, realized P&amp;L per token.</span></div>
   </div>
 
-  <p class="truth">English by default, Italian when the phone is. Free. The app earns on the swap fee, nothing else.</p>
+  <p class="truth">Free. The app earns on the swap fee, nothing else.</p>
   <footer><span>Came here from a payment link or a gift? Open that link again once the app is installed.</span><br><a href="https://github.com/DuckerForge">DuckerForge</a> · <a href="mailto:infernaytb@gmail.com">infernaytb@gmail.com</a> · built for the Solana Mobile Seeker · 2026 · "Seeker Wallet" is a working name, not the final one</footer>
 </main>
 <div id="sky"></div><div class="neb a"></div><div class="neb b"></div>
@@ -154,7 +154,7 @@
   document.querySelectorAll('.t, .ace').forEach((el, i) => { el.style.transitionDelay = (i % 4) * 70 + 'ms'; io.observe(el); });
   // The balance on the phone counts up, then breathes.
   const tot = document.getElementById('tot'); const target = 1284.5; let t0 = null;
-  function count(ts) { if (!t0) t0 = ts; const k = Math.min(1, (ts - t0) / 1600); const v = target * (1 - Math.pow(1 - k, 3)); tot.textContent = '€ ' + v.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (k < 1) requestAnimationFrame(count); }
+  function count(ts) { if (!t0) t0 = ts; const k = Math.min(1, (ts - t0) / 1600); const v = target * (1 - Math.pow(1 - k, 3)); tot.textContent = '$ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (k < 1) requestAnimationFrame(count); }
   requestAnimationFrame(count);
 </script>
 </body>

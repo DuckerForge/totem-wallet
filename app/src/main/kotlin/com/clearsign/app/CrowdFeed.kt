@@ -86,6 +86,10 @@ internal fun CrowdFeed(
     open: Boolean,
     onToggle: () -> Unit,
     played: MutableSet<String>,
+    owner: String? = null,
+    signer: SeedVaultSigner? = null,
+    /** A coin to open on arrival, when a notification brought us here. */
+    openMint: String? = null,
     compactRows: Int = 4,
     onBuy: (String) -> Unit,
 ) {
@@ -107,6 +111,10 @@ internal fun CrowdFeed(
     // exists to solve. The rest is one tap away and nothing is lost.
     val rows = events.orEmpty()
     val fresh = rows.firstOrNull()?.let { now - it.at < 5 * 60_000L } == true
+    // One row open at a time. Two open rows is an accordion, and it also means two
+    // quotes running against Jupiter for coins nobody is looking at any more.
+    var openRow by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(openMint) { openMint?.let { openRow = it } }
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -140,7 +148,17 @@ internal fun CrowdFeed(
             rows.take(if (open) 12 else compactRows).forEachIndexed { i, e ->
                 val id = "feed:" + e.wallet + e.at
                 val first = remember(id) { played.add(id) }
-                Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) { FeedRow(e, now, onBuy) }
+                val mine = openRow == e.mint
+                Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FeedRow(e, now, mine) { openRow = if (mine) null else e.mint }
+                        // The terminal, under the row that made you want it. Nobody
+                        // leaves the feed to trade any more.
+                        if (mine) {
+                            FeedBuyPanel(e.mint, e.symbol, e.solSpent, e.sell, owner, signer) { openRow = null }
+                        }
+                    }
+                }
             }
             if (rows.size > compactRows) {
                 SmallChip(
@@ -153,7 +171,7 @@ internal fun CrowdFeed(
             // Four lines of explanation nobody rereads, kept behind the toggle so
             // the switch bar stays above the fold.
             if (open) Text(
-                stringResource(R.string.feed_note) + " " + stringResource(R.string.feed_follow_note),
+                stringResource(R.string.feed_note) + " " + stringResource(R.string.feed_star_note),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
             )
         }
@@ -174,16 +192,20 @@ private fun LiveDot() {
 }
 
 @Composable
-private fun FeedRow(e: CrowdBuy, now: Long, onBuy: (String) -> Unit) {
+private fun FeedRow(e: CrowdBuy, now: Long, open: Boolean, onOpen: () -> Unit) {
     val whale = e.tier == SeekerTier.WHALE
-    val tint = if (whale) Halo.amber else Halo.cyan
+    // A sale reads red whoever made it: the size of the wallet matters less than
+    // the direction when somebody is on the way out.
+    val tint = if (e.sell) Halo.red else if (whale) Halo.amber else Halo.cyan
     val ctx = LocalContext.current
     val name = remember(e.wallet) { SeekerCrowd.nickname(e.wallet) }
     // The colour alone never said which of the two this was. The size does, and it
     // is the only whale score worth having: how much this wallet is actually holding.
     val size = remember(e.wallet) { SeekerScan.sizeOf(ctx, e.wallet) }
     Row(
-        Modifier.fillMaxWidth().clip(rs(Radius.row)).background(Halo.cardSoft)
+        Modifier.fillMaxWidth().clip(rs(Radius.row))
+            .background(if (open) Halo.cardHi else Halo.cardSoft)
+            .clickable { onOpen(); Haptics.tick(ctx) }
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -215,7 +237,7 @@ private fun FeedRow(e: CrowdBuy, now: Long, onBuy: (String) -> Unit) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                stringResource(R.string.feed_line, name, e.symbol),
+                stringResource(if (e.sell) R.string.feed_line_sell else R.string.feed_line, name, e.symbol),
                 fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, lineHeight = 17.sp,
             )
             Text(
@@ -236,19 +258,25 @@ private fun FeedRow(e: CrowdBuy, now: Long, onBuy: (String) -> Unit) {
         Box(
             Modifier.size(30.dp).clip(rs(999))
                 .background(if (followed) Halo.amber.copy(alpha = 0.16f) else Halo.cardSoft)
-                .clickable { followed = Follows.toggle(ctx, e.wallet); Haptics.tick(ctx) },
+                .clickable {
+                    followed = Follows.toggle(ctx, e.wallet)
+                    // Following now means two things, and the second one is the
+                    // one the star looks like it promises: the phone tells you.
+                    FollowWatch.sync(ctx)
+                    Haptics.tick(ctx)
+                },
             contentAlignment = Alignment.Center,
         ) { HaloIcon(if (followed) HIcon.STAR_FILLED else HIcon.STAR, if (followed) Halo.amber else Halo.muted, 15.dp) }
         Spacer(Modifier.width(6.dp))
         Box(
             Modifier.clip(rs(999)).background(Halo.mint.copy(alpha = 0.14f))
                 .border(1.dp, Halo.mint.copy(alpha = 0.45f), rs(999))
-                .clickable { onBuy(e.mint) }
+                .clickable { onOpen(); Haptics.tick(ctx) }
                 .padding(horizontal = 13.dp, vertical = 6.dp),
         ) {
             Text(
-                stringResource(R.string.feed_buy), fontFamily = Sora,
-                fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = Halo.mint,
+                stringResource(if (open) R.string.feed_close else if (e.sell) R.string.feed_look else R.string.feed_buy),
+                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = Halo.mint,
             )
         }
     }

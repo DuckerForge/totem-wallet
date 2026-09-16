@@ -121,7 +121,7 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
 
 /** The line, with the ground under it shaded so the direction reads at a glance. */
 @Composable
-private fun Spark(values: List<Double>, tint: Color, targets: List<ChartTarget> = emptyList()) {
+internal fun Spark(values: List<Double>, tint: Color, targets: List<ChartTarget> = emptyList()) {
     // The scale stretches to fit the targets, so a line at +30% is on the
     // picture and not off the top of it. Capped at four times the range of the
     // prices themselves: a target at +300% would flatten the whole story.

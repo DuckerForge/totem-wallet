@@ -291,7 +291,12 @@ object AgentBroker {
     fun warn(
         ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null, color: Int? = null,
         rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null, largeIcon: android.graphics.Bitmap? = null,
-    ) = notify(ctx, title, body, null, picture = picture, color = color, rhythm = rhythm, actions = actions, id = id, largeIcon = largeIcon)
+        /** Opens the crowd feed with this coin already unfolded, instead of the agent page. */
+        openMint: String? = null,
+    ) = notify(
+        ctx, title, body, null, picture = picture, color = color, rhythm = rhythm, actions = actions, id = id,
+        largeIcon = largeIcon, openMint = openMint,
+    )
 
     fun dismiss(ctx: Context, id: Int) = ctx.getSystemService(NotificationManager::class.java).cancel(id)
 
@@ -361,10 +366,15 @@ object AgentBroker {
         ctx: Context, title: String, body: String, txSig: String?, tap: PendingIntent? = null, heads: Boolean = false,
         picture: android.graphics.Bitmap? = null, color: Int? = null,
         rhythm: Rhythm? = null, actions: List<Notification.Action> = emptyList(), id: Int? = null, largeIcon: android.graphics.Bitmap? = null,
+        openMint: String? = null,
     ) {
         channel(ctx)
         val open = tap ?: PendingIntent.getActivity(
-            ctx, 0, Intent(ctx, MainActivity::class.java).putExtra("open", "agent").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            ctx, openMint?.hashCode() ?: 0,
+            Intent(ctx, MainActivity::class.java)
+                .putExtra("open", if (openMint != null) "crowd" else "agent")
+                .apply { openMint?.let { putExtra("mint", it) } }
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val n = Notification.Builder(ctx, rhythm?.let { channelFor(ctx, it) } ?: CHANNEL)

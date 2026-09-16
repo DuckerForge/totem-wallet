@@ -160,31 +160,19 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
      * existed on a transaction that would no longer land.
      */
     suspend fun buildReview(q: Jupiter.Quote, raw: Long): SwapState = try {
-        // Ultra first: the route, the slippage and the priority fee chosen by
-        // Jupiter, landed by Jupiter, out of the sandwich bots' sight. The
-        // receipt reads those bytes like any other. When Ultra does not answer,
-        // swap v1 as before, with our fee account when one exists.
-        val ultra = withContext(Dispatchers.IO) { runCatching { JupiterUltra.order(from.mint, to.mint, raw, owner) }.getOrNull() }
-        val feeAccount = if (ultra != null) null else withContext(Dispatchers.IO) { Jupiter.feeAccountIfUsable(to.mint) }
-        val priced = ultra?.asQuote() ?: if (feeAccount != null) q else withContext(Dispatchers.IO) {
-            Jupiter.quote(from.mint, to.mint, raw, feeBps = 0) ?: q
-        }
-        val tx = ultra?.tx ?: withContext(Dispatchers.IO) {
-            Jupiter.swapTransaction(priced, owner, feeAccount) ?: Jupiter.swapTransaction(priced, owner, null)
-        }
-        if (tx == null) SwapState.Error(ctx.getString(R.string.swap_build_failed)) else {
-            val analyzed = withContext(Dispatchers.IO) { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, owner, null, requireSim = false) }
-            SwapState.Review(
-                tx, swapReceipt(ctx, analyzed, owner, priced),
-                fmtUnits(priced.outAmount, to.decimals), to.symbol, priced,
-                SwapPair(
-                    outMint = from.mint, outSymbol = from.symbol, outUi = fmtUnits(priced.inAmount, from.decimals),
-                    inMint = to.mint, inSymbol = to.symbol, inUi = fmtUnits(priced.outAmount, to.decimals),
-                ),
-                at = System.currentTimeMillis(),
-                ultraRequestId = ultra?.requestId, ultraSlippageBps = ultra?.slippageBps ?: 0, gasless = ultra?.gasless ?: false,
-            )
-        }
+        // The building itself lives in SwapBuild, shared with the feed, so the
+        // same trade cannot produce two different receipts on two screens.
+        val b = SwapBuild.build(
+            ctx, owner,
+            SwapBuild.Side(from.mint, from.symbol, from.decimals),
+            SwapBuild.Side(to.mint, to.symbol, to.decimals),
+            raw, known = q,
+        )
+        if (b == null) SwapState.Error(ctx.getString(R.string.swap_build_failed))
+        else SwapState.Review(
+            b.tx, b.analyzed, b.outUi, b.outSymbol, b.quote, b.pair,
+            at = b.at, ultraRequestId = b.ultraRequestId, ultraSlippageBps = b.ultraSlippageBps, gasless = b.gasless,
+        )
     } catch (e: Exception) {
         SwapState.Error(e.message ?: ctx.getString(R.string.swap_build_failed))
     }
@@ -460,45 +448,6 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     }
 }
 
-/**
- * The platform fee is not shown in the quote preview any more: a raw "6544 SKR"
- * reads as a lot even when it is half a percent. It is still spelled out in full
- * in the receipt below, as one of the destinations, because that screen is where
- * the app promises to name everything that leaves.
- *
- * A Jupiter-built swap is not a payment to a stranger: the "unknown recipient"
- * is the AMM pool vault and the "account close" is the temporary wSOL account
- * being unwrapped back to the owner. Keep the receipt honest (the amounts and the
- * destination stay visible, tappable, and go to the ledger) but name the pool
- * and drop the two warnings that only make sense for a transfer.
- */
-private fun swapReceipt(ctx: android.content.Context, analyzed: ReceiptEngine.Analyzed, owner: String, q: Jupiter.Quote): ReceiptEngine.Analyzed {
-    val r = analyzed.receipt
-    // Short, because this name is read under a circle on a map and at the head of
-    // a row. The full route ("Jupiter · HumidiFi · Meteora DLMM") is one line up,
-    // in the summary, where it has a whole row to itself.
-    val pool = ctx.getString(R.string.swap_pool_short)
-    val drop = setOf(com.clearsign.core.RiskFlag.NEW_UNKNOWN_RECIPIENT, com.clearsign.core.RiskFlag.ACCOUNT_CLOSE)
-    return analyzed.copy(
-        receipt = r.copy(
-            risks = r.risks.filter { it.flag !in drop },
-            recipientLabel = r.recipientLabel ?: r.primaryRecipient?.takeIf { it != owner }?.let { pool },
-            distributions = r.distributions.map { d ->
-                when {
-                    d.label != null -> d
-                    // An account this transaction opens. **Not** your token
-                    // account for the coin: that one belongs to you, so it never
-                    // reaches this list. These belong to the route, and naming
-                    // them "Account for CATE" was a guess that put the same wrong
-                    // name on two different accounts at once.
-                    d.isNewAccount -> d.copy(label = ctx.getString(R.string.swap_new_account))
-                    d.address == owner -> d
-                    else -> d.copy(label = pool)
-                }
-            },
-        ),
-    )
-}
 
 /**
  * Pick your own slice, once.

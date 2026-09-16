@@ -77,6 +77,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
 
         SettingsGroup(stringResource(R.string.set_g_look), stringResource(R.string.set_g_look_sub), HIcon.PALETTE) {
             ThemesCard(signer, owner) {}
+            HomeCirclesCard()
             CrtCard()
         }
 
@@ -288,6 +289,19 @@ private fun SpeedCard() {
             Text(stringResource(R.string.speed_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
         }
     }
+}
+
+/** Which circles the home shows. It lives here, with the rest of how the app looks. */
+@Composable
+private fun HomeCirclesCard() {
+    var open by remember { mutableStateOf(false) }
+    GlassCard {
+        Row(Modifier.fillMaxWidth().clickable { open = true }, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { SectionTitle(stringResource(R.string.home_customize), stringResource(R.string.home_customize_sub), HIcon.PALETTE) }
+            HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
+        }
+    }
+    if (open) HomeActionsSheet { open = false }
 }
 
 /** One row that opens the page of the bubble and the widget. */

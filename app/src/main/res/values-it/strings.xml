@@ -1552,7 +1552,8 @@
     <string name="ctap_truth">Viaggiano un indirizzo, un nome e una firma. Niente chiavi, niente soldi. Il controllo dimostra che un telefono qui presente ha dichiarato quell\'indirizzo; non dice chi tiene il telefono.</string>
     <string name="bridge_short">Ponte</string>
     <string name="home_customize">Scegli i cerchi</string>
-    <string name="home_customize_sub">Quali azioni stanno in home, e in che ordine. Altro resta ultimo.</string>
+        <string name="home_customize_preview">Come sarà la home</string>
+<string name="home_customize_sub">Quali azioni stanno in home, e in che ordine. Altro resta ultimo.</string>
     <string name="home_customize_note">Spegnine una e finisce dentro Altro. Le frecce cambiano l\'ordine.</string>
     <string name="home_customize_reset">Torna a com\'era</string>
     <string name="chip_title">Il tuo wallet</string>

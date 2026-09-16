@@ -462,7 +462,7 @@ private fun SwapFeesCard(signer: SeedVaultSigner, owner: String?) {
 private fun AboutCard() {
     GlassCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(rs(12)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.PIGEON, Halo.ground, 24.dp) }
+            Box(Modifier.size(40.dp).clip(rs(12)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.AGENT, Halo.ground, 24.dp) }
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("Apex " + BuildConfig.VERSION_NAME, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
@@ -497,7 +497,7 @@ internal fun ProtectionsSheet(onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
             Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clip(rs(12)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.PIGEON, Halo.ground, 24.dp) }
+                Box(Modifier.size(40.dp).clip(rs(12)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.AGENT, Halo.ground, 24.dp) }
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(stringResource(R.string.prot_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)

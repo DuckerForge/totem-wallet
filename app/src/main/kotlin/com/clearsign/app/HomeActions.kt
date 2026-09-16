@@ -56,7 +56,7 @@ internal fun HomeActions(enabled: Boolean, onAction: (HomeAction) -> Unit) {
             // is buying is worth a look every day. Tap moved into "Altro", intact.
             Triple(HomeAction.CROWD, HIcon.NFC, R.string.home_act_crowd),
             Triple(HomeAction.LINK, HIcon.SHARE, R.string.home_act_link),
-            Triple(HomeAction.AGENT, HIcon.PIGEON, R.string.home_act_agent),
+            Triple(HomeAction.AGENT, HIcon.AGENT, R.string.home_act_agent),
             Triple(HomeAction.MORE, HIcon.MORE, R.string.home_act_more),
         ),
     )

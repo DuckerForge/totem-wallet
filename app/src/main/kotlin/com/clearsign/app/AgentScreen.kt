@@ -153,7 +153,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(38.dp).clip(rs(12)).background(Halo.mint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    HaloIcon(HIcon.PIGEON, Halo.mint, 22.dp)
+                    HaloIcon(HIcon.AGENT, Halo.mint, 22.dp)
                 }
                 SweepHalo(Halo.mint, Modifier.size(38.dp), key = FirstRun.at)
             }
@@ -179,7 +179,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                     Text(stringResource(R.string.agent_nobudget_title), style = HaloType.title, color = Halo.ink)
                     Text(stringResource(R.string.env_none), style = HaloType.small, color = Halo.muted)
                     PrimaryButton(stringResource(R.string.env_create), danger = false, enabled = owner != null, icon = HIcon.HOURGLASS) { showNew = true }
-                    GhostButton(stringResource(R.string.chat_open), Modifier.fillMaxWidth(), HIcon.PIGEON, tint = Halo.cyan) { onChat() }
+                    GhostButton(stringResource(R.string.chat_open), Modifier.fillMaxWidth(), HIcon.AGENT, tint = Halo.cyan) { onChat() }
                     if (owner == null) Text(stringResource(R.string.agent_tab_none), style = HaloType.small, color = Halo.amber)
                 }
             }
@@ -228,9 +228,9 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                         TraderLoop.stop(ctx, ctx.getString(R.string.trader_stopped_by_you)); TraderKeeper.sync(ctx); refresh++
                     }
                 } else {
-                    GhostButton(stringResource(R.string.agent_start), Modifier.weight(1f), HIcon.PIGEON, tint = Halo.mint) { showLane = true }
+                    GhostButton(stringResource(R.string.agent_start), Modifier.weight(1f), HIcon.AGENT, tint = Halo.mint) { showLane = true }
                 }
-                Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.PIGEON) { onChat() } }
+                Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.AGENT) { onChat() } }
             }
             // The screen that never sleeps: charts, lines, and the loop's own words.
             GhostButton(stringResource(R.string.eyes_open), Modifier.fillMaxWidth(), HIcon.SEARCH, tint = Halo.cyan) { showEyes = true }
@@ -348,7 +348,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 }
             }
 
-            ProSection(stringResource(R.string.pro_trace), HIcon.PIGEON) { AgentConsole() }
+            ProSection(stringResource(R.string.pro_trace), HIcon.AGENT) { AgentConsole() }
 
             // The bridge to an agent on a computer: the four cards the tab used
             // to open with, folded into one section for the people who run one.
@@ -594,7 +594,7 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)
             }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
-            PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.PIGEON) {
+            PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.AGENT) {
                 TraderLoop.start(ctx, cfg)
                 TraderKeeper.sync(ctx)
                 Haptics.tick(ctx)
@@ -617,7 +617,7 @@ private fun TruthSheet(onDismiss: () -> Unit) {
             Text(stringResource(R.string.agent_truth_link), style = HaloType.title, color = Halo.ink)
             TruthBlock(HIcon.SHIELD_LOCK, stringResource(R.string.agent_state_title), stringResource(R.string.agent_state_body))
             TruthBlock(HIcon.HOURGLASS, stringResource(R.string.agent_card_title), stringResource(R.string.env_truth))
-            TruthBlock(HIcon.PIGEON, stringResource(R.string.chat_title), stringResource(R.string.brain_truth))
+            TruthBlock(HIcon.AGENT, stringResource(R.string.chat_title), stringResource(R.string.brain_truth))
             GhostButton(stringResource(R.string.close), Modifier.fillMaxWidth()) { onDismiss() }
         }
     }

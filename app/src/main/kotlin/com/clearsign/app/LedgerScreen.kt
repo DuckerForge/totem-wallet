@@ -155,7 +155,7 @@ internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>
 @Composable
 private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
-    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.PIGEON; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
+    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
     Row(
         Modifier.fillMaxWidth().clip(rs(14)).background(Halo.card).border(1.dp, if (danger) Halo.red.copy(alpha = 0.5f) else Halo.stroke, rs(14)).clickable { onTap() }.padding(12.dp),

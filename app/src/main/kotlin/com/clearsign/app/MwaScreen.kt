@@ -316,7 +316,7 @@ private fun Header(danger: Boolean, dApp: DappId?) {
             Modifier.size(32.dp).clip(rs(10))
                 .background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))),
             contentAlignment = Alignment.Center,
-        ) { HaloIcon(HIcon.PIGEON, Halo.ground, 24.dp) }
+        ) { HaloIcon(HIcon.AGENT, Halo.ground, 24.dp) }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.app_name), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)

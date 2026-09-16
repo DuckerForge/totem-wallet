@@ -318,7 +318,7 @@ internal fun AgentConsole() {
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HaloIcon(HIcon.PIGEON, if (busy) Halo.mint else Halo.muted, 13.dp)
+            HaloIcon(HIcon.AGENT, if (busy) Halo.mint else Halo.muted, 13.dp)
             Spacer(Modifier.width(6.dp))
             Text(
                 stringResource(R.string.live_title).uppercase(),

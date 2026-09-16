@@ -122,7 +122,9 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             // amount moves over and the name key goes.
             var moved = false
             keys.zip(coins).forEach { (stored, c) ->
-                val mint = c.mint
+                // The markets list rarely carries the mint; the coin page does.
+                // Asked once per coin and cached inside Market.
+                val mint = c.mint ?: if (stored.startsWith("cg:")) withContext(Dispatchers.IO) { runCatching { Market.mintOf(stored.removePrefix("cg:")) }.getOrNull() } else null
                 if (stored.startsWith("cg:") && mint != null) {
                     val amt = Watchlist.amount(ctx, stored)
                     if (amt > 0 && Watchlist.amount(ctx, mint) <= 0) Watchlist.setAmount(ctx, mint, amt)

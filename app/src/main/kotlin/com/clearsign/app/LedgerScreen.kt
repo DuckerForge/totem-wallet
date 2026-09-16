@@ -241,7 +241,8 @@ private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", 
 
 internal fun fmtUi(v: Double): String = String.format(Locale.ROOT, "%,.6f", v).replace(',', ' ').trimEnd('0').trimEnd('.')
 internal fun fmtFiat(v: Double, cur: String): String =
-    if (cur == "SOL") String.format(Locale.getDefault(), if (kotlin.math.abs(v) < 1) "%,.4f" else "%,.3f", v) + " SOL"
+    if (Settings.guest.value) "••••"
+    else if (cur == "SOL") String.format(Locale.getDefault(), if (kotlin.math.abs(v) < 1) "%,.4f" else "%,.3f", v) + " SOL"
     else String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
 
 /**

@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -530,6 +531,15 @@ private class TokenAction(val label: String, val icon: HIcon, val tint: androidx
 @Composable
 private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
     val tint = if (values.last() >= values.first()) Halo.mint else Halo.red
+    // It draws itself, left to right, the way the month happened.
+    //
+    // Appearing all at once it read as a background texture that had always been
+    // there, and a month of your own money is worth one second of attention. A
+    // line that arrives from the left is also the only hint on this screen that
+    // the left edge is the past: there is no axis to say so, and there should
+    // not be one. Once per curve, not on every recomposition — a shape that
+    // keeps redrawing itself would say the numbers were still changing.
+    val grow = rememberReveal(key = values, durationMs = 1100)
     androidx.compose.foundation.Canvas(modifier) {
         val lo = values.min()
         val hi = values.max()
@@ -550,13 +560,23 @@ private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
             lineTo(0f, size.height)
             close()
         }
-        drawPath(
-            area,
-            androidx.compose.ui.graphics.Brush.verticalGradient(
-                listOf(tint.copy(alpha = 0.11f), tint.copy(alpha = 0f)),
-                startY = top, endY = size.height,
-            ),
-        )
-        drawPath(line, tint.copy(alpha = 0.24f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f))
+        clipRect(right = size.width * grow) {
+            drawPath(
+                area,
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(tint.copy(alpha = 0.11f), tint.copy(alpha = 0f)),
+                    startY = top, endY = size.height,
+                ),
+            )
+            drawPath(line, tint.copy(alpha = 0.24f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f))
+        }
+        // The head of the line while it travels, so the eye has something to
+        // follow. It stops existing the moment the curve is whole.
+        if (grow < 1f) {
+            val i = ((values.size - 1) * grow).toInt().coerceIn(0, values.size - 1)
+            val head = androidx.compose.ui.geometry.Offset(size.width * grow, py(values[i]))
+            drawCircle(tint.copy(alpha = 0.16f), 7f, head)
+            drawCircle(tint.copy(alpha = 0.55f), 2.2f, head)
+        }
     }
 }

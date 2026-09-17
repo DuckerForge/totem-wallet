@@ -300,6 +300,14 @@ object SessionWallet {
      * fare compere e vendite all'infinito senza toccare nessun limite, pagando
      * commissione e spread a ogni giro. Un modo silenzioso di svuotare una
      * paghetta senza che nessuna regola se ne accorgesse.
+     *
+     * Un giro che torna a casa **restituisce alla giornata quello che riporta**,
+     * cioe' entra con il segno meno. Segnare zero era giusto per la vendita ma
+     * lasciava sul contatore l'acquisto che quella vendita ha annullato: con
+     * pochi SOL bastava comprare e rivendere una volta per restare fermi fino al
+     * giorno dopo, con i soldi in tasca e il tetto che diceva di no. Il tetto
+     * dice quanto puo' **uscire** dalla paghetta in un giorno, e da un giro
+     * chiuso non e' uscito niente.
      */
     fun recordSpend(ctx: Context, lamports: Long, at: Long = System.currentTimeMillis()) {
         val a = spendLog(ctx).filter { it.first > at - 86_400_000L } + (at to lamports)
@@ -309,7 +317,10 @@ object SessionWallet {
     fun history(ctx: Context, now: Long = System.currentTimeMillis()): SpendHistory {
         val log = spendLog(ctx)
         return SpendHistory(
-            spentLast24hLamports = log.filter { it.first > now - 86_400_000L }.sumOf { it.second },
+            // Mai sotto zero: una vendita di una moneta comprata ieri porta
+            // indietro soldi che oggi non erano usciti, e non deve regalare
+            // margine sopra il tetto.
+            spentLast24hLamports = log.filter { it.first > now - 86_400_000L }.sumOf { it.second }.coerceAtLeast(0L),
             txLastHour = log.count { it.first > now - 3_600_000L },
         )
     }

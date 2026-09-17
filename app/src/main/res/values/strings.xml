@@ -1715,6 +1715,8 @@
     <string name="feed_chart_wait">Looking for the chart…</string>
     <string name="trust_my_budget">your budget</string>
     <string name="trust_my_wallet">your wallet</string>
+    <string name="follow_copy_both">copying buys and sells</string>
+    <string name="follow_copy_buys">copying its buys</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

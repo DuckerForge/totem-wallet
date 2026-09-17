@@ -42,6 +42,26 @@ object TokenShield {
     data class Warning(val type: String, val message: String, val severity: String) {
         val critical: Boolean get() = severity.equals("critical", true)
         val warning: Boolean get() = severity.equals("warning", true)
+
+        /**
+         * La commissione che la moneta stessa trattiene, in percento, se e' questo.
+         *
+         * Jupiter marca critico il fatto che un token trattenga una commissione a
+         * ogni trasferimento, e ha ragione a segnalarlo: e' una tassa che paghi
+         * entrando e uscendo. Ma non e' una truffa come lo sono una liquidita'
+         * fasulla o un conio aperto, e' un costo. Un costo lo si accetta o no, ed
+         * e' una decisione che spetta a chi mette i soldi.
+         *
+         * Letta dal testo perche' e' li' che Jupiter la scrive. Se non si riesce
+         * a leggerla, questo non e' una commissione e la porta resta chiusa.
+         */
+        val transferFeePct: Double?
+            get() {
+                val looksLikeFee = type.contains("fee", true) || message.contains("transfer fee", true)
+                if (!looksLikeFee) return null
+                return Regex("([0-9]+(?:[.,][0-9]+)?)\\s*%").find(message)
+                    ?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
+            }
     }
 
     private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Warning>>>()

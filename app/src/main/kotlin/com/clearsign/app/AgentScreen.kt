@@ -622,6 +622,13 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 stringResource(R.string.agent_slice), cfg.slicePercent.toString() + "%",
                 cfg.slicePercent / 100f, 0.1f..1f, Halo.mint, steps = 17,
             ) { cfg = cfg.copy(slicePercent = (it * 100).toInt().coerceIn(10, 100)) }
+            // La commissione che la moneta stessa trattiene. Zero e' la porta
+            // chiusa, ed e' il valore di partenza: si apre solo di proposito.
+            SliderRow(
+                stringResource(R.string.agent_fee_max),
+                if (cfg.maxFeePct == 0) stringResource(R.string.agent_payout_off) else cfg.maxFeePct.toString() + "%",
+                cfg.maxFeePct / 10f, 0f..1f, Halo.amber, steps = 9,
+            ) { cfg = cfg.copy(maxFeePct = (it * 10).toInt().coerceIn(0, 10)) }
             run {
                 val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
                 if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)

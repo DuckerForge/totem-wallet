@@ -90,6 +90,85 @@ object Portfolio {
     fun cached(owner: String?, currency: String): PortfolioView? =
         last?.takeIf { it.first == "$owner|$currency" }?.second
 
+    /**
+     * The same, but it also survives the app being closed.
+     *
+     * Memory alone fixed the jump between tabs and did nothing for the one that
+     * matters more: open the app cold and the page drew itself empty, the cards
+     * sat high, and a second later the numbers arrived and shoved everything
+     * down. It is the first thing anybody sees, every morning, and it looked
+     * like the app was rebuilding itself.
+     *
+     * Same lesson as the crowd archive: a cache dies with the process, a written
+     * file does not. The page opens at its real size with yesterday's truth, and
+     * the network corrects it in place a moment later.
+     */
+    fun cached(ctx: Context, owner: String?, currency: String): PortfolioView? {
+        val key = "$owner|$currency"
+        cached(owner, currency)?.let { return it }
+        val v = runCatching { read(ctx, key) }.getOrNull() ?: return null
+        last = key to v
+        return v
+    }
+
+    private fun file(ctx: Context) = java.io.File(ctx.filesDir, "portfolio.json")
+
+    private fun save(ctx: Context, key: String, v: PortfolioView) {
+        val o = org.json.JSONObject()
+        o.put("k", key)
+        o.put("cur", v.currency)
+        o.put("total", v.total)
+        o.put("priced", v.priced)
+        o.put("unpriced", v.unpriced)
+        val hs = org.json.JSONArray()
+        v.holdings.forEach { h ->
+            hs.put(
+                org.json.JSONObject()
+                    .put("m", h.mint).put("s", h.symbol).put("d", h.decimals).put("r", h.raw)
+                    .put("f", h.fiat ?: org.json.JSONObject.NULL)
+                    .put("n", h.name ?: org.json.JSONObject.NULL)
+                    .put("i", h.image ?: org.json.JSONObject.NULL)
+                    .put("nft", h.isNft)
+                    .put("c", h.change24h ?: org.json.JSONObject.NULL),
+            )
+        }
+        o.put("h", hs)
+        val ds = org.json.JSONArray()
+        v.defi.forEach { d ->
+            ds.put(
+                org.json.JSONObject()
+                    .put("k", d.kind.name).put("l", d.label).put("sub", d.sub).put("s", d.symbol)
+                    .put("ui", d.ui).put("f", d.fiat ?: org.json.JSONObject.NULL)
+                    .put("i", d.image ?: org.json.JSONObject.NULL)
+                    .put("st", d.state ?: org.json.JSONObject.NULL)
+                    .put("apr", d.aprPct ?: org.json.JSONObject.NULL),
+            )
+        }
+        o.put("d", ds)
+        file(ctx).writeText(o.toString())
+    }
+
+    private fun read(ctx: Context, key: String): PortfolioView? {
+        val f = file(ctx)
+        if (!f.exists()) return null
+        val o = org.json.JSONObject(f.readText())
+        if (o.optString("k") != key) return null
+        fun d(j: org.json.JSONObject, n: String): Double? = if (j.isNull(n)) null else j.optDouble(n).takeIf { !it.isNaN() }
+        fun t(j: org.json.JSONObject, n: String): String? = if (j.isNull(n)) null else j.optString(n).ifEmpty { null }
+        val hs = o.optJSONArray("h") ?: org.json.JSONArray()
+        val holdings = (0 until hs.length()).mapNotNull { i ->
+            val j = hs.optJSONObject(i) ?: return@mapNotNull null
+            Holding(j.optString("m"), j.optString("s"), j.optInt("d"), j.optLong("r"), d(j, "f"), t(j, "n"), t(j, "i"), j.optBoolean("nft"), d(j, "c"))
+        }
+        val ds = o.optJSONArray("d") ?: org.json.JSONArray()
+        val defi = (0 until ds.length()).mapNotNull { i ->
+            val j = ds.optJSONObject(i) ?: return@mapNotNull null
+            val kind = runCatching { DefiPosition.Kind.valueOf(j.optString("k")) }.getOrNull() ?: return@mapNotNull null
+            DefiPosition(kind, j.optString("l"), j.optString("sub"), j.optString("s"), j.optDouble("ui"), d(j, "f"), t(j, "i"), t(j, "st"), d(j, "apr"))
+        }
+        return PortfolioView(o.optString("cur"), o.optDouble("total"), holdings, o.optInt("priced"), o.optInt("unpriced"), defi)
+    }
+
     suspend fun load(ctx: Context?, owner: String, currency: String): PortfolioView = withContext(Dispatchers.IO) {
         val rpc = SolanaRpc.urlFor(null)
         val lam = runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() ?: 0L
@@ -163,6 +242,6 @@ object Portfolio {
 
         val total = holdings.sumOf { it.fiat ?: 0.0 } + defi.sumOf { it.fiat ?: 0.0 }
         PortfolioView(currency, total, holdings, holdings.count { it.fiat != null }, holdings.count { it.fiat == null && it.isMain }, defi)
-            .also { last = "$owner|$currency" to it }
+            .also { v -> last = "$owner|$currency" to v; ctx?.let { runCatching { save(it, "$owner|$currency", v) } } }
     }
 }

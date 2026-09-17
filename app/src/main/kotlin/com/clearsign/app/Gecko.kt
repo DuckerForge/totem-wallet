@@ -232,7 +232,10 @@ object Gecko {
                 out
             }.getOrElse { Log.w(TAG, "GET failed: ${it.message}"); null }
             if (body != null) return runCatching { JSONObject(body) }.getOrNull()
-            if (attempt == 0) runCatching { Thread.sleep(1400) }
+            // Sei secondi, non uno e mezzo. Misurato: quando rifiuta resta
+            // rifiutata per decine di secondi, quindi riprovare subito voleva
+            // dire solo farsi dire di no due volte.
+            if (attempt == 0) runCatching { Thread.sleep(6000) }
         }
         return null
     }

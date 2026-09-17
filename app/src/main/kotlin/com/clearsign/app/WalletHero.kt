@@ -365,17 +365,33 @@ private fun TokenSheet(
                 GhostButton(stringResource(R.string.send_btn), Modifier.weight(1f), HIcon.SEND, tint = Halo.mint) { onSend() }
                 GhostButton(stringResource(R.string.swap_btn), Modifier.weight(1f), HIcon.SWAP, tint = Halo.cyan) { onSwap() }
             }
+            // Native SOL has no mint to copy and no token page to open. Its mint
+            // field is the string "SOL", a placeholder this app uses internally,
+            // and handing that to an explorer produced a page saying the address
+            // is invalid. The card already hides the mint row for SOL; these two
+            // now follow the same rule, and the explorer goes to the wallet,
+            // which is the page that actually exists.
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY) {
-                    (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("mint", h.mint))
+                if (!isSol) {
+                    GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY) {
+                        (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("mint", h.mint))
+                    }
                 }
                 GhostButton("Solscan", Modifier.weight(1f), HIcon.EXTERNAL, tint = Halo.cyan) {
-                    runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(h.mint, null)))) }
+                    val target = if (isSol) owner else h.mint
+                    runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(target, null)))) }
                 }
             }
             // Sell it in profit without watching it, or be told when it moves.
-            // Both need a price; a coin nobody quotes gets neither button.
-            if (!isSol && !h.isNft && h.raw > 0) {
+            //
+            // Both need a price, so a coin nobody quotes gets neither button. But
+            // they are not the same gate: the take profit puts an order on the
+            // chain to sell the coin, which SOL is excluded from because SOL is
+            // what everything else is sold *into*. Being told when it moves has
+            // no such problem, and telling somebody when SOL moves is probably
+            // the single most wanted alert in the app. It used to be inside the
+            // same `if`, so on the one coin everybody holds there was no alert.
+            if (!h.isNft && h.raw > 0) {
                 var priceUsd by remember(h.mint) { mutableStateOf<Double?>(null) }
                 LaunchedEffect(h.mint) { priceUsd = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(h.mint))[h.mint] }.getOrNull() } }
                 var tp by remember { mutableStateOf(false) }
@@ -383,7 +399,7 @@ private fun TokenSheet(
                 val coin = OrderCoin(h.mint, h.symbol, h.decimals, h.image, priceUsd, h.raw)
                 if (priceUsd != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        GhostButton(stringResource(R.string.order_tp_short), Modifier.weight(1f), HIcon.HOURGLASS, tint = Halo.mint) { tp = true }
+                        if (!isSol) GhostButton(stringResource(R.string.order_tp_short), Modifier.weight(1f), HIcon.HOURGLASS, tint = Halo.mint) { tp = true }
                         GhostButton(stringResource(R.string.order_alert), Modifier.weight(1f), HIcon.WARNING, tint = Halo.amber) { alert = true }
                     }
                 }

@@ -1728,6 +1728,7 @@
     <string name="bridge_dest_wrong">This is not a %1$s address. Sent anyway, the money goes somewhere that is not yours and does not come back.</string>
     <string name="bridge_dest_unknown">We do not know this chain\'s address format, so we cannot check it. Read it twice.</string>
     <string name="bridge_memo_missing">This route needs a memo and the order did not carry one. Without it the deposit arrives and is credited to nobody.</string>
+    <string name="bridge_worse">The route moved: the quote said %1$s, the order gives %2$s, %3$s%% less. Press again to accept it, or change route.</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

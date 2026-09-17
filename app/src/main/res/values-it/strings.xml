@@ -1728,6 +1728,7 @@
     <string name="bridge_dest_wrong">Questo non e un indirizzo %1$s. Mandati lo stesso, i soldi vanno in un posto che non e tuo e non tornano.</string>
     <string name="bridge_dest_unknown">Il formato degli indirizzi di questa catena non lo conosciamo, quindi non possiamo controllarlo. Rileggilo due volte.</string>
     <string name="bridge_memo_missing">Questa rotta pretende un memo e l ordine non ne ha portato uno. Senza, il deposito arriva e non viene accreditato a nessuno.</string>
+    <string name="bridge_worse">La rotta si e mossa: il preventivo diceva %1$s, l ordine da %2$s, il %3$s%% in meno. Premi di nuovo per accettarlo, o cambia rotta.</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
     <string name="hold_col_each">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>

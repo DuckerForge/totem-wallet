@@ -42,8 +42,8 @@ class BlocklistScanner(context: Context) : TransactionScanner {
         val maliciousHit = touched.firstOrNull { it in malicious }
 
         val reason = when {
-            maliciousHit != null -> malicious[maliciousHit]?.reason ?: "Indirizzo in blocklist"
-            sanctionedHits.isNotEmpty() -> sanctioned[sanctionedHits.first()]?.reason ?: "Indirizzo sotto sanzioni"
+            maliciousHit != null -> malicious[maliciousHit]?.reason ?: "Address on the blocklist"
+            sanctionedHits.isNotEmpty() -> sanctioned[sanctionedHits.first()]?.reason ?: "Address under sanctions"
             else -> null
         }
         return ScanResult(
@@ -70,14 +70,14 @@ class BlocklistScanner(context: Context) : TransactionScanner {
                 for (i in 0 until arr.length()) {
                     val o = arr.optJSONObject(i) ?: continue
                     val addr = o.optString("address").takeIf { it.isNotBlank() } ?: continue
-                    malicious[addr] = Entry(o.optString("reason", "Indirizzo malevolo noto"))
+                    malicious[addr] = Entry(o.optString("reason", "Known malicious address"))
                 }
             }
             root.optJSONArray("sanctioned")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val o = arr.optJSONObject(i) ?: continue
                     val addr = o.optString("address").takeIf { it.isNotBlank() } ?: continue
-                    sanctioned[addr] = Entry(o.optString("reason", "Indirizzo sotto sanzioni"))
+                    sanctioned[addr] = Entry(o.optString("reason", "Address under sanctions"))
                 }
             }
         } catch (e: Exception) {

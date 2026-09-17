@@ -73,7 +73,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     val cfg = remember(refresh) { TraderLoop.config(ctx) }
     val link by AgentLink.state.collectAsState()
     val pro by Settings.agentPro
-    /** The account we pay from: the live connection, or the one this phone watches. */
+    /* The account we pay from: the live connection, or the one this phone watches. */
     val account = owner ?: Settings.watchWallet(ctx)
 
     var balance by remember(refresh, session?.pubkey) { mutableStateOf<Long?>(null) }
@@ -394,7 +394,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     }
 }
 
-/** The one switch: Simple or Pro, as a small pill that reads as a toggle. */
+/* The one switch: Simple or Pro, as a small pill that reads as a toggle. */
 @Composable
 private fun ProSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     val tint = if (on) Halo.amber else Halo.muted
@@ -409,7 +409,7 @@ private fun ProSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
-/** A Pro section: a title you tap, and its content when open. Closed by default, so the page stays a page. */
+/* A Pro section: a title you tap, and its content when open. Closed by default, so the page stays a page. */
 @Composable
 private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false, content: @Composable () -> Unit) {
     var open by remember(title) { mutableStateOf(openAtFirst) }
@@ -426,7 +426,7 @@ private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false,
     }
 }
 
-/**
+/*
  * What the agent did last, five lines. Each is a ledger row, so the receipt
  * behind it is one tab away; here it is the sentence, the sum, and when.
  */

@@ -24,10 +24,13 @@ object SeekerFeed {
     private const val TAG = "ClearSign-Seeker"
     private const val CACHE = "seeker_feed.json"
     /**
-     * Ninety seconds, not five minutes. The scanner publishes every four, and the
-     * page polls every minute while it is open: at five minutes the poll would
-     * always be served by the file it already had and the live feed would never
-     * move on its own.
+     * Two and a half minutes, which is shorter than the scan it follows.
+     *
+     * The service publishes every ten minutes. Holding the cached file for
+     * longer than that would mean a new publish sits unseen for a whole cycle,
+     * and the live feed would look frozen to somebody watching it. Shorter than
+     * the publish interval costs one request and keeps the page honest: what it
+     * shows is never more than a couple of minutes behind what exists.
      */
     private const val FRESH_MS = 150_000L
 

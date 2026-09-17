@@ -99,13 +99,13 @@ internal fun SeekerWhalesCard(limit: Int = 8) {
     }
 }
 
-/** One coin a whale is sitting on, and what that pile is worth. */
+/* One coin a whale is sitting on, and what that pile is worth. */
 internal class Held(val mint: String, val symbol: String, val amount: Double, val usd: Double)
 
-/** The three that hold the money, and how many things were left out for having no price. */
+/* The three that hold the money, and how many things were left out for having no price. */
 internal class Holdings(val top: List<Held>, val unpriced: Int)
 
-/**
+/*
  * What one wallet actually holds, read when somebody asks and not before.
  *
  * The census stores a total in dollars and nothing else, so the fourth whale read

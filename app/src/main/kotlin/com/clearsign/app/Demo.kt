@@ -11,7 +11,7 @@ import com.clearsign.core.Simulator
 import com.clearsign.core.TransactionDecoder
 import com.clearsign.core.TransactionScanner
 
-/**
+/*
  * Demo wiring for the on-device build.
  *
  * These are in-memory stand-ins for the real ports (Helius simulate, Blockaid

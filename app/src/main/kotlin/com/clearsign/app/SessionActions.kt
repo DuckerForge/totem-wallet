@@ -6,7 +6,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/**
+/*
  * The two chain operations the envelope needs: filling it, and taking it back.
  *
  * Filling it is a normal transfer out of your Seed Vault account, so it goes
@@ -117,7 +117,7 @@ object SessionActions {
         return Said(r.first, r.second)
     }
 
-    /**
+    /*
      * Sell one holding back to SOL, now, and let the collar judge it.
      *
      * The one door out, used by the loop on a target or a stop and by the button
@@ -214,7 +214,7 @@ object SessionActions {
         )
     }
 
-    /** What the whole holding would fetch in lamports right now, or null. */
+    /* What the whole holding would fetch in lamports right now, or null. */
     suspend fun quoteValue(ctx: Context, pos: Positions.Position): Long? {
         val s = SessionWallet.current(ctx) ?: return null
         val raw = heldRaw(ctx, s.pubkey)?.get(pos.mint) ?: return null
@@ -224,7 +224,7 @@ object SessionActions {
         }
     }
 
-    /**
+    /*
      * Sell everything the budget holds back to SOL, one coin at a time.
      *
      * Returns the symbols it could not sell, which is not always a failure: a
@@ -388,7 +388,7 @@ object SessionActions {
         return take
     }
 
-    /**
+    /*
      * Close the budget's empty token accounts and send their rent to [owner].
      *
      * Every coin the agent buys opens an account that holds about 0.002 SOL of

@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/**
+/*
  * The house motion vocabulary. Every helper animates in `graphicsLayer` or a
  * draw lambda, so a running animation never recomposes the tree around it.
  */

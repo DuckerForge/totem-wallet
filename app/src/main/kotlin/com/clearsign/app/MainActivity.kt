@@ -80,9 +80,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var bridge: ActivityResultBridge
     private lateinit var signer: SeedVaultSigner
 
-    /** A payment request read by tapping, or arrived as a link. */
+    /* A payment request read by tapping, or arrived as a link. */
     var incoming by mutableStateOf<com.clearsign.core.PayRequest?>(null)
-    /** Stamped when a tap carried no payment request, so the screen can say so. */
+    /* Stamped when a tap carried no payment request, so the screen can say so. */
     var tapMiss by mutableStateOf(0L)
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
         readRequest(intent)
     }
 
-    /**
+    /*
      * Reader mode: while Apex is in front, holding it against a tag or another
      * phone reads the request straight into the send form. It is only a read —
      * nothing is signed, and the ordinary receipt still has to be approved.
@@ -599,7 +599,6 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
     }
 }
 
-/** Three tabs on a hairline-topped bar; the active one sits on a soft pill. */
 /**
  * The door, when there is no wallet yet.
  *
@@ -670,6 +669,7 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
     }
 }
 
+/** Five tabs on a hairline-topped bar; the active one sits on a soft pill. */
 @Composable
 private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
     val ctx = LocalContext.current

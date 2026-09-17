@@ -37,7 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-/**
+/*
  * What the coin has been doing, under the thing that is about to buy it.
  *
  * Buying a name and a number with no idea of the shape behind them is the part

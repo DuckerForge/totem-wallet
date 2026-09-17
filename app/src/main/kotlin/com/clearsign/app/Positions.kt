@@ -163,16 +163,16 @@ object Positions {
         save(ctx, list)
     }
 
-    /** Change the one row for [mint] that belongs to the budget in use. */
+    /* Change the one row for [mint] that belongs to the budget in use. */
     private fun edit(ctx: Context, mint: String, f: (Position) -> Position) {
         val o = ownerNow(ctx)
         save(ctx, stored(ctx).map { if (it.mint == mint && mine(it, o)) f(it) else it })
     }
 
-    /** Mark it as on its way out, so a second tick cannot sell it again. */
+    /* Mark it as on its way out, so a second tick cannot sell it again. */
     fun markClosing(ctx: Context, mint: String) = edit(ctx, mint) { it.copy(closing = true) }
 
-    /** The sale failed: put it back in play rather than stranding it half closed. */
+    /* The sale failed: put it back in play rather than stranding it half closed. */
     fun reopen(ctx: Context, mint: String) = edit(ctx, mint) { it.copy(closing = false) }
 
     fun remove(ctx: Context, mint: String) {
@@ -182,7 +182,7 @@ object Positions {
 
     fun setTrigger(ctx: Context, mint: String, order: String?) = edit(ctx, mint) { it.copy(triggerOrder = order) }
 
-    /**
+    /*
      * Write down that a sale did not happen, and why. Returns how many times in a
      * row this one has failed, so the caller can say something once instead of
      * every ninety seconds.

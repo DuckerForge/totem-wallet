@@ -305,14 +305,14 @@ private fun SeekerFlow(ranks: List<CrowdRank>) {
     }
 }
 
-/** Two decimals under a tenth, three under a hundredth: enough to tell sums apart. */
+/* Two decimals under a tenth, three under a hundredth: enough to tell sums apart. */
 private fun fmtSol(v: Double): String = when {
     abs(v) >= 10 -> String.format("%.1f", v)
     abs(v) >= 0.1 -> String.format("%.2f", v)
     else -> String.format("%.3f", v)
 }
 
-/**
+/*
  * The Seeker crowd, its own page.
  *
  * A page rather than a sheet on purpose: this is something to read for a minute,
@@ -422,7 +422,7 @@ private fun mmss(seconds: Long): String {
 private fun thousands(v: Int): String =
     v.toString().reversed().chunked(3).joinToString(".").reversed()
 
-/**
+/*
  * The three things the page holds besides the live feed.
  *
  * The live feed is not one of them on purpose: it is the reason to open Scout,
@@ -515,7 +515,7 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
             kotlinx.coroutines.delay(150_000)
         }
     }
-    // Which of the three the bar is showing. Kept across a rotation, because
+    // Which of the five the bar is showing. Kept across a rotation, because
     // turning the phone is not a request to go back to the start.
     var tab by rememberSaveable { mutableStateOf(ScoutTab.LIVE) }
     // Read once per visit: following somebody is not something that changes

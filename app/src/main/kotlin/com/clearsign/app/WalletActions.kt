@@ -101,14 +101,14 @@ object WalletActions {
         }
         val at = System.currentTimeMillis()
         val statement = Attestation.statement(
-            at, "ClearSign", null, cluster, listOf(Attestation.sha256Hex(tx)), log.outflows, log.inflows,
+            at, ctx.getString(R.string.app_name), null, cluster, listOf(Attestation.sha256Hex(tx)), log.outflows, log.inflows,
             receipt?.risks?.map { it.flag.name }?.distinct() ?: emptyList(), owner, sig,
         )
         val attSig = Attestation.sign(statement)
         LedgerRecorder.record(
             ctx,
             LedgerRecorder.fromReceipt(
-                at = at, kind = log.kind, dApp = "ClearSign", host = null, pkg = ctx.packageName, cluster = cluster, wallet = owner,
+                at = at, kind = log.kind, dApp = ctx.getString(R.string.app_name), host = null, pkg = ctx.packageName, cluster = cluster, wallet = owner,
                 r = receipt, signature = sig, sent = true, txIndex = 0, txCount = 1, groupId = LedgerRecorder.newId(),
                 attestation = if (attSig != null) statement else null, attestationSig = attSig, recipientLabelFallback = log.recipientLabel,
             ),
@@ -141,7 +141,7 @@ object WalletActions {
         }
         val at = System.currentTimeMillis()
         val statement = Attestation.statement(
-            at, "ClearSign", null, cluster, listOf(Attestation.sha256Hex(txBytes)),
+            at, ctx.getString(R.string.app_name), null, cluster, listOf(Attestation.sha256Hex(txBytes)),
             receipt?.outflows?.map { "−" + it.symbol } ?: emptyList(), receipt?.inflows?.map { "+" + it.symbol } ?: emptyList(),
             receipt?.risks?.map { it.flag.name }?.distinct() ?: emptyList(), owner, sig,
         )
@@ -167,7 +167,6 @@ object WalletActions {
         "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     )
 
-    /** One-time: create the fee wallet's ATAs for the main mints so the swap fee lands. Idempotent. */
     /**
      * The mints worth opening a fee account for: the usual suspects, plus the
      * coins this person actually trades.

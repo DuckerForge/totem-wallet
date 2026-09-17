@@ -586,8 +586,12 @@ internal fun Avatar(pubkey: String, size: androidx.compose.ui.unit.Dp) {
     ) { Text(pubkey.take(2), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.34f).sp, color = Halo.ground.copy(alpha = 0.85f)) }
 }
 
-/** Amount with a lighter unit: "0.5 SOL" reads as a number, not a code. */
-/** The same one-line rule for a number that comes from a quote, not from a delta. */
+/**
+ * Amount with a lighter unit: "0.5 SOL" reads as a number, not a code.
+ *
+ * The same one-line rule holds for a number that comes from a quote rather than
+ * from a balance delta.
+ */
 @Composable
 private fun FitAmount(number: String, symbol: String, size: androidx.compose.ui.unit.TextUnit, color: Color, weight: FontWeight) {
     var actual by remember(number, symbol) { mutableStateOf(size) }
@@ -1778,7 +1782,6 @@ private fun AddressSheet(
     }
 }
 
-/** On-chain reputation-from-usage for a counterparty: history, age, kind, balance. */
 /** Address scan: what this wallet does, with whom, and the patterns that matter. */
 @Composable
 private fun TraceBlock(t: AddressTrace.Trace?, running: Boolean, ran: Boolean, isPro: Boolean, onRun: () -> Unit) {

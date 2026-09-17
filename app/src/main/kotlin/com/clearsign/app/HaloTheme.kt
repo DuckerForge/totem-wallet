@@ -119,7 +119,6 @@ object Palettes {
         fonts = HaloFonts(JetBrainsMonoFamily, JetBrainsMonoFamily, JetBrainsMonoFamily), radiusScale = 0.15f, iconStroke = 1.25f, receiptStyle = ReceiptStyle.TERMINAL,
     )
 
-    /** Solana brand: signature purple + mint green on a violet-black ground. */
     /**
      * Solana as a whole palette: violet ground, its green and its purple.
      *

@@ -46,12 +46,36 @@ object AgentLink {
         val host = uri.getQueryParameter("host")?.trimEnd('/') ?: return null
         val token = uri.getQueryParameter("token")?.takeIf { it.length >= 16 } ?: return null
         if (!(host.startsWith("http://") || host.startsWith("https://"))) return null
+        // Cleartext only towards your own network, never towards the internet.
+        //
+        // The app allows cleartext at all for one reason: an agent runs on a
+        // machine on the same wifi, at an address like http://192.168.1.10:8765,
+        // and Android has no way to permit cleartext for "the local network"
+        // alone. So the permission stays open at the manifest and the narrowing
+        // happens here, where we actually know the address. A pairing link that
+        // sends a token in the clear across the internet is refused.
+        if (host.startsWith("http://") && !isLocal(host)) return null
         val name = uri.getQueryParameter("name")?.take(40)?.ifBlank { null } ?: "agent"
         val link = Link(host, token, name, System.currentTimeMillis())
         prefs(ctx).edit().putString("host", host).putString("token", token).putString("name", name).putLong("pairedAt", link.pairedAt)
             .remove("last").remove("lastAt").apply()
         _state.value = State.On(name, null, 0L, healthy = false)
         return link
+    }
+
+    /** True for loopback and the three private ranges, plus the names wifi hands out. */
+    private fun isLocal(url: String): Boolean {
+        val h = runCatching { Uri.parse(url).host }.getOrNull()?.lowercase() ?: return false
+        if (h == "localhost" || h.endsWith(".local") || h.endsWith(".lan")) return true
+        val p = h.split(".").mapNotNull { it.toIntOrNull() }
+        if (p.size != 4 || p.any { it !in 0..255 }) return false
+        return when (p[0]) {
+            10, 127 -> true
+            192 -> p[1] == 168
+            172 -> p[1] in 16..31
+            169 -> p[1] == 254
+            else -> false
+        }
     }
 
     fun forget(ctx: Context) {

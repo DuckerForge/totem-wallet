@@ -714,7 +714,11 @@ private fun NightCard(refresh: Int) {
             Text(
                 stringResource(
                     when {
-                        moves.isNotEmpty() -> R.string.night_worked
+                        // "Mentre dormivi" alle due del pomeriggio e' una frase
+                        // che non regge: la finestra e' la stessa dodici ore, ma
+                        // il nome cambia con l'ora e cosi' deve fare il verdetto.
+                        moves.isNotEmpty() && hour in 4..12 -> R.string.night_worked
+                        moves.isNotEmpty() -> R.string.night_worked_recent
                         coins.isNotEmpty() -> R.string.night_still
                         else -> R.string.night_quiet
                     },

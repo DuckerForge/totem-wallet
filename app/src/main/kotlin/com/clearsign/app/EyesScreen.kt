@@ -338,8 +338,12 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                 } } ; if (rowOf.size == 1 && landscape) Spacer(Modifier.weight(1f)) } }
 
                 // The reasoning, newest at the bottom, typed as it lands.
-                GlassCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Box(
+                    Modifier.fillMaxWidth().clip(rs(14)).background(Halo.ground)
+                        .border(1.dp, Halo.cyan.copy(alpha = 0.20f), rs(14)),
+                ) {
+                    TubeGlass(Modifier.matchParentSize())
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.eyes_thoughts).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
                             // The voice, said in words: on or off, and where it belongs, next to the lines it reads.
@@ -396,7 +400,19 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
 
 private val clock = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
-/** One line of the trace. The last one types itself out; the older ones are already written. */
+/**
+ * Una riga della traccia, scritta come la scriverebbe una macchina.
+ *
+ * Era in carattere proporzionale dentro una scheda di vetro, e si leggeva come
+ * un racconto. Ma qui non sta raccontando: sta lavorando, e quello che si vuole
+ * guardare e' proprio il lavoro. Monospaziato, ogni riga con il suo segno
+ * davanti, e i segni sono quelli di un terminale perche' quella grammatica la
+ * conoscono tutti senza spiegarla: la freccia e' un passo, il piu' e' una cosa
+ * trovata, la ics e' una cosa rifiutata, il dollaro e' una cosa fatta coi soldi.
+ *
+ * L'ultima si batte da sola. Le vecchie sono gia' scritte: ribatterle a ogni
+ * ridisegno direbbe che stanno succedendo di nuovo.
+ */
 @Composable
 private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
     val tint = when (l.kind) {
@@ -405,17 +421,44 @@ private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
         AgentTrace.Kind.REFUSED -> Halo.red
         AgentTrace.Kind.ACTED -> Halo.mint
     }
+    val sigil = when (l.kind) {
+        AgentTrace.Kind.STEP -> ">"
+        AgentTrace.Kind.FOUND -> "+"
+        AgentTrace.Kind.REFUSED -> "x"
+        AgentTrace.Kind.ACTED -> "$"
+    }
     val shown = remember(l) { Animatable(if (last) 0f else 1f) }
-    LaunchedEffect(l) { if (last) shown.animateTo(1f, tween((l.text.length * 14).coerceIn(300, 1800), easing = FastOutSlowInEasing)) }
+    LaunchedEffect(l) { if (last) shown.animateTo(1f, tween((l.text.length * 16).coerceIn(300, 2200), easing = LinearEasing)) }
     val n = (l.text.length * shown.value).toInt().coerceIn(0, l.text.length)
     Row(verticalAlignment = Alignment.Top) {
-        Text(clock.format(Date(l.at)), fontFamily = Mono, fontSize = 10.sp, color = Halo.muted.copy(alpha = 0.7f), style = Tabular)
-        Spacer(Modifier.width(8.dp))
+        Text(clock.format(Date(l.at)), fontFamily = Mono, fontSize = 9.5.sp, color = Halo.muted.copy(alpha = 0.55f), style = Tabular)
+        Spacer(Modifier.width(7.dp))
+        Text(sigil, fontFamily = Mono, fontSize = 11.sp, color = tint.copy(alpha = 0.8f), style = Tabular)
+        Spacer(Modifier.width(6.dp))
         Text(
-            l.text.take(n), fontFamily = Inter, fontSize = 12.sp, color = tint, lineHeight = 16.sp,
-            fontWeight = if (l.kind == AgentTrace.Kind.ACTED) FontWeight.SemiBold else FontWeight.Normal,
+            l.text.take(n), fontFamily = Mono, fontSize = 11.sp, color = tint, lineHeight = 16.sp,
+            fontWeight = if (l.kind == AgentTrace.Kind.ACTED) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+/**
+ * Il vetro del tubo: righe di scansione e un alone, dietro la console.
+ *
+ * Non aggiunge nessuna informazione ed e' esattamente per questo che ci sta: da'
+ * alle righe un posto dove stare che sembri uno strumento acceso invece di una
+ * scheda dell'interfaccia. La stessa lingua dello scontrino terminale e
+ * dell'attesa di Scout.
+ */
+@Composable
+private fun TubeGlass(modifier: Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        var y = 0f
+        while (y < size.height) {
+            drawLine(Halo.cyan.copy(alpha = 0.045f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 1f)
+            y += 3f
+        }
     }
 }
 

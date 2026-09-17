@@ -365,7 +365,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     if (showLinkHelp) LinkHelpSheet(onScan = { showLinkHelp = false; scan() }) { showLinkHelp = false }
     if (lucky) LuckySheet(onDone = { refresh++ }) { lucky = false }
     if (showTruth) TruthSheet { showTruth = false }
-    if (showEyes) EyesDialog(onClose = { showEyes = false }, onStart = { showEyes = false; showLane = true })
+    if (showEyes) EyesDialog(onClose = { showEyes = false }, onStart = { showLane = true })
     if (showLane) LaneSheet(onStarted = { showLane = false; refresh++ }) { showLane = false }
     if (coins.isNotEmpty()) {
         ClosingCoinsSheet(

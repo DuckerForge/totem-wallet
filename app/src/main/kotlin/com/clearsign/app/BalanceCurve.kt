@@ -114,7 +114,7 @@ object BalanceCurve {
         val parts = ArrayList<List<Double>>(tracked.size)
         for (e in tracked) {
             val mint = if (e.key == com.clearsign.core.NATIVE_SOL_MINT) Jupiter.SOL_MINT else e.key
-            val closes = runCatching { Gecko.series(mint, Gecko.Span.DAYS) }.getOrNull()
+            val closes = runCatching { Gecko.series(mint, Gecko.Span.DAYS, bg = true) }.getOrNull()
                 ?.map { it.close }?.takeLast(POINTS)?.filter { it > 0.0 }.orEmpty()
             // Scaled by its own last close, so the series lands on what this coin
             // is worth right now whatever currency the screen is counting in.

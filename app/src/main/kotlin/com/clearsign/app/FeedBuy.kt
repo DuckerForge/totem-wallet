@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +120,21 @@ internal fun FeedBuyPanel(
             Box(Modifier.fillMaxWidth().height(if (marks.isEmpty()) 58.dp else 72.dp)) {
                 Spark(series.map { it.close }, if ((px?.change24h ?: 0.0) >= 0) Halo.mint else Halo.red, marks = marks)
             }
+            // How far back this is. Without it the line has no width: the same
+            // shape means one thing over five hours and another over three
+            // months, and the rings sitting on it mean nothing at all until you
+            // know which. Three marks, because two look like a caption and four
+            // start to crowd a line this small.
+            Row(Modifier.fillMaxWidth()) {
+                listOf(from, (from + to) / 2, to).forEachIndexed { i, t ->
+                    Text(
+                        if (i == 2) stringResource(R.string.chart_now) else stringResource(R.string.chart_ago, ago(t)),
+                        fontFamily = Mono, fontSize = 9.5.sp, color = Halo.muted, style = Tabular,
+                        modifier = Modifier.weight(1f),
+                        textAlign = if (i == 0) TextAlign.Start else if (i == 1) TextAlign.Center else TextAlign.End,
+                    )
+                }
+            }
             // What the price has done since they went in. Read off the chart, so
             // it is the coin's move over that stretch and not a claim about the
             // money they made, which nobody can see from here.
@@ -137,12 +153,27 @@ internal fun FeedBuyPanel(
             }
         }
 
+        // No chart at all, said rather than left blank.
+        //
+        // A coin nobody has made a pool for, or one made an hour ago, has no
+        // price history anywhere, and the panel simply had a hole where the
+        // picture goes. A hole reads as a thing that failed to load, and people
+        // tap it again.
+        if (series.size <= 2) {
+            Text(stringResource(R.string.feed_no_chart), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+        }
+
         if (sell) {
-            // Offering to buy what somebody is walking away from would be the
-            // opposite of what this feed is for.
+            // The fact, and nothing after it.
+            //
+            // It used to carry a sentence about somebody walking away and looking
+            // before you follow them in. True once. Printed under every single
+            // sale in the list it became wallpaper, and advice that repeats
+            // itself word for word stops being advice. What this panel says about
+            // a sale is already in what it does not offer: there is no buy button
+            // under it.
             Text(
-                stringResource(R.string.feed_they_sold, fmtSol((solSpent * 1e9).toLong(), 3)) + " " +
-                    stringResource(R.string.feed_sell_note),
+                stringResource(R.string.feed_they_sold, fmtSol((solSpent * 1e9).toLong(), 3)),
                 style = HaloType.small, color = Halo.amber, lineHeight = 16.sp,
             )
             return@Column

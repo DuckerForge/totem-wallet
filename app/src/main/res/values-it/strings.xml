@@ -1707,6 +1707,9 @@
     <string name="gift_review_hint">Questo è quello che firmi: il tuo portafoglio carica una chiave nuova, e il link porta quella chiave. Tieni premuto, poi l\'impronta.</string>
     <string name="crowd_tab_followed_short">Seguiti</string>
     <string name="feed_round">%1$s SOL messi, %2$s tolti · %3$s</string>
+    <string name="chart_now">ora</string>
+    <string name="chart_ago">%1$s fa</string>
+    <string name="feed_no_chart">Nessuno storico per questa moneta: non c\'e una piscina abbastanza profonda da farne un grafico.</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
     <string name="hold_col_each">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>

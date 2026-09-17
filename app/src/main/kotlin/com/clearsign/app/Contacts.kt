@@ -65,8 +65,33 @@ object Contacts {
     /** Build the trust model from the local address book (empty allowlist/history
      *  when nothing saved — then everything reads as NEW, which the receipt
      *  layer treats as noise rather than a warning). */
+    /**
+     * Le chiavi che sono tue contano come tue.
+     *
+     * Il motore sapeva riconoscere "sono io", ma confrontando con un indirizzo
+     * solo, il conto principale. La paghetta dell'agente e' un'altra chiave, e
+     * l'abbiamo generata noi dieci secondi prima: il suo seme e' in questo
+     * telefono. Caricarla faceva comparire sullo scontrino "destinatario mai
+     * visto, portafoglio nuovo di zecca, controlla bene", che e' vero alla
+     * lettera e completamente fuorviante. Un avviso che grida al lupo sul tuo
+     * stesso portafoglio insegna a ignorare gli avvisi, che e' l'unica cosa che
+     * questo prodotto non si puo' permettere.
+     */
+    private fun mine(ctx: Context): Map<String, String> = buildMap {
+        runCatching { SessionWallet.current(ctx)?.pubkey }.getOrNull()?.let {
+            put(it, ctx.getString(R.string.trust_my_budget))
+        }
+        // Fra il preventivo e la firma la paghetta nuova non e' ancora su disco.
+        runCatching { SessionWallet.preparedPubkey }.getOrNull()?.let {
+            put(it, ctx.getString(R.string.trust_my_budget))
+        }
+        runCatching { Settings.watchWallet(ctx) }.getOrNull()?.takeIf { it.isNotBlank() }?.let {
+            put(it, ctx.getString(R.string.trust_my_wallet))
+        }
+    }
+
     fun addressTrust(ctx: Context): AddressTrust =
-        AddressTrust(allowlist = allowlist(ctx), history = history(ctx))
+        AddressTrust(allowlist = allowlist(ctx) + mine(ctx), history = history(ctx))
 
     private fun shorten(a: String, ends: Int = 4) =
         if (a.length <= ends * 2) a else "${a.take(ends)}…${a.takeLast(ends)}"

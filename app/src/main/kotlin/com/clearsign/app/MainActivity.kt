@@ -741,15 +741,19 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
     val ownScan = rememberAgentScan { scanError = it }
     val scan = onScan ?: ownScan
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // The real artwork, not a glyph on a gradient. It was already in the project,
-        // used by the launcher and by nothing inside the app; scaled to show the
-        // adaptive icon's visible middle rather than its full bleed.
-        Box(Modifier.size(38.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
+        // Il segno vero, non un glifo su un gradiente.
+        //
+        // Stava a una volta e mezza e ritagliato, e aveva senso: quell'immagine
+        // era l'icona del lanciatore a tutto quadro, e per mostrarne il centro
+        // visibile bisognava ingrandirla. Adesso `brand_bird` e' composta apposta
+        // per stare dentro un riquadro, quindi lo zoom la gonfiava e le tagliava
+        // gli angoli. Sta dentro e basta.
+        Box(Modifier.size(36.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(R.mipmap.brand_bird),
                 contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().scale(1.5f),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
             )
         }
         Spacer(Modifier.width(10.dp))

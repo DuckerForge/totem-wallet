@@ -394,7 +394,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         SessionWallet.current(ctx)?.let { s -> TopUpSheet(account, signer, s, onDone = { showTopUp = false; refresh++ }, onDismiss = { showTopUp = false }) }
     }
     if (showRules && session != null && policy != null && owner != null) {
-        RulesSheet(policy, session, owner, onDone = { showRules = false; refresh++ }, onDismiss = { showRules = false })
+        RulesSheet(policy, session, owner, onTopUp = { showRules = false; showTopUp = true }, onDone = { showRules = false; refresh++ }, onDismiss = { showRules = false })
     }
 }
 

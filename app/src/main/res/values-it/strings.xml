@@ -1724,6 +1724,7 @@
     <string name="agent_slice">Quanto del tetto ci mette</string>
     <string name="trace_fee_ok">%1$s trattiene il %2$d%%, dentro il %3$d%% che accetti</string>
     <string name="agent_fee_max">Commissione della moneta</string>
+    <string name="rules_cap_is_budget">Questo e\' tutta la paghetta: %1$s. Per andare piu\' in alto, mettine dentro altri.</string>
     <string name="rules_daily_used">Oggi ne ha spesi %1$s su %2$s. Il tetto non puo\' superare la paghetta: piu\' di quello che hai non puo\' uscire.</string>
     <string name="rules_daily_roundtrip">Una moneta comprata e rivenduta qui non conta: non e\' uscito niente, ha solo cambiato forma.</string>
     <string name="bridge_dest_wrong">Questo non e un indirizzo %1$s. Mandati lo stesso, i soldi vanno in un posto che non e tuo e non tornano.</string>

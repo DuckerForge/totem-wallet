@@ -523,7 +523,7 @@ internal fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: Session
 
 /** The collar, adjustable: caps as a share of the pocket, the silent threshold, the pace, who may be paid. */
 @Composable
-internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owner: String, onDone: () -> Unit, onDismiss: () -> Unit) {
+internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, owner: String, onTopUp: () -> Unit, onDone: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cap = session.capLamports.coerceAtLeast(1L).toFloat()
@@ -623,6 +623,26 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                     stringResource(R.string.rules_daily_used, fmtSol(spent, 4), fmtSol((daily * cap).toLong(), 4)),
                     style = HaloType.small, color = if (spent >= (daily * cap).toLong()) Halo.amber else Halo.muted, lineHeight = 16.sp,
                 )
+            }
+            // Un cursore che non va piu' a destra e' un vicolo cieco finche' non
+            // dice dove finisce la strada e come si va oltre.
+            //
+            // Il tetto e' la paghetta, e ogni cursore qui e' una fetta di quella:
+            // arrivato al cento per cento non c'e' niente a destra da prendere.
+            // Il modo di alzarlo non sta in questo foglio, sta nel mettere altri
+            // soldi dentro la paghetta, che e' un'altra pagina e un'altra firma.
+            // Scritto in piccolo sotto i cursori non bastava: era una frase fra
+            // le altre, e chi guarda un cursore fermo cerca il cursore, non il
+            // paragrafo. Adesso compare solo quando serve, dice il numero, e
+            // porta dove si fa.
+            if (perTx >= 0.995f || daily >= 0.995f) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.rules_cap_is_budget, fmtSol(cap.toLong(), 4)),
+                        style = HaloType.small, color = Halo.amber, lineHeight = 16.sp, modifier = Modifier.weight(1f),
+                    )
+                    SmallChip(stringResource(R.string.env_add), HIcon.DOWNLOAD, tint = Halo.cyan) { onTopUp() }
+                }
                 Text(stringResource(R.string.rules_daily_roundtrip), style = HaloType.small, color = Halo.mint, lineHeight = 16.sp)
             }
             // The arithmetic nobody does in their head, said out loud before it

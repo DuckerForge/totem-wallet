@@ -1686,9 +1686,10 @@
 <string name="trader_unwatched_tag">unwatched</string>
     <string name="trader_unwatched">The loop is off and %1$d position has nothing watching it. The stop does not fire while the loop is off, and there is no on-chain target. Sell it by hand or switch the loop back on.</string>
     <string name="trader_no_onchain_small">Too small for an order on Jupiter, which wants at least $5. Only the loop watches it, while it runs.</string>
-    <string name="hold_bars_note">%1$d are worth money. The bar is how many Seekers hold it. The dollars are what one of them holds, on average.</string>
+    <string name="hold_bars_note">%1$d are worth money. The bar is how many Seekers hold it. The dollars are what a typical one of them holds.</string>
+    <string name="hold_typical">The dollars are the typical holder, not the average. On %1$s the typical holder has %2$s. The average is %3$s. A handful of large wallets drag it up there, where nobody stands.</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
-    <string name="hold_col_each">% · $ EACH</string>
+    <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>
     <string name="send_blocked_drain">Blocked: this sends almost the whole balance to an address this phone has never seen. If it is your own account, save it as a contact and try again.</string>
     <string name="send_save_contact">Save as a contact</string>

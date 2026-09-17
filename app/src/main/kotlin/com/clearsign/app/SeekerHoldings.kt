@@ -49,17 +49,31 @@ import kotlin.math.sqrt
  * What a hundred and twenty thousand Seekers are holding.
  *
  * The picture exists to make one fact impossible to miss: of the thirty-four
- * things this crowd holds most, **nineteen are worth nothing**. SEKR, CHAPTER2,
- * HM, PDT, GRUMPY, RETROPASS — they came with the phone, everybody has them, and
- * they are worth zero dollars. They lie along the floor here, dim, exactly where
- * they belong. The handful that hold real money float above it.
+ * things this crowd holds most, seven are worth nothing at all. SEKR, CHAPTER2,
+ * PDT, NAMI and the rest came with the phone, everybody has them, and they are
+ * worth zero dollars. They lie along the floor here, dim, exactly where they
+ * belong. The handful that hold real money float above it.
  *
  * That is why the crowd feature counts purchases and never holdings. A holdings
  * leaderboard for this crowd is a leaderboard of free things.
  *
  * Numbers from a random sample of the census, measured, not estimated.
+ *
+ * ## Typical, not average
+ *
+ * The dollars used to be the average, and the average was a lie about these
+ * people. For USDC it says four hundred and eighty seven dollars; the person in
+ * the middle has ten. Fifty times out. A few hundred large wallets drag the mean
+ * somewhere no real holder stands, and this crowd is mostly small wallets, so
+ * the mean described nobody in it.
+ *
+ * So the number shown is the median, the typical holder. The mean is kept for
+ * one job only: deciding whether a coin is worth nothing. Those are two
+ * different questions and they used to share one field. A median of zero means
+ * most holders have dust, which is not the same as the coin being worthless:
+ * SI, PLANK and MPLX all sit at a median of zero with a mean above it.
  */
-private class SeekerHolding(val symbol: String, val pct: Double, val usdPer: Double)
+private class SeekerHolding(val symbol: String, val pct: Double, val usdPer: Double, val avg: Double)
 
 /** What the staking program holds for this crowd, which no wallet balance shows. */
 private class SkrStaked(val pct: Double, val avg: Double, val usdPer: Double?)
@@ -71,7 +85,11 @@ private fun load(ctx: Context): Census = runCatching {
     val a = o.getJSONArray("rows")
     val rows = (0 until a.length()).map { i ->
         val r = a.getJSONObject(i)
-        SeekerHolding(r.getString("s"), r.getDouble("p"), r.getDouble("u"))
+        SeekerHolding(
+            r.getString("s"), r.getDouble("p"), r.getDouble("u"),
+            // Older censuses put the mean in `u` and carried no `avg` at all.
+            r.optDouble("avg", r.getDouble("u")),
+        )
     }
     val st = o.optJSONObject("skrStaked")?.let {
         SkrStaked(it.optDouble("pct"), it.optDouble("avg"), it.optDouble("usdPer").takeIf { u -> !u.isNaN() && u > 0 })
@@ -87,7 +105,7 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
     val total = census.total
     val sample = census.sample
     if (rows.isEmpty()) { GlassCard { NothingHere(stringResource(R.string.crowd_no_data)) }; return }
-    val free = rows.count { it.usdPer < 0.01 }
+    val free = rows.count { it.avg < 0.01 }
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -103,6 +121,19 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
             HoldingsField(rows, animate)
             Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
             Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
+            // Said out loud, because otherwise the dollars read as wrong. Ten
+            // dollars of USDC looks like a rounding error next to a crowd of a
+            // hundred and twenty thousand, and the reader's next thought is that
+            // the number is broken. It is not: the mean is four hundred and
+            // eighty seven and it describes nobody. The widest held coin makes
+            // the point, and it is read from the file, so it stays true when the
+            // census is run again.
+            rows.firstOrNull { it.avg >= 1 && it.avg > it.usdPer * 3 }?.let { h ->
+                Text(
+                    stringResource(R.string.hold_typical, h.symbol, dollars(h.usdPer), dollars(h.avg)),
+                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
+                )
+            }
             Text(
                 stringResource(R.string.hold_note, free, rows.size, sample),
                 fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
@@ -158,8 +189,8 @@ private fun Legend(dot: Color, text: String) {
  */
 @Composable
 private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
-    val valued = rows.filter { it.usdPer >= 0.01 }.sortedByDescending { it.pct }
-    val gifts = rows.filter { it.usdPer < 0.01 }.sortedByDescending { it.pct }
+    val valued = rows.filter { it.avg >= 0.01 }.sortedByDescending { it.pct }
+    val gifts = rows.filter { it.avg < 0.01 }.sortedByDescending { it.pct }
     val maxPct = (valued.maxOfOrNull { it.pct } ?: 1.0).coerceAtLeast(1.0)
 
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -180,7 +211,9 @@ private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
             // thrown away when it scrolls past the top, and without the flag every
             // bar would crawl out of zero again on the way back.
             val grow = if (animate) rememberReveal(key = h.symbol, durationMs = 600 + i * 70) else 1f
-            val tint = if (h.usdPer >= 50) Halo.mint else Halo.cyan
+            // Cinque dollari, non cinquanta. La soglia era tarata sulla media, e con
+                // il tipico non la passava piu' nessuno: erano tutte dello stesso colore.
+                val tint = if (h.usdPer >= 5) Halo.mint else Halo.cyan
             Row(
                 Modifier.fillMaxWidth().then(if (animate) Modifier.staggeredEntrance(i, key = h.symbol) else Modifier),
                 verticalAlignment = Alignment.CenterVertically,
@@ -235,6 +268,11 @@ private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
         }
     }
 }
+
+/** Money as a person writes it: cents while they matter, none once they do not. */
+private fun dollars(v: Double): String =
+    if (v < 100) "$" + java.text.DecimalFormat("0.00").format(v)
+    else "$" + java.text.DecimalFormat("#,##0").format(v)
 
 private fun fmtPct(v: Double) = java.text.DecimalFormat("#.#").format(v)
 private fun fmtInt(v: Double) = java.text.NumberFormat.getIntegerInstance().format(v)

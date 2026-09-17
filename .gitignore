@@ -30,3 +30,7 @@ SPRINT-2026-09-11.md
 WATCHER-RESULT.md
 STATO.md
 ROADMAP.md
+
+# Roba compilata di Python, generata girando gli strumenti.
+__pycache__/
+*.pyc

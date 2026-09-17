@@ -562,6 +562,36 @@ async function tokensOf(env, mints) {
   return out;
 }
 
+/**
+ * Il ponte, con la chiave che resta qui.
+ *
+ * La chiave RocketX viaggiava dentro l'APK: chiunque lo apre la tira fuori e
+ * spende la quota di qualcun altro, o se la fa revocare. Tenendola qui il
+ * telefono non ne ha bisogno.
+ *
+ * **Lo scambio, detto**: questo servizio finisce in mezzo alla risposta che
+ * contiene l'indirizzo di deposito, cioe' entra nella lista di chi potrebbe
+ * sostituirlo. La lista prima conteneva solo RocketX. E' infrastruttura nostra,
+ * ma e' una superficie sui soldi al posto di una sulla quota, ed e' una scelta
+ * di chi mette i soldi: il telefono passa di qui solo se non ha una chiave sua.
+ *
+ * Le strade ammesse sono cinque e basta: questo non e' un proxy aperto.
+ */
+const RX_HOST = "https://api.rocketx.exchange/v1";
+const RX_PATHS = ["/configs", "/tokens", "/quotation", "/swap", "/status"];
+
+async function rocketx(env, path, method, body) {
+  if (!env.RX_KEY) return null;
+  const clean = "/" + path.replace(/^\/+/, "");
+  if (!RX_PATHS.some((p) => clean === p || clean.startsWith(p + "?") || clean.startsWith(p + "/"))) return null;
+  const r = await fetch(RX_HOST + clean, {
+    method,
+    headers: { "x-api-key": env.RX_KEY, "Accept": "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body || undefined,
+  });
+  return { status: r.status, text: await r.text() };
+}
+
 export default {
   // Due sveglie: la scansione ai dieci, e cinque minuti dopo le facce da
   // scaldare. Separate perché le cinquanta chiamate in uscita del piano
@@ -583,6 +613,17 @@ export default {
         },
       });
     }
+    // Il ponte, quando il telefono non ha una chiave sua.
+    const rx = url.searchParams.get("rx");
+    if (rx) {
+      const out = await rocketx(env, rx, request.method, request.method === "POST" ? await request.text() : null).catch(() => null);
+      if (!out) return new Response('{"error":"no"}', { status: 502, headers: { "content-type": "application/json" } });
+      return new Response(out.text, {
+        status: out.status,
+        headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
+      });
+    }
+
     // Le monete: nome, simbolo, decimali, icona. Niente prezzi.
     const toks = url.searchParams.get("t");
     if (toks) {

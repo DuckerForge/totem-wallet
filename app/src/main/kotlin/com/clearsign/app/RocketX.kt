@@ -32,7 +32,28 @@ object RocketX {
     private const val HOST = "https://api.rocketx.exchange/v1"
     private const val KEY = BuildConfig.ROCKETX_KEY
 
-    val enabled: Boolean get() = KEY.isNotBlank()
+    /**
+     * Con la chiave si va diretti, senza si passa dal servizio.
+     *
+     * La chiave dentro l'APK chiunque la estrae: spende la quota di qualcun
+     * altro o se la fa revocare. Tenendola sul servizio il telefono non ne ha
+     * bisogno.
+     *
+     * **Lo scambio, detto per intero.** Il servizio finisce in mezzo alla
+     * risposta che contiene l'indirizzo di deposito, quindi entra nella lista di
+     * chi potrebbe sostituirlo, lista che prima conteneva solo RocketX. E'
+     * infrastruttura nostra, ma e' una superficie sui soldi al posto di una sulla
+     * quota. Per questo la scelta e' una riga in `local.properties` e non una
+     * decisione presa qui: c'e' la chiave, si va diretti; non c'e', si passa di
+     * la'.
+     */
+    private val viaWorker: String? get() =
+        BuildConfig.CROWD_URL.takeIf { KEY.isBlank() && it.isNotBlank() }?.trimEnd('/')
+
+    private fun endpoint(path: String): String =
+        viaWorker?.let { it + "/?rx=" + URLEncoder.encode(path, "UTF-8") } ?: (HOST + path)
+
+    val enabled: Boolean get() = KEY.isNotBlank() || viaWorker != null
 
     data class Network(val id: String, val name: String, val chainId: String, val native: String)
     data class Token(val id: Int, val symbol: String, val name: String, val contract: String, val decimals: Int, val networkId: String, val icon: String?, val isNative: Boolean)
@@ -81,7 +102,7 @@ object RocketX {
 
     fun networks(): List<Network> {
         networks.takeIf { it.isNotEmpty() }?.let { return it }
-        val o = get("$HOST/configs") ?: return emptyList()
+        val o = get(endpoint("/configs")) ?: return emptyList()
         val arr = o.optJSONArray("supported_network") ?: return emptyList()
         val all = (0 until arr.length()).mapNotNull { i ->
             val n = arr.optJSONObject(i) ?: return@mapNotNull null
@@ -93,7 +114,7 @@ object RocketX {
     }
 
     fun tokens(chainId: String, keyword: String = "All", networkId: String? = null): List<Token> {
-        val o = getArray("$HOST/tokens?chainId=${enc(chainId)}&page=1&perPage=100&keyword=${enc(keyword)}") ?: return emptyList()
+        val o = getArray(endpoint("/tokens?chainId=${enc(chainId)}&page=1&perPage=100&keyword=${enc(keyword)}")) ?: return emptyList()
         return (0 until o.length()).mapNotNull { i ->
             val t = o.optJSONObject(i) ?: return@mapNotNull null
             if (t.optInt("enabled", 1) != 1) return@mapNotNull null
@@ -108,7 +129,7 @@ object RocketX {
     /** [fromToken]/[toToken] are contract addresses, or null for the chain's native coin. Amount in whole coins. */
     fun quote(fromToken: String?, fromNetwork: String, toToken: String?, toNetwork: String, amount: Double, slippage: Double = 1.0): List<Quote> {
         val q = "fromToken=${fromToken ?: "null"}&fromNetwork=${enc(fromNetwork)}&toToken=${toToken ?: "null"}&toNetwork=${enc(toNetwork)}&amount=$amount&slippage=$slippage"
-        val o = get("$HOST/quotation?$q") ?: return emptyList()
+        val o = get(endpoint("/quotation?$q")) ?: return emptyList()
         val arr = o.optJSONArray("quotes") ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
             val x = arr.optJSONObject(i) ?: return@mapNotNull null
@@ -130,7 +151,7 @@ object RocketX {
     fun swap(fromId: Int, toId: Int, userAddress: String, destinationAddress: String, amount: Double, slippage: Double = 1.0): Order? {
         val body = JSONObject().put("fromTokenId", fromId).put("toTokenId", toId).put("userAddress", userAddress)
             .put("destinationAddress", destinationAddress).put("fee", 1).put("amount", amount).put("slippage", slippage).put("disableEstimate", true)
-        val o = post("$HOST/swap", body) ?: return null
+        val o = post(endpoint("/swap"), body) ?: return null
         val sw = o.optJSONObject("swap") ?: return null
         val tx = sw.optJSONObject("tx")
         return Order(
@@ -143,7 +164,7 @@ object RocketX {
 
     /** Where the order stands, by the chain signature of the deposit. */
     fun status(txSignature: String, requestId: String): String? =
-        get("$HOST/status?txId=${enc(txSignature)}&requestId=${enc(requestId)}")?.let { it.optString("status").ifEmpty { it.optJSONObject("swap")?.optString("status") } }
+        get(endpoint("/status?txId=${enc(txSignature)}&requestId=${enc(requestId)}"))?.let { it.optString("status").ifEmpty { it.optJSONObject("swap")?.optString("status") } }
 
     // ---- bridges this phone opened, so their status can be asked later -------
 
@@ -176,7 +197,9 @@ object RocketX {
 
     private fun open(url: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {
         connectTimeout = 8_000; readTimeout = 25_000
-        setRequestProperty("Accept", "application/json"); setRequestProperty("x-api-key", KEY)
+        setRequestProperty("Accept", "application/json")
+        // Sul servizio la chiave la mette il servizio: qui non ce n'e' una.
+        if (KEY.isNotBlank()) setRequestProperty("x-api-key", KEY)
     }
 
     private fun get(url: String): JSONObject? = try {

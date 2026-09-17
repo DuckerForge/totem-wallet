@@ -7,7 +7,20 @@ clearsign.heliusRpcUrl=
 # Wallet (base58) that receives SKR for ClearSign Pro. Blank = purchases disabled.
 clearsign.skrTreasury=
 
-# RocketX partner key (free at app.rocketx.exchange/partner). Blank = the bridge is off.
+# RocketX partner key (free at app.rocketx.exchange/partner).
+#
+# Leave it here and the phone talks to RocketX directly, key compiled into the
+# APK where anybody can pull it out and spend your quota.
+#
+# Leave it blank and, if clearsign.crowdUrl is set, the phone goes through the
+# worker instead and the key lives there (`npx wrangler secret put RX_KEY`).
+# That takes the key out of the APK, and it puts our own service in the middle
+# of the answer that carries the deposit address: one more party that could
+# swap it, where before there was only RocketX. A quota problem traded for a
+# money problem. Your call, which is why it is a line here and not a decision
+# in the code.
+#
+# Both blank = the bridge is off.
 clearsign.rocketxKey=
 
 # Jupiter referral account (made once at referral.jup.ag with the treasury wallet).

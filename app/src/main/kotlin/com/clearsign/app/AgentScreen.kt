@@ -604,10 +604,24 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
             StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
             StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
-            // The one number worth changing at the door: how many coins at once.
+            // I due numeri che si vogliono cambiare sulla porta, e sono due
+            // domande diverse che sembravano una sola.
+            //
+            // Quante monete alla volta risponde a "su quante cose scommetto".
+            // Quanto ci mette risponde a "quanto rischio su ognuna", ed era
+            // l'unica delle due che non si poteva toccare: stava nel motore,
+            // ferma all'ottanta per cento. Con un posto solo l'ottanta per cento
+            // di tutta la paghetta sembra tutta la paghetta, e l'unico modo di
+            // metterci meno era stringere il collare, cioe' rispondere a una
+            // terza domanda che nessuno aveva fatto. La riga qui sotto dice la
+            // fetta in SOL e in soldi, e si muove con tutti e due i cursori.
             SliderRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString(), cfg.maxPositions.toFloat(), 1f..5f, Halo.cyan, steps = 3) {
                 cfg = cfg.copy(maxPositions = it.toInt().coerceIn(1, 5))
             }
+            SliderRow(
+                stringResource(R.string.agent_slice), cfg.slicePercent.toString() + "%",
+                cfg.slicePercent / 100f, 0.1f..1f, Halo.mint, steps = 17,
+            ) { cfg = cfg.copy(slicePercent = (it * 100).toInt().coerceIn(10, 100)) }
             run {
                 val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
                 if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)

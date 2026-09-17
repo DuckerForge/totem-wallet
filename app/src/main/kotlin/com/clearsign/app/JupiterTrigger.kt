@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Base64
 import android.util.Log
 import org.json.JSONArray
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -60,7 +62,23 @@ object JupiterTrigger {
      * plus the percentage the person asked for. So the on-chain order says the
      * same thing the loop would have said, and whichever gets there first wins.
      */
-    suspend fun placeTakeProfit(ctx: Context, maker: String, position: Positions.Position): Placed {
+    /**
+     * Mai sul filo principale.
+     *
+     * Era bloccante e veniva chiamata anche da li', dove Android vieta la rete:
+     * l'eccezione che tira in quel caso non ha messaggio, quindi nel registro si
+     * leggeva "POST /createOrder failed: null" e sembrava che fosse Jupiter a
+     * rifiutare. Non era Jupiter. Visto il 17/09: un ordine da quattordici
+     * dollari, ben sopra il minimo, mai arrivato in catena, e la stessa chiamata
+     * con gli stessi numeri fatta da fuori tornava un ordine valido al primo
+     * colpo. Il messaggio nullo era l'indizio, e il thread nel registro la prova:
+     * pid e tid uguali.
+     */
+    suspend fun placeTakeProfit(ctx: Context, maker: String, position: Positions.Position): Placed = withContext(Dispatchers.IO) {
+        placeBlocking(ctx, maker, position)
+    }
+
+    private suspend fun placeBlocking(ctx: Context, maker: String, position: Positions.Position): Placed {
         val raw = (position.units * Math.pow(10.0, position.decimals.toDouble())).toLong()
         if (raw <= 0) return Placed.Failed("nothing to sell")
         val target = position.costLamports * (100L + position.takeProfitPct) / 100L
@@ -212,7 +230,11 @@ object JupiterTrigger {
      * Take an order back, so a position sold by the loop does not leave an order
      * on chain trying to sell tokens the budget no longer has.
      */
-    suspend fun cancel(ctx: Context, maker: String, order: String): Boolean {
+    suspend fun cancel(ctx: Context, maker: String, order: String): Boolean = withContext(Dispatchers.IO) {
+        cancelBlocking(ctx, maker, order)
+    }
+
+    private suspend fun cancelBlocking(ctx: Context, maker: String, order: String): Boolean {
         val built = buildCancel(maker, order) ?: return false
         val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(built.unsigned)) ?: return false
         val done = execute(built, attach(built.unsigned, maker, sig))
@@ -221,6 +243,17 @@ object JupiterTrigger {
 
     // ---- wire ----------------------------------------------------------------
 
+    /**
+     * Sul filo dell'IO, sempre.
+     *
+     * Era bloccante e veniva chiamata anche dal filo principale, dove Android
+     * vieta la rete: l'eccezione che tira in quel caso non ha messaggio, quindi
+     * nel registro si leggeva "POST /createOrder failed: null" e sembrava che
+     * fosse Jupiter a rifiutare. Non era Jupiter. Visto il 17/09: un ordine da
+     * quattordici dollari, ben sopra il minimo, mai arrivato in catena, e la
+     * stessa chiamata con gli stessi numeri fatta da fuori tornava un ordine
+     * valido al primo colpo.
+     */
     private fun post(path: String, body: JSONObject): JSONObject? = HOSTS.firstNotNullOfOrNull { host ->
         try {
             val c = (URL(host + path).openConnection() as HttpURLConnection).apply {

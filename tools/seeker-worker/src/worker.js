@@ -586,7 +586,16 @@ async function rocketx(env, path, method, body) {
   if (!RX_PATHS.some((p) => clean === p || clean.startsWith(p + "?") || clean.startsWith(p + "/"))) return null;
   const r = await fetch(RX_HOST + clean, {
     method,
-    headers: { "x-api-key": env.RX_KEY, "Accept": "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
+    // RocketX sta dietro al filtro anti-bot di Cloudflare, che risponde 403
+    // "error 1010" a chi non si presenta con un User-Agent. Un worker di suo
+    // non ne manda nessuno, e sarebbe bloccato prima ancora di mostrare la
+    // chiave.
+    headers: {
+      "x-api-key": env.RX_KEY,
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (Linux; Android 14) ClearSign/1.0",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
     body: body || undefined,
   });
   return { status: r.status, text: await r.text() };

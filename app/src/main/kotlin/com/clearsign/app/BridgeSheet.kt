@@ -72,6 +72,10 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
     var picked by remember { mutableStateOf(0) }
     // Il numero che l'ordine ha davvero portato, quando e' peggio del preventivo.
     var worse by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    // L'ordine gia' aperto e messo in attesa di una risposta. Senza questo, il
+    // secondo tocco su "accetta" apriva un secondo ordine a RocketX e pagava
+    // quello, mentre i numeri sullo schermo erano del primo.
+    var pending by remember { mutableStateOf<RocketX.Order?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val fromMint = if (usdc) "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" else null
     val fromSym = if (usdc) "USDC" else "SOL"
@@ -88,7 +92,7 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
 
     val amt = amount.replace(',', '.').toDoubleOrNull()
     LaunchedEffect(target, fromMint, toToken, amt, sameCoin) {
-        quotes = emptyList(); error = null; picked = 0; worse = null
+        quotes = emptyList(); error = null; picked = 0; worse = null; pending = null
         val t = target ?: return@LaunchedEffect
         if (amt == null || amt <= 0) return@LaunchedEffect
         if (usdc && sameCoin && toToken == null) return@LaunchedEffect
@@ -174,7 +178,7 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                 Column(
                     Modifier.fillMaxWidth().clip(rs(14)).background(if (best) Halo.mint.copy(alpha = 0.08f) else Halo.cardSoft)
                         .border(1.dp, if (best) Halo.mint.copy(alpha = 0.4f) else Halo.stroke, rs(14))
-                        .clickable { picked = i; worse = null }.padding(12.dp),
+                        .clickable { picked = i; worse = null; pending = null }.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -206,7 +210,9 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                 val q = quotes.getOrNull(picked) ?: quotes.first(); val t = target ?: return@PrimaryButton
                 busy = ctx.getString(R.string.bridge_opening)
                 scope.launch {
-                    val order = withContext(Dispatchers.IO) { runCatching { RocketX.swap(q.fromId, q.toId, owner, dest, amt!!) }.getOrNull() }
+                    // Se un ordine e' gia' aperto e in attesa del tuo si', e' quello
+                    // che si paga: non se ne apre un secondo.
+                    val order = pending ?: withContext(Dispatchers.IO) { runCatching { RocketX.swap(q.fromId, q.toId, owner, dest, amt!!) }.getOrNull() }
                     busy = null
                     val deposit = order?.depositAddress
                     when {
@@ -227,8 +233,10 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                         // peggio oltre una soglia, si dicono i due numeri e si
                         // aspetta una risposta. Sotto il due per cento non vale
                         // la pena fermare nessuno.
-                        order.toAmount > 0 && q.toAmount > 0 && order.toAmount < q.toAmount * 0.98 && worse == null ->
+                        order.toAmount > 0 && q.toAmount > 0 && order.toAmount < q.toAmount * 0.98 && worse == null -> {
                             worse = q.toAmount to order.toAmount
+                            pending = order
+                        }
                         else -> {
                             // The deposit is a payment like any other: Send, receipt, print. A memo, when the route wants one, rides in the transaction.
                             RocketX.remember(ctx, RocketX.Bridge(order.requestId, "", fromSym, if (usdc && sameCoin) "USDC" else t.native, t.name, System.currentTimeMillis(), order.exchange, deposit))
@@ -238,6 +246,7 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                             // sullo scontrino compariva l'indirizzo del deposito e
                             // mai quello dove i soldi vanno a finire: l'unica cosa
                             // che conta davvero non si vedeva al momento della firma.
+                            pending = null
                             val tail = if (dest.length > 10) dest.take(6) + "…" + dest.takeLast(6) else dest
                             onSend(
                                 PayRequest(

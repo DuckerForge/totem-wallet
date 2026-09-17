@@ -316,24 +316,52 @@ private fun fmt(v: Double): String = when {
 /** What each whale holds, kept for as long as the app lives: one wallet, one read. */
 private val heldMemo = java.util.concurrent.ConcurrentHashMap<String, Holdings>()
 
-/** The service's answer, already priced. Null when there is no service or it did not answer. */
+/**
+ * The service's answer, already priced. Null when there is no service or it did not answer.
+ *
+ * Two doors, and the cheap one first. The archive is a plain file on a shared
+ * store, readable by anybody, with no key and no worker woken up: whoever opened
+ * this wallet before today left the answer there for everyone. Only when the
+ * archive has nothing, or has something half a day old, do we knock on the
+ * service, which reads the chain and refills the archive for the next person.
+ *
+ * That ordering is the whole point. A cache only pays when people arrive
+ * together, and they do not: half of them open the app in the morning and half
+ * at night. An archive does not care what time it is.
+ */
 private fun shared(address: String, take: Int): Holdings? {
-    val base = BuildConfig.CROWD_URL.takeIf { it.isNotBlank() } ?: return null
-    val body = runCatching {
-        val c = (java.net.URL(base.trimEnd('/') + "/?w=" + address).openConnection() as java.net.HttpURLConnection)
-            .apply { connectTimeout = 6_000; readTimeout = 12_000; setRequestProperty("Accept", "application/json") }
-        if (c.responseCode !in 200..299) null else c.inputStream.bufferedReader().use { it.readText() }
-    }.getOrNull() ?: return null
-    return runCatching {
-        val o = org.json.JSONObject(body)
-        val arr = o.optJSONArray("top") ?: return null
-        val list = ArrayList<Held>(arr.length())
-        for (i in 0 until arr.length()) {
-            val r = arr.optJSONObject(i) ?: continue
-            val mint = r.optString("m").takeIf { it.isNotEmpty() } ?: continue
-            list += Held(mint, JupiterTokens.cached(mint)?.symbol ?: mint.take(4), r.optDouble("q"), r.optDouble("u"))
-        }
-        runCatching { JupiterTokens.warm(list.map { it.mint }) }
-        Holdings(list.take(take), o.optInt("unpriced"))
-    }.getOrNull()
+    val stored = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() }?.let { base ->
+        get(base.trimEnd('/') + "/clearsign/holdings/" + address + ".json")
+    }
+    // Half a day old is still worth showing. Older than that and we would rather
+    // wait for the service, which rereads the chain while it answers.
+    if (stored != null && ageOf(stored) < 12 * 3600_000L) parse(stored, take)?.let { return it }
+
+    val base = BuildConfig.CROWD_URL.takeIf { it.isNotBlank() } ?: return parse(stored ?: return null, take)
+    val body = get(base.trimEnd('/') + "/?w=" + address) ?: return stored?.let { parse(it, take) }
+    return parse(body, take)
 }
+
+private fun get(url: String): String? = runCatching {
+    val c = (java.net.URL(url).openConnection() as java.net.HttpURLConnection)
+        .apply { connectTimeout = 6_000; readTimeout = 12_000; setRequestProperty("Accept", "application/json") }
+    if (c.responseCode !in 200..299) null else c.inputStream.bufferedReader().use { it.readText() }
+}.getOrNull()?.takeIf { it.isNotBlank() && it.trim() != "null" }
+
+/** How old the answer is, by the clock written inside it. Forever, when it cannot be read. */
+private fun ageOf(body: String): Long = runCatching {
+    System.currentTimeMillis() - org.json.JSONObject(body).optLong("at")
+}.getOrDefault(Long.MAX_VALUE)
+
+private fun parse(body: String, take: Int): Holdings? = runCatching {
+    val o = org.json.JSONObject(body)
+    val arr = o.optJSONArray("top") ?: return null
+    val list = ArrayList<Held>(arr.length())
+    for (i in 0 until arr.length()) {
+        val r = arr.optJSONObject(i) ?: continue
+        val mint = r.optString("m").takeIf { it.isNotEmpty() } ?: continue
+        list += Held(mint, JupiterTokens.cached(mint)?.symbol ?: mint.take(4), r.optDouble("q"), r.optDouble("u"))
+    }
+    runCatching { JupiterTokens.warm(list.map { it.mint }) }
+    Holdings(list.take(take), o.optInt("unpriced"))
+}.getOrNull()

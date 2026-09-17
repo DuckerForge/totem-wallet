@@ -24,6 +24,8 @@ android {
     // Every phone reads this file; none of them scans. Blank → each phone falls
     // back to scanning for itself, which is fine for one user and absurd for many.
     val crowdUrl = localProps.getProperty("clearsign.crowdUrl", "")
+    // L'archivio condiviso, letto senza chiave. Vuoto: si passa dal servizio.
+    val archiveUrl = localProps.getProperty("clearsign.archiveUrl", "")
     // Wallet that receives SKR for premium themes. Blank → purchases disabled in the UI.
     val skrTreasury = localProps.getProperty("clearsign.skrTreasury", "")
     // RocketX partner key (free, from app.rocketx.exchange/partner): the bridge. Blank → the bridge is off.
@@ -40,6 +42,7 @@ android {
         buildConfigField("String", "HELIUS_RPC_URL", "\"$heliusRpcUrl\"")
         buildConfigField("String", "SCAN_RPC_URL", "\"$scanRpcUrl\"")
         buildConfigField("String", "CROWD_URL", "\"$crowdUrl\"")
+        buildConfigField("String", "ARCHIVE_URL", "\"$archiveUrl\"")
         buildConfigField("String", "SKR_TREASURY", "\"$skrTreasury\"")
         buildConfigField("String", "ROCKETX_KEY", "\"$rocketxKey\"")
         buildConfigField("String", "JUP_REFERRAL", "\"$jupReferral\"")

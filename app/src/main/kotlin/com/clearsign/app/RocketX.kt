@@ -83,16 +83,23 @@ object RocketX {
     fun addressFits(network: Network, address: String): Boolean? {
         val a = address.trim()
         if (a.isEmpty()) return null
+        // Prima la moneta nativa, poi il chainId numerico.
+        //
+        // L'ordine conta. Se RocketX desse un chainId numerico anche a Bitcoin o
+        // a Tron, e non ho potuto verificarlo dal vivo, guardare prima il numero
+        // avrebbe applicato la regola EVM a un indirizzo bitcoin e rifiutato
+        // ogni indirizzo valido: la falla opposta a quella che si vuole chiudere.
+        // La moneta nativa non lascia dubbi.
+        when (network.native.uppercase()) {
+            "BTC" -> return Regex("^(bc1[0-9ac-hj-np-z]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$").matches(a)
+            "TRX" -> return Regex("^T[1-9A-HJ-NP-Za-km-z]{33}$").matches(a)
+            "SUI" -> return Regex("^0x[0-9a-fA-F]{64}$").matches(a)
+            "TON" -> return Regex("^([A-Za-z0-9_-]{48}|-?\\d+:[0-9a-fA-F]{64})$").matches(a)
+            "SOL" -> return Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$").matches(a)
+        }
         // Le catene EVM hanno un chainId numerico, e tutte lo stesso formato.
         if (network.chainId.toLongOrNull() != null) return Regex("^0x[0-9a-fA-F]{40}$").matches(a)
-        return when (network.native.uppercase()) {
-            "BTC" -> Regex("^(bc1[0-9ac-hj-np-z]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$").matches(a)
-            "TRX" -> Regex("^T[1-9A-HJ-NP-Za-km-z]{33}$").matches(a)
-            "SUI" -> Regex("^0x[0-9a-fA-F]{64}$").matches(a)
-            "TON" -> Regex("^([A-Za-z0-9_-]{48}|-?\\d+:[0-9a-fA-F]{64})$").matches(a)
-            "SOL" -> Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$").matches(a)
-            else -> null
-        }
+        return null
     }
 
     /** The chains worth a chip, in this order, when RocketX lists them. */

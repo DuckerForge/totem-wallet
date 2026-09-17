@@ -746,7 +746,7 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
         // adaptive icon's visible middle rather than its full bleed.
         Box(Modifier.size(38.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(R.mipmap.ic_launcher_bird),
+                painter = androidx.compose.ui.res.painterResource(R.mipmap.brand_bird),
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().scale(1.5f),

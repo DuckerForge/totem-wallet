@@ -68,6 +68,10 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
     var quotes by remember { mutableStateOf<List<RocketX.Quote>>(emptyList()) }
     var quoting by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf<String?>(null) }
+    // Quale rotta, scelta da chi paga. Si azzera quando i preventivi cambiano.
+    var picked by remember { mutableStateOf(0) }
+    // Il numero che l'ordine ha davvero portato, quando e' peggio del preventivo.
+    var worse by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val fromMint = if (usdc) "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" else null
     val fromSym = if (usdc) "USDC" else "SOL"
@@ -84,7 +88,7 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
 
     val amt = amount.replace(',', '.').toDoubleOrNull()
     LaunchedEffect(target, fromMint, toToken, amt, sameCoin) {
-        quotes = emptyList(); error = null
+        quotes = emptyList(); error = null; picked = 0; worse = null
         val t = target ?: return@LaunchedEffect
         if (amt == null || amt <= 0) return@LaunchedEffect
         if (usdc && sameCoin && toToken == null) return@LaunchedEffect
@@ -159,11 +163,18 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
 
             if (quoting) Text(stringResource(R.string.bridge_quoting), style = HaloType.small, color = Halo.muted)
             error?.let { Banner(it, Halo.amber, HIcon.WARNING) }
+            // Tre rotte, e quella scelta e' quella che parte.
+            //
+            // Prima se ne mostravano tre e il bottone prendeva sempre la prima:
+            // l'elenco era decorativo, e su una pagina dove ogni riga porta un
+            // numero diverso di soldi in arrivo, tre scelte finte sono peggio di
+            // una sola vera.
             quotes.take(3).forEachIndexed { i, q ->
-                val best = i == 0
+                val best = i == picked
                 Column(
                     Modifier.fillMaxWidth().clip(rs(14)).background(if (best) Halo.mint.copy(alpha = 0.08f) else Halo.cardSoft)
-                        .border(1.dp, if (best) Halo.mint.copy(alpha = 0.4f) else Halo.stroke, rs(14)).padding(12.dp),
+                        .border(1.dp, if (best) Halo.mint.copy(alpha = 0.4f) else Halo.stroke, rs(14))
+                        .clickable { picked = i; worse = null }.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -177,10 +188,22 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                 }
             }
 
+            worse?.let { (quoted, real) ->
+                val drop = if (quoted > 0) (quoted - real) / quoted * 100.0 else 0.0
+                Banner(
+                    stringResource(
+                        R.string.bridge_worse,
+                        String.format(Locale.ROOT, "%.6f", quoted).trimEnd('0').trimEnd('.'),
+                        String.format(Locale.ROOT, "%.6f", real).trimEnd('0').trimEnd('.'),
+                        String.format(Locale.ROOT, "%.1f", drop),
+                    ),
+                    Halo.amber, HIcon.WARNING,
+                )
+            }
             busy?.let { Working(it) }
             val ready = quotes.isNotEmpty() && dest.length >= 20 && amt != null && amt > 0 && busy == null && fits != false
             PrimaryButton(stringResource(R.string.bridge_go), danger = false, enabled = ready, icon = HIcon.SWAP) {
-                val q = quotes.first(); val t = target ?: return@PrimaryButton
+                val q = quotes.getOrNull(picked) ?: quotes.first(); val t = target ?: return@PrimaryButton
                 busy = ctx.getString(R.string.bridge_opening)
                 scope.launch {
                     val order = withContext(Dispatchers.IO) { runCatching { RocketX.swap(q.fromId, q.toId, owner, dest, amt!!) }.getOrNull() }
@@ -195,6 +218,17 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                         // non veniva guardato da nessuna parte.
                         q.memoRequired && order.memo.isNullOrBlank() ->
                             error = ctx.getString(R.string.bridge_memo_missing)
+                        // Il preventivo non e' l'ordine.
+                        //
+                        // Fra il numero che hai guardato e l'ordine aperto passa
+                        // del tempo e una rotta puo' muoversi. Si firmava sulla
+                        // fiducia di una cifra vista prima, e l'app ha gia'
+                        // questo schema fatto bene sulle vendite: se il reale e'
+                        // peggio oltre una soglia, si dicono i due numeri e si
+                        // aspetta una risposta. Sotto il due per cento non vale
+                        // la pena fermare nessuno.
+                        order.toAmount > 0 && q.toAmount > 0 && order.toAmount < q.toAmount * 0.98 && worse == null ->
+                            worse = q.toAmount to order.toAmount
                         else -> {
                             // The deposit is a payment like any other: Send, receipt, print. A memo, when the route wants one, rides in the transaction.
                             RocketX.remember(ctx, RocketX.Bridge(order.requestId, "", fromSym, if (usdc && sameCoin) "USDC" else t.native, t.name, System.currentTimeMillis(), order.exchange, deposit))

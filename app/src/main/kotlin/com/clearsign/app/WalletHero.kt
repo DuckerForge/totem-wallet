@@ -538,6 +538,9 @@ private class TokenAction(val label: String, val icon: HIcon, val tint: androidx
  * here would be a figure nobody asked for, floating behind something they did
  * ask for, and the two would fight.
  */
+/** How much of the line's travel one coin's fall lasts. */
+private const val FALL = 0.34f
+
 @Composable
 private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Modifier) {
     val tint = if (values.last() >= values.first()) Halo.mint else Halo.red
@@ -556,11 +559,17 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
     // moves.
     val growth = remember(values) { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(values) {
-        growth.animateTo(1f, androidx.compose.animation.core.tween(2100, easing = androidx.compose.animation.core.LinearEasing))
+        growth.animateTo(1f, androidx.compose.animation.core.tween(3200, easing = androidx.compose.animation.core.LinearEasing))
     }
     val grow = growth.value
     // Loaded out here: an image is a composable's business, not a canvas's.
-    val marks = coins.map { rememberCoinBitmap(it) }
+    //
+    // Keyed on the mint, and that is not a nicety. Remembered state in a loop is
+    // handed out by position, so the moment this list changed length every coin
+    // was given the slot of a different coin, every image went back to null, and
+    // the icons vanished from a picture that had just drawn them. Keyed, a coin
+    // keeps its own slot for as long as it is in the list.
+    val marks = coins.map { m -> androidx.compose.runtime.key(m) { rememberCoinBitmap(m) } }
     androidx.compose.foundation.Canvas(modifier) {
         val lo = values.min()
         val hi = values.max()
@@ -591,31 +600,34 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
             )
             drawPath(line, tint.copy(alpha = 0.24f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f))
         }
-        // What the line is made of, dropped along it as it goes.
+        // What the line is made of, shaken loose as the head goes by.
         //
         // The shape alone says how the month went and says nothing about whose
-        // month it was. One coin for each of the things the curve is actually
-        // built from, sitting on the line where the line passed them, turns a
-        // background into a sentence: this is your money, and this is what it is
-        // made of. Each lands only once the head has gone by, so they arrive in
-        // order of size and the last one arrives with the end of the line.
+        // month it was. These are the same coins the curve is actually built
+        // from, biggest first, and each one is picked up by the head of the line
+        // and dropped: it appears where the head is, falls away with a bit of
+        // weight to it, and is gone. Nothing is left lying on the page, because
+        // underneath this are eight buttons somebody is trying to read.
         marks.forEachIndexed { i, bmp ->
             if (bmp == null) return@forEachIndexed
             val at = (i + 1f) / (marks.size + 1f)
             if (grow < at) return@forEachIndexed
+            // How far through its own fall this one is, on its own clock.
+            val fall = ((grow - at) / FALL).coerceIn(0f, 1f)
+            if (fall >= 1f) return@forEachIndexed
             val vi = ((values.size - 1) * at).toInt().coerceIn(0, values.size - 1)
             val r = 11.dp.toPx()
-            val c = androidx.compose.ui.geometry.Offset(size.width * at, py(values[vi]))
-            // A hole punched in the line, so the coin sits on it rather than
-            // over it, and a faint ring to hold it.
-            drawCircle(Halo.ground, r * 1.15f, c)
-            drawCircle(tint.copy(alpha = 0.22f), r * 1.15f, c, style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+            // Gravity, roughly: the square makes it hang for an instant at the
+            // head and then go. Linear it looked like a lift descending.
+            val drop = fall * fall * (size.height - py(values[vi]) + r * 2)
+            val c = androidx.compose.ui.geometry.Offset(size.width * at, py(values[vi]) + drop)
+            val fade = (1f - fall).coerceIn(0f, 1f)
             val d = (r * 1.7f).toInt()
             drawImage(
                 bmp,
                 dstOffset = androidx.compose.ui.unit.IntOffset((c.x - d / 2f).toInt(), (c.y - d / 2f).toInt()),
                 dstSize = androidx.compose.ui.unit.IntSize(d, d),
-                alpha = 0.72f,
+                alpha = 0.78f * fade,
             )
         }
         // The head of the line while it travels, so the eye has something to

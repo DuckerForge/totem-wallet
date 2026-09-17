@@ -259,6 +259,7 @@ private fun BuyBody(
             }
         }
     }
+    var review by remember { mutableStateOf(false) }
     if (working) Text(stringResource(R.string.analyzing), style = HaloType.small, color = Halo.muted)
     error?.let { Text(it, style = HaloType.small, color = Halo.red, lineHeight = 16.sp) }
 
@@ -304,17 +305,44 @@ private fun BuyBody(
         if (b.analyzed.receipt.blocksApproval) {
             Text(stringResource(R.string.feed_blocked), style = HaloType.small, color = Halo.red, lineHeight = 16.sp)
         } else {
-            HoldToConfirm(stringResource(R.string.hold_sign_send), enabled = !working) {
-                scope.launch {
-                    working = true
-                    val r = WalletActions.signAndSendRaw(
-                        ctx, signer, owner, b.tx, b.analyzed.receipt, kind = "swap",
-                        ultraRequestId = b.ultraRequestId,
-                    )
-                    working = false
-                    when (r) {
-                        is WalletActions.Result.Sent -> { done = r.signature; onDone() }
-                        is WalletActions.Result.Failed -> error = r.message
+            // Nothing is signed from inside a row any more.
+            //
+            // The three lines above are the menu: the dish and the price, enough
+            // to decide whether to go on. What you sign is a different thing, and
+            // in this app it has a screen of its own, every time. It used to be
+            // signed straight from here off a four-line summary, which is the one
+            // place in the whole product where the receipt was optional.
+            PrimaryButton(stringResource(R.string.gift_see_receipt), danger = false, enabled = !working, icon = HIcon.RECEIPT) {
+                review = true
+            }
+        }
+    }
+
+    // The receipt, on its own, over everything: same window as everywhere else.
+    val ready = built
+    if (review && ready != null) {
+        PayOverlay(
+            title = symbol,
+            hint = stringResource(R.string.env_review_hint_swap),
+            onBack = { if (!working) review = false },
+        ) {
+            Column { SignReceiptBody(ready.analyzed.receipt, null, ready.pair, plain = true) }
+            error?.let { Banner(it, Halo.red, HIcon.WARNING) }
+            if (working) {
+                Working(stringResource(R.string.theme_unlock_signing))
+            } else {
+                HoldToConfirm(stringResource(R.string.hold_sign_send)) {
+                    scope.launch {
+                        working = true
+                        val r = WalletActions.signAndSendRaw(
+                            ctx, signer, owner, ready.tx, ready.analyzed.receipt, kind = "swap",
+                            ultraRequestId = ready.ultraRequestId,
+                        )
+                        working = false
+                        when (r) {
+                            is WalletActions.Result.Sent -> { done = r.signature; review = false; onDone() }
+                            is WalletActions.Result.Failed -> error = r.message
+                        }
                     }
                 }
             }

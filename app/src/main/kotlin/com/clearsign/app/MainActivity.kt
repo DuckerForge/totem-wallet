@@ -250,6 +250,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showSwap by remember { mutableStateOf(requested == "swap") }
         // A coin chosen in the market tab: the swap opens already pointing at it.
         var swapMint by remember { mutableStateOf<String?>(null) }
+        // Asked from the card of a coin you hold: which one to sell, which one to send.
+        var swapSellMint by remember { mutableStateOf<String?>(null) }
+        var sendMint by remember { mutableStateOf<String?>(null) }
         var showChat by remember { mutableStateOf(false) }
         var showGift by remember { mutableStateOf(false) }
         var showTap by remember { mutableStateOf(false) }
@@ -406,6 +409,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                     WalletHero(
                                         owner, signer, collapse,
                                         reload = reload, onLoaded = { pulling = false },
+                                        onSendCoin = { mint -> sendMint = mint; showSend = true },
+                                        onSwapCoin = { mint -> swapSellMint = mint; showSwap = true },
                                         onAction = { a ->
                                             // A guest can receive and look; nothing that spends or sets.
                                             if (Settings.guest.value && a !in setOf(HomeAction.RECEIVE, HomeAction.SCAN, HomeAction.CROWD)) {
@@ -492,10 +497,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
             SendSheet(
                 signer, first.pubkeyBase58,
                 prefillTo = request?.recipient, prefillAmount = request?.amount?.let { fmtUi(it) },
-                prefillMint = request?.let { it.mint ?: com.clearsign.core.NATIVE_SOL_MINT },
+                prefillMint = request?.let { it.mint ?: com.clearsign.core.NATIVE_SOL_MINT } ?: sendMint,
                 prefillMemo = bridgeMemo,
                 onGift = { showSend = false; showGift = true },
-            ) { showSend = false; bridgeMemo = null; (ctx as? MainActivity)?.incoming = null }
+            ) { showSend = false; sendMint = null; bridgeMemo = null; (ctx as? MainActivity)?.incoming = null }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
         // A page, not a sheet: it sits over everything, tab bar included, because
@@ -535,7 +540,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         if (showGift && owner != null) GiftSheet(signer, owner) { showGift = false }
         if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label, onTap = { showReceive = false; showTap = true }) { showReceive = false }
         if ((showSwap || swapMint != null) && first != null) {
-            SwapSheet(signer, first.pubkeyBase58, buyMint = swapMint) { showSwap = false; swapMint = null }
+            SwapSheet(signer, first.pubkeyBase58, buyMint = swapMint, sellMint = swapSellMint) { showSwap = false; swapMint = null; swapSellMint = null }
         }
     }
 }

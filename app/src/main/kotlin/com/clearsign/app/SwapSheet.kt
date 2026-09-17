@@ -85,7 +85,7 @@ private sealed interface SwapState {
 }
 
 @Composable
-internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? = null, onDismiss: () -> Unit) {
+internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? = null, sellMint: String? = null, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -105,6 +105,16 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
         val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(mint)) }.getOrNull()?.get(mint) } ?: return@LaunchedEffect
         to = PickToken.of(t)
         from = POPULAR[0]
+    }
+    // Opened from a coin you already hold: that coin is what you are selling.
+    // The other side goes to dollars, or to SOL when the coin *is* dollars,
+    // because a swap with the same thing on both sides is not a swap.
+    LaunchedEffect(sellMint) {
+        val mint = sellMint ?: return@LaunchedEffect
+        val real = if (mint == com.clearsign.core.NATIVE_SOL_MINT) Jupiter.SOL_MINT else mint
+        val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(real)) }.getOrNull()?.get(real) } ?: return@LaunchedEffect
+        from = PickToken.of(t)
+        to = if (real == POPULAR[1].mint) POPULAR[0] else POPULAR[1]
     }
     var amount by remember { mutableStateOf("") }
     var quote by remember { mutableStateOf<Jupiter.Quote?>(null) }

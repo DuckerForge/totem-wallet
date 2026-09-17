@@ -62,6 +62,9 @@ internal fun WalletHero(
     reload: Int = 0,
     /** Called when a reload has finished, whatever it found. */
     onLoaded: () -> Unit = {},
+    /** Send this coin, or swap out of it: the sheet for one holding asks for both. */
+    onSendCoin: (String) -> Unit = {},
+    onSwapCoin: (String) -> Unit = {},
 ) {
     val currency by Settings.currency
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -75,7 +78,14 @@ internal fun WalletHero(
     }
     LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
     var picked by remember { mutableStateOf<Holding?>(null) }
-    picked?.let { h -> if (owner != null) TokenSheet(h, owner, signer, currency, onDismiss = { changed -> picked = null; if (changed) refreshKey++ }) }
+    picked?.let { h ->
+        if (owner != null) TokenSheet(
+            h, owner, signer, currency,
+            onSend = { picked = null; onSendCoin(h.mint) },
+            onSwap = { picked = null; onSwapCoin(h.mint) },
+            onDismiss = { changed -> picked = null; if (changed) refreshKey++ },
+        )
+    }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xl)) {
         // The one hero of the page, and it sits on the page rather than in a card:
@@ -306,7 +316,15 @@ private fun ChangePill(delta: Double, p: Double, currency: String, modifier: Mod
  * before the biometric prompt; the Seed Vault signs; the burn lands in the ledger.
  */
 @Composable
-private fun TokenSheet(h: Holding, owner: String, signer: SeedVaultSigner, currency: String, onDismiss: (Boolean) -> Unit) {
+private fun TokenSheet(
+    h: Holding,
+    owner: String,
+    signer: SeedVaultSigner,
+    currency: String,
+    onSend: () -> Unit,
+    onSwap: () -> Unit,
+    onDismiss: (Boolean) -> Unit,
+) {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var accounts by remember { mutableStateOf<List<SolanaRpc.TokenAccountInfo>?>(null) }
@@ -336,6 +354,16 @@ private fun TokenSheet(h: Holding, owner: String, signer: SeedVaultSigner, curre
                     StatRow(stringResource(R.string.token_mint), shorten(h.mint, 6))
                     accounts?.let { StatRow(stringResource(R.string.token_rent), "+" + fmtSol(it.sumOf { a -> a.lamports }, 5) + " SOL") }
                 }
+            }
+            // The two things you actually want to do with a coin you hold, and
+            // for a long time the one place they were missing. Tapping a holding
+            // opened a card that could copy its address, show it on an explorer
+            // and destroy it, and to send or sell it you had to back out and
+            // start again from the home actions, picking the same coin a second
+            // time from a list. Both open with this coin already chosen.
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostButton(stringResource(R.string.send_btn), Modifier.weight(1f), HIcon.SEND, tint = Halo.mint) { onSend() }
+                GhostButton(stringResource(R.string.swap_btn), Modifier.weight(1f), HIcon.SWAP, tint = Halo.cyan) { onSwap() }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY) {

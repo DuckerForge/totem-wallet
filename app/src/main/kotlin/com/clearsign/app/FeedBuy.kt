@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,7 +67,9 @@ internal fun FeedBuyPanel(
     var decimals by remember(mint) { mutableStateOf<Int?>(null) }
     var balance by remember(owner) { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(mint) {
+    var chartTry by remember(mint) { mutableIntStateOf(0) }
+    LaunchedEffect(mint, chartTry) {
+        Gecko.warmPools(ctx)
         withContext(Dispatchers.IO) {
             px = runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()
             decimals = runCatching { JupiterTokens.byMints(listOf(mint))[mint]?.decimals }.getOrNull()
@@ -160,7 +164,19 @@ internal fun FeedBuyPanel(
         // picture goes. A hole reads as a thing that failed to load, and people
         // tap it again.
         if (series.size <= 2) {
-            Text(stringResource(R.string.feed_no_chart), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+            // Said as what it is, and not as a fact about the coin.
+            //
+            // It used to read "nobody runs a pool deep enough to chart it",
+            // which sounds authoritative and is usually false: measured, a coin
+            // the app had just written that about had twenty pools. The chart
+            // source refuses after a few quick requests, and a refusal arrives
+            // here looking exactly like an absence. We cannot tell the two apart,
+            // so we say the only thing we know, and offer to go and look again.
+            Text(
+                stringResource(R.string.feed_no_chart),
+                style = HaloType.small, color = Halo.cyan, lineHeight = 16.sp,
+                modifier = Modifier.clickable { chartTry++ },
+            )
         }
 
         if (sell) {

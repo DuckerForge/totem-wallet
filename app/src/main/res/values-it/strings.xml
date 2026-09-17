@@ -1709,7 +1709,7 @@
     <string name="feed_round">%1$s SOL messi, %2$s tolti · %3$s</string>
     <string name="chart_now">ora</string>
     <string name="chart_ago">%1$s fa</string>
-    <string name="feed_no_chart">Nessuno storico per questa moneta: non c\'e una piscina abbastanza profonda da farne un grafico.</string>
+    <string name="feed_no_chart">Nessun grafico adesso. Tocca per riprovare.</string>
     <string name="gift_see_receipt">Vedi lo scontrino, poi paga</string>
     <string name="env_review_hint_swap">Questo e quello che firmi. Tieni premuto, poi l\'impronta.</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>

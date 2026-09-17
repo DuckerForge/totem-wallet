@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -137,6 +138,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             }
             ProSwitch(pro) { Settings.setAgentPro(ctx, it); Haptics.tick(ctx) }
         }
+
+        NightCard(refresh)
 
         if (session == null || policy == null) {
             // No budget: one card, one sentence, two ways in. The chat needs no
@@ -628,5 +631,134 @@ private fun TruthBlock(icon: HIcon, title: String, body: String) {
             Text(title, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Halo.ink)
         }
         Text(body, style = HaloType.small, color = Halo.muted)
+    }
+}
+
+/** Twelve hours: long enough to hold a night, short enough that it is still news. */
+private const val NIGHT_MS = 12 * 3600_000L
+
+/**
+ * What happened while you slept.
+ *
+ * A trading desk spends the first hour of the day building context before it
+ * touches anything: what moved overnight, what it is still holding, how much it
+ * is allowed to lose today. On a phone that hour does not exist, and the parts
+ * of it a wallet can honestly answer are already sitting on this device.
+ *
+ * So this costs **nothing**. Four local reads: the ledger file, the positions in
+ * prefs, the crowd file Scout already downloaded, and the budget's own caps. A
+ * morning brief that spent a request every time it was opened would be a brief
+ * people learn not to open, and the quota it eats is the quota the crowd scan
+ * needs.
+ *
+ * It draws nothing when the night was empty. A card that says "nothing happened"
+ * every morning teaches people to scroll past it, and then it is not there on
+ * the morning something did.
+ */
+@Composable
+private fun NightCard(refresh: Int) {
+    val ctx = LocalContext.current
+    val now = remember(refresh) { System.currentTimeMillis() }
+    val since = now - NIGHT_MS
+
+    val moves = remember(refresh) {
+        runCatching { Ledger.range(ctx, since, now).filter { it.kind == "agent" } }
+            .getOrDefault(emptyList()).sortedByDescending { it.at }
+    }
+    val held = remember(refresh) { runCatching { Positions.open(ctx) }.getOrDefault(emptyList()) }
+    // Scout's own file, whatever age it is. Refreshing it here would turn opening
+    // this page into a request, and the page is opened every morning.
+    val crowd = remember(refresh) {
+        runCatching { SeekerFeed.cached(ctx)?.events.orEmpty().filter { it.at >= since && !it.sell } }
+            .getOrDefault(emptyList())
+    }
+    val policy = remember(refresh) { SessionWallet.policy(ctx) }
+    val spent = remember(refresh) { runCatching { SessionWallet.history(ctx).spentLast24hLamports }.getOrDefault(0L) }
+
+    if (moves.isEmpty() && held.isEmpty() && crowd.isEmpty()) return
+
+    val coins = crowd.map { it.mint }.distinct()
+    val people = crowd.map { it.wallet }.distinct().size
+    // Morning or not, the window is the same twelve hours. Only the name changes,
+    // because calling six in the evening "the night" would be a small lie.
+    val hour = remember(refresh) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val title = if (hour in 4..12) R.string.night_title else R.string.night_title_recent
+
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HaloIcon(HIcon.HOURGLASS, Halo.cyan, 15.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(title).uppercase(), style = HaloType.label, color = Halo.cyan)
+            }
+            Text(
+                stringResource(
+                    when {
+                        moves.isNotEmpty() -> R.string.night_worked
+                        coins.isNotEmpty() -> R.string.night_still
+                        else -> R.string.night_quiet
+                    },
+                ),
+                fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, lineHeight = 18.sp,
+            )
+
+            NightRow(stringResource(R.string.night_agent)) {
+                if (moves.isEmpty()) {
+                    Text(stringResource(R.string.night_agent_none), style = HaloType.small, color = Halo.muted)
+                } else {
+                    moves.take(3).forEach { e ->
+                        val out = e.outflows.firstOrNull()
+                        val inn = e.inflows.firstOrNull()
+                        Text(
+                            when {
+                                out != null && inn != null -> fmtUi(kotlin.math.abs(out.uiAmount)) + " " + out.symbol + " → " + inn.symbol
+                                out != null -> "−" + fmtUi(kotlin.math.abs(out.uiAmount)) + " " + out.symbol
+                                inn != null -> "+" + fmtUi(kotlin.math.abs(inn.uiAmount)) + " " + inn.symbol
+                                else -> e.dApp
+                            },
+                            style = HaloType.small, color = Halo.ink, maxLines = 1,
+                        )
+                    }
+                }
+                if (held.isNotEmpty()) Text(stringResource(R.string.night_holding, held.size), style = HaloType.small, color = Halo.muted)
+            }
+
+            if (SeekerFeed.available) NightRow(stringResource(R.string.night_crowd)) {
+                if (coins.isEmpty()) {
+                    Text(stringResource(R.string.night_crowd_none), style = HaloType.small, color = Halo.muted)
+                } else {
+                    Text(stringResource(R.string.night_crowd_line, people, coins.size), style = HaloType.small, color = Halo.ink)
+                    // The three that most different people bought, which is the only
+                    // count that means a crowd: one wallet buying nine times is one
+                    // person changing their mind.
+                    crowd.groupBy { it.mint }
+                        .map { (_, b) -> b.first().symbol to b.map { it.wallet }.distinct().size }
+                        .sortedByDescending { it.second }.take(3)
+                        .forEach { (sym, n) ->
+                            Text("$sym · $n", fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, style = Tabular)
+                        }
+                }
+            }
+
+            policy?.let { p ->
+                val left = (p.dailyLamports - spent).coerceAtLeast(0L)
+                NightRow(stringResource(R.string.night_cap)) {
+                    Text(
+                        if (left == 0L) stringResource(R.string.night_cap_spent)
+                        else stringResource(R.string.night_cap_left, fmtSol(left, 4), fmtSol(p.dailyLamports, 4)),
+                        style = HaloType.small, color = if (left == 0L) Halo.amber else Halo.ink,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A label on the left, the lines it introduces on the right. */
+@Composable
+private fun NightRow(label: String, content: @Composable ColumnScope.() -> Unit) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(label, style = HaloType.label, color = Halo.muted, modifier = Modifier.width(74.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp), content = content)
     }
 }

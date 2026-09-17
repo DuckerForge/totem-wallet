@@ -4,8 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +26,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import kotlin.math.atan2
@@ -57,8 +56,12 @@ import kotlin.math.min
  */
 @Composable
 internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
-    val loop = rememberInfiniteTransition(label = "velum")
-    val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(8200, easing = LinearEasing)), label = "t")
+    // Una volta sola. Un racconto che riparte in continuazione smette di essere
+    // un racconto e diventa uno sfondo che si muove: la prima volta lo guardi,
+    // la terza ti da' fastidio. Arrivato in fondo resta il marchio, fermo.
+    val run = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { run.animateTo(1f, tween(8200, easing = LinearEasing)) }
+    val t = run.value
 
     // Il marchio vero, non un disegno che gli somiglia. E' la stessa immagine che
     // sta sul lanciatore: se un giorno cambia, cambia anche qui da sola.
@@ -80,13 +83,13 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
 
         // La V dei telefoni non e' una V qualsiasi che gli somiglia: e' **quella
         // del marchio**, presa appoggiando le sagome dei due telefoni sopra
-        // l'icona finche' non ci cascano dentro. I due pannelli scuri stanno a
-        // trenta gradi dalla verticale e il vertice e' basso, a 0,82 del lato:
-        // leggerli da un ritaglio di righe li dava molto piu' chiusi, perche' la
-        // parte bassa dell'immagine e' un'altra cosa e sporcava la misura.
+        // l'icona finche' non ci cascano dentro. Il vertice e' basso, a 0,82 del
+        // lato, e i bracci si aprono di 38 gradi dalla verticale: leggerli da un
+        // ritaglio di righe li dava molto piu' chiusi, perche' la parte bassa
+        // dell'immagine e' un'altra cosa e sporcava la misura.
         val vertex = Offset(cx, cy + d * 0.320f)
-        val armX = d * 0.350f
-        val armY = d * 0.606f
+        val armX = d * 0.480f
+        val armY = d * 0.615f
         val leftTip = Offset(cx - armX, vertex.y - armY)
         val rightTip = Offset(cx + armX, vertex.y - armY)
         val armLen = hypot(armX, armY)
@@ -106,7 +109,6 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // tratto cominciava a scivolare **mentre** lo stavo ancora disegnando,
         // quindi si staccava dal telefono a meta' corsa.
         val become = ease(seg(t, 0.62f, 0.76f))
-        val fade = seg(t, 0.94f, 1.00f)
 
         // L'apertura della porta non salta il racconto, lo lascia finire e poi
         // ritira tutto.
@@ -122,7 +124,10 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // leggibili, e sembrano due macchie che galleggiano sul marchio.
         val gone = (1f - become).let { it * it * it }
         val phoneAlpha = land * gone * leaving
-        val markAlpha = become * (1f - fade * 0.55f) * leaving
+        // Niente smorzatura in coda: serviva a nascondere lo stacco quando il
+        // giro ripartiva, e il giro non riparte piu'. Lasciandola, il marchio
+        // restava per sempre al quarantacinque per cento.
+        val markAlpha = become * leaving
         val glow = spark * (1f - seg(t, 0.80f, 0.94f) * 0.6f)
 
         // --- il respiro dietro ---------------------------------------------
@@ -153,7 +158,12 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         if (phoneAlpha > 0.01f) {
             listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
                 val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
-                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark)
+                // Quello di sinistra e' lo specchio dell'altro. Il dorso di un
+                // Seeker non e' simmetrico, l'isola sta in un angolo solo:
+                // disegnandoli uguali un'isola finiva all'esterno della V e
+                // l'altra all'interno, e due telefoni messi cosi' sembrano
+                // inclinati in modo diverso anche quando l'angolo e' lo stesso.
+                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark, mirror = side < 0f)
             }
         }
 
@@ -255,12 +265,21 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
  * Di dorso e non di fronte: davanti, a questa misura, e' un rettangolo nero che
  * potrebbe essere di chiunque.
  */
-private fun DrawScope.phone(center: Offset, len: Float, wide: Float, angle: Float, alpha: Float, glow: Float) {
+private fun DrawScope.phone(
+    center: Offset,
+    len: Float,
+    wide: Float,
+    angle: Float,
+    alpha: Float,
+    glow: Float,
+    mirror: Boolean = false,
+) {
     if (alpha <= 0.01f) return
     // Il corpo si scalda quando il tratto passa: e' l'unica cosa che lega i due
     // oggetti invece di lasciarli uno accanto all'altro.
     val body = lerp(Color(0xFF24243A), NEON_MID, 0.18f * glow)
     rotate(angle, center) {
+        scale(if (mirror) -1f else 1f, 1f, center) {
         drawPhone(
             x = center.x - wide / 2f,
             y = center.y - len / 2f,
@@ -272,6 +291,7 @@ private fun DrawScope.phone(center: Offset, len: Float, wide: Float, angle: Floa
             ink = Color(0xFF12121C).copy(alpha = alpha),
             glass = Color(0xFF0E0E18).copy(alpha = alpha),
         )
+        }
     }
 }
 

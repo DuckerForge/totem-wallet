@@ -116,8 +116,22 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.sin
 
-fun deviceLocaleTag(): String = when (Locale.getDefault().language) {
-    "it" -> "it"; "es" -> "es"; else -> "en"
+/**
+ * In che lingua parla l'app, non in che lingua parla il telefono.
+ *
+ * Chiedeva `Locale.getDefault()`, cioe' il sistema. Android pero' lascia
+ * scegliere la lingua **per singola app**, e allora le due si separano: schermi
+ * in inglese perche' le risorse rispondono in inglese, e in mezzo una riga
+ * italiana dello scontrino perche' il motore aveva chiesto al sistema. Vista dal
+ * vivo: "L'agente ha dichiarato..." dentro un'app tutta inglese.
+ *
+ * `getAdjustedDefault` e' la lista che Android usa davvero per risolvere le
+ * risorse, sistemata con la scelta per app davanti. La stessa che decide le
+ * scritte decide anche le frasi dello scontrino.
+ */
+fun deviceLocaleTag(): String {
+    val l = androidx.core.os.LocaleListCompat.getAdjustedDefault()[0] ?: Locale.getDefault()
+    return when (l.language) { "it" -> "it"; "es" -> "es"; else -> "en" }
 }
 
 private fun trustColor(t: TrustLevel) = when (t) {

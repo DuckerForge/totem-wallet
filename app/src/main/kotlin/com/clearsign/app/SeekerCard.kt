@@ -474,7 +474,7 @@ private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Un
             }
             // Only once there is somebody to put in it.
             if (follows > 0) {
-                ModeChip(stringResource(R.string.crowd_tab_followed, follows), selected == ScoutTab.FOLLOWED, Halo.amber, w) {
+                ModeChip(stringResource(R.string.crowd_tab_followed_short), selected == ScoutTab.FOLLOWED, Halo.amber, w) {
                     Haptics.tick(ctx); onPick(ScoutTab.FOLLOWED)
                 }
             }

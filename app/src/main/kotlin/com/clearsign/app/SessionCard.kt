@@ -72,7 +72,14 @@ internal fun ModeChip(label: String, on: Boolean, tint: Color, modifier: Modifie
             .clickable { onClick() }.padding(vertical = 9.dp, horizontal = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = if (on) tint else Halo.muted, maxLines = 1)
+        // Centred and told not to wrap. Left to itself a label wider than its
+        // chip is clipped on the right, and a word missing its last character
+        // does not read as clipped: it reads as crooked.
+        Text(
+            label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp,
+            color = if (on) tint else Halo.muted, maxLines = 1, softWrap = false,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 

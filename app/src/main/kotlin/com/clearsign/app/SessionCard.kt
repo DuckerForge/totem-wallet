@@ -599,8 +599,32 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
 
             Text(stringResource(R.string.agent_rules_body), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted, lineHeight = 18.sp)
 
-            SliderRow(stringResource(R.string.agent_per_tx), sol(perTx), perTx, 0.01f..1f, Halo.mint) { perTx = it }
-            SliderRow(stringResource(R.string.agent_daily), sol(daily), daily, 0.01f..1f, Halo.mint) { daily = it }
+            // Ogni cursore dice anche che fetta della paghetta e', e dove finisce.
+            //
+            // Erano quattro numeri in SOL su una paghetta da diciassette dollari:
+            // senza un riferimento non si capisce ne' quanto sia tanto, ne'
+            // perche' il cursore si fermi. Si ferma all'intero della paghetta, e
+            // adesso e' scritto: piu' di quello che hai non puo' uscire.
+            SliderRow(
+                stringResource(R.string.agent_per_tx),
+                sol(perTx) + "  ·  " + (perTx * 100).toInt() + "%",
+                perTx, 0.01f..1f, Halo.mint,
+            ) { perTx = it }
+            SliderRow(
+                stringResource(R.string.agent_daily),
+                sol(daily) + "  ·  " + (daily * 100).toInt() + "%",
+                daily, 0.01f..1f, Halo.mint,
+            ) { daily = it }
+            // Quanto della giornata e' gia' andato, e la regola che spiega perche'
+            // spesso e' meno di quanto sembra.
+            run {
+                val spent = remember { runCatching { SessionWallet.history(ctx).spentLast24hLamports }.getOrDefault(0L) }
+                Text(
+                    stringResource(R.string.rules_daily_used, fmtSol(spent, 4), fmtSol((daily * cap).toLong(), 4)),
+                    style = HaloType.small, color = if (spent >= (daily * cap).toLong()) Halo.amber else Halo.muted, lineHeight = 16.sp,
+                )
+                Text(stringResource(R.string.rules_daily_roundtrip), style = HaloType.small, color = Halo.mint, lineHeight = 16.sp)
+            }
             // The arithmetic nobody does in their head, said out loud before it
             // bites. A daily cap of 0.047 with a slice of 0.031 is one move a day
             // and a half; the second one asks for a signature the agent cannot

@@ -1704,6 +1704,7 @@
     <string name="night_cap_spent">The daily cap is spent. From here it asks you for every move.</string>
     <string name="hero_closed">%1$d coins</string>
     <string name="hero_closed_defi">%1$d coins · %2$d in DeFi</string>
+    <string name="gift_review_hint">This is what you will sign: your wallet funds a fresh key, and the link carries that key. Hold the button, then the fingerprint.</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

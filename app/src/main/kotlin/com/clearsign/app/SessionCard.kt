@@ -192,7 +192,7 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
             onBack = { if (state == null) { review = null; prepared = null } },
         ) {
             run {
-                SignReceiptBody(r.receipt, null)
+                Column { SignReceiptBody(r.receipt, null, hero = false) }
                 state?.let { Working(it) }
                 error?.let { Banner(it, Halo.red, HIcon.WARNING) }
                 if (state == null) {
@@ -494,7 +494,7 @@ internal fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: Session
             hint = stringResource(R.string.env_review_hint),
             onBack = { if (busy == null) review = null },
         ) {
-            SignReceiptBody(r.receipt, null)
+            Column { SignReceiptBody(r.receipt, null, hero = false) }
             error?.let { Banner(it, Halo.red, HIcon.WARNING) }
             if (busy != null) {
                 Working(busy!!)

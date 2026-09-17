@@ -913,6 +913,16 @@ internal fun SignReceiptBody(
      * it more than once, and "129% of the total" is not a fact anybody can use).
      */
     plain: Boolean = false,
+    /**
+     * Draw the headline amount at the top.
+     *
+     * Off where the screen has already said the number: PayOverlay carries a
+     * title and a line of its own above this, and under them "YOU PAY −0.005005"
+     * landed on top of the same amount drawn again in the map and again in the
+     * summary. Three times on one page is not emphasis, it is noise, and the eye
+     * stops trusting which one is the real one.
+     */
+    hero: Boolean = true,
 ) {
     val danger = r.blocksApproval
     var sheetAddr by remember { mutableStateOf<NodeDest?>(null) }
@@ -957,7 +967,7 @@ internal fun SignReceiptBody(
     if (style == ReceiptStyle.PAPER) { PaperReceipt(r, dests, danger, backCoin) { sheetAddr = it } }
     else if (style == ReceiptStyle.TERMINAL) { TerminalReceipt(r, dests, danger, backCoin) { sheetAddr = it } }
     else {
-    Box(Modifier.staggeredEntrance(0, animKey)) {
+    if (hero) Box(Modifier.staggeredEntrance(0, animKey)) {
         if (isSwap) SwapFlowHero(r, danger, dests, outCoin, backCoin, backSymbol, pair) { d -> if (d.address != null) sheetAddr = d }
         else HeroPay(r, danger)
     }

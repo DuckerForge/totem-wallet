@@ -37,6 +37,12 @@ import androidx.compose.ui.window.DialogProperties
  * pattern was already right in one place, the budget card, and the comment
  * there said why. This is that, lifted out so every sheet gets it.
  *
+ * Wrap the receipt in a bare `Column` when you pass it in. It carries its own
+ * spacing between its parts, and dropping it straight into this one's arrangement
+ * adds that gap again to every piece of it: the page comes out airy and twice as
+ * long as it needs to be, and the hold ends up below the fold again, which is the
+ * problem this was built to fix.
+ *
  * Give it the title, the one line under it, and whatever the sheet wants below
  * the receipt: the hold, what it is doing, what went wrong. The way out is
  * always here, at the bottom, and back means back to the form rather than out
@@ -55,8 +61,8 @@ internal fun PayOverlay(
     ) {
         Column(
             Modifier.fillMaxSize().background(Halo.ground2).statusBarsPadding().navigationBarsPadding()
-                .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(title, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
             hint?.let { Text(it, style = HaloType.small, color = Halo.muted, lineHeight = 17.sp) }

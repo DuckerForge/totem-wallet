@@ -174,10 +174,10 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
     review?.let { r ->
         PayOverlay(
             title = stringResource(R.string.gift_title),
-            hint = stringResource(R.string.env_review_hint),
+            hint = stringResource(R.string.gift_review_hint),
             onBack = { if (!busy) review = null },
         ) {
-            SignReceiptBody(r.receipt, null)
+            Column { SignReceiptBody(r.receipt, null, hero = false) }
             error?.let { Banner(it, Halo.red, HIcon.WARNING) }
             if (busy) {
                 Working(stringResource(R.string.gift_creating))

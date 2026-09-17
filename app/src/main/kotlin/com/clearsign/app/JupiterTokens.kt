@@ -69,6 +69,60 @@ object JupiterTokens {
 
     fun cached(mint: String): Tok? = cache[mint]
 
+    // ---- l'archivio e il disco -------------------------------------------
+    //
+    // Nome, simbolo, decimali e icona di una moneta non cambiano mai, e finora
+    // questa mappa viveva solo in memoria: ogni riavvio dell'app ricominciava da
+    // zero e richiedeva tutto. Nessuno paga in denaro, si paga in limiti di
+    // frequenza, ed e' la stessa quota che serve a mostrare un prezzo o un
+    // grafico mentre qualcuno sta guardando.
+    //
+    // Due passi, dal piu' economico. Il disco: quello che questo telefono ha
+    // gia' visto non si richiede mai piu'. L'archivio condiviso: quello che
+    // questo telefono non ha mai visto ma qualcun altro si'. Solo se manca da
+    // tutte e due si disturba Jupiter.
+    @Volatile private var diskFile: File? = null
+
+    fun warmDisk(ctx: Context) {
+        if (diskFile != null) return
+        val f = File(ctx.filesDir, "tokens.json")
+        diskFile = f
+        runCatching {
+            if (!f.exists()) return
+            parse(JSONArray(f.readText())).forEach { cache[it.mint] = it }
+        }
+    }
+
+    private fun saveDisk() {
+        val f = diskFile ?: return
+        runCatching { f.writeText(rawOf(cache.values.toList())) }
+    }
+
+    /**
+     * Quello che l'archivio sa: come si chiama e quante cifre ha, nient'altro.
+     *
+     * Niente prezzo, niente liquidita', niente giudizio sulla moneta. Un token
+     * che arriva da qui ha zero liquidita' e non verificato, che e' esattamente
+     * come appare una moneta sconosciuta: chi la deve giudicare la trattera' col
+     * sospetto che merita, invece di fidarsi di un dato che non abbiamo.
+     */
+    private fun fromArchive(mints: List<String>): List<Tok> {
+        val base = BuildConfig.CROWD_URL.takeIf { it.isNotBlank() } ?: return emptyList()
+        val body = runCatching {
+            val c = (java.net.URL(base.trimEnd('/') + "/?t=" + mints.take(20).joinToString(",")).openConnection() as java.net.HttpURLConnection)
+                .apply { connectTimeout = 5_000; readTimeout = 10_000; setRequestProperty("Accept", "application/json") }
+            if (c.responseCode !in 200..299) null else c.inputStream.bufferedReader().use { it.readText() }
+        }.getOrNull() ?: return emptyList()
+        return runCatching {
+            val o = org.json.JSONObject(body)
+            o.keys().asSequence().mapNotNull { k ->
+                val j = o.optJSONObject(k) ?: return@mapNotNull null
+                val sym = j.optString("s").ifEmpty { return@mapNotNull null }
+                Tok(k, sym, j.optString("n"), j.optString("i").ifEmpty { null }, j.optInt("d"))
+            }.toList()
+        }.getOrDefault(emptyList())
+    }
+
     /**
      * The popular list, by Jupiter's 24h organic score. Served from memory, then
      * from disk (a day old at most), then from the network. Blocking: call on IO.
@@ -102,7 +156,20 @@ object JupiterTokens {
     fun byMints(mints: List<String>): Map<String, Tok> {
         val todo = mints.distinct().filter { it != com.clearsign.core.NATIVE_SOL_MINT }
         if (todo.isEmpty()) return emptyMap()
-        return todo.chunked(100).flatMap { chunk -> fetch("/search?query=" + chunk.joinToString(",")) }.associateBy { it.mint }
+        val out = HashMap<String, Tok>()
+        // Il disco, gia' in memoria dopo warmDisk.
+        val unknown = todo.filter { m -> cache[m]?.also { out[m] = it } == null }
+        if (unknown.isEmpty()) return out
+        // L'archivio condiviso, per quelle che questo telefono non ha mai visto.
+        fromArchive(unknown).forEach { out[it.mint] = it; cache[it.mint] = it }
+        val still = unknown.filter { it !in out }
+        if (still.isNotEmpty()) {
+            still.chunked(100)
+                .flatMap { chunk -> fetch("/search?query=" + chunk.joinToString(",")) }
+                .forEach { out[it.mint] = it; cache[it.mint] = it }
+        }
+        saveDisk()
+        return out
     }
 
     /**

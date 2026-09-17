@@ -521,6 +521,47 @@ const WARM_MAX = 5;
 /** La sveglia che scalda invece di scansionare, sfasata di cinque minuti. */
 const WARM_CRON = "5-59/10 * * * *";
 
+/**
+ * Nome, simbolo, decimali e icona di una moneta: uno chiede, tutti sanno.
+ *
+ * Sono dati che non cambiano mai, e finora ogni telefono li chiedeva a Jupiter
+ * per conto suo. Nessuno paga in denaro, si paga in limiti di frequenza, ed e'
+ * la stessa quota che serve a mostrare un grafico o un prezzo mentre qualcuno
+ * sta guardando.
+ *
+ * Una lettura per moneta dall'archivio, una chiamata sola a Jupiter per tutte
+ * quelle che mancano, e una scrittura sola per rimetterle a posto. La prima
+ * persona che apre una moneta la paga; tutte le altre no, per sempre.
+ */
+const TOK_MAX = 20;
+
+async function tokensOf(env, mints) {
+  const want = mints.slice(0, TOK_MAX);
+  const out = {};
+  const missing = [];
+  for (const m of want) {
+    const got = fbOn(env) ? await fbGet(env, "tokens/" + m).catch(() => null) : null;
+    if (got) { try { out[m] = JSON.parse(got); } catch (_) { missing.push(m); } }
+    else missing.push(m);
+  }
+  if (missing.length) {
+    const r = await fetch("https://lite-api.jup.ag/tokens/v2/search?query=" + missing.join(","));
+    const list = r.ok ? await r.json().catch(() => null) : null;
+    const fresh = {};
+    for (const t of list || []) {
+      if (!t || !t.id) continue;
+      // Solo quello che non cambia. I prezzi non stanno qui: un prezzo di
+      // mezz'ora fa e' peggio di nessun prezzo.
+      fresh[t.id] = { s: t.symbol || "", n: t.name || "", d: t.decimals ?? 0, i: t.icon || null };
+      out[t.id] = fresh[t.id];
+    }
+    if (fbOn(env) && Object.keys(fresh).length) {
+      await fetch(fbUrl(env, "tokens"), { method: "PATCH", body: JSON.stringify(fresh) }).catch(() => {});
+    }
+  }
+  return out;
+}
+
 export default {
   // Due sveglie: la scansione ai dieci, e cinque minuti dopo le facce da
   // scaldare. Separate perché le cinquanta chiamate in uscita del piano
@@ -538,6 +579,19 @@ export default {
         headers: {
           "content-type": "application/json; charset=utf-8",
           "cache-control": "public, max-age=900",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
+    // Le monete: nome, simbolo, decimali, icona. Niente prezzi.
+    const toks = url.searchParams.get("t");
+    if (toks) {
+      const mints = toks.split(",").filter((m) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m));
+      const got = mints.length ? await tokensOf(env, mints).catch(() => ({})) : {};
+      return new Response(JSON.stringify(got), {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=86400",
           "access-control-allow-origin": "*",
         },
       });

@@ -194,7 +194,23 @@ object PolicyEngine {
                 listOfNotNull(receipt.primaryRecipient)
             for (a in payees.distinct()) {
                 if (a in policy.allowedDestinations || a in policy.allowedPrograms) continue
-                return Decision.Refuse("destination", if (it) "${short(a)} non è fra i destinatari ammessi" else "${short(a)} is not an allowed destination")
+                // Quando esce qualcosa e torna indietro un'altra moneta, questo
+                // rifiuto e' quasi sempre una rotta, non un destinatario: la
+                // piscina che incassa uno scambio non sta in nessuna lista di
+                // destinatari ne' ci deve stare, e il controllo si sarebbe
+                // saltato se la rotta fosse passata da uno scambio ammesso.
+                //
+                // Il codice del rifiuto resta "destination", perche' e' quello
+                // che protegge dai trasferimenti travestiti da scambio e le prove
+                // lo mettono nero su bianco. Ma il messaggio adesso dice anche
+                // quali programmi ha visto passare, perche' senza quello l'unico
+                // modo di far tornare una vendita sarebbe mettere l'id di un
+                // programma in una lista di sicurezza tirando a indovinare, ed e'
+                // esattamente cio' che questo collare esiste per non fare.
+                val swapShaped = outs.isNotEmpty() && ins.any { d -> outs.none { o -> o.mint == d.mint } }
+                val seen = if (!swapShaped) "" else programs.filter { p -> p !in AgentPolicy.BASE_PROGRAMS }.take(2).joinToString(", ") { short(it) }
+                val extra = if (seen.isEmpty()) "" else if (it) " (rotta: $seen)" else " (route: $seen)"
+                return Decision.Refuse("destination", (if (it) "${short(a)} non è fra i destinatari ammessi" else "${short(a)} is not an allowed destination") + extra)
             }
         }
 

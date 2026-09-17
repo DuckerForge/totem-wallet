@@ -118,16 +118,39 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
         onDispose { Voice.stop() }
     }
     val scanning = stringResource(R.string.trace_scanning)
+    /**
+     * La voce dice le cose che contano, non tutte.
+     *
+     * Leggeva ogni riga trovata o fatta. Le righe arrivano piu' in fretta di
+     * quanto una voce parli, quindi partiva, si fermava a meta', ripartiva su
+     * un'altra: dava l'impressione di una macchina che balbetta invece di una
+     * che lavora. E leggere venti righe non e' venti volte piu' informativo di
+     * leggerne una.
+     *
+     * Quindi: le cose fatte coi soldi si dicono sempre, perche' sono quelle che
+     * uno vorrebbe sentire anche dall'altra stanza. Del resto si dice una riga
+     * ogni dodici secondi, l'ultima arrivata, e le altre si guardano e basta.
+     * Una voce che tace mentre lo schermo scorre non sta nascondendo niente: sta
+     * lasciando leggere.
+     */
     LaunchedEffect(voice) {
         if (!voice) return@LaunchedEffect
         var seen = AgentTrace.lines.size
+        var lastSaid = 0L
         while (true) {
             val lines = AgentTrace.lines
             if (lines.size < seen) seen = 0
-            lines.drop(seen).forEach { l ->
-                if (l.kind == AgentTrace.Kind.ACTED || l.kind == AgentTrace.Kind.FOUND || l.text == scanning) Voice.add(ctx, l.text)
-            }
+            val fresh = lines.drop(seen)
             seen = lines.size
+            // Tutto quello che ha mosso dei soldi, sempre e in ordine.
+            fresh.filter { it.kind == AgentTrace.Kind.ACTED }.forEach { Voice.add(ctx, it.text) }
+            // Del resto, una sola, e non piu' spesso di una ogni dodici secondi.
+            val rest = fresh.lastOrNull { it.kind != AgentTrace.Kind.ACTED && (it.kind == AgentTrace.Kind.FOUND || it.kind == AgentTrace.Kind.REFUSED || it.text == scanning) }
+            val now = System.currentTimeMillis()
+            if (rest != null && now - lastSaid > 12_000L) {
+                Voice.add(ctx, rest.text)
+                lastSaid = now
+            }
             delay(500)
         }
     }
@@ -231,7 +254,17 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                         Row {
                             Text(stringResource(R.string.eyes_next_look, (lookLeft / 1000).toString()), fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint, style = Tabular)
                             Spacer(Modifier.width(10.dp))
-                            if (hunted > 0L) Text(
+                            // Pieno vuol dire che non caccia, e dirgli quando
+                            // caccia la prossima volta era una promessa che non
+                            // aveva intenzione di mantenere: il ciclo si ferma da
+                            // solo quando i posti sono occupati e ricompra solo
+                            // dopo che ha venduto. Adesso lo dice invece di
+                            // mostrare un conto alla rovescia verso niente.
+                            val full = open.size >= cfg.maxPositions
+                            if (full) Text(
+                                stringResource(R.string.eyes_full, open.size, cfg.maxPositions),
+                                fontFamily = Mono, fontSize = 10.5.sp, color = Halo.amber, style = Tabular,
+                            ) else if (hunted > 0L) Text(
                                 stringResource(R.string.eyes_next_hunt, String.format(Locale.ROOT, "%d:%02d", huntLeft / 60_000, huntLeft / 1000 % 60)),
                                 fontFamily = Mono, fontSize = 10.5.sp, color = Halo.cyan, style = Tabular,
                             )

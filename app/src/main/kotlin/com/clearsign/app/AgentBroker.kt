@@ -196,7 +196,11 @@ object AgentBroker {
                 own
             }
         }
-        SessionWallet.recordSpend(ctx, valueLamports)
+        // Uno scambio che torna a casa non consuma la giornata: vedi staysInPocket.
+        val pol = SessionWallet.policy(ctx)
+        if (pol == null || !com.clearsign.core.staysInPocket(receipt, pol)) {
+            SessionWallet.recordSpend(ctx, valueLamports)
+        }
         // The book of what the agent is holding, and what it paid. Kept here and
         // not in the loop so a coin bought or sold from the chat is tracked too.
         runCatching {

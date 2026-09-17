@@ -24,7 +24,7 @@ object BrainTools {
         .put(
             tool(
                 "send_sol",
-                "Propose sending SOL from the budget. Apex decides: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final — explain it to the user, never retry the same thing another way.",
+                "Propose sending SOL from the budget. Velum decides: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final — explain it to the user, never retry the same thing another way.",
                 JSONObject()
                     .put("to", prop("string", "Recipient address, base58. It must be one the user allowed."))
                     .put("amount", prop("number", "Amount in SOL."))
@@ -50,7 +50,7 @@ object BrainTools {
         .put(
             tool(
                 "market_search",
-                "Look up a coin by name, symbol or mint address. Returns what the project actually is, its market cap rank, how it moved over 24h, a week, a month and a year, how much liquidity it has, whether Jupiter verified it, and Apex\u2019s own safety grade with the reasons. A missing \"about\" means nobody has listed it, which for a brand new coin is normal and for an old one is worth saying. Use it before proposing any swap into something the user does not already hold, and tell them what you found.",
+                "Look up a coin by name, symbol or mint address. Returns what the project actually is, its market cap rank, how it moved over 24h, a week, a month and a year, how much liquidity it has, whether Jupiter verified it, and Velum\u2019s own safety grade with the reasons. A missing \"about\" means nobody has listed it, which for a brand new coin is normal and for an old one is worth saying. Use it before proposing any swap into something the user does not already hold, and tell them what you found.",
                 JSONObject().put("query", prop("string", "A name, a symbol, or a mint address.")),
                 listOf("query"),
             ),
@@ -470,7 +470,7 @@ object BrainTools {
         return verdict.toJson().put(
             "what_it_means",
             when (verdict.code) {
-                "signed_silently" -> "Inside the rules: Apex signed and sent it. Tell the user it is done and give the signature."
+                "signed_silently" -> "Inside the rules: Velum signed and sent it. Tell the user it is done and give the signature."
                 "confirmed_by_user" -> "The rules asked for a person; they approved with their fingerprint."
                 "refused" -> "Outside the rules: nothing was signed. Explain the reason. Do not try another route to the same thing."
                 else -> "Nobody answered in time. The request expired; ask whether to try again."

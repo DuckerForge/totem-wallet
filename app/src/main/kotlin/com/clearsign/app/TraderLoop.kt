@@ -66,6 +66,18 @@ object TraderLoop {
         val takeProfitPct: Int = 30,
         val stopLossPct: Int = 15,
         val slicePercent: Int = 80,
+        /**
+         * La commissione della moneta che si accetta, in percento. Zero: nessuna.
+         *
+         * Lo scudo di Jupiter ferma su qualsiasi avviso critico, e marca critica
+         * anche la commissione che un token trattiene a ogni trasferimento.
+         * Visto il 17/09: cinque monete esaminate di fila, quattro scartate per
+         * una commissione fra l'uno e il tre per cento, e l'agente che non
+         * comprava niente senza che si potesse fare nulla al riguardo. Una
+         * commissione non e' una truffa, e' un costo: chi mette i soldi decide se
+         * il costo gli sta bene. Tutto il resto dello scudo continua a fermare.
+         */
+        val maxFeePct: Int = 0,
     ) {
         // One lane. There used to be two and the agent asked which; on Solana
         // the honest answer is that the wild one is where the money goes to die,
@@ -84,6 +96,7 @@ object TraderLoop {
             takeProfitPct = p.getInt("tp", 30),
             stopLossPct = p.getInt("sl", 15),
             slicePercent = p.getInt("slice", 80),
+            maxFeePct = p.getInt("fee", 0),
         )
     }
 
@@ -91,7 +104,7 @@ object TraderLoop {
         prefs(ctx).edit()
             .putBoolean("on", c.on).putBoolean("bold", c.bold)
             .putInt("max", c.maxPositions).putInt("tp", c.takeProfitPct)
-            .putInt("sl", c.stopLossPct).putInt("slice", c.slicePercent)
+            .putInt("sl", c.stopLossPct).putInt("slice", c.slicePercent).putInt("fee", c.maxFeePct)
             .apply()
     }
 
@@ -660,9 +673,17 @@ object TraderLoop {
             }
             // Jupiter's own shield: critical stops, a warning is said, info is nothing.
             val shield = withContext(Dispatchers.IO) { runCatching { TokenShield.warnings(t.mint) }.getOrNull() }
-            shield?.firstOrNull { it.critical }?.let { w ->
-                AgentTrace.say(ctx.getString(R.string.trace_shield_stop, t.symbol, w.message), AgentTrace.Kind.REFUSED)
+            // Una commissione dentro la soglia scelta si dice e si passa; tutto
+            // il resto del critico ferma come prima.
+            val stopper = shield?.firstOrNull { w ->
+                w.critical && (w.transferFeePct?.let { it > cfg.maxFeePct } ?: true)
+            }
+            if (stopper != null) {
+                AgentTrace.say(ctx.getString(R.string.trace_shield_stop, t.symbol, stopper.message), AgentTrace.Kind.REFUSED)
                 continue
+            }
+            shield?.firstOrNull { it.critical && it.transferFeePct != null }?.let { w ->
+                AgentTrace.say(ctx.getString(R.string.trace_fee_ok, t.symbol, w.transferFeePct?.toInt() ?: 0, cfg.maxFeePct))
             }
             shield?.firstOrNull { it.warning }?.let { w -> AgentTrace.say(ctx.getString(R.string.trace_shield_warn, t.symbol, w.message)) }
 

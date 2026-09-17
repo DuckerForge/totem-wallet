@@ -132,7 +132,33 @@ object Gecko {
         return out.asReversed()
     }
 
+    /**
+     * One request at a time, and not too close together.
+     *
+     * Measured against the real thing: five calls in a row and it answers 429,
+     * and it stays refused for a while after. Nothing here needs to be fast, and
+     * two things ask at once — a coin chart somebody opened, and the balance
+     * curve filling itself in behind the home buttons — so without a gate the
+     * background work spends the whole allowance and the chart a person is
+     * waiting for gets the refusal.
+     *
+     * A lock and a gap. Everything here already runs on IO threads, so a blocked
+     * one costs nothing but itself.
+     */
+    private val gate = Any()
+    @Volatile private var lastCall = 0L
+    private const val GAP_MS = 2200L
+
+    private fun pace() {
+        synchronized(gate) {
+            val since = System.currentTimeMillis() - lastCall
+            if (since in 0 until GAP_MS) runCatching { Thread.sleep(GAP_MS - since) }
+            lastCall = System.currentTimeMillis()
+        }
+    }
+
     private fun get(url: String): JSONObject? = try {
+        pace()
         val c = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 6000; readTimeout = 12000
             setRequestProperty("Accept", "application/json")

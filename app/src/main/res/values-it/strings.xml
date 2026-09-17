@@ -1211,7 +1211,7 @@
     <string name="env_coins_sell">Vendile e chiudi</string>
     <string name="env_coins_move">Spostale sul mio conto e chiudi</string>
     <string name="env_stuck">Non sono riuscito a spostare %1$s. Non ho chiuso niente.</string>
-        <string name="crowd_window">ultime 24 ore</string>
+        <string name="crowd_window">ultimi 3 giorni</string>
     <string name="crowd_basis">Contati sui portafogli che lo scanner è riuscito a guardare in quelle ore, qualche centinaio dei %1$d che segue. La maggior parte dei Seeker non si muove da mesi.</string>
     <string name="crowd_more">E altre %1$d monete sotto queste.</string>
     <string name="crowd_bias">Le balene si rileggono ogni dieci minuti e tutti gli altri ogni ora e venti, quindi l\'acquisto di una balena si prende più facilmente. Il numero di balene su una riga dice anche come guardiamo noi, non solo chi ha comprato.</string>

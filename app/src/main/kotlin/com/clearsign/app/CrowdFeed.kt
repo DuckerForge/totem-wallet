@@ -6,6 +6,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
@@ -336,93 +337,77 @@ private fun ago(at: Long, now: Long): String {
  * The second before the crowd arrives.
  *
  * It was a line of grey text saying it was looking, which is the truthful and
- * completely forgettable version. This page is a scanner pointed at a hundred
- * and twenty thousand phones, and for one second a year it gets to look like
- * one. The sweep is drawn, not loaded: four rings, a cross, a beam with a
- * trail, and contacts that light as the beam crosses them and fade behind it.
+ * completely forgettable version. Then it was a radar, which was the wrong
+ * instrument: a radar sweeps a circle, and this page is a list that fills from
+ * the top down.
  *
- * The contacts sit at fixed angles chosen once, so the thing reads as an
- * instrument finding something rather than as noise. Nothing here means
- * anything — there is no data yet, that is the point — and nothing here is
- * shaped like a number, so it cannot be mistaken for one.
+ * So it is a tube instead. Scanlines across a dark screen, and a bar rolling
+ * down it the way an old set rolls when the picture has not locked yet, with
+ * the bright edge at the bottom where the beam is. The app already owns this
+ * look: the terminal receipt and the CRT switch in settings come from the same
+ * place, so the wait belongs to the product instead of visiting it.
+ *
+ * Drawn, not loaded. No image, no file, nothing added to the APK. And nothing
+ * in it is shaped like a number, because there is no data yet: that is the
+ * whole point of the moment, and the screen should not pretend otherwise.
  */
 @Composable
 private fun ScouterWait() {
-    Column(
-        Modifier.fillMaxWidth().padding(vertical = 26.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+    val t = rememberInfiniteTransition(label = "tube")
+    val roll by t.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(1500, easing = LinearEasing)),
+        label = "roll",
+    )
+    Box(
+        Modifier.fillMaxWidth().height(118.dp).clip(rs(14))
+            .background(Halo.ground)
+            .border(1.dp, Halo.cyan.copy(alpha = 0.22f), rs(14)),
+        contentAlignment = Alignment.Center,
     ) {
-        val t = rememberInfiniteTransition(label = "scouter")
-        val beam by t.animateFloat(
-            0f, 360f,
-            infiniteRepeatable(tween(1700, easing = LinearEasing)),
-            label = "beam",
-        )
-        // Chosen once and kept: a radar whose contacts jump every frame is
-        // static, and static is what a broken instrument looks like.
-        val blips = remember {
-            val r = kotlin.random.Random(11)
-            List(6) { Triple(r.nextFloat() * 360f, 0.30f + r.nextFloat() * 0.58f, 1.6f + r.nextFloat() * 1.9f) }
-        }
-        Canvas(Modifier.size(132.dp)) {
-            val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-            val rad = size.minDimension / 2f * 0.84f
-            val box = androidx.compose.ui.geometry.Size(rad * 2, rad * 2)
-            val at = androidx.compose.ui.geometry.Offset(c.x - rad, c.y - rad)
-
-            for (k in 1..4) {
-                drawCircle(Halo.cyan.copy(alpha = if (k == 4) 0.34f else 0.13f), rad * k / 4f, c, style = Stroke(1f))
-            }
-            drawLine(Halo.cyan.copy(alpha = 0.12f), androidx.compose.ui.geometry.Offset(c.x - rad, c.y), androidx.compose.ui.geometry.Offset(c.x + rad, c.y), 1f)
-            drawLine(Halo.cyan.copy(alpha = 0.12f), androidx.compose.ui.geometry.Offset(c.x, c.y - rad), androidx.compose.ui.geometry.Offset(c.x, c.y + rad), 1f)
-            // Ticks on the outer ring, so the circle reads as a dial.
-            for (k in 0 until 24) {
-                val a = k * 15.0 * Math.PI / 180.0
-                val long = k % 6 == 0
-                val r0 = rad * (if (long) 0.90f else 0.95f)
+        Canvas(Modifier.fillMaxSize()) {
+            // The lines of the raster. Three pixels apart is where it stops
+            // looking like a texture and starts looking like a screen.
+            var y = 0f
+            while (y < size.height) {
                 drawLine(
-                    Halo.cyan.copy(alpha = if (long) 0.40f else 0.18f),
-                    androidx.compose.ui.geometry.Offset(c.x + (r0 * kotlin.math.cos(a)).toFloat(), c.y + (r0 * kotlin.math.sin(a)).toFloat()),
-                    androidx.compose.ui.geometry.Offset(c.x + (rad * kotlin.math.cos(a)).toFloat(), c.y + (rad * kotlin.math.sin(a)).toFloat()),
+                    Halo.cyan.copy(alpha = 0.055f),
+                    androidx.compose.ui.geometry.Offset(0f, y),
+                    androidx.compose.ui.geometry.Offset(size.width, y),
                     1f,
                 )
+                y += 3f
             }
-            // The beam, as a stack of thin wedges fading behind the leading edge.
-            // A sweep gradient was the obvious way and it came out flat: the trail
-            // has to die over about seventy degrees, not over the whole circle.
-            val steps = 26
-            for (i in 0 until steps) {
-                drawArc(
-                    Halo.cyan.copy(alpha = 0.30f * (1f - i / steps.toFloat())),
-                    startAngle = beam - i * 2.7f, sweepAngle = 2.9f, useCenter = true,
-                    topLeft = at, size = box,
-                )
-            }
-            val br = beam * Math.PI / 180.0
-            drawLine(
-                Halo.cyan.copy(alpha = 0.85f), c,
-                androidx.compose.ui.geometry.Offset(c.x + (rad * kotlin.math.cos(br)).toFloat(), c.y + (rad * kotlin.math.sin(br)).toFloat()),
-                1.6f,
+            // The bar, and it does not wrap: it leaves the bottom and comes back
+            // at the top, which is what an unlocked picture actually does.
+            val band = size.height * 0.34f
+            val edge = -band + roll * (size.height + band)
+            drawRect(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Halo.cyan.copy(alpha = 0f), Halo.cyan.copy(alpha = 0.16f)),
+                    startY = edge - band, endY = edge,
+                ),
+                topLeft = androidx.compose.ui.geometry.Offset(0f, edge - band),
+                size = androidx.compose.ui.geometry.Size(size.width, band),
             )
-            blips.forEach { (angle, dist, dot) ->
-                // How far behind the beam this contact is, as a fraction of the
-                // seventy degrees the trail lives for.
-                val behind = ((beam - angle) % 360f + 360f) % 360f
-                val lit = if (behind <= 70f) 1f - behind / 70f else 0f
-                if (lit <= 0.02f) return@forEach
-                val a = angle * Math.PI / 180.0
-                val p = androidx.compose.ui.geometry.Offset(
-                    c.x + (rad * dist * kotlin.math.cos(a)).toFloat(),
-                    c.y + (rad * dist * kotlin.math.sin(a)).toFloat(),
-                )
-                drawCircle(Halo.mint.copy(alpha = 0.22f * lit), dot * 3.2f, p)
-                drawCircle(Halo.mint.copy(alpha = lit), dot, p)
-            }
+            // The beam itself: a hot line with a softer one under it, because a
+            // single hairline reads as a divider and not as light.
+            drawLine(
+                Halo.cyan.copy(alpha = 0.30f),
+                androidx.compose.ui.geometry.Offset(0f, edge + 2f),
+                androidx.compose.ui.geometry.Offset(size.width, edge + 2f),
+                3f,
+            )
+            drawLine(
+                Halo.cyan.copy(alpha = 0.95f),
+                androidx.compose.ui.geometry.Offset(0f, edge),
+                androidx.compose.ui.geometry.Offset(size.width, edge),
+                1.4f,
+            )
         }
         Text(
             stringResource(R.string.feed_waiting),
-            fontFamily = Mono, fontSize = 11.sp, color = Halo.cyan.copy(alpha = 0.75f), lineHeight = 16.sp,
+            fontFamily = Mono, fontSize = 11.5.sp, color = Halo.cyan.copy(alpha = 0.85f), lineHeight = 16.sp,
         )
     }
 }

@@ -181,21 +181,17 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
         }
     }
 
-    // The receipt, in a window of its own over the sheet: what you are about
-    // to sign, the hold, then the print. A receipt under the sliders was a
-    // receipt people scrolled past, or never found.
+    // The receipt, in a window of its own over the sheet: what you are about to
+    // sign, the hold, then the print. A receipt under the sliders was a receipt
+    // people scrolled past, or never found. This was the first place that got it
+    // right; PayOverlay is that same window, lifted out for everywhere else.
     review?.let { r ->
-        Dialog(
-            onDismissRequest = { if (state == null) { review = null; prepared = null } },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        PayOverlay(
+            title = stringResource(R.string.env_pay_title, "%.3f".format(cap)),
+            hint = stringResource(R.string.env_review_hint),
+            onBack = { if (state == null) { review = null; prepared = null } },
         ) {
-            Column(
-                Modifier.fillMaxSize().background(Halo.ground2).statusBarsPadding().navigationBarsPadding()
-                    .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Text(stringResource(R.string.env_pay_title, "%.3f".format(cap)), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
-                Text(stringResource(R.string.env_review_hint), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
+            run {
                 SignReceiptBody(r.receipt, null)
                 state?.let { Working(it) }
                 error?.let { Banner(it, Halo.red, HIcon.WARNING) }
@@ -223,7 +219,6 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
                     }
                 }
                 }
-                GhostButton(stringResource(R.string.cancel), Modifier.fillMaxWidth()) { if (state == null) { review = null; prepared = null } }
             }
         }
     }
@@ -470,8 +465,6 @@ internal fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: Session
                     // different amount.
                     SliderRow(stringResource(R.string.env_add_amount), "%.3f SOL".format(amount), amount, 0.001f..ceiling, Halo.mint) { amount = it; review = null }
 
-                    review?.let { r -> SignReceiptBody(r.receipt, null) }
-
                     if (busy == null && review == null) {
                         PrimaryButton(stringResource(R.string.env_review), danger = false, icon = HIcon.RECEIPT) {
                             busy = ctx.getString(R.string.w_analyzing)
@@ -486,21 +479,35 @@ internal fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: Session
                             }
                         }
                     }
-                    if (busy == null && review != null) {
-                        HoldToConfirm(stringResource(R.string.env_hold, "%.3f".format(amount))) {
-                            busy = ctx.getString(R.string.env_funding)
-                            scope.launch {
-                                val lamports = (amount * 1e9).toLong()
-                                val out = SessionActions.fund(ctx, signer, owner, session.pubkey, lamports)
-                                busy = null
-                                if (out == null) { SessionWallet.addFunded(ctx, lamports); onDone() } else error = out
-                            }
-                        }
-                    }
                 }
                 busy?.let { Working(it) }
                 error?.let { Banner(it, Halo.red, HIcon.WARNING) }
                 GhostButton(stringResource(R.string.cancel)) { onDismiss() }
+            }
+        }
+    }
+
+    // The receipt over the slider, not under it: see PayOverlay.
+    review?.let { r ->
+        PayOverlay(
+            title = stringResource(R.string.env_add),
+            hint = stringResource(R.string.env_review_hint),
+            onBack = { if (busy == null) review = null },
+        ) {
+            SignReceiptBody(r.receipt, null)
+            error?.let { Banner(it, Halo.red, HIcon.WARNING) }
+            if (busy != null) {
+                Working(busy!!)
+            } else {
+                HoldToConfirm(stringResource(R.string.env_hold, "%.3f".format(amount))) {
+                    busy = ctx.getString(R.string.env_funding)
+                    scope.launch {
+                        val lamports = (amount * 1e9).toLong()
+                        val out = SessionActions.fund(ctx, signer, owner, session.pubkey, lamports)
+                        busy = null
+                        if (out == null) { SessionWallet.addFunded(ctx, lamports); onDone() } else error = out
+                    }
+                }
             }
         }
     }

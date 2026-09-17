@@ -127,8 +127,6 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 )
                 Banner(stringResource(R.string.gift_warn), Halo.amber, HIcon.WARNING)
                 error?.let { Banner(it, Halo.red, HIcon.WARNING) }
-                review?.let { r -> SignReceiptBody(r.receipt, null) }
-
                 if (!busy && review == null && lamports > 0L) {
                     PrimaryButton(stringResource(R.string.env_review), danger = false, icon = HIcon.RECEIPT) {
                         busy = true
@@ -141,22 +139,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                     }
                 }
 
-                // One button at a time. Both used to sit there together — "Rivedi" and
-                // "Tieni premuto" — which asks you to choose between looking and doing,
-                // and nobody picks looking. Now the hold only exists once the receipt is
-                // on screen, so the order is the answer instead of a question.
-                if (busy) {
-                    Working(stringResource(R.string.gift_creating))
-                } else if (lamports > 0 && review != null) {
-                    HoldToConfirm(stringResource(R.string.gift_create, fmtSol(lamports, 5))) {
-                        busy = true; error = null
-                        scope.launch {
-                            val (url, err) = MoneyLinks.createGift(ctx, signer, owner, lamports, note)
-                            busy = false
-                            if (url != null) { link = url; refresh++ } else error = err
-                        }
-                    }
-                }
+                if (busy && review == null) Working(stringResource(R.string.gift_creating))
 
                 // Gifts nobody has taken yet are still yours: this is the way back.
                 val open = gifts.filter { it.open }
@@ -182,6 +165,31 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 }
                 Spacer(Modifier.height(2.dp))
                 GhostButton(stringResource(R.string.cancel)) { onDismiss() }
+            }
+        }
+    }
+
+    // What you are about to sign, over everything, on its own. Not appended to
+    // the bottom of the form the way it used to be: see PayOverlay.
+    review?.let { r ->
+        PayOverlay(
+            title = stringResource(R.string.gift_title),
+            hint = stringResource(R.string.env_review_hint),
+            onBack = { if (!busy) review = null },
+        ) {
+            SignReceiptBody(r.receipt, null)
+            error?.let { Banner(it, Halo.red, HIcon.WARNING) }
+            if (busy) {
+                Working(stringResource(R.string.gift_creating))
+            } else {
+                HoldToConfirm(stringResource(R.string.gift_create, fmtSol(lamports, 5))) {
+                    busy = true; error = null
+                    scope.launch {
+                        val (url, err) = MoneyLinks.createGift(ctx, signer, owner, lamports, note)
+                        busy = false
+                        if (url != null) { link = url; review = null; refresh++ } else error = err
+                    }
+                }
             }
         }
     }

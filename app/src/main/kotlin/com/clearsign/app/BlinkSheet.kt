@@ -135,25 +135,6 @@ internal fun BlinkSheet(link: String, signer: SeedVaultSigner, owner: String, on
                 }
                 busy?.let { Working(it) }
 
-                review?.let { (tx, analyzed) ->
-                    SignReceiptBody(analyzed.receipt, null)
-                    if (analyzed.receipt.blocksApproval) {
-                        Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
-                    } else {
-                        HoldToConfirm(stringResource(R.string.blink_hold)) {
-                            busy = ctx.getString(R.string.w_signing)
-                            scope.launch {
-                                val r = WalletActions.signAndSendRaw(ctx, signer, owner, tx, analyzed.receipt, kind = "blink")
-                                busy = null
-                                when (r) {
-                                    is WalletActions.Result.Sent -> { done = r.signature; review = null }
-                                    is WalletActions.Result.Failed -> error = r.message
-                                }
-                            }
-                        }
-                    }
-                    GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { review = null }
-                }
                 done?.let { sig ->
                     Banner(message ?: stringResource(R.string.blink_done), Halo.mint, HIcon.CHECK)
                     Text(sig, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, maxLines = 2)
@@ -162,6 +143,34 @@ internal fun BlinkSheet(link: String, signer: SeedVaultSigner, owner: String, on
             }
             Text(stringResource(R.string.blink_truth), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
             Spacer(Modifier.height(4.dp))
+        }
+    }
+
+    // What you are about to sign, over everything. Not under the buttons of the
+    // card that asked for it: see PayOverlay.
+    review?.let { (tx, analyzed) ->
+        PayOverlay(
+            title = stringResource(R.string.blink_title),
+            onBack = { if (busy == null) review = null },
+        ) {
+            SignReceiptBody(analyzed.receipt, null)
+            error?.let { Banner(it, Halo.red, HIcon.WARNING) }
+            busy?.let { Working(it) }
+            if (analyzed.receipt.blocksApproval) {
+                Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
+            } else if (busy == null) {
+                HoldToConfirm(stringResource(R.string.blink_hold)) {
+                    busy = ctx.getString(R.string.w_signing)
+                    scope.launch {
+                        val r = WalletActions.signAndSendRaw(ctx, signer, owner, tx, analyzed.receipt, kind = "blink")
+                        busy = null
+                        when (r) {
+                            is WalletActions.Result.Sent -> { done = r.signature; review = null }
+                            is WalletActions.Result.Failed -> error = r.message
+                        }
+                    }
+                }
+            }
         }
     }
 }

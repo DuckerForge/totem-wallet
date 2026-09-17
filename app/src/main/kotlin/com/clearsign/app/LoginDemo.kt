@@ -1,5 +1,7 @@
 package com.clearsign.app
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -13,307 +15,192 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
-import kotlin.math.cos
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 
 /**
- * What Apex is, shown instead of said.
+ * Il marchio, fatto da due telefoni.
  *
- * Orbit. The curve of a planet across the bottom with its atmosphere lit from
- * behind, one phone holding station above it, and requests arriving out of the
- * dark as streaks of light that slow as they come. Two are ordinary and are
- * taken in. The third turns red on approach and breaks against a ring of light
- * that leaves the phone to meet it.
+ * Due telefoni arrivano dal buio e si posano inclinati finche' non formano la V
+ * del logo. Poi il tratto al neon si disegna da solo attraverso di loro, dal
+ * viola in basso al ciano in alto, e resta acceso un momento prima che tutto
+ * ricominci.
  *
- * That is the product in six seconds: everything out there can only arrive and
- * ask, the phone is the thing that decides, and what lies does not get in.
+ * Non e' decorazione. La V del marchio **e' due telefoni che si toccano**, cioe'
+ * la cosa che quest'app sa fare e le altre no: avvicinarne due e far passare dei
+ * soldi senza indirizzi, senza link, senza nessuno in mezzo. La schermata su cui
+ * gira e' quella dove non c'e' niente da fare tranne aspettare un'impronta, ed e'
+ * l'unica animazione dell'app che parte senza che nessuno l'abbia chiesta.
  *
- * It replaced a version with three straight spokes into a wireframe globe, which
- * read as a spider rather than a scene. The rules that keep it a scene: no
- * straight lines, no grid, no text, nothing moving at constant speed, and a beat
- * of silence at the end of each loop so the refusal is a moment instead of a
- * stream.
- *
- * It plays on the door, where there is nothing to do but wait for a fingerprint,
- * and it is the only animation in the app that runs without being asked for.
+ * Prima c'era un pianeta con un campo stellato, una meteora e tre richieste in
+ * arrivo. Diceva una cosa giusta e la diceva con troppa roba: sei elementi che si
+ * muovono e nessuno che sia il marchio. Le regole di adesso: niente stelle,
+ * niente cose che cadono, un solo movimento alla volta, e un respiro di silenzio
+ * alla fine del giro, cosi' la V resta negli occhi invece di scorrere via.
  */
 @Composable
 internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
-    val loop = rememberInfiniteTransition(label = "orbit")
-    // The door opening: the phone's light goes to full and a ring leaves it for
-    // the edge of the screen, once, while the wallet fades in underneath. It is
-    // the one moment the scene answers the person instead of playing to itself.
-    val open = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(opening) { if (opening) open.animateTo(1f, tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
-    val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(6200, easing = LinearEasing)), label = "t")
-    val slow by loop.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "slow")
+    val loop = rememberInfiniteTransition(label = "velum")
+    val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(7400, easing = LinearEasing)), label = "t")
 
-    // Fixed once: a starfield that reshuffled every frame would be snow. Three
-    // depths, because a sky with one depth is wallpaper: the far ones are many,
-    // tiny and slow; the near ones are few, bright, and drift a little faster
-    // across them. Each has its own phase and pace, so no two twinkle together.
-    val stars = remember {
-        val rnd = java.util.Random(7)
-        List(70) { i ->
-            val depth = when { i < 44 -> 0; i < 62 -> 1; else -> 2 }
-            Star(
-                rnd.nextFloat(), rnd.nextFloat() * 0.78f,
-                r = when (depth) { 0 -> 0.5f + rnd.nextFloat() * 0.7f; 1 -> 1.0f + rnd.nextFloat() * 0.9f; else -> 1.8f + rnd.nextFloat() * 1.2f },
-                phase = rnd.nextFloat() * 6.28f, depth = depth, pace = 0.6f + rnd.nextFloat() * 1.6f,
-            )
-        }
-    }
+    // L'apertura della porta: il tratto va al massimo e la scena si ritira, una
+    // volta sola. E' il solo momento in cui la scena risponde a una persona
+    // invece di recitare per conto suo.
+    val open = remember { Animatable(0f) }
+    LaunchedEffect(opening) { if (opening) open.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
 
-    val mint = Halo.mint
-    val cyan = Halo.cyan
-    val bad = Halo.red
-    val faint = Halo.muted
-
-    // The height is the caller's. On the door it is the whole middle of the
-    // screen, which used to be a 190dp strip with half a page of dark under it.
-    Canvas(modifier.fillMaxWidth()) {
+    Canvas(modifier.fillMaxWidth().height(228.dp)) {
         val w = size.width
         val h = size.height
-        val unit = min(w, h)
+        val cx = w / 2f
+        val op = open.value
 
-        // ---- the dark, and what is in it -----------------------------------
-        // A breath of colour behind everything: two soft clouds, cyan and
-        // violet, drifting against each other so the black is not flat.
-        run {
-            val c1 = Offset(w * (0.30f + 0.06f * sin(slow * 0.5f)), h * (0.22f + 0.03f * cos(slow * 0.4f)))
-            val c2 = Offset(w * (0.74f + 0.05f * cos(slow * 0.45f)), h * (0.40f + 0.04f * sin(slow * 0.6f)))
-            drawCircle(Brush.radialGradient(listOf(cyan.copy(alpha = 0.07f), Color.Transparent), center = c1, radius = w * 0.55f), w * 0.55f, c1)
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF8B7CF6).copy(alpha = 0.06f), Color.Transparent), center = c2, radius = w * 0.5f), w * 0.5f, c2)
-        }
-        stars.forEach { s ->
-            val tw = 0.5f + 0.5f * sin(slow * 1.7f * s.pace + s.phase)
-            val twinkle = when (s.depth) { 0 -> 0.25f + 0.35f * tw; 1 -> 0.4f + 0.5f * tw; else -> 0.55f + 0.45f * tw }
-            // Parallax: the near layer moves three times as much as the far one.
-            val par = (s.depth + 1) * unit * 0.004f
-            val p = Offset(s.x * w + sin(slow * 0.35f + s.phase) * par, s.y * h + cos(slow * 0.25f + s.phase) * par * 0.4f)
-            val rr = s.r * unit / 1000f * 2.2f
-            if (s.depth == 2) {
-                // The bright few breathe: a soft halo that swells on the peak of
-                // the twinkle. No spikes; a cross of light reads as a symbol, and
-                // a symbol in a sky is a thing the eye stops on.
-                val swell = ((tw - 0.6f) / 0.4f).coerceIn(0f, 1f)
-                drawCircle(
-                    Brush.radialGradient(listOf(Color.White.copy(alpha = 0.22f + 0.30f * swell), Color.Transparent), center = p, radius = rr * (3f + 3f * swell)),
-                    rr * (3f + 3f * swell), p,
-                )
-            }
-            drawCircle(Color.White.copy(alpha = 0.9f * twinkle), rr, p)
-        }
+        // I due bracci della V, e da li' tutto il resto.
+        // Alta e raccolta.
+        //
+        // Il vertice stava al settanta per cento dell'altezza e i bracci erano
+        // lunghi: la V finiva schiacciata in basso e riempiva tutto, e una cosa
+        // che riempie tutto non e' un marchio, e' uno sfondo. Adesso sta al
+        // centro con dell'aria intorno.
+        val vertex = Offset(cx, h * 0.605f)
+        val armX = w * 0.132f
+        val armY = h * 0.325f
+        val leftTip = Offset(cx - armX, vertex.y - armY)
+        val rightTip = Offset(cx + armX, vertex.y - armY)
 
-        // ---- one falling star, early in the loop, never in the silence -------
-        // Between the first arrival and the second, when nothing else moves: a
-        // streak across the top that says the dark is deep. It stays out of the
-        // last beat on purpose; the refusal owns that silence.
-        run {
-            val local = (t - 0.14f) / 0.07f
-            if (local > 0f && local < 1f) {
-                val p = easeOut(local)
-                val from = Offset(w * 0.12f, h * 0.06f)
-                val to = Offset(w * 0.58f, h * 0.20f)
-                val head = Offset(from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p)
-                val fade = 1f - local
-                for (k in 6 downTo 0) {
-                    val u = (p - k * 0.035f).coerceAtLeast(0f)
-                    val q = Offset(from.x + (to.x - from.x) * u, from.y + (to.y - from.y) * u)
-                    val a = 1f - k / 7f
-                    drawCircle(Color.White.copy(alpha = 0.55f * a * a * fade), unit * 0.0035f * (0.4f + a), q)
-                }
-                drawCircle(Color.White.copy(alpha = 0.9f * fade), unit * 0.005f, head)
-            }
-        }
+        // --- i tempi -------------------------------------------------------
+        // Uno alla volta: i telefoni arrivano, poi il tratto, poi il respiro.
+        val land = ease(seg(t, 0.00f, 0.30f))
+        val draw = ease(seg(t, 0.36f, 0.74f))
+        val bloom = seg(t, 0.68f, 0.82f)
+        val rest = seg(t, 0.90f, 1.00f)
+        // Aprendo la porta il tratto e' gia' tutto acceso, comunque vada il giro.
+        val reveal = max(draw, op)
+        val glow = max(bloom * (1f - rest), op)
 
-        // ---- the planet ----------------------------------------------------
-        // Only its limb crosses the frame. A circle this large reads as a world;
-        // the same circle small enough to see whole reads as a ball.
-        val planetR = w * 1.35f
-        val planet = Offset(w / 2f, h * 0.92f + planetR)
-        val limbY = planet.y - planetR
-
-        // The atmosphere is one soft radial glow just outside the horizon, not
-        // stroked arcs: arcs scaled with the scene and turned into three thick
-        // bands when the scene got tall. A gradient over the same radius fades
-        // out on its own, whatever the size.
-        val glowOut = w * 0.09f
+        // --- il respiro dietro, al posto del campo stellato -----------------
         drawCircle(
             Brush.radialGradient(
-                colorStops = arrayOf(
-                    (planetR - w * 0.01f) / (planetR + glowOut) to Color.Transparent,
-                    planetR / (planetR + glowOut) to cyan.copy(alpha = 0.55f),
-                    (planetR + glowOut * 0.35f) / (planetR + glowOut) to cyan.copy(alpha = 0.12f),
-                    1f to Color.Transparent,
-                ),
-                center = planet, radius = planetR + glowOut,
+                listOf(NEON_MID.copy(alpha = 0.055f * (0.4f + 0.6f * reveal)), Color.Transparent),
+                center = vertex, radius = w * 0.52f,
             ),
-            planetR + glowOut, planet,
+            radius = w * 0.52f, center = vertex,
         )
-        clipRect(top = limbY) {
-            drawCircle(Halo.ground, planetR, planet)
-            // The lit rim, thin: it fades out well before the frame's bottom edge,
-            // so the body meets the edge as plain dark and not as a cut band.
-            drawCircle(
-                brush = Brush.verticalGradient(
-                    listOf(cyan.copy(alpha = 0.20f), cyan.copy(alpha = 0.04f), Color.Transparent),
-                    startY = limbY, endY = limbY + w * 0.16f,
-                ),
-                radius = planetR, center = planet,
-            )
-            drawCircle(cyan.copy(alpha = 0.6f), planetR, planet, style = Stroke(1.dp.toPx()))
-            // Cities, breathing out of phase. Six points of life, not a grid.
-            for (k in 0 until 7) {
-                val a = -1.2f + k * 0.4f
-                val lit = 0.25f + 0.75f * (0.5f + 0.5f * sin(slow * 2.1f + k * 1.7f))
-                val p = Offset(planet.x + planetR * sin(a) * 0.62f, limbY + w * (0.015f + 0.02f * ((k % 3) + 1)))
-                drawCircle(cyan.copy(alpha = 0.55f * lit), w * 0.003f, p)
-                drawCircle(cyan.copy(alpha = 0.12f * lit), w * 0.010f, p)
-            }
+
+        // --- i due telefoni ------------------------------------------------
+        val armLen = hypot(armX, armY)
+        val phoneLen = armLen * 0.88f
+        val phoneW = phoneLen * 0.44f
+        listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
+            val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
+            // Arrivano da fuori lungo la propria diagonale e rallentano entrando.
+            val away = 1f - land
+            val from = Offset(mid.x + side * w * 0.75f * away, mid.y - h * 0.30f * away)
+            val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
+            phone(from, phoneLen, phoneW, ang, land * (1f - op * 0.35f), glow)
         }
 
-        // ---- the phone, holding station ------------------------------------
-        // The phone sits in the upper part of the scene, whatever the scene's
-        // height. On the door the fingerprint sheet rises over the bottom half
-        // of the screen, and a phone at the vertical middle of a tall canvas
-        // was exactly the thing it covered. Sized from the width, so a taller
-        // screen gives the planet more sky, not the phone a longer fall.
-        val phoneH = min(h * 0.34f, w * 0.30f)
-        val phoneW = phoneH * 0.47f
-        val phone = Offset(w / 2f, min(h * 0.46f, w * 0.42f) + sin(slow) * unit * 0.008f)   // a slow float, never still
-        val shieldR = phoneW * 0.95f
-
-        // ---- three arrivals -------------------------------------------------
-        // Two are ordinary, the third lies. Always the third, always from the same
-        // side: the eye learns where to look before it knows why.
-        val lanes = listOf(
-            Lane(Offset(-w * 0.25f, h * 0.16f), Offset(w * 0.22f, h * 0.02f), 0.02f, mint, true),
-            Lane(Offset(w * 1.25f, h * 0.30f), Offset(w * 0.80f, h * 0.04f), 0.28f, cyan, true),
-            Lane(Offset(w * 1.28f, -h * 0.10f), Offset(w * 0.86f, h * 0.30f), 0.56f, bad, false),
-        )
-
-        lanes.forEach { lane ->
-            val local = (t - lane.start) / 0.30f
-            if (local <= 0f || local > 1.35f) return@forEach
-            val p = easeOut(clamp(local))
-            // The liar never reaches the glass: it stops where the shield is.
-            val stopAt = if (lane.honest) 1f else 0.72f
-            val travel = min(p, stopAt)
-            val fade = 1f - clamp((local - 1f) / 0.35f)
-
-            fun at(u: Float): Offset {
-                val m = 1 - u
-                return Offset(
-                    m * m * lane.from.x + 2 * m * u * lane.ctrl.x + u * u * phone.x,
-                    m * m * lane.from.y + 2 * m * u * lane.ctrl.y + u * u * phone.y,
-                )
-            }
-
-            // A tail of eight, thinning behind the head. Cheaper than a gradient
-            // stroke and it bends with the curve for free.
-            for (k in 7 downTo 0) {
-                val u = (travel - k * 0.026f).coerceAtLeast(0f)
-                if (u <= 0f) continue
-                val a = (1f - k / 8f)
-                drawCircle(lane.color.copy(alpha = 0.5f * a * a * fade), unit * (0.004f + 0.010f * a), at(u))
-            }
-            val head = at(travel)
-            drawCircle(lane.color.copy(alpha = 0.18f * fade), unit * 0.030f, head)
-            drawCircle(lane.color.copy(alpha = 0.95f * fade), unit * 0.011f, head)
-
-            if (lane.honest) {
-                // Taken in: a ring closing on the phone, quick and quiet.
-                val land = clamp((p - 0.92f) / 0.08f)
-                if (land > 0f) {
-                    drawCircle(lane.color.copy(alpha = 0.45f * (1f - land) * fade), shieldR * (1.4f - 0.5f * land), phone, style = Stroke(1.6.dp.toPx()))
-                }
-            } else if (p >= stopAt) {
-                // Refused: the shield goes out to meet it and the thing breaks up.
-                val hit = clamp((p - stopAt) / (1f - stopAt))
-                drawCircle(bad.copy(alpha = 0.55f * (1f - hit) * fade), shieldR * (1f + 1.6f * hit), phone, style = Stroke((2.4f * (1f - hit)).coerceAtLeast(0.4f).dp.toPx()))
-                drawCircle(bad.copy(alpha = 0.10f * (1f - hit) * fade), shieldR * (1f + 1.6f * hit), phone)
-                for (k in 0 until 3) {
-                    val ang = -0.9f + k * 0.9f
-                    val d = unit * 0.09f * hit
-                    val frag = Offset(head.x + cos(ang) * d, head.y + sin(ang) * d + d * 0.5f)
-                    drawCircle(bad.copy(alpha = 0.7f * (1f - hit) * fade), unit * 0.006f * (1f - hit), frag)
-                }
-            }
-        }
-
-        // The phone is always there, whole, in the middle of the dark. What
-        // changes as a streak closes in is its light: the glass wakes, the
-        // station ring shows, and the shield takes the hit. No fading in and
-        // out, no cuts: the eye should be able to rest on it.
-        val o = open.value
-        var wake = o
-        lanes.forEach { lane ->
-            val local = (t - lane.start) / 0.30f
-            if (local <= 0f || local > 1.35f) return@forEach
-            val rise = ((local - 0.25f) / 0.45f).coerceIn(0f, 1f)
-            val fall = 1f - ((local - 1.0f) / 0.35f).coerceIn(0f, 1f)
-            wake = max(wake, rise * rise * (3f - 2f * rise) * fall)
-        }
-        drawPhone(
-            phone.x - phoneW / 2f, phone.y - phoneH / 2f, phoneW, phoneH,
-            back = false, body = Halo.cardSoft, edge = Halo.stroke, ink = Halo.ink, glass = Halo.ground,
-        )
-        // The glass lights from the bottom as it wakes, and a thin line of light
-        // near the foot says "on". No dot, no ring in the middle: a symbol on the
-        // screen was a thing to read, and there is nothing to read here.
-        val glassL = phone.x - phoneW * 0.40f
-        val glassT = phone.y - phoneH * 0.42f
-        val glassW = phoneW * 0.80f
-        val glassH = phoneH * 0.84f
-        drawRect(
-            Brush.verticalGradient(listOf(Color.Transparent, mint.copy(alpha = 0.14f + 0.30f * wake + 0.20f * o)), startY = glassT, endY = glassT + glassH),
-            Offset(glassL, glassT), androidx.compose.ui.geometry.Size(glassW, glassH),
-        )
-        drawLine(
-            mint.copy(alpha = 0.85f), Offset(phone.x - phoneW * 0.18f, glassT + glassH - phoneH * 0.06f),
-            Offset(phone.x + phoneW * 0.18f, glassT + glassH - phoneH * 0.06f), strokeWidth = 2f * density, cap = StrokeCap.Round,
-        )
-        // The station light, brighter while it is awake: a thin ring that says watching.
-        drawCircle(mint.copy(alpha = 0.06f + 0.14f * wake), shieldR * 1.15f, phone, style = Stroke(1.dp.toPx()))
-        if (o > 0f) {
-            // Opening: two rings leaving the phone for the edge, thinning as they go.
-            for (k in 0 until 2) {
-                val q = ((o - k * 0.18f) / 0.82f).coerceIn(0f, 1f)
-                if (q <= 0f) continue
-                drawCircle(mint.copy(alpha = 0.5f * (1f - q)), shieldR + (w * 0.9f) * q, phone, style = Stroke((2.2f * (1f - q) + 0.4f).dp.toPx()))
-            }
-        }
+        // --- il tratto al neon ---------------------------------------------
+        // Un solo tratto dritto che attraversa la V, come nel marchio: non il
+        // contorno della V, che sarebbe un'altra forma.
+        val a = Offset(cx - w * 0.068f, h * 0.665f)
+        val b = Offset(cx + w * 0.138f, h * 0.235f)
+        neon(a, b, reveal, glow, w)
     }
 }
 
-private class Star(val x: Float, val y: Float, val r: Float, val phase: Float, val depth: Int = 0, val pace: Float = 1f)
+/** Il viola in basso e il ciano in alto: i due estremi del marchio. */
+private val NEON_LOW = Color(0xFF9524F3)
+private val NEON_MID = Color(0xFF666CF4)
+private val NEON_HIGH = Color(0xFF0BF5EC)
 
-private class Lane(
-    val from: Offset,
-    val ctrl: Offset,
-    val start: Float,
-    val color: Color,
-    val honest: Boolean,
-)
-
-/** Fast in, slow on arrival. Nothing in a scene moves at a constant speed. */
-private fun easeOut(p: Float): Float {
-    val m = 1f - p
-    return 1f - m * m * m
+/**
+ * Il tratto che si disegna da solo, con il colore che scorre lungo la sua
+ * lunghezza.
+ *
+ * A pezzi e non in un colpo solo perche' il colore cambia strada facendo, e
+ * perche' e' cosi' che si mostra solo la parte gia' arrivata. Tre passate: un
+ * alone largo e tenue, una media, e il filo vero, che e' quello che si legge.
+ */
+private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, w: Float) {
+    if (reveal <= 0f) return
+    val core = w * 0.013f
+    val steps = 44
+    for (i in 0 until steps) {
+        val u0 = i / steps.toFloat()
+        if (u0 >= reveal) break
+        val u1 = min((i + 1) / steps.toFloat(), reveal)
+        val p0 = Offset(a.x + (b.x - a.x) * u0, a.y + (b.y - a.y) * u0)
+        val p1 = Offset(a.x + (b.x - a.x) * u1, a.y + (b.y - a.y) * u1)
+        val u = (u0 + u1) / 2f
+        val c = if (u < 0.5f) lerp(NEON_LOW, NEON_MID, u * 2f) else lerp(NEON_MID, NEON_HIGH, (u - 0.5f) * 2f)
+        drawLine(c.copy(alpha = 0.10f + 0.16f * glow), p0, p1, core * 5.2f, StrokeCap.Round)
+        drawLine(c.copy(alpha = 0.26f + 0.24f * glow), p0, p1, core * 2.4f, StrokeCap.Round)
+        drawLine(c, p0, p1, core, StrokeCap.Round)
+    }
+    // La punta accesa mentre viaggia, e niente quando e' arrivata: un filo che
+    // continua a brillare in cima direbbe che sta ancora succedendo qualcosa.
+    if (reveal < 1f) {
+        val head = Offset(a.x + (b.x - a.x) * reveal, a.y + (b.y - a.y) * reveal)
+        val c = if (reveal < 0.5f) lerp(NEON_LOW, NEON_MID, reveal * 2f) else lerp(NEON_MID, NEON_HIGH, (reveal - 0.5f) * 2f)
+        drawCircle(c.copy(alpha = 0.22f), core * 3.4f, head)
+        drawCircle(c, core * 1.15f, head)
+    }
 }
 
-private fun clamp(v: Float) = max(0f, min(1f, v))
+/**
+ * Un telefono, ridotto a quello che lo rende riconoscibile.
+ *
+ * Corpo, bordo, vetro e l'altoparlante: quattro tratti. Tutto il resto, la
+ * fotocamera, i tasti, il riflesso, a questa misura diventa sporco. Il vetro
+ * prende il colore del neon quando il tratto passa, ed e' l'unica cosa che lega
+ * i due oggetti invece di lasciarli uno accanto all'altro.
+ */
+private fun DrawScope.phone(center: Offset, len: Float, wide: Float, angle: Float, alpha: Float, glow: Float) {
+    if (alpha <= 0.01f) return
+    rotate(angle, center) {
+        val tl = Offset(center.x - wide / 2f, center.y - len / 2f)
+        val sz = Size(wide, len)
+        val r = CornerRadius(wide * 0.20f)
+        drawRoundRect(
+            Brush.verticalGradient(listOf(Color(0xFF1A1A22), Color(0xFF0B0B10)), startY = tl.y, endY = tl.y + len),
+            tl, sz, r, alpha = alpha,
+        )
+        drawRoundRect(Color(0xFF34344A).copy(alpha = alpha * 0.85f), tl, sz, r, style = Stroke(1.1.dp.toPx()))
+        val ins = wide * 0.075f
+        val gtl = Offset(tl.x + ins, tl.y + ins)
+        val gsz = Size(wide - ins * 2f, len - ins * 2f)
+        val gr = CornerRadius(wide * 0.15f)
+        drawRoundRect(Color(0xFF07070B).copy(alpha = alpha), gtl, gsz, gr)
+        if (glow > 0.01f) drawRoundRect(NEON_MID.copy(alpha = 0.14f * glow * alpha), gtl, gsz, gr)
+        drawRoundRect(
+            Color(0xFF3C3C4E).copy(alpha = alpha * 0.7f),
+            Offset(center.x - wide * 0.09f, tl.y + ins * 2.1f),
+            Size(wide * 0.18f, max(1f, wide * 0.02f)),
+            CornerRadius(wide * 0.02f),
+        )
+    }
+}
+
+/** La fetta di tempo fra due istanti del giro, da zero a uno. */
+private fun seg(t: Float, from: Float, to: Float): Float =
+    if (t <= from) 0f else if (t >= to) 1f else (t - from) / (to - from)
+
+/** Niente si muove a velocita' costante: rallenta arrivando. */
+private fun ease(p: Float): Float {
+    val c = min(1f, max(0f, p))
+    return 1f - (1f - c) * (1f - c) * (1f - c)
+}

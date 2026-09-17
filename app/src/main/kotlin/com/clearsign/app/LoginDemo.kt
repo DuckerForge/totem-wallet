@@ -78,9 +78,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val cx = w / 2f
         val cy = h * 0.17f
 
-        val vertex = Offset(cx, cy + d * 0.30f)
-        val armX = d * 0.34f
-        val armY = d * 0.56f
+        // La V dei telefoni non e' una V qualsiasi che gli somiglia: e' **quella
+        // del marchio**, righe misurate dentro la sua immagine. I bracci stanno
+        // a 22 gradi e mezzo dalla verticale e le punte non arrivano agli angoli:
+        // una V larga quanto il quadrato sarebbe molto piu' aperta di cosi', ed
+        // e' esattamente lo scarto che si vedeva al cambio.
+        val vertex = Offset(cx, cy + d * 0.300f)
+        val armX = d * 0.230f
+        val armY = d * 0.554f
         val leftTip = Offset(cx - armX, vertex.y - armY)
         val rightTip = Offset(cx + armX, vertex.y - armY)
         val armLen = hypot(armX, armY)
@@ -121,34 +126,50 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         )
 
         // --- i due telefoni, finche' ci sono -------------------------------
+        val phoneLen = armLen * 0.98f
+        val phoneW = phoneLen * 0.46f
+        val away = 1f - land
+        // Nella luce non svaniscono sul posto: si avvicinano di un soffio, come
+        // se venissero assorbiti.
+        val pull = become * d * 0.06f
+        // Dove sta un telefono adesso. Serve due volte, ai telefoni e al tratto
+        // che ci corre sopra, e finche' e' un conto solo non possono staccarsi.
+        fun seat(tip: Offset, side: Float): Offset {
+            val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
+            return Offset(
+                mid.x + side * d * 1.5f * away - side * pull,
+                mid.y - d * 0.6f * away + pull * 0.4f,
+            )
+        }
         if (phoneAlpha > 0.01f) {
-            val phoneLen = armLen * 0.92f
-            val phoneW = phoneLen * 0.40f
             listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
-                val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
-                val away = 1f - land
-                // Nella luce non svaniscono sul posto: si avvicinano di un soffio,
-                // come se venissero assorbiti.
-                val pull = become * d * 0.06f
-                val from = Offset(
-                    mid.x + side * d * 1.5f * away - side * pull,
-                    mid.y - d * 0.6f * away + pull * 0.4f,
-                )
                 val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
-                phone(from, phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark)
+                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark)
             }
         }
 
-        // --- la scintilla lungo il braccio destro ---------------------------
+        // --- la scintilla lungo il telefono destro --------------------------
         // Solo mentre i telefoni ci sono ancora: e' la cosa che li trasforma. Il
         // marchio, una volta arrivato, il suo tratto ce l'ha gia' dipinto dentro.
+        //
+        // Il tratto corre **sul vetro**, non accanto: stesso centro e stessa
+        // lunghezza del telefono destro, rientrato di un raggio d'angolo perche'
+        // la punta tonda si fermi dentro il bordo. Prima andava da vertice a
+        // punta e sbordava di un decimo per parte, e quando i telefoni venivano
+        // tirati dentro restava dov'era: due oggetti vicini invece di uno.
         if (spark > 0f && become < 1f) {
             val ux = (rightTip.x - vertex.x) / armLen
             val uy = (rightTip.y - vertex.y) / armLen
-            val over = armLen * 0.10f
-            val a = Offset(vertex.x - ux * over, vertex.y - uy * over)
-            val b = Offset(rightTip.x + ux * over, rightTip.y + uy * over)
-            neon(a, b, spark, (1f - become) * (0.4f + 0.6f * spark), d, (1f - become) * leaving)
+            val c = seat(rightTip, 1f)
+            val half = phoneLen / 2f - phoneW * 0.24f
+            // Nel marchio il tratto non e' l'asse del braccio: parte sotto il
+            // vertice, taglia la V ed esce dalla punta destra, molto piu'
+            // inclinato. Misurato dentro l'immagine. Mentre i telefoni si
+            // dissolvono il tratto ci scivola sopra, cosi' il marchio non
+            // arriva: si posa su qualcosa che e' gia' al posto giusto.
+            val a = mix(Offset(c.x - ux * half, c.y - uy * half), Offset(cx - d * 0.154f, cy + d * 0.250f), become)
+            val b = mix(Offset(c.x + ux * half, c.y + uy * half), Offset(cx + d * 0.346f, cy - d * 0.260f), become)
+            neon(a, b, spark, (1f - become) * (0.4f + 0.6f * spark), d, (1f - become * 0.8f) * leaving)
         }
 
         // --- e arriva il marchio -------------------------------------------
@@ -210,38 +231,59 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
 }
 
 /**
- * Un telefono, ridotto a quello che lo rende riconoscibile.
+ * Un Seeker visto di dorso, ridotto a quello che lo rende riconoscibile.
  *
- * Corpo, bordo, vetro e l'altoparlante: quattro tratti. Tutto il resto, la
- * fotocamera, i tasti, il riflesso, a questa misura diventa sporco. Il vetro
- * prende il colore del neon quando il tratto passa, ed e' l'unica cosa che lega
- * i due oggetti invece di lasciarli uno accanto all'altro.
+ * Il davanti di un telefono a questa misura e' un rettangolo nero: potrebbe
+ * essere chiunque. Il dorso no. L'isola della fotocamera in alto a sinistra e le
+ * tre barre inclinate di Solana bastano, e le barre prendono il viola e il
+ * ciano del marchio: e' la cosa che lega i due oggetti invece di lasciarli uno
+ * accanto all'altro.
  */
 private fun DrawScope.phone(center: Offset, len: Float, wide: Float, angle: Float, alpha: Float, glow: Float) {
     if (alpha <= 0.01f) return
+    val hair = max(1.2f, wide * 0.020f)
     rotate(angle, center) {
         val tl = Offset(center.x - wide / 2f, center.y - len / 2f)
         val sz = Size(wide, len)
-        val r = CornerRadius(wide * 0.20f)
+        val r = CornerRadius(wide * 0.22f)
         drawRoundRect(
-            Brush.verticalGradient(listOf(Color(0xFF3A3A50), Color(0xFF1A1A26)), startY = tl.y, endY = tl.y + len),
+            Brush.verticalGradient(listOf(Color(0xFF454562), Color(0xFF1C1C2B)), startY = tl.y, endY = tl.y + len),
             tl, sz, r, alpha = alpha,
         )
-        drawRoundRect(Color(0xFF8A8ABC).copy(alpha = alpha), tl, sz, r, style = Stroke(1.6.dp.toPx()))
-        val ins = wide * 0.075f
-        val gtl = Offset(tl.x + ins, tl.y + ins)
-        val gsz = Size(wide - ins * 2f, len - ins * 2f)
-        val gr = CornerRadius(wide * 0.15f)
-        drawRoundRect(Color(0xFF0E0E18).copy(alpha = alpha), gtl, gsz, gr)
-        if (glow > 0.01f) drawRoundRect(NEON_MID.copy(alpha = 0.14f * glow * alpha), gtl, gsz, gr)
-        drawRoundRect(
-            Color(0xFF3C3C4E).copy(alpha = alpha * 0.7f),
-            Offset(center.x - wide * 0.09f, tl.y + ins * 2.1f),
-            Size(wide * 0.18f, max(1f, wide * 0.02f)),
-            CornerRadius(wide * 0.02f),
-        )
+        drawRoundRect(Color(0xFFB2B2E4).copy(alpha = alpha), tl, sz, r, style = Stroke(hair * 1.2f))
+        if (glow > 0.01f) drawRoundRect(NEON_MID.copy(alpha = 0.10f * glow * alpha), tl, sz, r)
+
+        val iw = wide * 0.30f
+        val ih = len * 0.155f
+        val itl = Offset(tl.x + wide * 0.095f, tl.y + len * 0.045f)
+        val ir = CornerRadius(iw * 0.36f)
+        drawRoundRect(Color(0xFF0B0B12).copy(alpha = alpha), itl, Size(iw, ih), ir)
+        drawRoundRect(Color(0xFF9494C8).copy(alpha = alpha * 0.7f), itl, Size(iw, ih), ir, style = Stroke(hair))
+        val lens = iw * 0.21f
+        for (f in listOf(0.29f, 0.71f)) {
+            val o = Offset(itl.x + iw / 2f, itl.y + ih * f)
+            drawCircle(Color(0xFF191926).copy(alpha = alpha), lens, o)
+            drawCircle(Color(0xFF9E9ED2).copy(alpha = alpha * 0.4f), lens, o, style = Stroke(hair * 0.8f))
+        }
+
+        val bw = wide * 0.44f
+        val slant = bw * 0.20f
+        val gap = len * 0.042f
+        val by = center.y + len * 0.02f
+        listOf(NEON_HIGH, NEON_MID, NEON_LOW).forEachIndexed { i, c ->
+            val y = by + (i - 1) * gap
+            drawLine(
+                c.copy(alpha = alpha * (0.50f + 0.40f * glow)),
+                Offset(center.x - bw / 2f, y + slant / 2f),
+                Offset(center.x + bw / 2f, y - slant / 2f),
+                max(1f, len * 0.016f), StrokeCap.Round,
+            )
+        }
     }
 }
+
+/** Un punto a meta' strada fra due, che serve solo qui. */
+private fun mix(a: Offset, b: Offset, k: Float) = Offset(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k)
 
 /** La fetta di tempo fra due istanti del giro, da zero a uno. */
 private fun seg(t: Float, from: Float, to: Float): Float =

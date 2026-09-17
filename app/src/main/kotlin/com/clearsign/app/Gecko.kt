@@ -66,19 +66,19 @@ object Gecko {
      * public API with no key, and get everybody rate limited. Five minutes is
      * shorter than the candle itself on every span we draw.
      */
-    private const val FRESH_MS = 5 * 60_000L
+    private const val FRESH_MS = 30 * 60_000L
     private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Candle>>>()
     private val poolCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
 
     /** Candles for [mint] on [span], from memory when they are fresh enough. */
-    fun series(mint: String, span: Span): List<Candle> {
+    fun series(mint: String, span: Span, bg: Boolean = false): List<Candle> {
         val key = "$mint|${span.name}"
         val now = System.currentTimeMillis()
         seriesCache[key]?.let { (at, v) -> if (now - at < FRESH_MS) return v }
         val pool = poolCache[mint]?.takeIf { now - it.first < 30 * 60_000L }?.second
-            ?: topPool(mint)?.also { poolCache[mint] = now to it }
+            ?: topPool(mint, bg)?.also { poolCache[mint] = now to it }
             ?: return emptyList()
-        val v = candles(pool, span)
+        val v = candles(pool, span, bg)
         // An empty answer is not cached: the pool may simply be a minute too young,
         // and a coin bought right now is exactly the one somebody wants to see.
         if (v.isNotEmpty()) seriesCache[key] = now to v
@@ -86,8 +86,8 @@ object Gecko {
     }
 
     /** The busiest pool for [mint], which is the one a price should come from. */
-    fun topPool(mint: String): String? {
-        val data = get("$BASE/tokens/$mint/pools?page=1")?.optJSONArray("data") ?: return null
+    fun topPool(mint: String, bg: Boolean = false): String? {
+        val data = get("$BASE/tokens/$mint/pools?page=1", bg)?.optJSONArray("data") ?: return null
         var best: String? = null
         var bestLiq = -1.0
         for (i in 0 until data.length()) {
@@ -116,9 +116,9 @@ object Gecko {
      */
     data class Candle(val at: Long, val close: Double)
 
-    fun candles(pool: String, span: Span): List<Candle> {
+    fun candles(pool: String, span: Span, bg: Boolean = false): List<Candle> {
         val url = "$BASE/pools/$pool/ohlcv/${span.path}?aggregate=${span.aggregate}&limit=${span.limit}"
-        val list = get(url)?.optJSONObject("data")?.optJSONObject("attributes")
+        val list = get(url, bg)?.optJSONObject("data")?.optJSONObject("attributes")
             ?.optJSONArray("ohlcv_list") ?: return emptyList()
         val out = ArrayList<Candle>(list.length())
         for (i in 0 until list.length()) {
@@ -147,27 +147,52 @@ object Gecko {
      */
     private val gate = Any()
     @Volatile private var lastCall = 0L
-    private const val GAP_MS = 2200L
+    @Volatile private var lastFront = 0L
+    /** A chart somebody opened waits about a second. */
+    private const val GAP_FRONT = 900L
+    /** The curve filling itself in behind the buttons waits much longer, and gets out of the way. */
+    private const val GAP_BACK = 3600L
 
-    private fun pace() {
+    /**
+     * Two lanes, because one of the two callers has somebody watching it.
+     *
+     * A single gap for everybody made the balance curve and an opened chart
+     * equally slow, and the curve goes first because it starts with the screen:
+     * tap a row and you queue behind six of its requests. So background work
+     * keeps a wider gap and also stands down for three seconds after anything in
+     * front asked, which is exactly the window in which a person is waiting.
+     */
+    private fun pace(bg: Boolean) {
         synchronized(gate) {
-            val since = System.currentTimeMillis() - lastCall
-            if (since in 0 until GAP_MS) runCatching { Thread.sleep(GAP_MS - since) }
+            val now = System.currentTimeMillis()
+            var wait = (if (bg) GAP_BACK else GAP_FRONT) - (now - lastCall)
+            if (bg) wait = maxOf(wait, 3000L - (now - lastFront))
+            if (wait > 0) runCatching { Thread.sleep(wait) }
             lastCall = System.currentTimeMillis()
+            if (!bg) lastFront = lastCall
         }
     }
 
-    private fun get(url: String): JSONObject? = try {
-        pace()
-        val c = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 6000; readTimeout = 12000
-            setRequestProperty("Accept", "application/json")
+    private fun get(url: String, bg: Boolean = false): JSONObject? {
+        // Refused once is not refused. The limiter answers 429 and forgets about
+        // it a moment later, and an empty answer here is a chart that simply
+        // does not appear, which reads as broken rather than as busy.
+        repeat(2) { attempt ->
+            pace(bg)
+            val body = runCatching {
+                val c = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 6000; readTimeout = 12000
+                    setRequestProperty("Accept", "application/json")
+                }
+                val code = c.responseCode
+                val out = if (code in 200..299) c.inputStream.bufferedReader().use { it.readText() } else null
+                c.disconnect()
+                if (out == null) Log.w(TAG, "GET $code")
+                out
+            }.getOrElse { Log.w(TAG, "GET failed: ${it.message}"); null }
+            if (body != null) return runCatching { JSONObject(body) }.getOrNull()
+            if (attempt == 0) runCatching { Thread.sleep(1400) }
         }
-        val code = c.responseCode
-        val body = if (code in 200..299) c.inputStream.bufferedReader().use { it.readText() } else null
-        c.disconnect()
-        body?.let { JSONObject(it) }
-    } catch (e: Exception) {
-        Log.w(TAG, "GET failed: ${e.message}"); null
+        return null
     }
 }

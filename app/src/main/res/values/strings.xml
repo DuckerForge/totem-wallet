@@ -1707,6 +1707,9 @@
     <string name="gift_review_hint">This is what you will sign: your wallet funds a fresh key, and the link carries that key. Hold the button, then the fingerprint.</string>
     <string name="crowd_tab_followed_short">Followed</string>
     <string name="feed_round">%1$s SOL in, %2$s out · %3$s</string>
+    <string name="chart_now">now</string>
+    <string name="chart_ago">%1$s ago</string>
+    <string name="feed_no_chart">No price history for this coin: nobody runs a pool deep enough to chart it.</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

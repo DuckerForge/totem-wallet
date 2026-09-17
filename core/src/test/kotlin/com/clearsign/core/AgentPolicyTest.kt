@@ -272,6 +272,15 @@ class AgentPolicyTest {
         assertTrue(staysInPocket(swap(0.01, usdc, "USDC", 1.0), policy))
     }
 
+    @Test fun aRoundTripStillCountsAsAMove() {
+        // Il giro non spende la giornata, ma e' una mossa: il tetto orario conta
+        // le mosse, non i soldi, e un agente che gira senza toccare nessun
+        // limite paga commissione e spread a ogni giro.
+        val full = SpendHistory(spentLast24hLamports = 0L, txLastHour = policy.maxTxPerHour)
+        val d = decide(swap(0.01, usdc, "USDC", 1.0), h = full)
+        assertTrue(d is Decision.Refuse && d.code == "rate", d.toString())
+    }
+
     @Test fun aTransferOutSpendsTheDay() {
         assertFalse(staysInPocket(transferTo(luca, 0.01), policy))
     }

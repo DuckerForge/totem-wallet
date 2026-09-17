@@ -187,9 +187,8 @@ class AgentGateActivity : ComponentActivity() {
                                     val spent = if (allSol) out.sumOf { kotlin.math.abs(it.rawAmount) }
                                     else SessionWallet.policy(this@AgentGateActivity)?.perTxLamports ?: 0L
                                     val pol = SessionWallet.policy(this@AgentGateActivity)
-                                    if (pol == null || !com.clearsign.core.staysInPocket(receipt, pol)) {
-                                        SessionWallet.recordSpend(this@AgentGateActivity, spent)
-                                    }
+                                    val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol)
+                                    SessionWallet.recordSpend(this@AgentGateActivity, if (homeAgain) 0L else spent)
                                 }
                                 AgentBroker.complete(j, AgentBroker.Verdict.Confirmed(txSig))
                                 AgentLink.noteAction(this@AgentGateActivity, getString(R.string.agent_last_confirmed, IntentGuard.summary(agentIntent, deviceLocaleTag() == "it")))

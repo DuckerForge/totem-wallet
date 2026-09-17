@@ -79,13 +79,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val cy = h * 0.17f
 
         // La V dei telefoni non e' una V qualsiasi che gli somiglia: e' **quella
-        // del marchio**, righe misurate dentro la sua immagine. I bracci stanno
-        // a 22 gradi e mezzo dalla verticale e le punte non arrivano agli angoli:
-        // una V larga quanto il quadrato sarebbe molto piu' aperta di cosi', ed
-        // e' esattamente lo scarto che si vedeva al cambio.
-        val vertex = Offset(cx, cy + d * 0.300f)
-        val armX = d * 0.230f
-        val armY = d * 0.554f
+        // del marchio**, presa appoggiando le sagome dei due telefoni sopra
+        // l'icona finche' non ci cascano dentro. I due pannelli scuri stanno a
+        // trenta gradi dalla verticale e il vertice e' basso, a 0,82 del lato:
+        // leggerli da un ritaglio di righe li dava molto piu' chiusi, perche' la
+        // parte bassa dell'immagine e' un'altra cosa e sporcava la misura.
+        val vertex = Offset(cx, cy + d * 0.320f)
+        val armX = d * 0.350f
+        val armY = d * 0.606f
         val leftTip = Offset(cx - armX, vertex.y - armY)
         val rightTip = Offset(cx + armX, vertex.y - armY)
         val armLen = hypot(armX, armY)
@@ -99,9 +100,13 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // figurine, ma una cosa che diventa l'altra dentro un lampo.
         val land = ease(seg(t, 0.00f, 0.26f))
         val hold = seg(t, 0.30f, 0.40f)
-        val spark = ease(seg(t, 0.40f, 0.56f))
-        val become = ease(seg(t, 0.50f, 0.66f))
-        val fade = seg(t, 0.92f, 1.00f)
+        val spark = ease(seg(t, 0.40f, 0.54f))
+        // Fra la fine del tratto e la dissolvenza c'e' una battuta ferma: la V
+        // di due Seeker con il bordo acceso. Prima `become` partiva a 0,50 e il
+        // tratto cominciava a scivolare **mentre** lo stavo ancora disegnando,
+        // quindi si staccava dal telefono a meta' corsa.
+        val become = ease(seg(t, 0.62f, 0.76f))
+        val fade = seg(t, 0.94f, 1.00f)
 
         // L'apertura della porta non salta il racconto, lo lascia finire e poi
         // ritira tutto.
@@ -112,9 +117,13 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // telefoni non si vedevano piu' **mai**, e la porta mostrava un logo fermo.
         // Adesso il giro va per conto suo e l'apertura lo sfuma via.
         val leaving = 1f - op * 0.85f
-        val phoneAlpha = land * (1f - become) * leaving
+        // I telefoni se ne vanno in fretta una volta cominciato: a dissolvenza
+        // lineare il corpo sparisce ma le isole della fotocamera restano
+        // leggibili, e sembrano due macchie che galleggiano sul marchio.
+        val gone = (1f - become).let { it * it * it }
+        val phoneAlpha = land * gone * leaving
         val markAlpha = become * (1f - fade * 0.55f) * leaving
-        val glow = spark * (1f - seg(t, 0.72f, 0.92f) * 0.6f)
+        val glow = spark * (1f - seg(t, 0.80f, 0.94f) * 0.6f)
 
         // --- il respiro dietro ---------------------------------------------
         drawCircle(
@@ -160,15 +169,19 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         if (spark > 0f && become < 1f) {
             val ux = (rightTip.x - vertex.x) / armLen
             val uy = (rightTip.y - vertex.y) / armLen
-            val c = seat(rightTip, 1f)
-            val half = phoneLen / 2f - phoneW * 0.24f
+            // Non in mezzo al telefono: sul suo **bordo sinistro**, quello che
+            // guarda il vertice. Nel marchio il tratto e' la piega fra i due
+            // pannelli, non una riga in mezzo a uno.
+            val edge = Offset(uy, -ux)
+            val c = seat(rightTip, 1f) + edge * (phoneW * 0.46f)
+            val half = phoneLen / 2f - phoneW * 0.15f
             // Nel marchio il tratto non e' l'asse del braccio: parte sotto il
             // vertice, taglia la V ed esce dalla punta destra, molto piu'
             // inclinato. Misurato dentro l'immagine. Mentre i telefoni si
             // dissolvono il tratto ci scivola sopra, cosi' il marchio non
             // arriva: si posa su qualcosa che e' gia' al posto giusto.
-            val a = mix(Offset(c.x - ux * half, c.y - uy * half), Offset(cx - d * 0.154f, cy + d * 0.250f), become)
-            val b = mix(Offset(c.x + ux * half, c.y + uy * half), Offset(cx + d * 0.346f, cy - d * 0.260f), become)
+            val a = mix(Offset(c.x - ux * half, c.y - uy * half), Offset(cx - d * 0.310f, cy + d * 0.280f), become)
+            val b = mix(Offset(c.x + ux * half, c.y + uy * half), Offset(cx + d * 0.360f, cy - d * 0.330f), become)
             neon(a, b, spark, (1f - become) * (0.4f + 0.6f * spark), d, (1f - become * 0.8f) * leaving)
         }
 

@@ -1,5 +1,6 @@
 package com.clearsign.app
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
@@ -46,13 +47,28 @@ object BalanceCurve {
     private const val MIN_POINTS = 8
     private const val TRACK_MAX = 6
     private const val TTL_MS = 30 * 60_000L
+    /** How old a written curve may be before it is worth thirteen requests to redraw it. */
+    private const val DISK_MS = 6 * 3600_000L
 
     private val cache = ConcurrentHashMap<String, Pair<Long, List<Double>>>()
 
-    suspend fun of(owner: String, view: PortfolioView): List<Double> = withContext(Dispatchers.IO) {
+    suspend fun of(ctx: Context, owner: String, view: PortfolioView): List<Double> = withContext(Dispatchers.IO) {
         val key = owner + "|" + view.currency
         val now = System.currentTimeMillis()
         cache[key]?.let { (at, v) -> if (now - at < TTL_MS) return@withContext v }
+        // Written down, so it is on screen the instant the app opens.
+        //
+        // It lived in memory only, and memory dies with the process: every cold
+        // start paid thirteen requests and four seconds of pauses before the
+        // shape appeared, so the first thing you saw in the morning was the one
+        // morning it was missing. Six hours is old enough for a thirty-day
+        // shape, and the whole thing is scaled onto today's total before it is
+        // drawn, so the right-hand edge is never stale even when the curve is.
+        read(ctx, key, now)?.let { stored ->
+            val anchored = anchor(stored, view.total)
+            cache[key] = now to anchored
+            return@withContext anchored
+        }
 
         // Everything that is yours and has a price, coins and DeFi together.
         //
@@ -123,6 +139,34 @@ object BalanceCurve {
             }
         }
         cache[key] = now to out
+        runCatching { write(ctx, key, now, out) }
         out
+    }
+
+    /** The same shape, lifted so its last point is what the wallet is worth now. */
+    private fun anchor(v: List<Double>, total: Double): List<Double> {
+        val last = v.lastOrNull() ?: return v
+        if (last <= 0.0 || total <= 0.0) return v
+        val k = total / last
+        return v.map { it * k }
+    }
+
+    private fun file(ctx: Context) = java.io.File(ctx.filesDir, "balance_curve.json")
+
+    private fun write(ctx: Context, key: String, at: Long, v: List<Double>) {
+        val a = org.json.JSONArray()
+        v.forEach { a.put(it) }
+        file(ctx).writeText(org.json.JSONObject().put("k", key).put("at", at).put("v", a).toString())
+    }
+
+    private fun read(ctx: Context, key: String, now: Long): List<Double>? {
+        val f = file(ctx)
+        if (!f.exists()) return null
+        val o = runCatching { org.json.JSONObject(f.readText()) }.getOrNull() ?: return null
+        if (o.optString("k") != key) return null
+        if (now - o.optLong("at") > DISK_MS) return null
+        val a = o.optJSONArray("v") ?: return null
+        val out = (0 until a.length()).map { a.optDouble(it) }.filter { !it.isNaN() }
+        return out.takeIf { it.size >= MIN_POINTS }
     }
 }

@@ -105,6 +105,32 @@ def symbols(mints):
         except Exception:
             pass
         time.sleep(0.2)
+    # Quelle che Jupiter non conosce sono proprio i regali del telefono, cioè il
+    # cuore di quello che la scheda racconta: SEKR, JUPENGU, JPMB. Senza nome
+    # finivano in scheda come pezzi di indirizzo, e una riga al 30% che si chiama
+    # "FfrLtQ" non dice niente a nessuno. Il nome vero sta sulla catena.
+    missing = [m for m in mints if m not in out]
+    if missing:
+        out.update(onchain_symbols(missing))
+    return out
+
+
+def onchain_symbols(mints):
+    """Il simbolo dai metadati, chiesto al nodo una moneta alla volta."""
+    out = {}
+    url = rpc_url()
+    for m in mints:
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getAsset", "params": {"id": m}}).encode()
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=25) as r:
+                res = json.loads(r.read()).get('result') or {}
+            sym = ((res.get('content') or {}).get('metadata') or {}).get('symbol')
+            if sym:
+                out[m] = sym
+        except Exception:
+            pass
+        time.sleep(0.1)
     return out
 
 

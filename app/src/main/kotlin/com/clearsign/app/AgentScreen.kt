@@ -208,11 +208,11 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             // opens a small sheet rather than flipping a switch.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (cfg.on) {
-                    GhostButton(stringResource(R.string.trader_stop_action), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber) {
+                    GhostButton(stringResource(R.string.trader_stop_action), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber, height = 54.dp) {
                         TraderLoop.stop(ctx, ctx.getString(R.string.trader_stopped_by_you)); TraderKeeper.sync(ctx); refresh++
                     }
                 } else {
-                    GhostButton(stringResource(R.string.agent_start), Modifier.weight(1f), HIcon.AGENT, tint = Halo.mint) { showLane = true }
+                    GhostButton(stringResource(R.string.agent_start), Modifier.weight(1f), HIcon.AGENT, tint = Halo.mint, height = 54.dp) { showLane = true }
                 }
                 Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.AGENT) { onChat() } }
             }

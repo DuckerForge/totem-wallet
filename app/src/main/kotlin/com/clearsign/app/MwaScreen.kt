@@ -517,11 +517,27 @@ internal fun PrimaryButton(label: String, danger: Boolean, enabled: Boolean = tr
 }
 
 @Composable
-internal fun GhostButton(label: String, modifier: Modifier = Modifier, icon: HIcon? = null, tint: Color = Halo.muted, fillWidth: Boolean = true, onClick: () -> Unit) {
+internal fun GhostButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    icon: HIcon? = null,
+    tint: Color = Halo.muted,
+    fillWidth: Boolean = true,
+    /**
+     * Quarantotto di suo, cinquantaquattro quando sta accanto a un pieno.
+     *
+     * I due tipi di bottone hanno altezze diverse di proposito: uno pieno pesa
+     * di piu' anche fisicamente. Messi fianco a fianco nella stessa riga pero'
+     * quella differenza non legge come gerarchia, legge come sbaglio, e in quella
+     * riga sono due cose che si fanno allo stesso modo.
+     */
+    height: androidx.compose.ui.unit.Dp = 48.dp,
+    onClick: () -> Unit,
+) {
     val shape = rs(16)
     val src = remember { MutableInteractionSource() }
     Row(
-        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(48.dp).clip(shape).border(cardBorder(), shape).clickable(interactionSource = src, indication = null) { onClick() },
+        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(height).clip(shape).border(cardBorder(), shape).clickable(interactionSource = src, indication = null) { onClick() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { HaloIcon(icon, tint, 17.dp); Spacer(Modifier.width(8.dp)) }

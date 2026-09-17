@@ -26,7 +26,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import kotlin.math.atan2
@@ -161,12 +160,12 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         if (phoneAlpha > 0.01f) {
             listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
                 val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
-                // Quello di sinistra e' lo specchio dell'altro. Il dorso di un
-                // Seeker non e' simmetrico, l'isola sta in un angolo solo:
-                // disegnandoli uguali un'isola finiva all'esterno della V e
-                // l'altra all'interno, e due telefoni messi cosi' sembrano
-                // inclinati in modo diverso anche quando l'angolo e' lo stesso.
-                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark, mirror = side < 0f)
+                // Uno di fronte e uno di dorso. Due dorsi uguali erano la stessa
+                // cosa detta due volte, e per non farli sembrare inclinati in
+                // modo diverso andava pure specchiato quello di sinistra, che e'
+                // una toppa. Cosi' invece i due lati del telefono si vedono
+                // tutti e due, e il tratto corre sul dorso, dove sta nel marchio.
+                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark, back = side > 0f)
             }
         }
 
@@ -257,7 +256,7 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
 }
 
 /**
- * Un Seeker, di dorso.
+ * Un Seeker.
  *
  * Il telefono e' gia' disegnato altrove, e non a occhio: `drawPhone` in
  * TapAnimation viene dal disegno di fabbrica del Seeker, isola a tre obiettivi
@@ -265,8 +264,10 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
  * due telefoni. Disegnarne un altro qui voleva dire tenere due Seeker diversi
  * nella stessa app e vederli divergere alla prima correzione.
  *
- * Di dorso e non di fronte: davanti, a questa misura, e' un rettangolo nero che
- * potrebbe essere di chiunque.
+ * Uno dei due di dorso, perche' davanti, a questa misura, un telefono e' un
+ * rettangolo nero che potrebbe essere di chiunque: l'isola a tre obiettivi e'
+ * quello che dice Seeker. L'altro di fronte, cosi' del telefono si vedono tutti
+ * e due i lati invece della stessa cosa detta due volte.
  */
 private fun DrawScope.phone(
     center: Offset,
@@ -275,26 +276,24 @@ private fun DrawScope.phone(
     angle: Float,
     alpha: Float,
     glow: Float,
-    mirror: Boolean = false,
+    back: Boolean,
 ) {
     if (alpha <= 0.01f) return
     // Il corpo si scalda quando il tratto passa: e' l'unica cosa che lega i due
     // oggetti invece di lasciarli uno accanto all'altro.
     val body = lerp(Color(0xFF24243A), NEON_MID, 0.18f * glow)
     rotate(angle, center) {
-        scale(if (mirror) -1f else 1f, 1f, center) {
         drawPhone(
             x = center.x - wide / 2f,
             y = center.y - len / 2f,
             w = wide,
             h = len,
-            back = true,
+            back = back,
             body = body.copy(alpha = alpha),
             edge = Color(0xFFB2B2E4).copy(alpha = alpha),
             ink = Color(0xFF12121C).copy(alpha = alpha),
-            glass = Color(0xFF0E0E18).copy(alpha = alpha),
+            glass = Color(0xFF0B0B14).copy(alpha = alpha),
         )
-        }
     }
 }
 

@@ -149,6 +149,14 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                 colors = pickerField(), shape = rs(12),
             )
 
+            // Il giudizio sull'indirizzo, mentre lo incolli e non dopo.
+            val fits = target?.let { t -> dest.takeIf { it.isNotBlank() }?.let { RocketX.addressFits(t, it) } }
+            if (fits == false) {
+                Banner(stringResource(R.string.bridge_dest_wrong, target?.name ?: ""), Halo.red, HIcon.BLOCK)
+            } else if (fits == null && dest.length >= 20) {
+                Text(stringResource(R.string.bridge_dest_unknown), style = HaloType.small, color = Halo.amber, lineHeight = 16.sp)
+            }
+
             if (quoting) Text(stringResource(R.string.bridge_quoting), style = HaloType.small, color = Halo.muted)
             error?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             quotes.take(3).forEachIndexed { i, q ->
@@ -170,7 +178,7 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
             }
 
             busy?.let { Working(it) }
-            val ready = quotes.isNotEmpty() && dest.length >= 20 && amt != null && amt > 0 && busy == null
+            val ready = quotes.isNotEmpty() && dest.length >= 20 && amt != null && amt > 0 && busy == null && fits != false
             PrimaryButton(stringResource(R.string.bridge_go), danger = false, enabled = ready, icon = HIcon.SWAP) {
                 val q = quotes.first(); val t = target ?: return@PrimaryButton
                 busy = ctx.getString(R.string.bridge_opening)
@@ -180,10 +188,31 @@ internal fun BridgeSheet(owner: String, onSend: (PayRequest, String?) -> Unit, o
                     val deposit = order?.depositAddress
                     when {
                         order == null || deposit == null -> error = ctx.getString(R.string.bridge_open_failed)
+                        // Il preventivo diceva che questa rotta pretende un memo, e
+                        // l'ordine non ne ha portato uno. Un deposito senza memo su
+                        // una catena che lo pretende arriva e non viene accreditato
+                        // a nessuno: e' il preventivo stesso a dirlo, e quel campo
+                        // non veniva guardato da nessuna parte.
+                        q.memoRequired && order.memo.isNullOrBlank() ->
+                            error = ctx.getString(R.string.bridge_memo_missing)
                         else -> {
                             // The deposit is a payment like any other: Send, receipt, print. A memo, when the route wants one, rides in the transaction.
                             RocketX.remember(ctx, RocketX.Bridge(order.requestId, "", fromSym, if (usdc && sameCoin) "USDC" else t.native, t.name, System.currentTimeMillis(), order.exchange, deposit))
-                            onSend(PayRequest(deposit, amt, fromMint, ctx.getString(R.string.bridge_memo_line, t.name, order.exchange), "RocketX"), order.memo)
+                            // La destinazione finale finisce sullo scontrino.
+                            //
+                            // Quello che si firma e' un pagamento a RocketX, quindi
+                            // sullo scontrino compariva l'indirizzo del deposito e
+                            // mai quello dove i soldi vanno a finire: l'unica cosa
+                            // che conta davvero non si vedeva al momento della firma.
+                            val tail = if (dest.length > 10) dest.take(6) + "…" + dest.takeLast(6) else dest
+                            onSend(
+                                PayRequest(
+                                    deposit, amt, fromMint,
+                                    ctx.getString(R.string.bridge_memo_line, t.name, order.exchange) + " · " + tail,
+                                    "RocketX",
+                                ),
+                                order.memo,
+                            )
                         }
                     }
                 }

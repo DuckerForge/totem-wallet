@@ -60,6 +60,19 @@ object BalanceCurve {
 
     private val cache = ConcurrentHashMap<String, Pair<Long, List<Double>>>()
 
+    /**
+     * Quando l'app e' partita, e perche' importa.
+     *
+     * Calcolare la curva da zero costa sei richieste a una fonte che rifiuta
+     * dopo cinque ravvicinate e resta offesa per decine di secondi. Farlo
+     * all'avvio vuol dire farlo esattamente mentre la persona apre le righe e
+     * guarda i grafici, e quello che vedeva era il suo grafico che non arrivava
+     * perche' lo sfondo si era mangiato tutto. Se la curva e' gia' scritta
+     * compare subito; se va calcolata, aspetta che il primo minuto sia passato.
+     */
+    private val bornAt = System.currentTimeMillis()
+    private const val QUIET_MS = 60_000L
+
     suspend fun of(ctx: Context, owner: String, view: PortfolioView): List<Double> = withContext(Dispatchers.IO) {
         val key = owner + "|" + view.currency
         val now = System.currentTimeMillis()
@@ -87,6 +100,9 @@ object BalanceCurve {
         // to a coin you also hold by that name. Staked SKR and SKR in the wallet
         // are then one line to look up instead of two, which also spends one
         // request instead of two.
+        val waited = System.currentTimeMillis() - bornAt
+        if (waited < QUIET_MS) kotlinx.coroutines.delay(QUIET_MS - waited)
+
         val byMint = HashMap<String, Double>()
         val symbolToMint = HashMap<String, String>()
         for (h in view.holdings) {

@@ -1712,6 +1712,7 @@
     <string name="feed_no_chart">Nessun grafico adesso. Tocca per riprovare.</string>
     <string name="gift_see_receipt">Vedi lo scontrino, poi paga</string>
     <string name="env_review_hint_swap">Questo e quello che firmi. Tieni premuto, poi l\'impronta.</string>
+    <string name="feed_chart_wait">Sto cercando il grafico…</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
     <string name="hold_col_each">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>

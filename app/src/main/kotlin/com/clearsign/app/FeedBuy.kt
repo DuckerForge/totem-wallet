@@ -68,6 +68,15 @@ internal fun FeedBuyPanel(
     var balance by remember(owner) { mutableStateOf<Long?>(null) }
 
     var chartTry by remember(mint) { mutableIntStateOf(0) }
+    // Insiste da sola, invece di arrendersi al primo no.
+    //
+    // La fonte dei grafici rifiuta a raffiche e poi torna disponibile. Prima
+    // dell'attesa fra una richiesta e l'altra il pannello ritentava per conto suo
+    // a ogni ricomposizione, e il grafico "compariva dopo un po'": brutto da
+    // dentro, giusto da fuori. Adesso riprova tre volte a otto secondi, e la
+    // riga dice che sta ancora guardando. Solo dopo si arrende, e si puo'
+    // toccare per un altro giro.
+    var giveUp by remember(mint) { mutableStateOf(false) }
     LaunchedEffect(mint, chartTry) {
         Gecko.warmPools(ctx)
         withContext(Dispatchers.IO) {
@@ -75,6 +84,13 @@ internal fun FeedBuyPanel(
             decimals = runCatching { JupiterTokens.byMints(listOf(mint))[mint]?.decimals }.getOrNull()
             series = runCatching { Gecko.series(mint, spanFor(moves)) }.getOrDefault(emptyList())
         }
+        var left = 3
+        while (series.size <= 2 && left > 0) {
+            left--
+            kotlinx.coroutines.delay(8000)
+            series = withContext(Dispatchers.IO) { runCatching { Gecko.series(mint, spanFor(moves)) }.getOrDefault(emptyList()) }
+        }
+        if (series.size <= 2) giveUp = true
     }
     LaunchedEffect(owner) {
         owner ?: return@LaunchedEffect
@@ -163,7 +179,10 @@ internal fun FeedBuyPanel(
         // price history anywhere, and the panel simply had a hole where the
         // picture goes. A hole reads as a thing that failed to load, and people
         // tap it again.
-        if (series.size <= 2) {
+        if (series.size <= 2 && !giveUp) {
+            Text(stringResource(R.string.feed_chart_wait), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
+        }
+        if (series.size <= 2 && giveUp) {
             // Said as what it is, and not as a fact about the coin.
             //
             // It used to read "nobody runs a pool deep enough to chart it",
@@ -175,7 +194,7 @@ internal fun FeedBuyPanel(
             Text(
                 stringResource(R.string.feed_no_chart),
                 style = HaloType.small, color = Halo.cyan, lineHeight = 16.sp,
-                modifier = Modifier.clickable { chartTry++ },
+                modifier = Modifier.clickable { giveUp = false; chartTry++ },
             )
         }
 

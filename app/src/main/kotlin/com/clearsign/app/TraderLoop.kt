@@ -857,8 +857,25 @@ object TraderLoop {
             // by the loop or by nobody. Said on the row rather than swallowed.
             // Measured on 2026-09-15: a 0.036 SOL position with SOL at 99 dollars
             // is 3.60 dollars, and its target 4.68, both under the floor.
-            JupiterTrigger.Placed.TooSmall -> Positions.note(ctx, mint, ctx.getString(R.string.trader_no_onchain_small))
-            else -> Unit
+            JupiterTrigger.Placed.TooSmall -> {
+                Positions.note(ctx, mint, ctx.getString(R.string.trader_no_onchain_small))
+                AgentTrace.say(ctx.getString(R.string.trader_no_onchain_small), AgentTrace.Kind.REFUSED)
+            }
+            // Qualsiasi altro no, detto. Era `else -> Unit`: l'app aveva appena
+            // promesso un ordine in catena e poi taceva, e la posizione restava
+            // senza uscita che sopravviva all'app senza che nessuno lo dicesse.
+            // Un fallimento silenzioso su una promessa fatta e' peggio di un
+            // fallimento: e' una bugia a scoppio ritardato.
+            is JupiterTrigger.Placed.Failed -> {
+                val why = ctx.getString(R.string.trader_no_onchain_why, r.reason)
+                Positions.note(ctx, mint, why)
+                AgentTrace.say(why, AgentTrace.Kind.REFUSED)
+            }
+            null -> {
+                val why = ctx.getString(R.string.trader_no_onchain_why, "?")
+                Positions.note(ctx, mint, why)
+                AgentTrace.say(why, AgentTrace.Kind.REFUSED)
+            }
         }
     }
 

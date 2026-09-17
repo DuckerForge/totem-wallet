@@ -1724,6 +1724,7 @@
     <string name="agent_slice">How much of the cap it puts in</string>
     <string name="trace_fee_ok">%1$s keeps a %2$d%% fee, inside the %3$d%% you allow</string>
     <string name="agent_fee_max">Coin fee allowed</string>
+    <string name="rules_cap_is_budget">This is the whole budget: %1$s. To let it go higher, put more into the budget.</string>
     <string name="rules_daily_used">Today it has spent %1$s of %2$s. The cap cannot go past the budget: more than you have cannot leave.</string>
     <string name="rules_daily_roundtrip">A coin bought and sold back does not count here: nothing left the pocket, it only changed shape.</string>
     <string name="bridge_dest_wrong">This is not a %1$s address. Sent anyway, the money goes somewhere that is not yours and does not come back.</string>

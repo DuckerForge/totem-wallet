@@ -62,22 +62,28 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     val open = remember { Animatable(0f) }
     LaunchedEffect(opening) { if (opening) open.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
 
-    Canvas(modifier.fillMaxWidth().height(228.dp)) {
+    Canvas(modifier.fillMaxWidth()) {
         val w = size.width
         val h = size.height
-        val cx = w / 2f
         val op = open.value
 
-        // I due bracci della V, e da li' tutto il resto.
-        // Alta e raccolta.
+        // Il marchio vive in un quadrato suo, non nella scatola che gli tocca.
         //
-        // Il vertice stava al settanta per cento dell'altezza e i bracci erano
-        // lunghi: la V finiva schiacciata in basso e riempiva tutto, e una cosa
-        // che riempie tutto non e' un marchio, e' uno sfondo. Adesso sta al
-        // centro con dell'aria intorno.
-        val vertex = Offset(cx, h * 0.605f)
-        val armX = w * 0.132f
-        val armY = h * 0.325f
+        // La prima stesura misurava tutto in percentuale di larghezza e altezza.
+        // Ma la scatola qui e' `weight(1f)`, cioe' si prende tutta l'altezza che
+        // avanza: su uno schermo alto la V si schiacciava in verticale, i due
+        // telefoni finivano uno sopra l'altro e il tratto diventava un tubo. Una
+        // forma non puo' dipendere dal buco in cui la metti.
+        val d = min(w * 0.46f, h * 0.62f)
+        val cx = w / 2f
+        // Sotto il nome, non a mezzo schermo. La scatola qui prende tutta
+        // l'altezza che avanza, quindi centrarsi dentro di lei vuol dire finire
+        // lontanissimo dal titolo, con un buco in mezzo.
+        val cy = h * 0.17f
+
+        val vertex = Offset(cx, cy + d * 0.30f)
+        val armX = d * 0.34f
+        val armY = d * 0.56f
         val leftTip = Offset(cx - armX, vertex.y - armY)
         val rightTip = Offset(cx + armX, vertex.y - armY)
 
@@ -87,38 +93,44 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val draw = ease(seg(t, 0.36f, 0.74f))
         val bloom = seg(t, 0.68f, 0.82f)
         val rest = seg(t, 0.90f, 1.00f)
-        // Aprendo la porta il tratto e' gia' tutto acceso, comunque vada il giro.
         val reveal = max(draw, op)
         val glow = max(bloom * (1f - rest), op)
 
         // --- il respiro dietro, al posto del campo stellato -----------------
         drawCircle(
             Brush.radialGradient(
-                listOf(NEON_MID.copy(alpha = 0.055f * (0.4f + 0.6f * reveal)), Color.Transparent),
-                center = vertex, radius = w * 0.52f,
+                listOf(NEON_MID.copy(alpha = 0.05f * (0.4f + 0.6f * reveal)), Color.Transparent),
+                center = Offset(cx, cy), radius = d * 0.95f,
             ),
-            radius = w * 0.52f, center = vertex,
+            radius = d * 0.95f, center = Offset(cx, cy),
         )
 
         // --- i due telefoni ------------------------------------------------
+        // Il fondo di ognuno arriva al vertice e la cima si apre: e' la V, ed e'
+        // due telefoni che si toccano.
         val armLen = hypot(armX, armY)
-        val phoneLen = armLen * 0.88f
-        val phoneW = phoneLen * 0.44f
+        val phoneLen = armLen * 0.92f
+        val phoneW = phoneLen * 0.40f
         listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
             val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
-            // Arrivano da fuori lungo la propria diagonale e rallentano entrando.
             val away = 1f - land
-            val from = Offset(mid.x + side * w * 0.75f * away, mid.y - h * 0.30f * away)
+            val from = Offset(mid.x + side * d * 1.5f * away, mid.y - d * 0.6f * away)
             val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
             phone(from, phoneLen, phoneW, ang, land * (1f - op * 0.35f), glow)
         }
 
         // --- il tratto al neon ---------------------------------------------
-        // Un solo tratto dritto che attraversa la V, come nel marchio: non il
-        // contorno della V, che sarebbe un'altra forma.
-        val a = Offset(cx - w * 0.068f, h * 0.665f)
-        val b = Offset(cx + w * 0.138f, h * 0.235f)
-        neon(a, b, reveal, glow, w)
+        //
+        // Nel marchio il tratto **corre lungo il braccio destro della V**, e
+        // sborda un po' oltre tutte e due le punte: e' quel braccio, acceso. Lo
+        // avevo messo di traverso in mezzo alla V, e si vedeva: sembrava una
+        // riga buttata sopra due telefoni invece del logo.
+        val ux = (rightTip.x - vertex.x) / armLen
+        val uy = (rightTip.y - vertex.y) / armLen
+        val over = armLen * 0.10f
+        val a = Offset(vertex.x - ux * over, vertex.y - uy * over)
+        val b = Offset(rightTip.x + ux * over, rightTip.y + uy * over)
+        neon(a, b, reveal, glow, d)
     }
 }
 
@@ -135,9 +147,11 @@ private val NEON_HIGH = Color(0xFF0BF5EC)
  * perche' e' cosi' che si mostra solo la parte gia' arrivata. Tre passate: un
  * alone largo e tenue, una media, e il filo vero, che e' quello che si legge.
  */
-private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, w: Float) {
+private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: Float) {
     if (reveal <= 0f) return
-    val core = w * 0.013f
+    // Spesso come nel logo, non come un tubo al neon: misurato sul marchio, che
+    // e' l'unica cosa di cui il tratto e' una parte.
+    val core = d * 0.017f
     val steps = 44
     for (i in 0 until steps) {
         val u0 = i / steps.toFloat()
@@ -147,8 +161,8 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, w: 
         val p1 = Offset(a.x + (b.x - a.x) * u1, a.y + (b.y - a.y) * u1)
         val u = (u0 + u1) / 2f
         val c = if (u < 0.5f) lerp(NEON_LOW, NEON_MID, u * 2f) else lerp(NEON_MID, NEON_HIGH, (u - 0.5f) * 2f)
-        drawLine(c.copy(alpha = 0.10f + 0.16f * glow), p0, p1, core * 5.2f, StrokeCap.Round)
-        drawLine(c.copy(alpha = 0.26f + 0.24f * glow), p0, p1, core * 2.4f, StrokeCap.Round)
+        drawLine(c.copy(alpha = 0.09f + 0.13f * glow), p0, p1, core * 4.4f, StrokeCap.Round)
+        drawLine(c.copy(alpha = 0.24f + 0.22f * glow), p0, p1, core * 2.1f, StrokeCap.Round)
         drawLine(c, p0, p1, core, StrokeCap.Round)
     }
     // La punta accesa mentre viaggia, e niente quando e' arrivata: un filo che
@@ -176,15 +190,15 @@ private fun DrawScope.phone(center: Offset, len: Float, wide: Float, angle: Floa
         val sz = Size(wide, len)
         val r = CornerRadius(wide * 0.20f)
         drawRoundRect(
-            Brush.verticalGradient(listOf(Color(0xFF1A1A22), Color(0xFF0B0B10)), startY = tl.y, endY = tl.y + len),
+            Brush.verticalGradient(listOf(Color(0xFF2E2E3E), Color(0xFF15151F)), startY = tl.y, endY = tl.y + len),
             tl, sz, r, alpha = alpha,
         )
-        drawRoundRect(Color(0xFF34344A).copy(alpha = alpha * 0.85f), tl, sz, r, style = Stroke(1.1.dp.toPx()))
+        drawRoundRect(Color(0xFF5E5E82).copy(alpha = alpha), tl, sz, r, style = Stroke(1.4.dp.toPx()))
         val ins = wide * 0.075f
         val gtl = Offset(tl.x + ins, tl.y + ins)
         val gsz = Size(wide - ins * 2f, len - ins * 2f)
         val gr = CornerRadius(wide * 0.15f)
-        drawRoundRect(Color(0xFF07070B).copy(alpha = alpha), gtl, gsz, gr)
+        drawRoundRect(Color(0xFF0A0A12).copy(alpha = alpha), gtl, gsz, gr)
         if (glow > 0.01f) drawRoundRect(NEON_MID.copy(alpha = 0.14f * glow * alpha), gtl, gsz, gr)
         drawRoundRect(
             Color(0xFF3C3C4E).copy(alpha = alpha * 0.7f),

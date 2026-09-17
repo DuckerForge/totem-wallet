@@ -1705,6 +1705,8 @@
     <string name="hero_closed">%1$d coins</string>
     <string name="hero_closed_defi">%1$d coins · %2$d in DeFi</string>
     <string name="gift_review_hint">This is what you will sign: your wallet funds a fresh key, and the link carries that key. Hold the button, then the fingerprint.</string>
+    <string name="crowd_tab_followed_short">Followed</string>
+    <string name="feed_round">%1$s SOL in, %2$s out · %3$s</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

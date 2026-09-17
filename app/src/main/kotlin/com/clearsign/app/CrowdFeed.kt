@@ -162,7 +162,7 @@ internal fun CrowdFeed(
                 val mine = openRow == e.mint
                 Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FeedRow(e, moves.size, now, mine, onWallet = { onWallet(e.wallet) }) { openRow = if (mine) null else e.mint }
+                        FeedRow(e, moves, now, mine, onWallet = { onWallet(e.wallet) }) { openRow = if (mine) null else e.mint }
                         // The terminal, under the row that made you want it. Nobody
                         // leaves the feed to trade any more.
                         if (mine) FeedBuyPanel(e.mint, e.symbol, moves, owner, signer) { openRow = null }
@@ -192,7 +192,7 @@ private fun LiveDot() {
 }
 
 @Composable
-private fun FeedRow(e: CrowdBuy, times: Int, now: Long, open: Boolean, onWallet: () -> Unit, onOpen: () -> Unit) {
+private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean, onWallet: () -> Unit, onOpen: () -> Unit) {
     val whale = e.tier == SeekerTier.WHALE
     // A sale reads red whoever made it: the size of the wallet matters less than
     // the direction when somebody is on the way out.
@@ -256,13 +256,34 @@ private fun FeedRow(e: CrowdBuy, times: Int, now: Long, open: Boolean, onWallet:
                 color = if (e.sell) Halo.red.copy(alpha = 0.8f) else if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted,
                 style = Tabular, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            // Said once, quietly: this wallet has been in and out of this coin
-            // several times in the window. That is a fact about the wallet, and
-            // usually the most useful one on the row.
-            if (times > 1) Text(
-                stringResource(R.string.feed_churn, times),
-                fontFamily = Inter, fontSize = 10.5.sp, color = Halo.amber, maxLines = 1,
-            )
+            // The round trip, when we watched both ends of it.
+            //
+            // "Took out 10.28 SOL" is half a sentence: it says what came out and
+            // nothing about whether that was good. If the same wallet's buy is
+            // also in this window then we saw what went in, and the two numbers
+            // together are the only thing anybody actually wants to know. It is
+            // written only when we have both sides ourselves; a position opened
+            // before the window is one we cannot price, and guessing at it would
+            // be worse than staying quiet.
+            val paid = moves.filter { !it.sell }.sumOf { it.solSpent }
+            val took = moves.filter { it.sell }.sumOf { it.solSpent }
+            val times = moves.size
+            if (paid > 0.0 && took > 0.0) {
+                val pct = (took - paid) / paid * 100.0
+                Text(
+                    stringResource(R.string.feed_round, sol(paid), sol(took), (if (pct >= 0) "+" else "") + String.format(java.util.Locale.ROOT, "%.0f%%", pct)),
+                    fontFamily = Mono, fontSize = 10.5.sp, style = Tabular, maxLines = 1,
+                    color = if (pct >= 0) Halo.mint else Halo.red,
+                )
+            } else if (times > 1) {
+                // Said once, quietly: this wallet has been in and out of this coin
+                // several times in the window. That is a fact about the wallet, and
+                // usually the most useful one on the row.
+                Text(
+                    stringResource(R.string.feed_churn, times),
+                    fontFamily = Inter, fontSize = 10.5.sp, color = Halo.amber, maxLines = 1,
+                )
+            }
         }
         Spacer(Modifier.width(6.dp))
         // Follow this wallet: from now on what it buys goes to the agent as a

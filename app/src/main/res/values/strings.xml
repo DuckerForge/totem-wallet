@@ -1211,7 +1211,7 @@
     <string name="env_coins_sell">Sell them and close</string>
     <string name="env_coins_move">Move them to my account and close</string>
     <string name="env_stuck">Could not move %1$s. Nothing was closed.</string>
-        <string name="crowd_window">last 24 hours</string>
+        <string name="crowd_window">last 3 days</string>
     <string name="crowd_basis">Counted over the wallets the scanner managed to watch in those hours, a few hundred of the %1$d it follows. Most Seekers have not moved in months.</string>
     <string name="crowd_more">And %1$d more coins below these.</string>
     <string name="crowd_bias">Whales are re-read every ten minutes and everybody else every hour and twenty, so a whale\'s purchase is likelier to be caught. The whale count on a row is partly about how we look, not only about who bought.</string>

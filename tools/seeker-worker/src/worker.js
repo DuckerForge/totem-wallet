@@ -45,7 +45,20 @@ const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const MIN_SOL = 0.005;
 /** Tre portafogli diversi, o non esiste. Sotto tre è una persona. */
 const MIN_WALLETS = 3;
-const WINDOW = 24 * 3600_000;
+/**
+ * Tre giorni, non ventiquattro ore.
+ *
+ * Misurato sui dati veri: in un giorno questa folla fa 115 acquisti buoni su 55
+ * monete diverse. Quasi ognuno compra una cosa sua, quindi quasi nessuna moneta
+ * arriva a tre compratori distinti e la classifica ne mostrava due. Non era la
+ * regola dei tre a essere troppo dura, era la finestra a essere troppo corta:
+ * a 48 ore le monete buone diventano otto, a 72 undici.
+ *
+ * I dati li tenevamo gia' tre giorni (KEEP), quindi non costa una chiamata in
+ * piu'. La regola dei tre portafogli diversi resta intatta: si guarda piu'
+ * indietro, non si abbassa l'asticella.
+ */
+const WINDOW = 72 * 3600_000;
 const KEEP = 3 * 24 * 3600_000;
 
 /**

@@ -45,7 +45,15 @@ import java.util.concurrent.ConcurrentHashMap
 object BalanceCurve {
     private const val POINTS = 30
     private const val MIN_POINTS = 8
-    private const val TRACK_MAX = 6
+    /**
+     * Three coins, not six.
+     *
+     * Every coin costs two requests to a source that starts refusing after five
+     * in a row, and the ones a person actually opened have to win that argument.
+     * The largest three are almost the whole curve anyway; what is left rides
+     * flat, which is what we honestly know about it.
+     */
+    private const val TRACK_MAX = 3
     private const val TTL_MS = 30 * 60_000L
     /** How old a written curve may be before it is worth thirteen requests to redraw it. */
     private const val DISK_MS = 6 * 3600_000L
@@ -104,12 +112,7 @@ object BalanceCurve {
         val flat = view.total - tracked.sumOf { it.value }
 
         val parts = ArrayList<List<Double>>(tracked.size)
-        for ((i, e) in tracked.withIndex()) {
-            // A breath between calls. Six coins fired at once came back with one
-            // series out of six, which is what a free price API does when you
-            // ask it six things in the same second, and the curve ended up being
-            // the shape of whichever coin happened to answer.
-            if (i > 0) kotlinx.coroutines.delay(260)
+        for (e in tracked) {
             val mint = if (e.key == com.clearsign.core.NATIVE_SOL_MINT) Jupiter.SOL_MINT else e.key
             val closes = runCatching { Gecko.series(mint, Gecko.Span.DAYS) }.getOrNull()
                 ?.map { it.close }?.takeLast(POINTS)?.filter { it > 0.0 }.orEmpty()

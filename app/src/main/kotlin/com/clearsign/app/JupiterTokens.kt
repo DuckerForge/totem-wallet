@@ -93,9 +93,17 @@ object JupiterTokens {
         }
     }
 
+    /**
+     * Il disco ricorda come si chiama una moneta, mai quanto vale.
+     *
+     * Un nome non invecchia. Un prezzo si': riletto domani da un file sarebbe un
+     * numero vecchio con l'aria di essere quello di adesso, ed e' peggio di
+     * nessun numero. Quindi qui `usd` e la variazione escono azzerati, e chi ha
+     * bisogno di un prezzo lo va a prendere.
+     */
     private fun saveDisk() {
         val f = diskFile ?: return
-        runCatching { f.writeText(rawOf(cache.values.toList())) }
+        runCatching { f.writeText(rawOf(cache.values.map { it.copy(usd = null, change24h = null) })) }
     }
 
     /**
@@ -156,18 +164,22 @@ object JupiterTokens {
     fun byMints(mints: List<String>): Map<String, Tok> {
         val todo = mints.distinct().filter { it != com.clearsign.core.NATIVE_SOL_MINT }
         if (todo.isEmpty()) return emptyMap()
+        // Questa chiede a Jupiter, sempre, e non passa ne' dal disco ne'
+        // dall'archivio.
+        //
+        // Chi la chiama vuole un prezzo, e un prezzo ha un'eta'. Il disco e
+        // l'archivio sanno come si chiama una moneta, quante cifre ha e che
+        // faccia: cose che non cambiano mai. Non sanno quanto vale, e per un po'
+        // oggi hanno risposto lo stesso, con `usd` vuoto: il Mercato scriveva
+        // "no price" su monete che un prezzo ce l'hanno eccome.
+        //
+        // Il risparmio vero e' in `warm`, che e' la strada del volume: i nomi
+        // per la diretta, per il censimento, per i grafici. Li' una risposta
+        // scritta ieri vale quanto una di adesso.
         val out = HashMap<String, Tok>()
-        // Il disco, gia' in memoria dopo warmDisk.
-        val unknown = todo.filter { m -> cache[m]?.also { out[m] = it } == null }
-        if (unknown.isEmpty()) return out
-        // L'archivio condiviso, per quelle che questo telefono non ha mai visto.
-        fromArchive(unknown).forEach { out[it.mint] = it; cache[it.mint] = it }
-        val still = unknown.filter { it !in out }
-        if (still.isNotEmpty()) {
-            still.chunked(100)
-                .flatMap { chunk -> fetch("/search?query=" + chunk.joinToString(",")) }
-                .forEach { out[it.mint] = it; cache[it.mint] = it }
-        }
+        todo.chunked(100)
+            .flatMap { chunk -> fetch("/search?query=" + chunk.joinToString(",")) }
+            .forEach { out[it.mint] = it; cache[it.mint] = it }
         saveDisk()
         return out
     }
@@ -229,14 +241,28 @@ object JupiterTokens {
      *
      * Blocking: call on IO.
      */
+    /**
+     * Solo come si chiamano, e questa e' la strada del volume.
+     *
+     * Serve alla diretta, al censimento, ai grafici: posti dove di una moneta si
+     * vuole il simbolo e la faccia, non il prezzo. Quindi puo' passare dal disco
+     * e dall'archivio condiviso, dove un nome scritto ieri vale quanto uno di
+     * adesso, e disturba Jupiter solo per quelle che non conosce nessuno.
+     */
     fun warm(mints: Collection<String>) {
         val missing = mints.filter { it.isNotEmpty() && cache[it] == null }.distinct()
         if (missing.isEmpty()) return
-        for (chunk in missing.chunked(50)) {
+        val still = missing.filter { m -> fromArchiveInto(m) == null }
+        for (chunk in still.chunked(50)) {
             val q = URLEncoder.encode(chunk.joinToString(","), "UTF-8")
             HOSTS.firstNotNullOfOrNull { getArray("$it/search?query=$q") }?.let { parse(it) }
         }
+        saveDisk()
     }
+
+    /** Una moneta dall'archivio nella cache, se c'e'. Ritorna null se non c'era. */
+    private fun fromArchiveInto(mint: String): Tok? =
+        fromArchive(listOf(mint)).firstOrNull()?.also { cache[it.mint] = it }
 
     /**
      * One coin, with its trading windows, so a receipt can judge the thing it is

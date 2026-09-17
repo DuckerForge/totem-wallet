@@ -60,7 +60,7 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     // un racconto e diventa uno sfondo che si muove: la prima volta lo guardi,
     // la terza ti da' fastidio. Arrivato in fondo resta il marchio, fermo.
     val run = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { run.animateTo(1f, tween(8200, easing = LinearEasing)) }
+    LaunchedEffect(Unit) { run.animateTo(1f, tween(6000, easing = LinearEasing)) }
     val t = run.value
 
     // Il marchio vero, non un disegno che gli somiglia. E' la stessa immagine che
@@ -101,14 +101,18 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // destro si accende, e nella luce i telefoni se ne vanno e resta il
         // marchio: non un dissolvenza incrociata, che sarebbe uno scambio di
         // figurine, ma una cosa che diventa l'altra dentro un lampo.
-        val land = ease(seg(t, 0.00f, 0.26f))
-        val hold = seg(t, 0.30f, 0.40f)
-        val spark = ease(seg(t, 0.40f, 0.54f))
+        // I due telefoni sono **gia' li'** al primo fotogramma. Prima entravano
+        // da fuori, e quell'arrivo costava un terzo del racconto per dire una
+        // cosa che si vede da sola: che sono due telefoni. La scena si apre
+        // sulla V gia' fatta, e quello che succede dopo e' l'unica cosa che
+        // succede.
+        val hold = seg(t, 0.04f, 0.20f)
+        val spark = ease(seg(t, 0.22f, 0.50f))
         // Fra la fine del tratto e la dissolvenza c'e' una battuta ferma: la V
         // di due Seeker con il bordo acceso. Prima `become` partiva a 0,50 e il
         // tratto cominciava a scivolare **mentre** lo stavo ancora disegnando,
         // quindi si staccava dal telefono a meta' corsa.
-        val become = ease(seg(t, 0.62f, 0.76f))
+        val become = ease(seg(t, 0.62f, 0.80f))
 
         // L'apertura della porta non salta il racconto, lo lascia finire e poi
         // ritira tutto.
@@ -123,12 +127,12 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // lineare il corpo sparisce ma le isole della fotocamera restano
         // leggibili, e sembrano due macchie che galleggiano sul marchio.
         val gone = (1f - become).let { it * it * it }
-        val phoneAlpha = land * gone * leaving
+        val phoneAlpha = gone * leaving
         // Niente smorzatura in coda: serviva a nascondere lo stacco quando il
         // giro ripartiva, e il giro non riparte piu'. Lasciandola, il marchio
         // restava per sempre al quarantacinque per cento.
         val markAlpha = become * leaving
-        val glow = spark * (1f - seg(t, 0.80f, 0.94f) * 0.6f)
+        val glow = spark * (1f - seg(t, 0.84f, 0.96f) * 0.6f)
 
         // --- il respiro dietro ---------------------------------------------
         drawCircle(
@@ -142,17 +146,16 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // --- i due telefoni, finche' ci sono -------------------------------
         val phoneLen = armLen * 0.98f
         val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
-        val away = 1f - land
         // Nella luce non svaniscono sul posto: si avvicinano di un soffio, come
-        // se venissero assorbiti.
+        // se venissero assorbiti. E' l'unico spostamento rimasto.
         val pull = become * d * 0.06f
         // Dove sta un telefono adesso. Serve due volte, ai telefoni e al tratto
         // che ci corre sopra, e finche' e' un conto solo non possono staccarsi.
         fun seat(tip: Offset, side: Float): Offset {
             val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
             return Offset(
-                mid.x + side * d * 1.5f * away - side * pull,
-                mid.y - d * 0.6f * away + pull * 0.4f,
+                mid.x - side * pull,
+                mid.y + pull * 0.4f,
             )
         }
         if (phoneAlpha > 0.01f) {

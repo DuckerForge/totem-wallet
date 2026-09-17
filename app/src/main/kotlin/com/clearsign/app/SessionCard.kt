@@ -619,6 +619,18 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 }
             }
 
+            // Quanto ne mette in una mossa, che non e' il tetto.
+            //
+            // Il tetto per operazione dice quanto **puo'** mettere; questo dice
+            // quanto **ne mette**. Erano la stessa cosa sullo schermo perche'
+            // questa manopola esisteva solo nel motore, ferma all'ottanta per
+            // cento, e con un posto solo l'ottanta per cento di tutta la paghetta
+            // sembra tutta la paghetta. Chi vuole rischiare meta' di quello che
+            // gli e' concesso adesso puo' dirlo senza stringere il collare.
+            SliderRow(
+                stringResource(R.string.agent_slice), trade.slicePercent.toString() + "%",
+                trade.slicePercent / 100f, 0.1f..1f, Halo.mint, steps = 17,
+            ) { trade = trade.copy(slicePercent = (it * 100).toInt().coerceIn(10, 100)) }
             SliderRow(stringResource(R.string.agent_ask_above), sol(askAbove), askAbove, 0f..1f, Halo.cyan) { askAbove = it }
             SliderRow(stringResource(R.string.agent_per_hour), perHour.toInt().toString(), perHour, 1f..120f, Halo.amber, steps = 118) { perHour = it }
 

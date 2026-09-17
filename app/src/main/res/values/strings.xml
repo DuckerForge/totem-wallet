@@ -1720,6 +1720,7 @@
     <string name="trader_no_onchain_why">No on-chain order: %1$s. The loop watches the target instead, which needs the app.</string>
     <string name="eyes_full">full %1$d/%2$d · no hunt until one closes</string>
     <string name="night_worked_recent">Your agent has been working.</string>
+    <string name="agent_slice">How much of the cap it puts in</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

@@ -127,7 +127,7 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
 
         // --- i due telefoni, finche' ci sono -------------------------------
         val phoneLen = armLen * 0.98f
-        val phoneW = phoneLen * 0.46f
+        val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
         val away = 1f - land
         // Nella luce non svaniscono sul posto: si avvicinano di un soffio, come
         // se venissero assorbiti.
@@ -231,54 +231,34 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
 }
 
 /**
- * Un Seeker visto di dorso, ridotto a quello che lo rende riconoscibile.
+ * Un Seeker, di dorso.
  *
- * Il davanti di un telefono a questa misura e' un rettangolo nero: potrebbe
- * essere chiunque. Il dorso no. L'isola della fotocamera in alto a sinistra e le
- * tre barre inclinate di Solana bastano, e le barre prendono il viola e il
- * ciano del marchio: e' la cosa che lega i due oggetti invece di lasciarli uno
- * accanto all'altro.
+ * Il telefono e' gia' disegnato altrove, e non a occhio: `drawPhone` in
+ * TapAnimation viene dal disegno di fabbrica del Seeker, isola a tre obiettivi
+ * col flash di fianco, tasti sul lato, 150,86 x 69,56 mm. Lo usa il tocco fra
+ * due telefoni. Disegnarne un altro qui voleva dire tenere due Seeker diversi
+ * nella stessa app e vederli divergere alla prima correzione.
+ *
+ * Di dorso e non di fronte: davanti, a questa misura, e' un rettangolo nero che
+ * potrebbe essere di chiunque.
  */
 private fun DrawScope.phone(center: Offset, len: Float, wide: Float, angle: Float, alpha: Float, glow: Float) {
     if (alpha <= 0.01f) return
-    val hair = max(1.2f, wide * 0.020f)
+    // Il corpo si scalda quando il tratto passa: e' l'unica cosa che lega i due
+    // oggetti invece di lasciarli uno accanto all'altro.
+    val body = lerp(Color(0xFF24243A), NEON_MID, 0.18f * glow)
     rotate(angle, center) {
-        val tl = Offset(center.x - wide / 2f, center.y - len / 2f)
-        val sz = Size(wide, len)
-        val r = CornerRadius(wide * 0.22f)
-        drawRoundRect(
-            Brush.verticalGradient(listOf(Color(0xFF454562), Color(0xFF1C1C2B)), startY = tl.y, endY = tl.y + len),
-            tl, sz, r, alpha = alpha,
+        drawPhone(
+            x = center.x - wide / 2f,
+            y = center.y - len / 2f,
+            w = wide,
+            h = len,
+            back = true,
+            body = body.copy(alpha = alpha),
+            edge = Color(0xFFB2B2E4).copy(alpha = alpha),
+            ink = Color(0xFF12121C).copy(alpha = alpha),
+            glass = Color(0xFF0E0E18).copy(alpha = alpha),
         )
-        drawRoundRect(Color(0xFFB2B2E4).copy(alpha = alpha), tl, sz, r, style = Stroke(hair * 1.2f))
-        if (glow > 0.01f) drawRoundRect(NEON_MID.copy(alpha = 0.10f * glow * alpha), tl, sz, r)
-
-        val iw = wide * 0.30f
-        val ih = len * 0.155f
-        val itl = Offset(tl.x + wide * 0.095f, tl.y + len * 0.045f)
-        val ir = CornerRadius(iw * 0.36f)
-        drawRoundRect(Color(0xFF0B0B12).copy(alpha = alpha), itl, Size(iw, ih), ir)
-        drawRoundRect(Color(0xFF9494C8).copy(alpha = alpha * 0.7f), itl, Size(iw, ih), ir, style = Stroke(hair))
-        val lens = iw * 0.21f
-        for (f in listOf(0.29f, 0.71f)) {
-            val o = Offset(itl.x + iw / 2f, itl.y + ih * f)
-            drawCircle(Color(0xFF191926).copy(alpha = alpha), lens, o)
-            drawCircle(Color(0xFF9E9ED2).copy(alpha = alpha * 0.4f), lens, o, style = Stroke(hair * 0.8f))
-        }
-
-        val bw = wide * 0.44f
-        val slant = bw * 0.20f
-        val gap = len * 0.042f
-        val by = center.y + len * 0.02f
-        listOf(NEON_HIGH, NEON_MID, NEON_LOW).forEachIndexed { i, c ->
-            val y = by + (i - 1) * gap
-            drawLine(
-                c.copy(alpha = alpha * (0.50f + 0.40f * glow)),
-                Offset(center.x - bw / 2f, y + slant / 2f),
-                Offset(center.x + bw / 2f, y - slant / 2f),
-                max(1f, len * 0.016f), StrokeCap.Round,
-            )
-        }
     }
 }
 

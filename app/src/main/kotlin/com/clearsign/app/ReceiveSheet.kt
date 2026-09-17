@@ -29,6 +29,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var copied by remember { mutableStateOf(false) }
+    var copiedAddr by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
@@ -58,6 +60,54 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+
+            // The address, first, and the copy under it filled in.
+            //
+            // It used to be last, under tapping and QR codes and links, in the
+            // same outlined button as everything else on the page. Four ways of
+            // doing one thing, all weighted the same, and the one that always
+            // works was at the bottom. Somebody in a hurry wants to paste an
+            // address into a chat; that is the common case and it should be the
+            // loud one.
+            //
+            // And it is written whole. It was cut into blocks of four, which is
+            // what you do to something a person is meant to read aloud or check
+            // digit by digit. Nobody reads a Solana address. They copy it, and
+            // chopping it up only made it look like something it is not.
+            Column(
+                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    address,
+                    fontFamily = Mono, fontSize = 13.sp, color = Halo.ink,
+                    textAlign = TextAlign.Center, lineHeight = 20.sp,
+                )
+                // One breath when the sheet opens, and never again. Enough for the
+                // eye to land here first; a button that keeps pulsing is a button
+                // people learn to look away from.
+                val breath = remember { androidx.compose.animation.core.Animatable(0f) }
+                LaunchedEffect(Unit) {
+                    breath.animateTo(1f, androidx.compose.animation.core.tween(520))
+                    breath.animateTo(0f, androidx.compose.animation.core.tween(1100))
+                }
+                Box(Modifier.fillMaxWidth()) {
+                    Box(
+                        Modifier.matchParentSize().padding(horizontal = 6.dp)
+                            .clip(rs(16))
+                            .background(Halo.mint.copy(alpha = 0.22f * breath.value)),
+                    )
+                    PrimaryButton(
+                        if (copiedAddr) stringResource(R.string.copied) else stringResource(R.string.copy_address),
+                        danger = false,
+                        icon = if (copiedAddr) HIcon.CHECK else HIcon.COPY,
+                    ) {
+                        copyText(ctx, address); Haptics.success(ctx); copiedAddr = true
+                    }
+                }
+            }
+
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(40.dp).clip(rs(12)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(HIcon.RECEIVE, Halo.cyan, 20.dp) }
                 Spacer(Modifier.width(12.dp))
@@ -122,13 +172,6 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
                 }
             }
 
-            // The address itself stays put: with no NFC, no camera and no chat, it is
-            // still the one thing that always works.
-            Text(
-                address.chunked(4).joinToString(" "),
-                fontFamily = Mono, fontSize = 12.5.sp, color = Halo.ink, textAlign = TextAlign.Center, lineHeight = 19.sp,
-            )
-            GhostButton(stringResource(R.string.copy_address), Modifier.fillMaxWidth(), HIcon.COPY) { copyText(ctx, address); Haptics.tick(ctx) }
             Spacer(Modifier.height(4.dp))
         }
     }

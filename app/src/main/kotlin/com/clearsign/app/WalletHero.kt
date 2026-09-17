@@ -539,7 +539,7 @@ private class TokenAction(val label: String, val icon: HIcon, val tint: androidx
  * ask for, and the two would fight.
  */
 /** How much of the line's travel one coin's fall lasts. */
-private const val FALL = 0.34f
+private const val FALL = 0.46f
 
 @Composable
 private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Modifier) {
@@ -559,7 +559,7 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
     // moves.
     val growth = remember(values) { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(values) {
-        growth.animateTo(1f, androidx.compose.animation.core.tween(3200, easing = androidx.compose.animation.core.LinearEasing))
+        growth.animateTo(1f, androidx.compose.animation.core.tween(4400, easing = androidx.compose.animation.core.LinearEasing))
     }
     val grow = growth.value
     // Loaded out here: an image is a composable's business, not a canvas's.
@@ -617,10 +617,21 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
             if (fall >= 1f) return@forEachIndexed
             val vi = ((values.size - 1) * at).toInt().coerceIn(0, values.size - 1)
             val r = 11.dp.toPx()
-            // Gravity, roughly: the square makes it hang for an instant at the
-            // head and then go. Linear it looked like a lift descending.
-            val drop = fall * fall * (size.height - py(values[vi]) + r * 2)
-            val c = androidx.compose.ui.geometry.Offset(size.width * at, py(values[vi]) + drop)
+            // Thrown, not dropped.
+            //
+            // Straight gravity read as the coin being released by something that
+            // had stopped caring about it. The head is moving, so what it lets go
+            // of should keep moving: a little up and forward first, then down.
+            // The arc is the whole difference between shaken loose and posted
+            // through a slot.
+            val y0 = py(values[vi])
+            val dist = size.height - y0 + r * 2
+            val rise = 0.34f
+            val drop = -rise * dist * fall + (1f + rise) * dist * fall * fall
+            val c = androidx.compose.ui.geometry.Offset(
+                size.width * at + dist * 0.13f * fall,
+                y0 + drop,
+            )
             val fade = (1f - fall).coerceIn(0f, 1f)
             val d = (r * 1.7f).toInt()
             drawImage(

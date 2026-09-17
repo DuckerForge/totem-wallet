@@ -107,57 +107,55 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
     if (rows.isEmpty()) { GlassCard { NothingHere(stringResource(R.string.crowd_no_data)) }; return }
     val free = rows.count { it.avg < 0.01 }
 
-    GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloIcon(HIcon.GEM, Halo.mint, 16.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.hold_title, total),
+                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = Halo.mint, modifier = Modifier.weight(1f),
+            )
+        }
+        HoldingsField(rows, animate)
+        Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
+        Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
+        // Said out loud, because otherwise the dollars read as wrong. Ten
+        // dollars of USDC looks like a rounding error next to a crowd of a
+        // hundred and twenty thousand, and the reader's next thought is that
+        // the number is broken. It is not: the mean is four hundred and
+        // eighty seven and it describes nobody. The widest held coin makes
+        // the point, and it is read from the file, so it stays true when the
+        // census is run again.
+        rows.firstOrNull { it.avg >= 1 && it.avg > it.usdPer * 3 }?.let { h ->
+            Text(
+                stringResource(R.string.hold_typical, h.symbol, dollars(h.usdPer), dollars(h.avg)),
+                fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
+            )
+        }
+        Text(
+            stringResource(R.string.hold_note, free, rows.size, sample),
+            fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
+        )
+        // The half of this crowd that looks asleep. Their SKR are not in
+        // the wallet at all: they are inside the staking program, earning.
+        // A census that reads token accounts cannot see them, so it calls
+        // these people empty. They are not.
+        census.staked?.let { st ->
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Halo.stroke))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HaloIcon(HIcon.GEM, Halo.mint, 16.dp)
-                Spacer(Modifier.width(8.dp))
+                HaloIcon(HIcon.SHIELD_LOCK, Halo.cyan, 14.dp)
+                Spacer(Modifier.width(7.dp))
                 Text(
-                    stringResource(R.string.hold_title, total),
-                    fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                    color = Halo.mint, modifier = Modifier.weight(1f),
-                )
-            }
-            HoldingsField(rows, animate)
-            Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
-            Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
-            // Said out loud, because otherwise the dollars read as wrong. Ten
-            // dollars of USDC looks like a rounding error next to a crowd of a
-            // hundred and twenty thousand, and the reader's next thought is that
-            // the number is broken. It is not: the mean is four hundred and
-            // eighty seven and it describes nobody. The widest held coin makes
-            // the point, and it is read from the file, so it stays true when the
-            // census is run again.
-            rows.firstOrNull { it.avg >= 1 && it.avg > it.usdPer * 3 }?.let { h ->
-                Text(
-                    stringResource(R.string.hold_typical, h.symbol, dollars(h.usdPer), dollars(h.avg)),
-                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
+                    stringResource(R.string.hold_staked_title, fmtPct(st.pct)),
+                    fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.cyan,
                 )
             }
             Text(
-                stringResource(R.string.hold_note, free, rows.size, sample),
+                st.usdPer?.let { u -> stringResource(R.string.hold_staked_body_usd, fmtInt(st.avg), fmtUsd(u)) }
+                    ?: stringResource(R.string.hold_staked_body, fmtInt(st.avg)),
                 fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
             )
-            // The half of this crowd that looks asleep. Their SKR are not in
-            // the wallet at all: they are inside the staking program, earning.
-            // A census that reads token accounts cannot see them, so it calls
-            // these people empty. They are not.
-            census.staked?.let { st ->
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Halo.stroke))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    HaloIcon(HIcon.SHIELD_LOCK, Halo.cyan, 14.dp)
-                    Spacer(Modifier.width(7.dp))
-                    Text(
-                        stringResource(R.string.hold_staked_title, fmtPct(st.pct)),
-                        fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.cyan,
-                    )
-                }
-                Text(
-                    st.usdPer?.let { u -> stringResource(R.string.hold_staked_body_usd, fmtInt(st.avg), fmtUsd(u)) }
-                        ?: stringResource(R.string.hold_staked_body, fmtInt(st.avg)),
-                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
-                )
-            }
         }
     }
 }

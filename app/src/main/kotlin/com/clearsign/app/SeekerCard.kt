@@ -449,13 +449,17 @@ private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES, FOLLOWED }
 private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Unit) {
     val ctx = LocalContext.current
     Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 18.dp, vertical = 8.dp)) {
-        // Scrollable, because with somebody followed there are five words and a
-        // phone is not wide enough for five equal chips that stay readable.
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            val w = Modifier.width(92.dp)
+        // Five chips that share the width, instead of five fixed ones on a rail.
+        //
+        // It used to scroll sideways, and a bar that scrolls sideways with no
+        // edge showing is a bar with a hidden tab: the fifth word sat past the
+        // right side of the screen, and the only way to learn it existed was to
+        // drag something that does not look draggable. Following somebody is the
+        // one thing here you do on purpose, and it was the thing you could not
+        // find afterwards. Equal shares always fit, and the words are short
+        // enough to survive the squeeze.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            val w = Modifier.weight(1f)
             ModeChip(stringResource(R.string.crowd_tab_live), selected == ScoutTab.LIVE, Halo.cyan, w) {
                 Haptics.tick(ctx); onPick(ScoutTab.LIVE)
             }
@@ -470,7 +474,7 @@ private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Un
             }
             // Only once there is somebody to put in it.
             if (follows > 0) {
-                ModeChip(stringResource(R.string.crowd_tab_followed, follows), selected == ScoutTab.FOLLOWED, Halo.amber, Modifier.width(112.dp)) {
+                ModeChip(stringResource(R.string.crowd_tab_followed, follows), selected == ScoutTab.FOLLOWED, Halo.amber, w) {
                     Haptics.tick(ctx); onPick(ScoutTab.FOLLOWED)
                 }
             }
@@ -547,7 +551,14 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
         WalletPage(addr, events.orEmpty().filter { it.wallet == addr }.sortedBy { it.at }) { person = null }
     }
 
-    val pad = Modifier.padding(horizontal = 18.dp)
+    // The live tab dropped its card and its title months ago, for a reason it
+    // wrote down: as its own tab the frame is a box drawn around the whole
+    // screen and the title repeats the word already lit in the bar above it.
+    // Everything on the bar is its own tab now, so the same is true of all of
+    // them: the census, the ranking and the whales each sat in a card inside a
+    // padded page inside a screen, three frames deep, and the picture that is
+    // the point of them was squeezed into what was left.
+    val pad = Modifier.padding(horizontal = 14.dp)
 
     // Nothing scrolls to make the bar work.
     //

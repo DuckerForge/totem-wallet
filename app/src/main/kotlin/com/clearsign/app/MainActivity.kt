@@ -200,6 +200,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Themes.load(this)
         Settings.load(this)
+        // Quello che questo telefono ha gia' imparato sulle monete: nomi, decimali,
+        // icone. Non cambiano mai, e senza questo si richiedevano tutti a ogni avvio.
+        runCatching { JupiterTokens.warmDisk(this) }
+        runCatching { Gecko.warmPools(this) }
         Pro.load(this)
         // Hand the radio back and forth as the tap screen arms and disarms.
         //

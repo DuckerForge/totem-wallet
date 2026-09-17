@@ -43,6 +43,37 @@ object RocketX {
     )
     data class Order(val requestId: String, val txId: Long, val depositAddress: String?, val memo: String?, val toAmount: Double, val exchange: String)
 
+    /**
+     * L'indirizzo ha la forma giusta per quella catena?
+     *
+     * Null vuol dire che non lo sappiamo, e non sapere non e' un no: bloccare
+     * una catena di cui non conosciamo il formato vorrebbe dire rompere il ponte
+     * ogni volta che RocketX ne aggiunge una. Ma dove il formato lo conosciamo,
+     * e non torna, si blocca.
+     *
+     * Perche' e' l'unico posto dell'app dove un errore di incollaggio manda via
+     * i soldi senza che niente lo dica. Ovunque altro un indirizzo sbagliato e'
+     * un indirizzo sbagliato su Solana, e lo scontrino lo mostra prima della
+     * firma; qui l'indirizzo che conta e' su un'altra catena, il deposito va a
+     * RocketX, e quello che si vede firmare non e' la destinazione finale.
+     * Incollare un indirizzo Solana mentre si fa il ponte verso Arbitrum passava
+     * senza una parola.
+     */
+    fun addressFits(network: Network, address: String): Boolean? {
+        val a = address.trim()
+        if (a.isEmpty()) return null
+        // Le catene EVM hanno un chainId numerico, e tutte lo stesso formato.
+        if (network.chainId.toLongOrNull() != null) return Regex("^0x[0-9a-fA-F]{40}$").matches(a)
+        return when (network.native.uppercase()) {
+            "BTC" -> Regex("^(bc1[0-9ac-hj-np-z]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$").matches(a)
+            "TRX" -> Regex("^T[1-9A-HJ-NP-Za-km-z]{33}$").matches(a)
+            "SUI" -> Regex("^0x[0-9a-fA-F]{64}$").matches(a)
+            "TON" -> Regex("^([A-Za-z0-9_-]{48}|-?\\d+:[0-9a-fA-F]{64})$").matches(a)
+            "SOL" -> Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$").matches(a)
+            else -> null
+        }
+    }
+
     /** The chains worth a chip, in this order, when RocketX lists them. */
     private val PREFERRED = listOf("ethereum", "arbitrum", "Base Chain", "binance", "polygon", "optimism", "BTC", "TRON", "avalanche", "sui", "ton")
 

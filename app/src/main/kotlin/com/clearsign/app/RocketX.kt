@@ -97,8 +97,16 @@ object RocketX {
             "TON" -> return Regex("^([A-Za-z0-9_-]{48}|-?\\d+:[0-9a-fA-F]{64})$").matches(a)
             "SOL" -> return Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$").matches(a)
         }
-        // Le catene EVM hanno un chainId numerico, e tutte lo stesso formato.
-        if (network.chainId.toLongOrNull() != null) return Regex("^0x[0-9a-fA-F]{40}$").matches(a)
+        // Le catene EVM hanno tutte lo stesso formato di indirizzo, e RocketX le
+        // identifica con un chainId **esadecimale**: "0x1", "0xA4B1", "0x38".
+        // Verificato dal vivo il 17/09. La prima versione di questa regola
+        // cercava un numero decimale, non lo trovava mai, e il controllo sulle
+        // sei catene che contano di piu' non scattava: ogni indirizzo passava come
+        // "formato sconosciuto". Un controllo che non scatta mai e' peggio di
+        // nessun controllo, perche' sembra esserci.
+        val cid = network.chainId.trim()
+        val evm = (cid.startsWith("0x", ignoreCase = true) && cid.drop(2).toLongOrNull(16) != null) || cid.toLongOrNull() != null
+        if (evm) return Regex("^0x[0-9a-fA-F]{40}$").matches(a)
         return null
     }
 

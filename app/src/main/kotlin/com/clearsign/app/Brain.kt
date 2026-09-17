@@ -23,7 +23,7 @@ import org.json.JSONObject
  * [AgentBroker] decides; the Seed Vault is untouchable either way.
  */
 object Brain {
-    private const val TAG = "Apex-Brain"
+    private const val TAG = "Velum-Brain"
     private const val MAX_TOOL_ROUNDS = 6
 
     /** One line in the transcript. [tool] rows are the receipts of what was done. */
@@ -260,16 +260,16 @@ object Brain {
         val sb = StringBuilder()
         sb.append(
             if (italian) {
-                "Sei l'assistente dentro Apex, un portafoglio Solana sul telefono Seeker. Parli italiano, in modo diretto e breve.\n\n"
+                "Sei l'assistente dentro Velum, un portafoglio Solana sul telefono Seeker. Parli italiano, in modo diretto e breve.\n\n"
             } else {
-                "You are the assistant inside Apex, a Solana wallet on the Seeker phone. Be direct and brief.\n\n"
+                "You are the assistant inside Velum, a Solana wallet on the Seeker phone. Be direct and brief.\n\n"
             },
         )
         sb.append(
             if (italian) {
-                "Tu non firmi niente. Proponi, e Apex decide sul telefono: può firmare in silenzio, chiedere l'impronta alla persona, o rifiutare. Un rifiuto è definitivo: spiegalo con parole semplici e non cercare un'altra strada per fare la stessa cosa.\n\n"
+                "Tu non firmi niente. Proponi, e Velum decide sul telefono: può firmare in silenzio, chiedere l'impronta alla persona, o rifiutare. Un rifiuto è definitivo: spiegalo con parole semplici e non cercare un'altra strada per fare la stessa cosa.\n\n"
             } else {
-                "You never sign anything. You propose, and Apex decides on the phone: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final: explain it plainly and do not look for another route to the same thing.\n\n"
+                "You never sign anything. You propose, and Velum decides on the phone: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final: explain it plainly and do not look for another route to the same thing.\n\n"
             },
         )
         if (s == null || p == null) {

@@ -549,7 +549,7 @@ private fun AboutCard() {
             Box(Modifier.size(40.dp).clip(rs(12)).background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan))), contentAlignment = Alignment.Center) { HaloIcon(HIcon.AGENT, Halo.ground, 24.dp) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Apex " + BuildConfig.VERSION_NAME, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
+                Text(stringResource(R.string.app_name) + " " + BuildConfig.VERSION_NAME, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
                 Text(stringResource(R.string.tagline), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 Text(stringResource(R.string.about_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
             }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Apex</string>
+    <string name="app_name">Velum</string>
+    <string name="app_label">Velum Wallet</string>
     <string name="tagline">What you see is what you sign</string>
     <string name="header_danger">Rischio rilevato</string>
     <string name="close">Chiudi</string>
@@ -51,7 +52,7 @@
     <string name="and_send">" e l\'invio"</string>
     <string name="tx_n_of">Transazione %1$d di %2$d</string>
     <string name="blocked_bundle">La transazione %1$d contiene un rischio grave: l\'intero bundle è bloccato.</string>
-    <string name="blocked_single">Rischio grave: Apex non firma questa transazione.</string>
+    <string name="blocked_single">Rischio grave: Velum non firma questa transazione.</string>
     <string name="blocked_title">Firma bloccata</string>
     <string name="pay">PAGHI</string>
     <string name="receive">RICEVI</string>
@@ -153,14 +154,14 @@
     <string name="rt_limited">Delega di spesa</string>
     <string name="home_wallet_hdr">WALLET HARDWARE</string>
     <string name="home_wallet_sub">Seed Vault del Seeker</string>
-    <string name="home_wallet_note">Le chiavi restano nell\'enclave sicura del Seeker. Apex mostra cosa firmi, il Seed Vault firma con la tua biometria.</string>
+    <string name="home_wallet_note">Le chiavi restano nell\'enclave sicura del Seeker. Velum mostra cosa firmi, il Seed Vault firma con la tua biometria.</string>
     <string name="connecting">Connessione…</string>
     <string name="connect_seed_vault">Collega il Seed Vault</string>
     <string name="connect_failed">Connessione fallita.</string>
     <string name="tokens_n">%1$d token</string>
     <string name="home_keys_note">Chiavi in enclave hardware, mai esposte al software.</string>
     <string name="home_ready_title">Pronto per le dApp</string>
-    <string name="home_ready_note">Quando una dApp chiede un wallet, scegli Apex e «Sempre». Ogni transazione passa da qui, decodificata e simulata, prima della firma.</string>
+    <string name="home_ready_note">Quando una dApp chiede un wallet, scegli Velum e «Sempre». Ogni transazione passa da qui, decodificata e simulata, prima della firma.</string>
     <string name="home_log_hdr">REGISTRO FIRME</string>
     <string name="log_empty_sub">nessuna firma ancora</string>
     <string name="log_count_one">1 firma</string>
@@ -299,7 +300,7 @@
     <string name="wa_log_revoke">Revoca delegato %1$s</string>
     <string name="wa_log_close">Chiudi %1$d account vuoti</string>
     <string name="send_title">Invia</string>
-    <string name="send_sub">SOL o token, con la ricevuta Apex</string>
+    <string name="send_sub">SOL o token, con la ricevuta Velum</string>
     <string name="send_review_sub">Controlla la ricevuta, poi tieni premuto per firmare</string>
     <string name="send_btn">Invia</string>
     <string name="receive_btn">Ricevi</string>
@@ -367,7 +368,7 @@
     <string name="k_stake">staking</string>
     <string name="k_mint">mint</string>
     <string name="k_other">altro</string>
-    <string name="prot_row_title">Cosa fa Apex per te</string>
+    <string name="prot_row_title">Cosa fa Velum per te</string>
     <string name="prot_row_sub">%1$d difese attive · %2$d tipi di rischio riconosciuti</string>
     <string name="prot_title">Le tue difese</string>
     <string name="prot_intro">Ogni voce qui sotto è implementata e attiva in questa build. Nessuna firma parte prima che siano passate tutte.</string>
@@ -494,14 +495,14 @@
     <string name="onb_skip">Salta</string>
     <string name="theme_note_pro">Tocca una tessera per cambiare stile. Tutti i temi sono inclusi.</string>
     <string name="theme_pro_tag">Pro</string>
-    <string name="pro_title">Apex Pro</string>
+    <string name="pro_title">Velum Pro</string>
     <string name="pro_active">Attivo — grazie</string>
     <string name="pro_price">%1$d SKR, una volta</string>
     <string name="pro_sheet_note">Pagamento unico in SKR su mainnet, firmato dal Seed Vault.</string>
     <string name="pro_unlock">Sblocca Pro · %1$d SKR</string>
     <string name="pro_hold">Tieni premuto per pagare %1$d SKR</string>
-    <string name="pro_done">Apex Pro è attivo. Goditelo.</string>
-    <string name="pro_log">Apex Pro</string>
+    <string name="pro_done">Velum Pro è attivo. Goditelo.</string>
+    <string name="pro_log">Velum Pro</string>
     <string name="pro_f1">Temi premium (carta, terminale, aurora)</string>
     <string name="pro_f2">Watchtower — avvisi in background sui tuoi indirizzi</string>
     <string name="pro_f3">Scan profondi attività indirizzi</string>
@@ -526,17 +527,17 @@
     <string name="health_frozen">%1$d account congelati: %2$s</string>
     <string name="health_frozen_why">Può sbloccarli solo chi ha emesso la moneta. Tu non puoi farci niente, e non si possono nemmeno chiudere per recuperare il rent.</string>
     <string name="trace_run">Scansiona a fondo questo indirizzo</string>
-    <string name="trace_pro">Scan profondo attività — funzione Apex Pro</string>
+    <string name="trace_pro">Scan profondo attività — funzione Velum Pro</string>
     <string name="store_reviews">recensioni</string>
     <string name="store_not_listed">Non sul dApp Store</string>
     <string name="swap_title">Swap</string>
-    <string name="swap_sub">Miglior rotta via Jupiter · firmato in Apex</string>
+    <string name="swap_sub">Miglior rotta via Jupiter · firmato in Velum</string>
     <string name="swap_you_pay">Paghi</string>
     <string name="swap_you_get">Ricevi (stima)</string>
     <string name="swap_from_hint">Scambia da qualsiasi token che possiedi</string>
     <string name="swap_rate">Tasso</string>
     <string name="swap_route">Rotta</string>
-    <string name="swap_fee">Fee Apex (%1$s%%)</string>
+    <string name="swap_fee">Fee Velum (%1$s%%)</string>
     <string name="swap_impact">Impatto sul prezzo</string>
     <string name="swap_would_fail">Questa rotta fallirebbe. Non te la faccio firmare.</string>
     <string name="swap_retry">Rifai il preventivo</string>
@@ -572,9 +573,9 @@
     <string name="watch_enable">Attiva</string>
     <string name="watch_disable">Disattiva</string>
     <string name="watch_note">Controlla il tuo wallet e gli indirizzi che hai pagato ogni poche ore. Ti avvisa se compare un\'approvazione illimitata o un indirizzo pagato viene segnalato.</string>
-    <string name="watch_flag_title">Apex · indirizzo segnalato</string>
-    <string name="watch_flag_body">Un indirizzo che hai pagato è finito nella blocklist. Apri Apex per controllare.</string>
-    <string name="watch_appr_title">Apex · approvazioni da rivedere</string>
+    <string name="watch_flag_title">Velum · indirizzo segnalato</string>
+    <string name="watch_flag_body">Un indirizzo che hai pagato è finito nella blocklist. Apri Velum per controllare.</string>
+    <string name="watch_appr_title">Velum · approvazioni da rivedere</string>
     <string name="watch_appr_body">%1$d approvazione/i illimitata/e attive sul tuo wallet. Tocca per revocarle.</string>
     <string name="hero_show_all">Mostra tutti (%1$d)</string>
     <string name="hero_show_less">Mostra meno</string>
@@ -660,7 +661,7 @@
     <string name="rt_agent_ok">Intento agente verificato</string>
     <string name="agent_unknown">Agente sconosciuto</string>
     <string name="agent_bad_link">Richiesta Agent Gate malformata: manca la transazione o l\'intento.</string>
-    <string name="agent_no_wallet">Nessun wallet collegato in Apex. Apri Apex e collega prima il Seed Vault.</string>
+    <string name="agent_no_wallet">Nessun wallet collegato in Velum. Apri Velum e collega prima il Seed Vault.</string>
     <string name="agent_done_sent">Firmata col Seed Vault e inviata.</string>
     <string name="agent_done_signed">Firmata col Seed Vault e restituita all\'agente.</string>
     <string name="agent_requests">«%1$s» chiede una firma tramite Agent Gate</string>
@@ -668,7 +669,7 @@
     <string name="widget_name">Salute wallet</string>
     <string name="widget_desc">Punteggio di salute, saldo e ultimo avviso del wallet, a colpo d\'occhio.</string>
     <string name="widget_health">SALUTE WALLET</string>
-    <string name="widget_no_wallet">Apri Apex e collega il Seed Vault</string>
+    <string name="widget_no_wallet">Apri Velum e collega il Seed Vault</string>
     <string name="widget_clean">Tutto pulito</string>
     <string name="widget_updated">agg. %1$s</string>
     <string name="widget_reclaim">%1$s SOL da recuperare</string>
@@ -684,13 +685,13 @@
     <string name="companion_running">Salute wallet, sopra ogni app</string>
     <string name="companion_sub">Una bolla con la salute del tuo wallet, sopra qualsiasi app.</string>
     <string name="companion_note">Trascinala dove vuoi, toccala per aprire il pannello. Serve il permesso Android di disegnare sopra le altre app e legge solo ciò che l\'app già sa.</string>
-    <string name="companion_open">Apri Apex</string>
+    <string name="companion_open">Apri Velum</string>
     <string name="companion_hide">Nascondi</string>
     <string name="companion_on">Attivo</string>
     <string name="companion_off">Spento</string>
     <string name="companion_grant">Concedi permesso</string>
     <string name="companion_needs_perm">Serve il permesso Android: disegnare sopra le altre app.</string>
-    <string name="agent_origin_qr">QR inquadrato con Apex</string>
+    <string name="agent_origin_qr">QR inquadrato con Velum</string>
     <string name="agent_origin_link">Aperto da un link, origine non verificabile</string>
     <string name="agent_origin_app">App su questo telefono: %1$s</string>
     <string name="agent_name_claimed">nome dichiarato dall\'agente, non verificato</string>
@@ -699,13 +700,13 @@
     <string name="agent_signed_note">Al tuo agente servono questi byte. Copiali, oppure fagli leggere il QR da questo schermo.</string>
     <string name="gate_card_title">Agent Gate</string>
     <string name="gate_card_sub">Firma per un agente IA, senza dargli una chiave.</string>
-    <string name="gate_card_note">Un agente sul computer mostra un QR; lo inquadri e Apex confronta ciò che l\'agente DICHIARA con ciò che la transazione FA davvero, poi approvi con la biometria. La chiave non lascia mai il Seed Vault.</string>
+    <string name="gate_card_note">Un agente sul computer mostra un QR; lo inquadri e Velum confronta ciò che l\'agente DICHIARA con ciò che la transazione FA davvero, poi approvi con la biometria. La chiave non lascia mai il Seed Vault.</string>
     <string name="gate_scan">Inquadra una richiesta agente</string>
     <string name="gate_not_a_request">Quel QR non è una richiesta Agent Gate.</string>
     <string name="tab_agent">Agent</string>
     <string name="agent_tab_title">Agent Gate</string>
     <string name="agent_tab_sub">Il tuo agente, la sua paghetta, e cosa può fare senza di te.</string>
-    <string name="agent_tab_how">Un agente sul tuo computer prepara una transazione e dichiara cosa fa. Tu inquadri qui il suo QR: Apex simula i byte veri e blocca la firma se la dichiarazione non corrisponde. La chiave non lascia mai il Seed Vault.</string>
+    <string name="agent_tab_how">Un agente sul tuo computer prepara una transazione e dichiara cosa fa. Tu inquadri qui il suo QR: Velum simula i byte veri e blocca la firma se la dichiarazione non corrisponde. La chiave non lascia mai il Seed Vault.</string>
     <string name="agent_tab_wallet">DAI ALL\'AGENTE QUESTO INDIRIZZO</string>
     <string name="agent_tab_none">Collega prima il Seed Vault dalla linguetta Portafoglio.</string>
     <string name="agent_tab_recent">FIRME PER AGENTI</string>
@@ -769,7 +770,7 @@
     <string name="agent_last_signed">Firmato da solo: %1$s</string>
     <string name="agent_last_confirmed">Confermato da te: %1$s</string>
     <string name="agent_last_expired">Nessuna risposta in tempo: %1$s</string>
-    <string name="agent_notif_refused">Apex ha rifiutato una richiesta dell\'agente</string>
+    <string name="agent_notif_refused">Velum ha rifiutato una richiesta dell\'agente</string>
     <string name="agent_notif_signed">L\'agente ha speso dalla paghetta</string>
     <string name="agent_notif_ask">L\'agente chiede: %1$s</string>
     <string name="agent_ask_timeout">nessuno ha risposto prima della scadenza</string>
@@ -843,8 +844,8 @@
     <string name="brain_unreachable">Non sono riuscito a raggiungere il modello. Controlla la connessione e la chiave.</string>
     <string name="brain_too_many_steps">Mi sono fermato dopo qualche passo per non girare a vuoto. Dimmi tu come procedere.</string>
     <string name="chat_title">Il tuo agente</string>
-    <string name="chat_sub">Lui propone. Apex decide.</string>
-    <string name="chat_empty">Chiedimi qualcosa. Posso cercare prezzo e sicurezza di una moneta, farmi dare un preventivo di scambio prima di farlo, guardare il tuo portafoglio, mandare SOL, incassare i guadagni o fermarmi. Non firmo mai io: firma Apex, con le tue regole.</string>
+    <string name="chat_sub">Lui propone. Velum decide.</string>
+    <string name="chat_empty">Chiedimi qualcosa. Posso cercare prezzo e sicurezza di una moneta, farmi dare un preventivo di scambio prima di farlo, guardare il tuo portafoglio, mandare SOL, incassare i guadagni o fermarmi. Non firmo mai io: firma Velum, con le tue regole.</string>
     <string name="chat_no_key">Non c\'è un modello configurato. Apri Impostazioni, poi Il tuo agente, e metti una chiave. Il resto funziona già: quello che propongo passa comunque dalle stesse regole.</string>
     <string name="chat_ex1">Cosa ho in mano?</string>
     <string name="chat_ex2">Com\'è andato il portafoglio oggi?</string>
@@ -854,7 +855,7 @@
     <string name="chat_thinking">Sto pensando…</string>
     <string name="chat_signed">Firmato da solo</string>
     <string name="chat_confirmed">Hai confermato tu</string>
-    <string name="chat_refused">Apex ha rifiutato</string>
+    <string name="chat_refused">Velum ha rifiutato</string>
     <string name="chat_expired">Scaduto senza risposta</string>
     <string name="chat_checked">Ho eseguito %1$s</string>
     <string name="chat_open">Parlagli</string>
@@ -876,11 +877,11 @@
     <string name="claim_taking">Li sto prendendo…</string>
     <string name="claim_done">Sono tuoi</string>
     <string name="claim_failed">Non sono riuscito a prenderli. Riprova tra poco.</string>
-    <string name="claim_no_wallet">Prima collega un wallet in Apex, poi riapri questo link.</string>
+    <string name="claim_no_wallet">Prima collega un wallet in Velum, poi riapri questo link.</string>
     <string name="claim_truth">Un link regalo si porta dietro la sua chiave: chi lo apre per primo può prenderlo. Non c\'è altro che lo protegga.</string>
     <string name="gift_title">Manda soldi con un link</string>
     <string name="gift_log">Link regalo</string>
-    <string name="gift_body">Apex crea un portafoglino usa e getta, ci mette la cifra e ti dà un link. Mandalo a chi vuoi: chi lo apre porta i soldi nel suo wallet.</string>
+    <string name="gift_body">Velum crea un portafoglino usa e getta, ci mette la cifra e ti dà un link. Mandalo a chi vuoi: chi lo apre porta i soldi nel suo wallet.</string>
     <string name="gift_warn">Chi ha il link ha i soldi. Va bene per una mancia, non per uno stipendio. Finché nessuno lo ritira, puoi riprendertelo.</string>
     <string name="gift_amount">Importo</string>
     <string name="gift_note">Una nota (facoltativa)</string>
@@ -898,7 +899,7 @@
     <string name="req_hint">Lascia vuoto e il codice è solo il tuo indirizzo.</string>
     <string name="req_link">Link di pagamento</string>
     <string name="kind_gift">Regalo</string>
-    <string name="tap_service_desc">Richieste di pagamento Apex</string>
+    <string name="tap_service_desc">Richieste di pagamento Velum</string>
     <string name="tap_aid_desc">Avvicina due telefoni per chiedere un pagamento</string>
     <string name="tap_title">Fatti pagare col tocco</string>
     <string name="tap_sub">Schiena contro schiena: i due retri si guardano.</string>
@@ -978,7 +979,7 @@
     <!-- forma del link di richiesta -->
     <string name="recv_link_web">Link universale</string>
     <string name="recv_link_pay">Solana Pay</string>
-    <string name="recv_link_web_note">Si apre su qualsiasi telefono. Con Apex va dritto alla richiesta, senza Apex a una pagina che spiega e offre l\'app.</string>
+    <string name="recv_link_web_note">Si apre su qualsiasi telefono. Con Velum va dritto alla richiesta, senza Velum a una pagina che spiega e offre l\'app.</string>
     <string name="recv_link_pay_note">La richiesta solana: classica. La leggono Phantom, Solflare e Backpack. Un telefono senza wallet non ci fa nulla.</string>
     <!-- cosa può farti la moneta in sé -->
     <string name="safe_title">Sulla moneta %1$s</string>
@@ -1000,20 +1001,20 @@
     <string name="safe_few_holders">Non ce l\'ha ancora quasi nessuno.</string>
     <string name="safe_unverified">Non è nell\'elenco verificato di Jupiter.</string>
     <string name="safe_issuer">Ha un emittente che può congelarla o stamparne altra. Normale per una stablecoin, diverso dal tenere SOL.</string>
-    <string name="safe_blocked">Non c\'è modo di rivenderla. Apex non costruisce lo scambio.</string>
+    <string name="safe_blocked">Non c\'è modo di rivenderla. Velum non costruisce lo scambio.</string>
     <string name="safe_checking">Sto controllando la moneta…</string>
     <!-- ricevi / invia: i due modi di passare una richiesta -->
     <string name="recv_block_qr">Codice QR</string>
     <string name="recv_block_qr_sub">Per un telefono che non fa il tocco</string>
     <string name="recv_block_nfc">Tocco</string>
     <string name="recv_block_nfc_sub">Solo i due telefoni. Tocca per iniziare.</string>
-    <string name="tap_who">Questo telefono diventa la tessera, l\'altro si appoggia sopra. Non gli serve Apex: la richiesta gli si apre nel browser.</string>
+    <string name="tap_who">Questo telefono diventa la tessera, l\'altro si appoggia sopra. Non gli serve Velum: la richiesta gli si apre nel browser.</string>
     <string name="send_block_qr">Inquadra un codice QR</string>
-    <string name="send_block_qr_sub">Indirizzo, Solana Pay o link Apex</string>
+    <string name="send_block_qr_sub">Indirizzo, Solana Pay o link Velum</string>
     <string name="send_block_nfc">Leggi col tocco</string>
     <string name="send_block_nfc_sub">Il telefono ascolta mentre sei qui</string>
     <string name="send_tap_listening">Appoggia il telefono a quello di chi chiede. Deve avere aperta la sua schermata del tocco. Qui si legge soltanto.</string>
-    <string name="tap_how">Schiena contro schiena, i due retri che si guardano. Fai scorrere l\'altro piano su e giù finché non reagisce. Deve essere sbloccato. Non gli serve Apex.</string>
+    <string name="tap_how">Schiena contro schiena, i due retri che si guardano. Fai scorrere l\'altro piano su e giù finché non reagisce. Deve essere sbloccato. Non gli serve Velum.</string>
     <string name="recv_qr_tap">Tocca per ingrandire</string>
     <string name="send_tap">Tocco</string>
     <string name="recv_block_link">Chiedi con un link</string>
@@ -1084,7 +1085,7 @@
     <string name="trader_why_buy">%1$s è primo nella ricerca: %2$s</string>
     <string name="trader_running">Opera: %1$d aperte, %2$s SOL liberi</string>
     <string name="trader_idle">Guarda il mercato</string>
-    <string name="trader_notif_title">Apex sta operando, %1$d aperte</string>
+    <string name="trader_notif_title">Velum sta operando, %1$d aperte</string>
     <string name="trader_stop_action">Ferma</string>
     <string name="trader_stopped_by_you">L\'hai fermato tu.</string>
     <string name="widget_trading">Opera · %1$d aperte · %2$s</string>
@@ -1174,15 +1175,15 @@
     <string name="trace_no_sim">non riesco a simulare %1$s adesso, riprovo dopo</string>
     <string name="trace_asked">il collare vuole una firma per %1$s, e non c\'è nessuno</string>
     <string name="trader_declined">Fermo: hai rifiutato %1$s.</string>
-    <string name="lock_title">Apex</string>
+    <string name="lock_title">Velum</string>
     <string name="lock_sub">La tua impronta per aprire il portafoglio.</string>
     <string name="lock_open">Sblocca</string>
     <string name="lock_failed">Non riconosciuta. Riprova.</string>
     <string name="door_src_app">app</string>
     <string name="door_src_site">sito</string>
     <string name="door_src_agent">agente</string>
-    <string name="door_pitch">App, siti e agenti possono solo chiedere. Apex simula ogni richiesta e ti mostra dove vanno davvero i soldi. Niente è autorizzato in anticipo.</string>
-    <string name="door_title">Apex Wallet</string>
+    <string name="door_pitch">App, siti e agenti possono solo chiedere. Velum simula ogni richiesta e ti mostra dove vanno davvero i soldi. Niente è autorizzato in anticipo.</string>
+    <string name="door_title">Velum Wallet</string>
     <string name="pulse_paused">In pausa, l\'hai messa tu</string>
     <string name="pulse_holding">Opera · %1$d aperte</string>
     <string name="pulse_looking">Opera · sta cercando</string>
@@ -1346,7 +1347,7 @@
     <string name="agent_positions">Posizioni</string>
     <string name="agent_recent">Ultime mosse</string>
     <string name="agent_recent_none">Ancora niente.</string>
-    <string name="agent_truth_link">Cosa garantisce Apex</string>
+    <string name="agent_truth_link">Cosa garantisce Velum</string>
     <string name="pro_model">Modello e chiave</string>
     <string name="pro_collar">Il collare</string>
     <string name="pro_trading">Corsia e obiettivi</string>
@@ -1530,8 +1531,8 @@
     <string name="sticker_lock">Blocca l\'adesivo</string>
     <string name="sticker_lock_sub">Nessuno potrà riscriverlo con il suo indirizzo. Non si torna indietro.</string>
     <string name="sticker_web">Link web invece di Solana Pay</string>
-    <string name="sticker_web_on">Si apre anche in un browser, senza wallet. Con Apex apre Invia.</string>
-    <string name="sticker_web_off">Solana Pay standard: Apex, Phantom, Solflare e gli altri aprono il pagamento.</string>
+    <string name="sticker_web_on">Si apre anche in un browser, senza wallet. Con Velum apre Invia.</string>
+    <string name="sticker_web_off">Solana Pay standard: Velum, Phantom, Solflare e gli altri aprono il pagamento.</string>
     <string name="sticker_write">Scrivi l\'adesivo</string>
     <string name="sticker_hold">Tieni l\'adesivo contro il retro del telefono…</string>
     <string name="sticker_locked">Scritto e bloccato. Toccalo per provare.</string>
@@ -1598,7 +1599,7 @@
     <string name="blink_build_failed">L\'azione non ha dato una transazione.</string>
     <string name="blink_hold">Tieni premuto per firmare</string>
     <string name="blink_done">Fatto.</string>
-    <string name="blink_truth">Un Blink è un\'API che ti passa una transazione. Apex la legge e la simula come tutte le altre prima dell\'impronta. Aprire il link non firma niente.</string>
+    <string name="blink_truth">Un Blink è un\'API che ti passa una transazione. Velum la legge e la simula come tutte le altre prima dell\'impronta. Aprire il link non firma niente.</string>
     <string name="ctap_open">Scambia i contatti col tocco</string>
     <string name="ctap_title">Contatti col tocco</string>
     <string name="ctap_sub">Due telefoni, schiena contro schiena, due volte.</string>
@@ -1621,7 +1622,7 @@
     <string name="home_customize_note">Spegnine una e finisce dentro Altro. Le frecce cambiano l\'ordine.</string>
     <string name="home_customize_reset">Torna a com\'era</string>
     <string name="chip_title">Il tuo wallet</string>
-    <string name="chip_info">È il conto del Seed Vault che Apex legge. La chiave non esce mai dal vault; ogni firma chiede la tua impronta.</string>
+    <string name="chip_info">È il conto del Seed Vault che Velum legge. La chiave non esce mai dal vault; ogni firma chiede la tua impronta.</string>
     <string name="cover_title">Una mano sullo schermo nasconde i numeri</string>
     <string name="cover_sub">Copri la parte alta dello schermo e le cifre si coprono fino alla tua impronta.</string>
     <string name="comp_page_title">Bolla e widget</string>
@@ -1630,7 +1631,7 @@
     <string name="comp_preview_sub">Lo stesso disegno che usa la bolla. Cambia la faccia qui sotto e guardalo qui.</string>
     <string name="comp_bubble">La bolla</string>
     <string name="comp_auto">Torna da sola</string>
-    <string name="comp_auto_sub">Ogni volta che apri Apex, la bolla si accende.</string>
+    <string name="comp_auto_sub">Ogni volta che apri Velum, la bolla si accende.</string>
     <string name="comp_face">Cosa dice il cerchietto</string>
     <string name="comp_face_agent">Agente</string>
     <string name="comp_face_health">Salute</string>

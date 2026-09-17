@@ -17,6 +17,7 @@ object Settings {
     private const val KEY_SWAP_PCT = "swap_custom_pct"
     private const val KEY_WEB_CHECK = "web_check"
     private const val KEY_AGENT_PRO = "agent_pro"
+    private const val KEY_WALLET_OPEN = "wallet_open"
 
     val currency = mutableStateOf("USD")
     val onboarded = mutableStateOf(true)
@@ -55,6 +56,10 @@ object Settings {
      */
     val agentPro = mutableStateOf(false)
 
+    /** Whether the holdings card on Home is unrolled. Remembered, because a list
+     *  somebody has deliberately closed should stay closed tomorrow morning. */
+    val walletOpen = mutableStateOf(true)
+
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
@@ -65,6 +70,12 @@ object Settings {
         swapCustomPct.value = p.getInt(KEY_SWAP_PCT, 0)
         webCheck.value = p.getBoolean(KEY_WEB_CHECK, false)
         agentPro.value = p.getBoolean(KEY_AGENT_PRO, false)
+        walletOpen.value = p.getBoolean(KEY_WALLET_OPEN, true)
+    }
+
+    fun setWalletOpen(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_WALLET_OPEN, on).apply()
+        walletOpen.value = on
     }
 
     fun setAgentPro(ctx: Context, on: Boolean) {
@@ -141,8 +152,17 @@ object Settings {
     val homeActionsTick = mutableStateOf(0)
     val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "LINK", "AGENT")
 
-    /** A hand over the screen (the proximity sensor) covers the numbers. On by default. */
-    fun coverToHide(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cover_hide", true)
+    /**
+     * A hand over the screen (the proximity sensor) covers the numbers. **Off by default.**
+     *
+     * It was on, and it fired on the wrong thing: a thumb travelling up the
+     * screen passes the sensor, so scrolling the wallet locked the numbers and
+     * asked for a fingerprint. A privacy trick that goes off while you are
+     * reading is not protecting anything, it is taking the page away. It stays
+     * in settings for the people who want it, and for the demo, where a hand
+     * deliberately laid over the top is exactly the gesture being shown.
+     */
+    fun coverToHide(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cover_hide", false)
     fun setCoverToHide(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("cover_hide", on).apply()
 
     /** Priority fee for the transactions we build ourselves, in micro‑lamports per compute unit. 0 = none. */

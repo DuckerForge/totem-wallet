@@ -128,20 +128,60 @@ internal fun WalletHero(
                     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
                         var showAll by remember(view) { mutableStateOf(false) }
                         var showOthers by remember(view) { mutableStateOf(false) }
-                        Text(stringResource(R.string.hero_portfolio), style = HaloType.label, color = Halo.muted)
+                        val hctx = LocalContext.current
+                        // The whole card rolls up.
+                        //
+                        // Open, this is the tallest thing on the screen: twelve
+                        // coins, the ones nobody prices, thirty-three odds and
+                        // ends, and the DeFi under all of it. Somebody who knows
+                        // what they hold scrolls past the lot every time to reach
+                        // the rest of the page. Closed, it is one line that still
+                        // says how much is in there, and it stays closed tomorrow,
+                        // because a drawer that reopens itself is not a drawer.
+                        val open by Settings.walletOpen
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                Settings.setWalletOpen(hctx, !open); Haptics.tick(hctx)
+                            },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.hero_portfolio), style = HaloType.label, color = Halo.muted)
+                            Spacer(Modifier.weight(1f))
+                            if (!open) {
+                                val n = main.size + others.size
+                                Text(
+                                    if (view.defi.isEmpty()) stringResource(R.string.hero_closed, n)
+                                    else stringResource(R.string.hero_closed_defi, n, view.defi.size),
+                                    style = HaloType.label, color = Halo.muted,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            HaloIcon(if (open) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 14.dp)
+                        }
+                        if (!open) return@Column
                         (if (showAll || main.size <= MAX_COLLAPSED) main else main.take(MAX_COLLAPSED)).forEach { h -> HoldingRow(h, currency) { picked = h } }
                         if (main.size > MAX_COLLAPSED) {
                             LinkRow(if (showAll) stringResource(R.string.hero_show_less) else stringResource(R.string.hero_show_all, main.size)) { showAll = !showAll }
                         }
-                        if (view.unpriced > 0) Text(stringResource(R.string.hero_some_unpriced), style = HaloType.label, color = Halo.muted)
-                        if (others.isNotEmpty()) {
-                            LinkRow(if (showOthers) stringResource(R.string.hero_others_hide) else stringResource(R.string.hero_others, others.size)) { showOthers = !showOthers }
-                            if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
-                        }
-                        if (view.defi.isNotEmpty()) {
-                            Spacer(Modifier.height(Space.xs))
-                            Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
-                            view.defi.forEach { d -> DefiRow(d) }
+                        // Everything past the first few coins lives behind "show all".
+                        //
+                        // The odds and ends and the DeFi used to sit below the fold
+                        // whatever you did, so the card was tall even when it was
+                        // "collapsed" and the interesting part, the coins, was the
+                        // smallest thing in it. One link now decides the whole
+                        // depth of the card: the coins you actually watch, or all
+                        // of it.
+                        if (showAll || main.size <= MAX_COLLAPSED) {
+                            if (view.unpriced > 0) Text(stringResource(R.string.hero_some_unpriced), style = HaloType.label, color = Halo.muted)
+                            if (others.isNotEmpty()) {
+                                LinkRow(if (showOthers) stringResource(R.string.hero_others_hide) else stringResource(R.string.hero_others, others.size)) { showOthers = !showOthers }
+                                if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
+                            }
+                            if (view.defi.isNotEmpty()) {
+                                Spacer(Modifier.height(Space.xs))
+                                Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
+                                view.defi.forEach { d -> DefiRow(d) }
+                            }
                         }
                     }
                 }

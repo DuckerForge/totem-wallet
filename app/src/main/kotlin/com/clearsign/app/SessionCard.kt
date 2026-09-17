@@ -529,6 +529,10 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
     val cap = session.capLamports.coerceAtLeast(1L).toFloat()
     var perTx by remember { mutableFloatStateOf((policy.perTxLamports / cap).coerceIn(0.01f, 1f)) }
     var daily by remember { mutableFloatStateOf((policy.dailyLamports / cap).coerceIn(0.01f, 1f)) }
+    // Il tetto giornaliero e' una fetta della paghetta, quindi al massimo vale
+    // tutta la paghetta. Al massimo il cursore e' finito, e un cursore finito
+    // sembra rotto: "spento" e' lo stesso stato, ma detto.
+    var dailyOn by remember { mutableStateOf(policy.dailyLamports < session.capLamports) }
     var askAbove by remember { mutableFloatStateOf((policy.askAboveLamports / cap).coerceIn(0f, 1f)) }
     var perHour by remember { mutableFloatStateOf(policy.maxTxPerHour.toFloat()) }
     var usdc by remember { mutableStateOf(AgentPolicy.USDC in policy.allowedMints) }
@@ -610,11 +614,31 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 sol(perTx) + "  ·  " + (perTx * 100).toInt() + "%",
                 perTx, 0.01f..1f, Halo.mint,
             ) { perTx = it }
-            SliderRow(
-                stringResource(R.string.agent_daily),
-                sol(daily) + "  ·  " + (daily * 100).toInt() + "%",
-                daily, 0.01f..1f, Halo.mint,
-            ) { daily = it }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.agent_daily), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Halo.ink)
+                    Text(
+                        if (dailyOn) stringResource(R.string.rules_daily_on_sub, sol(daily))
+                        else stringResource(R.string.rules_daily_off_sub, fmtSol(cap.toLong(), 4) + " SOL"),
+                        style = HaloType.small, color = Halo.muted, lineHeight = 16.sp,
+                    )
+                }
+                Text(
+                    stringResource(if (dailyOn) R.string.watch_disable else R.string.watch_enable),
+                    fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp,
+                    color = if (dailyOn) Halo.muted else Halo.mint,
+                    modifier = Modifier.clip(rs(10)).background((if (dailyOn) Halo.muted else Halo.mint).copy(alpha = 0.14f))
+                        .clickable { dailyOn = !dailyOn; Haptics.tick(ctx) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
+            if (dailyOn) {
+                SliderRow(
+                    stringResource(R.string.agent_daily),
+                    sol(daily) + "  ·  " + (daily * 100).toInt() + "%",
+                    daily, 0.01f..1f, Halo.mint,
+                ) { daily = it }
+            }
             // Quanto della giornata e' gia' andato, e la regola che spiega perche'
             // spesso e' meno di quanto sembra.
             run {
@@ -635,7 +659,7 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
             // le altre, e chi guarda un cursore fermo cerca il cursore, non il
             // paragrafo. Adesso compare solo quando serve, dice il numero, e
             // porta dove si fa.
-            if (perTx >= 0.995f || daily >= 0.995f) {
+            if (perTx >= 0.995f || (dailyOn && daily >= 0.995f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         stringResource(R.string.rules_cap_is_budget, fmtSol(cap.toLong(), 4)),
@@ -793,7 +817,7 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 SessionWallet.setPolicy(
                     ctx,
                     policy.copy(
-                        perTxLamports = (perTx * cap).toLong(), dailyLamports = (daily * cap).toLong(), askAboveLamports = (askAbove * cap).toLong(),
+                        perTxLamports = (perTx * cap).toLong(), dailyLamports = if (dailyOn) (daily * cap).toLong() else cap.toLong(), askAboveLamports = (askAbove * cap).toLong(),
                         maxTxPerHour = perHour.toInt().coerceAtLeast(1), allowedMints = mints, allowAnyMint = anyMint,
                         allowedDestinations = whom + owner + session.pubkey,
                     ),

@@ -79,6 +79,16 @@ internal fun WalletHero(
     }
     LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
     var curve by remember { mutableStateOf<List<Double>>(emptyList()) }
+    // The coins the curve is made of, biggest first: the line drops one of each
+    // as it passes. Six at most, which is all the curve looks up anyway.
+    val curveCoins = remember(pv) {
+        pv?.let { v ->
+            val byMint = HashMap<String, Double>()
+            v.holdings.filter { !it.isNft && it.raw > 0 && (it.fiat ?: 0.0) > 0.0 }
+                .forEach { byMint[it.mint] = (byMint[it.mint] ?: 0.0) + (it.fiat ?: 0.0) }
+            byMint.entries.sortedByDescending { it.value }.take(6).map { it.key }
+        }.orEmpty()
+    }
     LaunchedEffect(owner, pv?.total) {
         val o = owner
         val v = pv
@@ -147,7 +157,7 @@ internal fun WalletHero(
         // BalanceCurve for exactly what it is a chart of, because it is not the
         // obvious thing.
         Box(Modifier.fillMaxWidth()) {
-            if (curve.size >= 8) BalanceSpark(curve, Modifier.matchParentSize())
+            if (curve.size >= 8) BalanceSpark(curve, curveCoins, Modifier.matchParentSize())
             HomeActions(enabled = owner != null, onAction = onAction)
         }
 
@@ -529,7 +539,7 @@ private class TokenAction(val label: String, val icon: HIcon, val tint: androidx
  * ask for, and the two would fight.
  */
 @Composable
-private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
+private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Modifier) {
     val tint = if (values.last() >= values.first()) Halo.mint else Halo.red
     // It draws itself, left to right, the way the month happened.
     //
@@ -549,6 +559,8 @@ private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
         growth.animateTo(1f, androidx.compose.animation.core.tween(2100, easing = androidx.compose.animation.core.LinearEasing))
     }
     val grow = growth.value
+    // Loaded out here: an image is a composable's business, not a canvas's.
+    val marks = coins.map { rememberCoinBitmap(it) }
     androidx.compose.foundation.Canvas(modifier) {
         val lo = values.min()
         val hi = values.max()
@@ -578,6 +590,33 @@ private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
                 ),
             )
             drawPath(line, tint.copy(alpha = 0.24f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f))
+        }
+        // What the line is made of, dropped along it as it goes.
+        //
+        // The shape alone says how the month went and says nothing about whose
+        // month it was. One coin for each of the things the curve is actually
+        // built from, sitting on the line where the line passed them, turns a
+        // background into a sentence: this is your money, and this is what it is
+        // made of. Each lands only once the head has gone by, so they arrive in
+        // order of size and the last one arrives with the end of the line.
+        marks.forEachIndexed { i, bmp ->
+            if (bmp == null) return@forEachIndexed
+            val at = (i + 1f) / (marks.size + 1f)
+            if (grow < at) return@forEachIndexed
+            val vi = ((values.size - 1) * at).toInt().coerceIn(0, values.size - 1)
+            val r = 11.dp.toPx()
+            val c = androidx.compose.ui.geometry.Offset(size.width * at, py(values[vi]))
+            // A hole punched in the line, so the coin sits on it rather than
+            // over it, and a faint ring to hold it.
+            drawCircle(Halo.ground, r * 1.15f, c)
+            drawCircle(tint.copy(alpha = 0.22f), r * 1.15f, c, style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+            val d = (r * 1.7f).toInt()
+            drawImage(
+                bmp,
+                dstOffset = androidx.compose.ui.unit.IntOffset((c.x - d / 2f).toInt(), (c.y - d / 2f).toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(d, d),
+                alpha = 0.72f,
+            )
         }
         // The head of the line while it travels, so the eye has something to
         // follow. It stops existing the moment the curve is whole.

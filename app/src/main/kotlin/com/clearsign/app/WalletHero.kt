@@ -539,7 +539,16 @@ private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
     // the left edge is the past: there is no axis to say so, and there should
     // not be one. Once per curve, not on every recomposition — a shape that
     // keeps redrawing itself would say the numbers were still changing.
-    val grow = rememberReveal(key = values, durationMs = 1100)
+    //
+    // Two seconds and a steady speed, not the app's usual reveal. That one eases
+    // out, so the head bolts across and then crawls the last tenth, which on a
+    // line reads as a stutter rather than a trace. A pen moves at the speed it
+    // moves.
+    val growth = remember(values) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(values) {
+        growth.animateTo(1f, androidx.compose.animation.core.tween(2100, easing = androidx.compose.animation.core.LinearEasing))
+    }
+    val grow = growth.value
     androidx.compose.foundation.Canvas(modifier) {
         val lo = values.min()
         val hi = values.max()

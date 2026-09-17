@@ -1720,6 +1720,7 @@
     <string name="trader_no_onchain_why">Nessun ordine in catena: %1$s. L\'obiettivo lo guarda il ciclo, che ha bisogno dell\'app.</string>
     <string name="eyes_full">pieno %1$d/%2$d · non cerca finche\' non chiude una</string>
     <string name="night_worked_recent">L\'agente ha lavorato.</string>
+    <string name="agent_slice">Quanto del tetto ci mette</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
     <string name="hold_col_each">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>

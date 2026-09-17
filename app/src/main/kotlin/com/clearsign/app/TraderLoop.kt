@@ -193,8 +193,22 @@ object TraderLoop {
      * time, whoever asks, and the lock is shared with every other action that
      * signs with the budget key.
      */
+    /**
+     * Due giri attaccati sono un giro, non due.
+     *
+     * Da quando Start fa partire subito il primo giro, quel giro e la sveglia di
+     * sfondo possono capitare a pochi secondi l'uno dall'altro: il lucchetto li
+     * mette in fila, quindi non si rompe niente, ma sullo schermo si legge due
+     * volte "guardo il mercato" e sembra che l'agente balbetti o che stia
+     * spendendo il doppio. Nei primi dodici secondi il secondo non fa niente.
+     */
+    private const val SAME_TICK_MS = 12_000L
+
     suspend fun tick(ctx: Context, mayHunt: Boolean): Tick = EnvelopeLock.withLock {
         val now = System.currentTimeMillis()
+        if (now - lookedAt.longValue < SAME_TICK_MS && lookedAt.longValue > 0L) {
+            return@withLock Tick("already looked", acted = false)
+        }
         lookedAt.longValue = now
         if (mayHunt) huntedAt.longValue = now
         AgentTrace.working { tickInner(ctx, mayHunt) }

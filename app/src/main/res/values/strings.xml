@@ -1713,6 +1713,8 @@
     <string name="gift_see_receipt">See the receipt, then pay</string>
     <string name="env_review_hint_swap">This is what you will sign. Hold the button, then the fingerprint.</string>
     <string name="feed_chart_wait">Looking for the chart…</string>
+    <string name="trust_my_budget">your budget</string>
+    <string name="trust_my_wallet">your wallet</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
     <string name="hold_col_each">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>

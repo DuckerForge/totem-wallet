@@ -105,10 +105,24 @@ object SessionWallet {
      * overwrite a budget that is already funded, and its seed is the only copy
      * of the key to that money. So it is held in memory until the fingerprint.
      */
+    /**
+     * L'ultima chiave preparata ma non ancora salvata.
+     *
+     * Fra il preventivo e la firma la paghetta esiste solo qui: il seme e' in
+     * memoria e su disco non c'e' niente, perche' scriverlo prima della firma
+     * sovrascriverebbe una paghetta gia' finanziata. Ma lo scontrino di quella
+     * firma deve poter dire che quel destinatario e' tuo, se no avvisa su un
+     * portafoglio che hai appena creato tu.
+     */
+    @Volatile var preparedPubkey: String? = null
+        private set
+
     fun prepare(): Pair<ByteArray, String> {
         val seed = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val spec = EdDSAPrivateKeySpec(seed, EdDSANamedCurveTable.getByName(CURVE))
-        return seed to Base58.encode(spec.a.toByteArray())
+        val pub = Base58.encode(spec.a.toByteArray())
+        preparedPubkey = pub
+        return seed to pub
     }
 
     fun create(ctx: Context, capLamports: Long, days: Int, note: String, prepared: Pair<ByteArray, String>? = null): Session {

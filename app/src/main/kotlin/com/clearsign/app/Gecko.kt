@@ -68,15 +68,56 @@ object Gecko {
      */
     private const val FRESH_MS = 30 * 60_000L
     private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Candle>>>()
+    /**
+     * Which pool to read a coin from, written down for good.
+     *
+     * The busiest pool for a coin does not change from one minute to the next,
+     * and finding it costs a request to a source that starts refusing after five
+     * of them. Held only in memory it was looked up again after every restart and
+     * every half hour, so opening a chart cost two requests where it needed one,
+     * and the second one was the one that got refused. Measured: a coin the app
+     * had just called unchartable turned out to have twenty pools.
+     */
     private val poolCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
+    private const val POOL_MS = 7 * 24 * 3600_000L
+    @Volatile private var poolsLoaded = false
+
+    /** Give it a context once and the pool map survives the app being closed. */
+    fun warmPools(ctx: android.content.Context) {
+        if (poolsLoaded) return
+        poolsLoaded = true
+        poolFile = java.io.File(ctx.filesDir, "gecko_pools.json")
+        runCatching {
+            val f = poolFile ?: return
+            if (!f.exists()) return
+            val o = JSONObject(f.readText())
+            val now = System.currentTimeMillis()
+            o.keys().forEach { k ->
+                val a = o.optJSONArray(k) ?: return@forEach
+                val at = a.optLong(0)
+                if (now - at < POOL_MS) poolCache[k] = at to a.optString(1)
+            }
+        }
+    }
+
+    @Volatile private var poolFile: java.io.File? = null
+
+    private fun savePools() {
+        val f = poolFile ?: return
+        runCatching {
+            val o = JSONObject()
+            poolCache.forEach { (k, v) -> o.put(k, org.json.JSONArray().put(v.first).put(v.second)) }
+            f.writeText(o.toString())
+        }
+    }
 
     /** Candles for [mint] on [span], from memory when they are fresh enough. */
     fun series(mint: String, span: Span, bg: Boolean = false): List<Candle> {
         val key = "$mint|${span.name}"
         val now = System.currentTimeMillis()
         seriesCache[key]?.let { (at, v) -> if (now - at < FRESH_MS) return v }
-        val pool = poolCache[mint]?.takeIf { now - it.first < 30 * 60_000L }?.second
-            ?: topPool(mint, bg)?.also { poolCache[mint] = now to it }
+        val pool = poolCache[mint]?.takeIf { now - it.first < POOL_MS }?.second
+            ?: topPool(mint, bg)?.also { poolCache[mint] = now to it; savePools() }
             ?: return emptyList()
         val v = candles(pool, span, bg)
         // An empty answer is not cached: the pool may simply be a minute too young,

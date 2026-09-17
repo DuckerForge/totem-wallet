@@ -141,19 +141,7 @@ internal fun WalletHero(
                         if (view.defi.isNotEmpty()) {
                             Spacer(Modifier.height(Space.xs))
                             Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
-                            view.defi.forEach { d -> DefiRow(d, currency) }
-                            // What the whole of it pays, over a stretch long enough
-                            // to be worth printing. "About 0.00 a day" was true and
-                            // said nothing; at these sizes the month is the number a
-                            // person can actually picture.
-                            val perDay = view.defi.mapNotNull { it.perDayFiat }.sum()
-                            if (perDay > 0) {
-                                Text(
-                                    if (perDay >= 0.01) stringResource(R.string.hero_defi_day, fmtFiat(perDay, currency), fmtFiat(perDay * 30, currency))
-                                    else stringResource(R.string.hero_defi_month, fmtFiat(perDay * 30, currency), fmtFiat(perDay * 365, currency)),
-                                    fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint, lineHeight = 15.sp,
-                                )
-                            }
+                            view.defi.forEach { d -> DefiRow(d) }
                         }
                     }
                 }
@@ -383,9 +371,19 @@ private fun BigTotal(total: Double, currency: String) {
     }
 }
 
-/** One thing that is yours outside the token list: what, where, how much, and whether it is live. */
+/**
+ * One thing that is yours outside the token list: what, where, and whether it is live.
+ *
+ * It used to carry the money too: what the position is worth, how many coins are
+ * in it, what it pays a day and at what rate. Those numbers came out of an API
+ * that only sees its own platforms and an APR that is an estimate, and four
+ * estimates stacked in one corner read as a statement. A number that precise
+ * about somebody's money has to be right or absent, and this one could not be
+ * made right from here. So the row says what is true and stops: this is yours,
+ * it is over there, and it is working.
+ */
 @Composable
-private fun DefiRow(d: DefiPosition, currency: String) {
+private fun DefiRow(d: DefiPosition) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         TokenLogo(d.symbol, d.symbol, d.image, 34.dp)
         Spacer(Modifier.width(10.dp))
@@ -402,24 +400,6 @@ private fun DefiRow(d: DefiPosition, currency: String) {
                 } ?: ""),
                 fontFamily = Inter, fontSize = 11.sp, color = if (d.state == "active" || d.state == null) Halo.mint else Halo.amber, maxLines = 1,
             )
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(d.fiat?.let { fmtFiat(it, currency) } ?: "…", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Halo.ink)
-            Text((if (Settings.guest.value) "••••" else fmtUi(d.ui)) + " " + d.symbol, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
-            // What it pays, in money when we can and in coins otherwise. A line
-            // reading "+0.000002 SOL/day" is arithmetic, not information.
-            d.aprPct?.let { apr ->
-                val perDay = d.perDayFiat
-                val say = when {
-                    perDay != null && perDay >= 0.01 -> "+" + fmtFiat(perDay, currency) + stringResource(R.string.hero_per_day)
-                    perDay != null -> "+" + fmtFiat(perDay * 30, currency) + stringResource(R.string.hero_per_month)
-                    else -> "+" + fmtUi(d.perDayUi ?: 0.0) + " " + d.symbol + stringResource(R.string.hero_per_day)
-                }
-                Text(
-                    say + String.format(java.util.Locale.ROOT, " · %.1f%%", apr),
-                    fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint,
-                )
-            }
         }
     }
 }

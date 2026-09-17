@@ -178,6 +178,33 @@ object JupiterTrigger {
      * no SOL beyond the fee. A simulation we cannot get is a refusal, not a
      * shrug: the whole point of the order is that nobody will be watching it.
      */
+    /**
+     * Anche l'annullamento e' un mucchio di byte scritti dal server di qualcun
+     * altro, e questa chiave tiene soldi veri.
+     *
+     * Il gemello qui sotto controlla l'ordine prima di firmarlo, e il suo
+     * commento dice che quest'app non firma niente che non abbia guardato.
+     * L'annullamento pero' non passava da nessun controllo: si chiedeva a
+     * Jupiter una transazione e la si firmava alla cieca, dal ciclo, senza
+     * nessuno davanti al telefono. Trovato facendo l'audit.
+     *
+     * Un annullamento vero restituisce quello che era in deposito e non manda
+     * niente a nessuno: qui dentro nulla puo' uscire dalla paghetta tranne la
+     * commissione di rete. Se la simulazione non si puo' fare, non si firma:
+     * "non ho potuto guardare" e "ho guardato ed e' a posto" non sono la stessa
+     * cosa, e su una chiave che spende non si confondono.
+     */
+    private suspend fun checkItOnlyCancels(ctx: Context, tx: ByteArray, maker: String): String? {
+        val a = runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, maker, null, requireSim = true) }.getOrNull()
+            ?: return "could not simulate the cancel"
+        val mine = a.receipt.outflows.filter { it.owner == maker }
+        val solOut = mine.filter { it.mint == com.clearsign.core.NATIVE_SOL_MINT }.sumOf { -it.rawAmount }
+        if (solOut > 5_000_000L) return "the cancel would move SOL out"
+        if (mine.any { it.mint != com.clearsign.core.NATIVE_SOL_MINT }) return "the cancel would move a coin out"
+        a.receipt.risks.firstOrNull { it.severity == com.clearsign.core.Severity.DANGER }?.let { return it.detail }
+        return null
+    }
+
     private suspend fun checkItOnlySellsThis(ctx: Context, tx: ByteArray, maker: String, position: Positions.Position): String? {
         val a = runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, maker, null, requireSim = true) }.getOrNull()
             ?: return "could not simulate the order"
@@ -236,6 +263,7 @@ object JupiterTrigger {
 
     private suspend fun cancelBlocking(ctx: Context, maker: String, order: String): Boolean {
         val built = buildCancel(maker, order) ?: return false
+        checkItOnlyCancels(ctx, built.unsigned, maker)?.let { Log.w(TAG, "cancel refused: $it"); return false }
         val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(built.unsigned)) ?: return false
         val done = execute(built, attach(built.unsigned, maker, sig))
         return done != null && done.optString("error").isEmpty()

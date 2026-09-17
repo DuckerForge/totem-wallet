@@ -288,7 +288,19 @@ object SessionWallet {
 
     fun setMode(ctx: Context, mode: AgentMode) { policy(ctx)?.let { setPolicy(ctx, it.copy(mode = mode)) } }
 
-    /** What the agent spent on its own, kept for the rolling caps. [at, lamports] pairs, pruned to 24h. */
+    /**
+     * Ogni mossa lascia una riga. Quanto e' costata puo' essere zero.
+     *
+     * Questo registro serve a due regole che sembrano una sola: il tetto dei
+     * soldi al giorno, che **somma i lamport**, e il tetto delle mosse all'ora,
+     * che **conta le righe**. Un giro che torna a casa non spende niente, quindi
+     * non deve entrare nella somma, ma resta una mossa e nel conto deve entrare.
+     *
+     * Saltando la riga per intero, come si faceva da stamattina, un agente poteva
+     * fare compere e vendite all'infinito senza toccare nessun limite, pagando
+     * commissione e spread a ogni giro. Un modo silenzioso di svuotare una
+     * paghetta senza che nessuna regola se ne accorgesse.
+     */
     fun recordSpend(ctx: Context, lamports: Long, at: Long = System.currentTimeMillis()) {
         val a = spendLog(ctx).filter { it.first > at - 86_400_000L } + (at to lamports)
         prefs(ctx).edit().putString("spend", JSONArray(a.map { JSONArray().put(it.first).put(it.second) }).toString()).apply()

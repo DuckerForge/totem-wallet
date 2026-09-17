@@ -196,11 +196,11 @@ object AgentBroker {
                 own
             }
         }
-        // Uno scambio che torna a casa non consuma la giornata: vedi staysInPocket.
+        // Uno scambio che torna a casa non consuma la giornata, ma resta una
+        // mossa: zero lamport, una riga. Vedi staysInPocket e recordSpend.
         val pol = SessionWallet.policy(ctx)
-        if (pol == null || !com.clearsign.core.staysInPocket(receipt, pol)) {
-            SessionWallet.recordSpend(ctx, valueLamports)
-        }
+        val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol)
+        SessionWallet.recordSpend(ctx, if (homeAgain) 0L else valueLamports)
         // The book of what the agent is holding, and what it paid. Kept here and
         // not in the loop so a coin bought or sold from the chat is tracked too.
         runCatching {

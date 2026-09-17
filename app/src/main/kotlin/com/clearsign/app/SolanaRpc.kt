@@ -91,7 +91,7 @@ object SolanaRpc {
             SimResult(ok = err == null, err = err, logs = logs, unitsConsumed = units)
         } catch (_: Exception) {
             // A JSON-RPC error object (not "result") means the node rejected it.
-            SimResult(ok = false, err = resp.optJSONObject("error")?.optString("message") ?: "errore di simulazione", logs = emptyList(), unitsConsumed = null)
+            SimResult(ok = false, err = resp.optJSONObject("error")?.optString("message") ?: "simulation failed", logs = emptyList(), unitsConsumed = null)
         }
     }
 
@@ -587,7 +587,7 @@ object SolanaRpc {
         return list
     }
 
-    /** Both token programs queried concurrently (they're independent). A failed call reads as empty. */
+    /* Both token programs queried concurrently (they're independent). A failed call reads as empty. */
     private fun getTokenAccounts(rpcUrl: String, owner: String): List<TokenAccountInfo> {
         val list = readTokenAccounts(rpcUrl, owner).flatMap { it.orEmpty() }
         // Learn the symbols of whatever tokens this wallet holds (one DAS call, cached).
@@ -595,7 +595,7 @@ object SolanaRpc {
         return list
     }
 
-    /** One list per token program, in order; null for a program whose call did not come back. */
+    /* One list per token program, in order; null for a program whose call did not come back. */
     private fun readTokenAccounts(rpcUrl: String, owner: String): List<List<TokenAccountInfo>?> {
         // Read the two token programs in a row, on whatever thread called us.
         //
@@ -623,7 +623,7 @@ object SolanaRpc {
         }
     }
 
-    /**
+    /*
      * Token symbols from the Digital Asset Standard API (Helius only): mint → symbol.
      * A symbol is only trusted when it's short and printable; anything else stays
      * an address, so a scam token can't impersonate "USDC" through metadata alone.
@@ -721,7 +721,7 @@ object SolanaRpc {
     fun send(rpcUrl: String, signedTx: ByteArray): SendOutcome {
         val b64 = Base64.encodeToString(signedTx, Base64.NO_WRAP)
         val params = JSONArray().put(b64).put(JSONObject().put("encoding", "base64").put("preflightCommitment", COMMITMENT))
-        val resp = post(rpcUrl, "sendTransaction", params) ?: return SendOutcome(null, "rete non raggiungibile")
+        val resp = post(rpcUrl, "sendTransaction", params) ?: return SendOutcome(null, "network unreachable")
         if (resp.has("result")) return SendOutcome(resp.getString("result"), null)
         val err = resp.optJSONObject("error")
         val msg = err?.optJSONObject("data")?.optJSONArray("logs")?.let { logs ->

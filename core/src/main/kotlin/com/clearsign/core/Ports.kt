@@ -1,6 +1,6 @@
 package com.clearsign.core
 
-/**
+/*
  * The device/network boundary. The pure engine above depends only on these
  * interfaces; the Android/Seeker app provides the real implementations
  * (Seed Vault, Mobile Wallet Adapter, Helius RPC, Blockaid). Keeping them as

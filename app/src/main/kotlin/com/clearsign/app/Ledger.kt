@@ -9,7 +9,7 @@ import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.pow
 
-/**
+/*
  * The structured ledger — one entry per transaction the user approved, with
  * raw amounts, counterparties, risks, fiat snapshots and the attested proof.
  * Everything the "Scontrini" tab and the tax exports need, kept as monthly

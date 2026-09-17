@@ -62,7 +62,7 @@ import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-/**
+/*
  * Send SOL or a token from the wallet itself — through the very same receipt a
  * dApp request gets (simulation, split map, risks, look-alike detection), then
  * hold-to-sign. Recipient from the clipboard, the address book, or a QR scan.
@@ -474,7 +474,7 @@ internal fun clipboardText(ctx: Context): String? =
     (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()
 
 internal fun copyText(ctx: Context, text: String) {
-    (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("ClearSign", text))
+    (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(ctx.getString(R.string.app_name), text))
 }
 
 @Composable

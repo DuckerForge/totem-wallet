@@ -42,7 +42,7 @@ import com.clearsign.core.SeekerTier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
+/*
  * The buys as they happen, one line each, like a room people are talking in.
  *
  * The ranking above answers "what is the crowd doing"; this answers "who just did

@@ -75,18 +75,18 @@ object MoneyLinks {
     fun claimUrl(seed: ByteArray, note: String): String =
         WEB + "/g/#k=" + Base58.encode(seed) + (if (note.isNotBlank()) "&n=" + Uri.encode(note.take(60)) else "")
 
-    /** Reads the key out of either form: the web link's fragment, or the old `apex://claim?k=`. */
+    /* Reads the key out of either form: the web link's fragment, or the old `apex://claim?k=`. */
     fun seedFrom(uri: Uri): ByteArray? =
         (uri.getQueryParameter("k") ?: fragmentParam(uri, "k"))
             ?.let { runCatching { Base58.decode(it) }.getOrNull() }?.takeIf { it.size == 32 }
 
-    /** The note that came with the gift, from wherever this link keeps it. */
+    /* The note that came with the gift, from wherever this link keeps it. */
     fun noteFrom(uri: Uri): String? = uri.getQueryParameter("n") ?: fragmentParam(uri, "n")?.let { Uri.decode(it) }
 
     private fun fragmentParam(uri: Uri, key: String): String? =
         uri.fragment?.split('&')?.firstOrNull { it.startsWith("$key=") }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
 
-    /**
+    /*
      * Create a gift: a fresh key, funded from the Seed Vault with one approval.
      * Returns the link, or an error message.
      */

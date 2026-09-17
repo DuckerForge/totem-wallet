@@ -21,7 +21,7 @@ object PnlCard {
 
     data class Face(val title: String, val sub: String, val pct: Double?, val amountText: String, val foot: String)
 
-    fun draw(face: Face): Bitmap {
+    fun draw(face: Face, brandName: String): Bitmap {
         val p = Halo.palette
         val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
@@ -41,13 +41,13 @@ object PnlCard {
         c.drawText(face.amountText, 72f, 480f, mid)
         c.drawText(face.foot, 72f, H - 64f, small)
         val brand = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.accent.toArgb(); textSize = 30f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT }
-        c.drawText("SEEKER WALLET", W - 72f, H - 64f, brand)
+        c.drawText(brandName.uppercase(), W - 72f, H - 64f, brand)
         return bmp
     }
 
     /** Draw, save in the export folder, open the share sheet. */
     fun share(ctx: Context, face: Face, name: String) {
-        val bmp = draw(face)
+        val bmp = draw(face, ctx.getString(R.string.app_name))
         val out = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         val f = Exports.write(ctx, name, out.toByteArray())
         Exports.share(ctx, listOf(f), "image/png", face.title)

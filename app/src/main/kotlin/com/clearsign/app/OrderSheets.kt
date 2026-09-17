@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.pow
 
-/**
+/*
  * The four things a person can ask of a coin without staying on the chart:
  * sell it in profit, buy it cheaper, buy it a slice at a time, be told when it
  * moves. The first three are orders on Jupiter and fire with the phone off;

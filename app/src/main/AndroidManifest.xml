@@ -41,6 +41,11 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+<!-- usesCleartextTraffic resta aperto per una cosa sola: l'agente gira su un
+     computer sulla stessa wifi, a un indirizzo tipo http://192.168.1.10:8765, e
+     Android non sa permettere il chiaro "solo per la rete locale". Quindi il
+     permesso resta aperto qui e la stretta la fa AgentLink.isLocal, che rifiuta
+     un http verso internet. Ogni altro indirizzo dell'app e' https. -->
 <application
         android:allowBackup="false"
         android:usesCleartextTraffic="true"

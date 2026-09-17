@@ -69,7 +69,7 @@ object SolanaTx {
             }
     }
 
-    /**
+    /*
      * The message part of a serialized transaction: everything after the
      * signature array. This is what an ed25519 signature must cover — the Seed
      * Vault signs exactly the bytes it is handed, so it must be handed this.

@@ -1,6 +1,6 @@
 package com.clearsign.core
 
-/**
+/*
  * Paying by holding two phones together.
  *
  * What travels over NFC is a **request**, never a key and never a signature: the

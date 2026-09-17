@@ -97,7 +97,6 @@ object SessionWallet {
 
     // ---- the key ------------------------------------------------------------
 
-    /** Create a fresh envelope key. Replaces any previous one, so sweep first. */
     /**
      * A key for a budget that does not exist yet: generated, not stored.
      *
@@ -195,7 +194,7 @@ object SessionWallet {
         )
     }
 
-    /**
+    /*
      * Close the budget and forget everything that belonged to it.
      *
      * The trading settings, the last thing the loop said and the open positions

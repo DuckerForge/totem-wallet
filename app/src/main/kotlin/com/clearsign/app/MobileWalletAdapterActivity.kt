@@ -133,7 +133,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
             /* noConnectionWarningTimeoutMs = */ 10_000L,
         )
         val callbacks = Callbacks()
-        val sc = associationUri.createScenario(this, config, AuthIssuerConfig("Apex"), callbacks)
+        val sc = associationUri.createScenario(this, config, AuthIssuerConfig(getString(R.string.app_name)), callbacks)
         callbacks.owner = sc
         scenario = sc
         // Reference pattern (fakewallet): drive the local server on an IO thread
@@ -364,7 +364,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
             ui = MwaUi.Working(getString(R.string.w_authorizing))
             lifecycleScope.launch {
                 try {
-                    val label = acc.label ?: "Apex"
+                    val label = acc.label ?: getString(R.string.app_name)
                     if (signIn == null) request.completeWithAuthorize(acc.pubkeyBytes, label, null, null)
                     else request.completeWithAuthorize(AuthorizedAccount(acc.pubkeyBytes, label, null, null, null), null, null, signIn)
                     // The other half of the auth token bargain. The dApp keeps the
@@ -573,7 +573,6 @@ class MobileWalletAdapterActivity : ComponentActivity() {
     }
 }
 
-/** Who is asking: the dApp's declared name, its verified host, and its icon (absolute URL). */
 /**
  * Who is asking. [name] is what gets shown; when it came from the request itself
  * (an agent naming itself) [nameIsClaimed] is true and [origin] carries what we

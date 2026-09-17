@@ -4,7 +4,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/**
+/*
  * Which coin is worth looking at, out of everything trading right now.
  *
  * [TokenSafety] answers "is this a trap". This answers the harder question the
@@ -414,7 +414,6 @@ fun runnerScore(c: Candidate, gate: ScanGate): Pair<Double, List<String>> {
 /** What the scan threw out and why, so "nothing found" is never the whole answer. */
 data class MarketPicks(val picks: List<Scored>, val rejected: Map<String, Int>, val looked: Int)
 
-/** Gate, score, sort. The whole pipeline in one call. */
 /**
  * The other question: not which coin is moving, but which one is standing up.
  *

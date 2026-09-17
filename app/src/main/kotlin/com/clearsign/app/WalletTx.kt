@@ -38,7 +38,6 @@ object WalletTx {
         byteArrayOf(9),
     )
 
-    /** SPL TransferChecked (12). */
     /** BurnChecked (ix 15): destroys [amount] raw units of [mint] held in [account]; the owner signs. */
     fun tokenBurnChecked(account: ByteArray, mint: ByteArray, owner: ByteArray, amount: Long, decimals: Int, program: ByteArray = TOKEN_PROGRAM) = Instruction(
         program,
@@ -46,6 +45,7 @@ object WalletTx {
         byteArrayOf(15) + le64(amount) + byteArrayOf(decimals.toByte()),
     )
 
+    /** SPL TransferChecked (12). */
     fun tokenTransferChecked(source: ByteArray, mint: ByteArray, dest: ByteArray, owner: ByteArray, amount: Long, decimals: Int, program: ByteArray = TOKEN_PROGRAM) = Instruction(
         program,
         listOf(AccountMeta(source, false, true), AccountMeta(mint, false, false), AccountMeta(dest, false, true), AccountMeta(owner, true, false)),

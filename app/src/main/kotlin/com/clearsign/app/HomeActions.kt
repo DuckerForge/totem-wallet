@@ -40,10 +40,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 
-/** The eight things you can start from the wallet home. */
+/* The eight things you can start from the wallet home. */
 internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AGENT, BRIDGE, MORE }
 
-/**
+/*
  * The action grid: eight round, **neutral** buttons.
  *
  * Neutral on purpose. The three tiles this replaces were tinted — two mint, one

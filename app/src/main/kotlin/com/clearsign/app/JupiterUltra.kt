@@ -84,7 +84,7 @@ object JupiterUltra {
      */
     fun execute(signedTx: ByteArray, requestId: String): Exec {
         val body = JSONObject().put("signedTransaction", java.util.Base64.getEncoder().encodeToString(signedTx)).put("requestId", requestId)
-        val o = HOSTS.firstNotNullOfOrNull { postJson("$it/execute", body) } ?: return Exec(null, "unreachable", "Jupiter non raggiungibile")
+        val o = HOSTS.firstNotNullOfOrNull { postJson("$it/execute", body) } ?: return Exec(null, "unreachable", "Jupiter unreachable")
         val status = o.optString("status")
         val sig = o.optString("signature").takeIf { it.isNotEmpty() }
         val err = o.optString("error").takeIf { it.isNotEmpty() } ?: o.optString("errorMessage").takeIf { it.isNotEmpty() }

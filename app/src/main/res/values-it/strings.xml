@@ -1704,6 +1704,7 @@
     <string name="night_cap_spent">Il tetto di oggi è finito. Da qui chiede l\'impronta a ogni mossa.</string>
     <string name="hero_closed">%1$d monete</string>
     <string name="hero_closed_defi">%1$d monete · %2$d in DeFi</string>
+    <string name="gift_review_hint">Questo è quello che firmi: il tuo portafoglio carica una chiave nuova, e il link porta quella chiave. Tieni premuto, poi l\'impronta.</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
     <string name="hold_col_each">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>

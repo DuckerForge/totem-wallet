@@ -153,7 +153,7 @@ internal fun BlinkSheet(link: String, signer: SeedVaultSigner, owner: String, on
             title = stringResource(R.string.blink_title),
             onBack = { if (busy == null) review = null },
         ) {
-            SignReceiptBody(analyzed.receipt, null)
+            Column { SignReceiptBody(analyzed.receipt, null, hero = false) }
             error?.let { Banner(it, Halo.red, HIcon.WARNING) }
             busy?.let { Working(it) }
             if (analyzed.receipt.blocksApproval) {

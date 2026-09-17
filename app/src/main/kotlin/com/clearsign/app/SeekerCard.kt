@@ -505,13 +505,34 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
     // every bar and every feed row replays its arrival each time it comes back.
     val played = remember { mutableSetOf<String>() }
     var feedOpen by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(feed) { events = runCatching { crowdEvents(ctx, feed) }.getOrDefault(emptyList()) }
+    // Nothing is drawn until we know what the service has to say.
+    //
+    // It used to draw the moment the phone's own scan had anything, which is
+    // three or four rows, and then the service answered and the list was rebuilt
+    // from a different set of purchases. Every row was new, so every row played
+    // its entrance again, and what that looks like is the page throwing away
+    // what it had just shown you and starting over. Waiting one beat for the
+    // cached file, which is a disk read, means the first thing drawn is already
+    // the whole picture.
+    var asked by remember { mutableStateOf(false) }
+    LaunchedEffect(feed, asked) {
+        if (!asked) return@LaunchedEffect
+        // A failure keeps what is on screen. Replacing a good list with an empty
+        // one says "nobody is buying anything", which is a different claim from
+        // "we could not look".
+        events = runCatching { crowdEvents(ctx, feed) }.getOrNull() ?: events
+    }
     LaunchedEffect(Unit) {
         // The file first, so the page is never blank while the network answers.
-        withContext(Dispatchers.IO) { SeekerFeed.cached(ctx) }?.let { feed = it }
-        if (!SeekerFeed.available) return@LaunchedEffect
+        val cached = withContext(Dispatchers.IO) { SeekerFeed.cached(ctx) }
+        if (cached != null) feed = cached
+        if (!SeekerFeed.available) { asked = true; return@LaunchedEffect }
+        // With a file in hand we can draw now; without one there is nothing to
+        // draw yet, so the wait stays on screen until the service answers.
+        if (cached != null) asked = true
         while (true) {
             withContext(Dispatchers.IO) { SeekerFeed.refresh(ctx) }?.let { feed = it }
+            asked = true
             kotlinx.coroutines.delay(150_000)
         }
     }

@@ -77,6 +77,13 @@ internal fun WalletHero(
         onLoaded()
     }
     LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
+    var curve by remember { mutableStateOf<List<Double>>(emptyList()) }
+    LaunchedEffect(owner, pv?.total) {
+        val o = owner
+        val v = pv
+        curve = if (o == null || v == null) emptyList()
+        else runCatching { BalanceCurve.of(o, v) }.getOrDefault(emptyList())
+    }
     var picked by remember { mutableStateOf<Holding?>(null) }
     picked?.let { h ->
         if (owner != null) TokenSheet(
@@ -128,7 +135,20 @@ internal fun WalletHero(
             }
         }
 
-        HomeActions(enabled = owner != null, onAction = onAction)
+        // The shape of the month, under the buttons rather than beside them.
+        //
+        // A chart of your own money is the thing people open a wallet to look at,
+        // and it had nowhere to go: the balance says today and the pill says the
+        // last day, and between them there was no picture at all. Put in a card
+        // of its own it would have pushed the holdings further down the page for
+        // something nobody needs to read closely. Here it costs no height, and
+        // what it is for is a glance: up or down, steady or jagged. See
+        // BalanceCurve for exactly what it is a chart of, because it is not the
+        // obvious thing.
+        Box(Modifier.fillMaxWidth()) {
+            if (curve.size >= 8) BalanceSpark(curve, Modifier.matchParentSize())
+            HomeActions(enabled = owner != null, onAction = onAction)
+        }
 
         pv?.let { view ->
             val main = view.main.filter { it.raw > 0 }
@@ -365,47 +385,55 @@ private fun TokenSheet(
                 GhostButton(stringResource(R.string.send_btn), Modifier.weight(1f), HIcon.SEND, tint = Halo.mint) { onSend() }
                 GhostButton(stringResource(R.string.swap_btn), Modifier.weight(1f), HIcon.SWAP, tint = Halo.cyan) { onSwap() }
             }
-            // Native SOL has no mint to copy and no token page to open. Its mint
-            // field is the string "SOL", a placeholder this app uses internally,
-            // and handing that to an explorer produced a page saying the address
-            // is invalid. The card already hides the mint row for SOL; these two
-            // now follow the same rule, and the explorer goes to the wallet,
-            // which is the page that actually exists.
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!isSol) {
-                    GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY) {
-                        (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("mint", h.mint))
-                    }
-                }
-                GhostButton("Solscan", Modifier.weight(1f), HIcon.EXTERNAL, tint = Halo.cyan) {
-                    val target = if (isSol) owner else h.mint
-                    runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(target, null)))) }
-                }
-            }
-            // Sell it in profit without watching it, or be told when it moves.
+            // The rest of what this card can do, two to a row, whatever survives.
             //
-            // Both need a price, so a coin nobody quotes gets neither button. But
-            // they are not the same gate: the take profit puts an order on the
-            // chain to sell the coin, which SOL is excluded from because SOL is
-            // what everything else is sold *into*. Being told when it moves has
-            // no such problem, and telling somebody when SOL moves is probably
-            // the single most wanted alert in the app. It used to be inside the
-            // same `if`, so on the one coin everybody holds there was no alert.
-            if (!h.isNft && h.raw > 0) {
-                var priceUsd by remember(h.mint) { mutableStateOf<Double?>(null) }
-                LaunchedEffect(h.mint) { priceUsd = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(h.mint))[h.mint] }.getOrNull() } }
-                var tp by remember { mutableStateOf(false) }
-                var alert by remember { mutableStateOf(false) }
-                val coin = OrderCoin(h.mint, h.symbol, h.decimals, h.image, priceUsd, h.raw)
-                if (priceUsd != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (!isSol) GhostButton(stringResource(R.string.order_tp_short), Modifier.weight(1f), HIcon.HOURGLASS, tint = Halo.mint) { tp = true }
-                        GhostButton(stringResource(R.string.order_alert), Modifier.weight(1f), HIcon.WARNING, tint = Halo.amber) { alert = true }
-                    }
-                }
-                if (tp) TakeProfitSheet(coin, signer, owner, onDone = { tp = false; onDismiss(true) }) { tp = false }
-                if (alert) AlertSheet(coin, onDone = { alert = false }) { alert = false }
+            // They used to be written as fixed rows, and each row hid its own
+            // buttons: no mint to copy when the coin is SOL, no take profit on
+            // SOL either, nothing at all for a coin nobody prices. On SOL that
+            // left one button on one row and one button on the next, each
+            // stretched the full width, stacked, which looks like a mistake
+            // rather than a card with fewer things to offer. A list that lays
+            // itself out in pairs cannot get that wrong: it is balanced for
+            // every coin, and it stays balanced when a button appears late,
+            // which the two price-driven ones do.
+            var priceUsd by remember(h.mint) { mutableStateOf<Double?>(null) }
+            LaunchedEffect(h.mint) { priceUsd = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(h.mint))[h.mint] }.getOrNull() } }
+            var tp by remember { mutableStateOf(false) }
+            var alert by remember { mutableStateOf(false) }
+            val coin = OrderCoin(h.mint, h.symbol, h.decimals, h.image, priceUsd, h.raw)
+            val orderable = !h.isNft && h.raw > 0 && priceUsd != null
+
+            val actions = buildList<TokenAction> {
+                // Native SOL's mint field is the string "SOL", a placeholder this
+                // app uses internally. There is nothing to copy, and handing it to
+                // an explorer produced a page saying the address is invalid, so the
+                // explorer goes to the wallet instead: the page that exists.
+                if (!isSol) add(
+                    TokenAction(stringResource(R.string.copy), HIcon.COPY, Halo.muted) {
+                        (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                            .setPrimaryClip(android.content.ClipData.newPlainText("mint", h.mint))
+                    },
+                )
+                add(
+                    TokenAction("Solscan", HIcon.EXTERNAL, Halo.cyan) {
+                        val target = if (isSol) owner else h.mint
+                        runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(target, null)))) }
+                    },
+                )
+                // The take profit puts an order on the chain to sell the coin, and
+                // SOL is what everything else is sold *into*, so it has none. Being
+                // told when something moves has no such problem, and "tell me when
+                // SOL moves" is probably the most wanted alert in the app.
+                if (orderable && !isSol) add(TokenAction(stringResource(R.string.order_tp_short), HIcon.HOURGLASS, Halo.mint) { tp = true })
+                if (orderable) add(TokenAction(stringResource(R.string.order_alert), HIcon.WARNING, Halo.amber) { alert = true })
             }
+            actions.chunked(2).forEach { pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    pair.forEach { a -> GhostButton(a.label, Modifier.weight(1f), a.icon, tint = a.tint, onClick = a.onClick) }
+                }
+            }
+            if (tp) TakeProfitSheet(coin, signer, owner, onDone = { tp = false; onDismiss(true) }) { tp = false }
+            if (alert) AlertSheet(coin, onDone = { alert = false }) { alert = false }
             if (!isSol) {
                 Text(stringResource(R.string.token_burn_note), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 PrimaryButton(stringResource(R.string.token_burn_btn), danger = true, enabled = !accounts.isNullOrEmpty(), icon = HIcon.TRASH) {
@@ -485,5 +513,50 @@ private fun DefiRow(d: DefiPosition) {
                 fontFamily = Inter, fontSize = 11.sp, color = if (d.state == "active" || d.state == null) Halo.mint else Halo.amber, maxLines = 1,
             )
         }
+    }
+}
+
+/** One of the smaller things a holding's card can do. */
+private class TokenAction(val label: String, val icon: HIcon, val tint: androidx.compose.ui.graphics.Color, val onClick: () -> Unit)
+
+/**
+ * The curve itself: an area under a line, faint enough to read the buttons through.
+ *
+ * Green when the month ends higher than it started, red when it does not, and
+ * that is the only thing it says. No axis, no grid, no numbers: a figure printed
+ * here would be a figure nobody asked for, floating behind something they did
+ * ask for, and the two would fight.
+ */
+@Composable
+private fun BalanceSpark(values: List<Double>, modifier: Modifier) {
+    val tint = if (values.last() >= values.first()) Halo.mint else Halo.red
+    androidx.compose.foundation.Canvas(modifier) {
+        val lo = values.min()
+        val hi = values.max()
+        val span = (hi - lo).takeIf { it > 0.0 } ?: 1.0
+        // Kept off the floor and the ceiling: a line that touches either edge
+        // reads as clipped, as if the real shape carried on outside the box.
+        val top = size.height * 0.16f
+        val usable = size.height * 0.66f
+        fun px(i: Int) = size.width * i / (values.size - 1).toFloat()
+        fun py(v: Double) = top + usable - ((v - lo) / span).toFloat() * usable
+        val line = androidx.compose.ui.graphics.Path().apply {
+            moveTo(0f, py(values[0]))
+            for (i in 1 until values.size) lineTo(px(i), py(values[i]))
+        }
+        val area = androidx.compose.ui.graphics.Path().apply {
+            addPath(line)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        drawPath(
+            area,
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                listOf(tint.copy(alpha = 0.11f), tint.copy(alpha = 0f)),
+                startY = top, endY = size.height,
+            ),
+        )
+        drawPath(line, tint.copy(alpha = 0.24f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f))
     }
 }

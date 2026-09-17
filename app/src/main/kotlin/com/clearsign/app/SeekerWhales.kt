@@ -68,33 +68,31 @@ internal fun SeekerWhalesCard(limit: Int = 8) {
     val (rows, count, total) = remember { whales(ctx) }
     if (rows.isEmpty()) { GlassCard { NothingHere(stringResource(R.string.crowd_no_data)) }; return }
 
-    GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HaloIcon(HIcon.GEM, Halo.amber, 16.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.whales_title),
-                    fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                    color = Halo.amber, modifier = Modifier.weight(1f),
-                )
-                Text(
-                    stringResource(R.string.whales_count, count),
-                    fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, style = Tabular,
-                )
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloIcon(HIcon.GEM, Halo.amber, 16.dp)
+            Spacer(Modifier.width(8.dp))
             Text(
-                stringResource(R.string.whales_total, money(total)),
-                fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp,
+                stringResource(R.string.whales_title),
+                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = Halo.amber, modifier = Modifier.weight(1f),
             )
-            // One open at a time: two expanded rows is a list that has stopped
-            // being a ranking.
-            // Survives the switch to another Scout tab: reopening a whale you
-            // had already opened should not cost the same three calls again.
-            var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
-            rows.take(limit).forEachIndexed { i, w ->
-                WhaleRow(i + 1, w, open == w.address) { open = if (open == w.address) null else w.address }
-            }
+            Text(
+                stringResource(R.string.whales_count, count),
+                fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, style = Tabular,
+            )
+        }
+        Text(
+            stringResource(R.string.whales_total, money(total)),
+            fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp,
+        )
+        // One open at a time: two expanded rows is a list that has stopped
+        // being a ranking.
+        // Survives the switch to another Scout tab: reopening a whale you
+        // had already opened should not cost the same three calls again.
+        var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+        rows.take(limit).forEachIndexed { i, w ->
+            WhaleRow(i + 1, w, open == w.address) { open = if (open == w.address) null else w.address }
         }
     }
 }

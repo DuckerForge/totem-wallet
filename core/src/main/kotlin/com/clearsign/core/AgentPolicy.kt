@@ -93,6 +93,37 @@ sealed class Decision(val code: String) {
     }
 }
 
+/**
+ * Un giro che torna a casa non ha speso niente.
+ *
+ * Il tetto giornaliero esiste per limitare **quanto puo' andarsene** in un
+ * giorno. Contava invece quanto gira: comprare una moneta e rivenderla lascia il
+ * borsello com'era, solo in una forma diversa per un po', eppure mangiava il
+ * tetto due volte. Su una paghetta piccola il risultato e' che l'agente fa un
+ * giro solo e poi chiede l'impronta a ogni mossa, cioe' smette di essere un
+ * agente. Misurato il 17/09: comprato, rivenduto con i soldi tornati indietro, e
+ * le due compere successive fermate dal tetto.
+ *
+ * La condizione e' la stessa che rende uno scambio uno scambio, ed e' per questo
+ * che l'esenzione non si puo' sfruttare: serve che la rotta sia passata da un
+ * programma di scambio **ammesso** e che sia tornata indietro una moneta diversa
+ * nello stesso borsello. Un trasferimento travestito da scambio non arriva
+ * nemmeno qui: lo ferma prima la regola cinque.
+ *
+ * Quello che questo **non** esenta: un trasferimento fuori, una spesa che non
+ * torna, e il tetto per singola operazione, che resta intero. Cambia solo la
+ * somma della giornata.
+ */
+fun staysInPocket(receipt: Receipt, policy: AgentPolicy): Boolean {
+    val programs = receipt.stats?.programs.orEmpty()
+    val exchange = programs.any { p -> p in AgentPolicy.EXCHANGE_PROGRAMS && p in policy.allowedPrograms }
+    if (!exchange) return false
+    val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
+    val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
+    if (outs.isEmpty() || ins.isEmpty()) return false
+    return ins.any { d -> outs.none { o -> o.mint == d.mint } }
+}
+
 object PolicyEngine {
     private val EXCHANGE_PROGRAMS get() = AgentPolicy.EXCHANGE_PROGRAMS
 

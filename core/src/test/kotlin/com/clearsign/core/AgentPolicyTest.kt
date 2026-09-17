@@ -2,6 +2,7 @@ package com.clearsign.core
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AgentPolicyTest {
@@ -258,6 +259,40 @@ class AgentPolicyTest {
     @Test fun theEffectSummaryReadsTheSimulationNotTheClaim() {
         val line = Effects.summary(transferTo(luca, 0.25), "en")
         assertTrue(line.contains("0.25") && line.contains("SOL") && line.contains("8ncU"), line)
+    }
+
+    // ---- il giro che torna a casa --------------------------------------------
+    //
+    // Il tetto giornaliero limita quanto puo' andarsene in un giorno. Comprare e
+    // rivendere non manda via niente: lascia il borsello com'era, in una forma
+    // diversa per un po'. Contarlo due volte vuol dire che un agente con una
+    // paghetta piccola fa un giro e poi chiede l'impronta per sempre.
+
+    @Test fun aRealSwapDoesNotSpendTheDay() {
+        assertTrue(staysInPocket(swap(0.01, usdc, "USDC", 1.0), policy))
+    }
+
+    @Test fun aTransferOutSpendsTheDay() {
+        assertFalse(staysInPocket(transferTo(luca, 0.01), policy))
+    }
+
+    @Test fun aSwapWithoutAnAllowedExchangeSpendsTheDay() {
+        // Senza un programma di scambio ammesso non e' uno scambio, ed e' la
+        // stessa condizione che impedisce a un trasferimento travestito di
+        // arrivare fin qui: l'esenzione non si puo' sfruttare.
+        assertFalse(staysInPocket(swap(0.01, usdc, "USDC", 1.0, AgentPolicy.SYSTEM, AgentPolicy.TOKEN), policy))
+    }
+
+    @Test fun sellingBackIntoSolDoesNotSpendTheDay() {
+        // La vendita: esce una moneta, torna SOL. Stesso borsello, niente perso.
+        val sale = Receipt(
+            primaryRecipient = "PoolAuthorityXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", recipientLabel = null, recipientTrust = TrustLevel.NEW,
+            outflows = listOf(d(env, usdc, "USDC", 6, -1.0)),
+            inflows = listOf(d(env, NATIVE_SOL_MINT, "SOL", 9, 0.01)),
+            feeLamports = 5_000, risks = emptyList(), distributions = emptyList(),
+            stats = stats(AgentPolicy.COMPUTE_BUDGET, AgentPolicy.JUPITER_V6),
+        )
+        assertTrue(staysInPocket(sale, policy))
     }
 
     @Test fun transferDisguisedAsSwapIsRefused() {

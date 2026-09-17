@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,19 +74,19 @@ import java.util.Locale
  * phone.
  */
 @Composable
-internal fun EyesDialog(onClose: () -> Unit) {
+internal fun EyesDialog(onClose: () -> Unit, onStart: () -> Unit = {}) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // The whole point is a screen that stays on.
         val view = LocalView.current
         LaunchedEffect(view) {
             (view.parent as? DialogWindowProvider)?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-        EyesScreen(onClose)
+        EyesScreen(onClose, onStart)
     }
 }
 
 @Composable
-internal fun EyesScreen(onClose: () -> Unit) {
+internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     val ctx = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     val open = remember(refresh) { Positions.open(ctx) }
@@ -236,6 +237,23 @@ internal fun EyesScreen(onClose: () -> Unit) {
                             )
                         }
                     }
+                }
+                // Spento, questa schermata offriva di guardare il niente.
+                //
+                // E' la pagina fatta per vederlo lavorare: se non sta lavorando,
+                // la cosa da fare e' accenderlo, e mandare qualcuno a cercare il
+                // tasto sulla pagina precedente e' chiedergli di indovinare dove
+                // eravamo noi quando l'abbiamo scritto.
+                if (!cfg.on) {
+                    Box(
+                        Modifier.clip(rs(999)).background(Halo.mint.copy(alpha = 0.16f))
+                            .border(1.dp, Halo.mint.copy(alpha = 0.5f), rs(999))
+                            .clickable { onStart() }.padding(horizontal = 14.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(stringResource(R.string.agent_start), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.mint)
+                    }
+                    Spacer(Modifier.width(6.dp))
                 }
                 Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp) }
             }

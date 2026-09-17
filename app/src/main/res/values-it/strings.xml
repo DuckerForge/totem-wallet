@@ -1715,6 +1715,8 @@
     <string name="feed_chart_wait">Sto cercando il grafico…</string>
     <string name="trust_my_budget">la tua paghetta</string>
     <string name="trust_my_wallet">il tuo portafoglio</string>
+    <string name="follow_copy_both">copio acquisti e vendite</string>
+    <string name="follow_copy_buys">copio i suoi acquisti</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
     <string name="hold_col_each">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>

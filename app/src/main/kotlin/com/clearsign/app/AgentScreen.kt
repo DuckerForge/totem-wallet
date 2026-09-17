@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -364,7 +365,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     if (showLinkHelp) LinkHelpSheet(onScan = { showLinkHelp = false; scan() }) { showLinkHelp = false }
     if (lucky) LuckySheet(onDone = { refresh++ }) { lucky = false }
     if (showTruth) TruthSheet { showTruth = false }
-    if (showEyes) EyesDialog { showEyes = false }
+    if (showEyes) EyesDialog(onClose = { showEyes = false }, onStart = { showEyes = false; showLane = true })
     if (showLane) LaneSheet(onStarted = { showLane = false; refresh++ }) { showLane = false }
     if (coins.isNotEmpty()) {
         ClosingCoinsSheet(
@@ -505,17 +506,36 @@ private fun FollowsSection(refresh: Int) {
                             fontFamily = Inter, fontSize = 10.5.sp, color = if (last != null) Halo.mint else Halo.muted, maxLines = 1,
                         )
                     }
-                    // Mirror: leave a coin when this wallet leaves it. Off by default.
+                    // Tre comandi, e nessuno dei tre sembrava un comando.
+                    //
+                    // Erano tre scritte nude: "sells too", "buys only", "Following".
+                    // Toccandole succedeva qualcosa, ma niente diceva che si
+                    // potessero toccare ne' quale fosse lo stato acceso. E la
+                    // domanda che la gente si fa qui e' "come lo metto a
+                    // copiare", a cui la risposta e' che lo sta gia' facendo:
+                    // seguire uno **e'** copiarlo. Adesso c'e' scritto, e le due
+                    // cose che si possono davvero cambiare hanno la forma di
+                    // cose che si cambiano.
                     var mirror by remember(w) { mutableStateOf(Follows.mirrors(ctx, w)) }
-                    Text(
-                        stringResource(if (mirror) R.string.follow_mirror_on else R.string.follow_mirror_off), fontFamily = Inter, fontSize = 10.5.sp,
-                        color = if (mirror) Halo.mint else Halo.muted,
-                        modifier = Modifier.clip(rs(8)).clickable { mirror = !mirror; Follows.setMirror(ctx, w, mirror); Haptics.tick(ctx) }.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                    Text(
-                        stringResource(R.string.follow_on), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber,
-                        modifier = Modifier.clip(rs(8)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) }.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            stringResource(if (mirror) R.string.follow_copy_both else R.string.follow_copy_buys),
+                            fontFamily = Inter, fontSize = 10.sp, color = if (mirror) Halo.mint else Halo.muted, maxLines = 1,
+                        )
+                        androidx.compose.material3.Switch(
+                            checked = mirror,
+                            onCheckedChange = { mirror = it; Follows.setMirror(ctx, w, it); Haptics.tick(ctx) },
+                            modifier = Modifier.scale(0.72f),
+                        )
+                    }
+                    Spacer(Modifier.width(2.dp))
+                    // La stella, la stessa di Scout: accesa vuol dire che lo
+                    // segui, e toccarla smette. Un'icona che si riconosce batte
+                    // una parola che va letta.
+                    Box(
+                        Modifier.size(34.dp).clip(rs(999)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) },
+                        contentAlignment = Alignment.Center,
+                    ) { HaloIcon(HIcon.STAR_FILLED, Halo.amber, 17.dp) }
                 }
             }
             Text(stringResource(R.string.agent_copy_how), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)

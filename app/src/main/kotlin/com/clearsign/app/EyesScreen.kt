@@ -278,13 +278,32 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                 // tasto sulla pagina precedente e' chiedergli di indovinare dove
                 // eravamo noi quando l'abbiamo scritto.
                 if (!cfg.on) {
+                    // Un interruttore da strumento, non da modulo.
+                    //
+                    // Questa schermata e' un tubo acceso con una console dentro,
+                    // e in mezzo c'era una pillola arrotondata come quelle del
+                    // resto dell'app. Qui il tasto che accende una macchina che
+                    // spende soldi da sola merita di sembrare quello che e':
+                    // angoli vivi, monospaziato, la parola fra parentesi quadre
+                    // come un comando, e un respiro lento sul bordo perche' una
+                    // cosa spenta che puo' essere accesa deve farsi notare senza
+                    // gridare.
+                    val pulse by rememberInfiniteTransition(label = "arm").animateFloat(
+                        0.28f, 0.85f,
+                        infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Reverse),
+                        label = "armPulse",
+                    )
                     Box(
-                        Modifier.clip(rs(999)).background(Halo.mint.copy(alpha = 0.16f))
-                            .border(1.dp, Halo.mint.copy(alpha = 0.5f), rs(999))
-                            .clickable { onStart() }.padding(horizontal = 14.dp, vertical = 7.dp),
+                        Modifier.clip(rs(4)).background(Halo.mint.copy(alpha = 0.10f))
+                            .border(1.dp, Halo.mint.copy(alpha = pulse), rs(4))
+                            .clickable { onStart() }.padding(horizontal = 12.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(stringResource(R.string.agent_start), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.mint)
+                        Text(
+                            "[ " + stringResource(R.string.agent_start).uppercase() + " ]",
+                            fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                            color = Halo.mint, style = Tabular,
+                        )
                     }
                     Spacer(Modifier.width(6.dp))
                 }

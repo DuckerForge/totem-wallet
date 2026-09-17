@@ -146,9 +146,24 @@ object TraderLoop {
     }
 
     /** Switch on, and forget what the last stop said: that was about a run that is over. */
+    /**
+     * Acceso vuol dire che parte adesso, non alla prossima sveglia.
+     *
+     * Accendeva l'interruttore e basta, e il primo giro arrivava quando toccava
+     * alla sveglia di sfondo: fino a un minuto e mezzo di schermo fermo dopo aver
+     * premuto un tasto che dice Start. Peggio, il conto alla rovescia partiva da
+     * dove si trovava, quindi poteva anche crescere sotto gli occhi.
+     *
+     * Un tasto che dice start deve far partire qualcosa mentre lo stai ancora
+     * guardando. La sveglia continua a fare il suo mestiere per tutto il resto
+     * del tempo: questo e' solo il primo giro, subito, sotto lo stesso lucchetto
+     * di tutti gli altri, quindi non puo' accavallarsi con uno in corso.
+     */
     fun start(ctx: Context, cfg: Config) {
         setConfig(ctx, cfg.copy(on = true))
         prefs(ctx).edit().remove("note").apply()
+        val app = ctx.applicationContext
+        AppScope.launch { runCatching { tick(app, mayHunt = true) } }
     }
 
     /** The last thing the loop did, for the notification, the bubble and the widget. */

@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -538,8 +539,19 @@ private class TokenAction(val label: String, val icon: HIcon, val tint: androidx
  * here would be a figure nobody asked for, floating behind something they did
  * ask for, and the two would fight.
  */
-/** How much of the line's travel one coin's fall lasts. */
-private const val FALL = 0.46f
+/**
+ * The whole thing on one clock, running past the end of the line.
+ *
+ * The line and the coins used to share a progress that stopped at the moment the
+ * line arrived, so every coin still in the air when that happened simply froze
+ * there and stayed for as long as the screen was open. Now the line finishes at
+ * [LINE_END] of the run and the rest of the time belongs to the last coins
+ * falling: the animation is over only when nothing is left on the page.
+ */
+private const val LINE_END = 0.66f
+
+/** How long one coin's flight lasts, on that same clock. */
+private const val FALL = 0.30f
 
 @Composable
 private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Modifier) {
@@ -559,9 +571,10 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
     // moves.
     val growth = remember(values) { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(values) {
-        growth.animateTo(1f, androidx.compose.animation.core.tween(4400, easing = androidx.compose.animation.core.LinearEasing))
+        growth.animateTo(1f, androidx.compose.animation.core.tween(5200, easing = androidx.compose.animation.core.LinearEasing))
     }
-    val grow = growth.value
+    val p = growth.value
+    val grow = (p / LINE_END).coerceAtMost(1f)
     // Loaded out here: an image is a composable's business, not a canvas's.
     //
     // Keyed on the mint, and that is not a nicety. Remembered state in a loop is
@@ -610,10 +623,11 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
         // underneath this are eight buttons somebody is trying to read.
         marks.forEachIndexed { i, bmp ->
             if (bmp == null) return@forEachIndexed
+            // Where on the line it sits, and when on the clock it is let go.
             val at = (i + 1f) / (marks.size + 1f)
-            if (grow < at) return@forEachIndexed
-            // How far through its own fall this one is, on its own clock.
-            val fall = ((grow - at) / FALL).coerceIn(0f, 1f)
+            val release = LINE_END * at
+            if (p < release) return@forEachIndexed
+            val fall = ((p - release) / FALL).coerceIn(0f, 1f)
             if (fall >= 1f) return@forEachIndexed
             val vi = ((values.size - 1) * at).toInt().coerceIn(0, values.size - 1)
             val r = 11.dp.toPx()
@@ -632,14 +646,20 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
                 size.width * at + dist * 0.13f * fall,
                 y0 + drop,
             )
-            val fade = (1f - fall).coerceIn(0f, 1f)
-            val d = (r * 1.7f).toInt()
-            drawImage(
-                bmp,
-                dstOffset = androidx.compose.ui.unit.IntOffset((c.x - d / 2f).toInt(), (c.y - d / 2f).toInt()),
-                dstSize = androidx.compose.ui.unit.IntSize(d, d),
-                alpha = 0.78f * fade,
-            )
+            // It turns as it goes and gets smaller, and it is gone well before
+            // it would have reached anything. A coin that simply fades on the
+            // spot looks switched off; one that tumbles away looks thrown.
+            val fade = (1f - fall * fall).coerceIn(0f, 1f)
+            val spin = (if (i % 2 == 0) 1f else -1f) * 46f * fall
+            val d = (r * 1.7f * (1f - 0.28f * fall)).toInt()
+            rotate(spin, c) {
+                drawImage(
+                    bmp,
+                    dstOffset = androidx.compose.ui.unit.IntOffset((c.x - d / 2f).toInt(), (c.y - d / 2f).toInt()),
+                    dstSize = androidx.compose.ui.unit.IntSize(d, d),
+                    alpha = 0.78f * fade,
+                )
+            }
         }
         // The head of the line while it travels, so the eye has something to
         // follow. It stops existing the moment the curve is whole.

@@ -55,7 +55,71 @@ object RocketX {
 
     val enabled: Boolean get() = KEY.isNotBlank() || viaWorker != null
 
-    data class Network(val id: String, val name: String, val chainId: String, val native: String)
+    data class Network(
+        val id: String, val name: String, val chainId: String, val native: String,
+        /** Dove si va a vedere una cosa su quella catena. Lo dice RocketX, catena per catena. */
+        val explorer: String = "",
+        /** Il nome corto e stabile che manda RocketX: ETHEREUM, BASE, AVAXC. Vedi [POPULAR]. */
+        val short: String = "",
+    )
+
+    /**
+     * Le otto che si usano, in quest'ordine. Tutte le altre stanno dietro la ricerca.
+     *
+     * L'ordine di RocketX e' il suo, e mette terza una catena che nessuno qui
+     * userebbe mai. Duecento pastiglie tutte insieme non sono una scelta, sono
+     * un muro: si scorre col pollice e si seleziona quello che capita. Ogni
+     * ponte serio (Relay, Jumper, Li.Fi) fa la stessa cosa, e la fa per questo:
+     * una manciata di catene vere davanti, e una ricerca per il resto.
+     *
+     * Si aggancia allo `shorthand`, non all'id: e' il nome corto e leggibile che
+     * manda RocketX. E soprattutto **se uno di questi sparisce non sparisce la
+     * catena**: esce solo dalla prima fila e resta trovabile cercandola. E' la
+     * differenza con la lista di prima, dove un id morto cancellava la catena
+     * dallo schermo senza dire niente.
+     */
+    val POPULAR = listOf("ETHEREUM", "BASE", "ARBITRUM", "BNB", "POLYGON", "OPTIMISM", "AVAXC", "BITCOIN")
+
+    /** Le prime, nell'ordine di [POPULAR]: quelle che ci sono davvero, e basta. */
+    fun popular(all: List<Network>): List<Network> {
+        val byShort = all.associateBy { it.short.uppercase() }
+        return POPULAR.mapNotNull { byShort[it] }
+    }
+
+    /**
+     * Il patto, una volta fatto.
+     *
+     * Quando `/swap` risponde, i numeri non sono piu' negoziabili: quell'ordine
+     * aspetta **quella** cifra a **quell'indirizzo** di deposito, e in cambio
+     * manda **quella** cifra all'indirizzo dall'altra parte. Da li' in poi lo
+     * schermo non deve piu' chiedere niente, deve solo dire cosa e' stato
+     * pattuito e farlo firmare.
+     */
+    data class Deal(
+        val requestId: String,
+        val fromText: String,
+        val toAmount: Double,
+        val toSymbol: String,
+        val network: String,
+        val toAddress: String,
+        val exchange: String,
+        val minutes: Int?,
+        val explorer: String,
+    )
+
+    /** Dove si guarda un ordine quando qualcosa non torna. */
+    const val ORDERS_URL = "https://app.rocketx.exchange/transaction-history"
+
+    /**
+     * Il link a un indirizzo sull'esploratore della sua catena.
+     *
+     * Vale anche per chi tiene tutto dietro il cancelletto, tipo Tronscan, che
+     * lo porta gia' nel suo url di base: "https://tronscan.org/#/" diventa
+     * "https://tronscan.org/#/address/T…" senza un caso a parte.
+     */
+    fun explorerAddress(explorer: String, address: String): String? =
+        explorer.takeIf { it.isNotBlank() && address.isNotBlank() }
+            ?.let { it.trimEnd('/') + "/address/" + address }
     data class Token(val id: Int, val symbol: String, val name: String, val contract: String, val decimals: Int, val networkId: String, val icon: String?, val isNative: Boolean)
     data class Quote(
         val exchange: String, val keyword: String, val type: String, val walletLess: Boolean, val memoRequired: Boolean,
@@ -110,22 +174,53 @@ object RocketX {
         return null
     }
 
-    /** The chains worth a chip, in this order, when RocketX lists them. */
-    private val PREFERRED = listOf("ethereum", "arbitrum", "Base Chain", "binance", "polygon", "optimism", "BTC", "TRON", "avalanche", "sui", "ton")
-
     @Volatile private var networks: List<Network> = emptyList()
+    @Volatile private var homeNet: Network? = null
 
+    /**
+     * Le catene, nell'ordine che dice RocketX.
+     *
+     * C'era una lista di undici id scritti a mano qui dentro, e tre non
+     * esistevano piu' (`avalanche` adesso e' `avaxc-mainnet`, `sui` e'
+     * `Sui Mainnet`, `ton` e' `TON`). Un id che non risponde non da' errore:
+     * `byId[it]` torna null e quella catena semplicemente **non appare**. Di
+     * undici ne restavano otto, e nessuno aveva modo di accorgersene guardando
+     * lo schermo. Una lista scritta a mano di roba che vive su un server altrui
+     * marcisce da sola e in silenzio.
+     *
+     * RocketX ne manda duecento e le manda **gia' ordinate** (`sort_order`:
+     * Bitcoin, Ethereum, Solana, Sui, Base, TON, BNB, Arbitrum…), dicendo quali
+     * sono accese. Quindi niente lista: si prendono tutte quelle accese, tolta
+     * Solana che e' la sponda da cui si parte, nel loro ordine.
+     */
     fun networks(): List<Network> {
         networks.takeIf { it.isNotEmpty() }?.let { return it }
         val o = get(endpoint("/configs")) ?: return emptyList()
         val arr = o.optJSONArray("supported_network") ?: return emptyList()
-        val all = (0 until arr.length()).mapNotNull { i ->
+        val parsed = (0 until arr.length()).mapNotNull { i ->
             val n = arr.optJSONObject(i) ?: return@mapNotNull null
-            Network(n.optString("id"), n.optString("name"), n.optString("chainId"), n.optString("native_token"))
-        }
-        val byId = all.associateBy { it.id }
-        networks = PREFERRED.mapNotNull { byId[it] }
+            if (n.optInt("enabled", 1) != 1) return@mapNotNull null
+            val id = n.optString("id")
+            if (id.isEmpty()) return@mapNotNull null
+            (n.optInt("sort_order", 9999)) to Network(
+                id, n.optString("name"), n.optString("chainId"), n.optString("native_token"),
+                n.optString("block_explorer_url"), n.optString("shorthand"),
+            )
+        }.sortedBy { it.first }.map { it.second }
+        // Solana esce dall'elenco delle destinazioni — e' la sponda da cui si
+        // parte — ma si tiene da parte: l'invio privato ha Solana da tutte e
+        // due le parti, e gli serve il suo esploratore e il suo formato di
+        // indirizzo come a qualsiasi altra catena.
+        homeNet = parsed.firstOrNull { it.id.equals("solana", true) }
+        networks = parsed.filterNot { it.id.equals("solana", true) }
         return networks
+    }
+
+    /** La sponda di casa: Solana. Fuori dalle destinazioni, ma serve all'invio privato. */
+    fun home(): Network? {
+        homeNet?.let { return it }
+        networks()
+        return homeNet
     }
 
     fun tokens(chainId: String, keyword: String = "All", networkId: String? = null): List<Token> {
@@ -163,9 +258,19 @@ object RocketX {
     }
 
     /** Open the order. What comes back for a deposit route is the address to pay. */
+    /**
+     * Apre l'ordine.
+     *
+     * L'indirizzo di rimborso si manda **esplicito**. Prima non si mandava
+     * affatto e si sperava che RocketX usasse `userAddress`: su una rotta
+     * qualsiasi e' una scommessa piccola, ma le rotte private dichiarano
+     * `isRefundAddressRequired: true`, e li' la scommessa e' su dove tornano i
+     * soldi quando lo scambio non riesce. Torna dove sono partiti.
+     */
     fun swap(fromId: Int, toId: Int, userAddress: String, destinationAddress: String, amount: Double, slippage: Double = 1.0): Order? {
         val body = JSONObject().put("fromTokenId", fromId).put("toTokenId", toId).put("userAddress", userAddress)
-            .put("destinationAddress", destinationAddress).put("fee", 1).put("amount", amount).put("slippage", slippage).put("disableEstimate", true)
+            .put("destinationAddress", destinationAddress).put("refundAddress", userAddress)
+            .put("fee", 1).put("amount", amount).put("slippage", slippage).put("disableEstimate", true)
         val o = post(endpoint("/swap"), body) ?: return null
         val sw = o.optJSONObject("swap") ?: return null
         val tx = sw.optJSONObject("tx")
@@ -177,23 +282,82 @@ object RocketX {
         )
     }
 
-    /** Where the order stands, by the chain signature of the deposit. */
-    fun status(txSignature: String, requestId: String): String? =
-        get(endpoint("/status?txId=${enc(txSignature)}&requestId=${enc(requestId)}"))?.let { it.optString("status").ifEmpty { it.optJSONObject("swap")?.optString("status") } }
+    /**
+     * Come e' finita, e **dove andare a vedere**.
+     *
+     * Di questa risposta si leggeva una parola sola, `status`, e "success" da
+     * solo non e' una prova di niente: dice che RocketX e' contento, non che i
+     * soldi sono arrivati. Dentro c'e' molto di piu', ed e' tutto gia' pronto:
+     * `destinationTransactionUrl` e' la transazione **sull'altra catena**, cioe'
+     * l'unica pagina al mondo che dimostra l'arrivo, e `actualAmount` e' quanto
+     * e' arrivato davvero, che non e' quello che diceva il preventivo.
+     *
+     * I due link li costruisce RocketX, non noi: un elenco di esploratori
+     * scritto a mano qui dentro invecchierebbe come e' invecchiato quello delle
+     * catene. Misurato il 18/09/2026 su un ponte vero, SOL verso ETH su Base.
+     */
+    data class Status(
+        val state: String,
+        val subState: String,
+        val actualAmount: Double,
+        val expected: Double,
+        val originUrl: String?,
+        val destUrl: String?,
+        val destAddress: String,
+    ) {
+        /** Finita, in bene o in male: non c'e' piu' niente da aspettare. */
+        val done: Boolean get() = state.equals("success", true) || state.equals("failed", true) || state.equals("refunded", true)
+        val good: Boolean get() = state.equals("success", true)
+    }
+
+    fun status(txSignature: String, requestId: String): Status? {
+        val o = get(endpoint("/status?txId=${enc(txSignature)}&requestId=${enc(requestId)}")) ?: return null
+        val state = o.optString("status").ifEmpty { o.optJSONObject("swap")?.optString("status").orEmpty() }
+        if (state.isEmpty()) return null
+        fun url(k: String) = o.optString(k).takeIf { it.startsWith("http") }
+        return Status(
+            state = state, subState = o.optString("subState"),
+            actualAmount = o.optDouble("actualAmount", 0.0), expected = o.optDouble("expectedTokenAmount", 0.0),
+            originUrl = url("originTransactionUrl"), destUrl = url("destinationTransactionUrl"),
+            destAddress = o.optString("destinationAddress"),
+        )
+    }
 
     // ---- bridges this phone opened, so their status can be asked later -------
 
-    data class Bridge(val requestId: String, val signature: String, val from: String, val to: String, val toNetwork: String, val at: Long, val exchange: String, val deposit: String = "")
+    /**
+     * Un ponte che questo telefono ha aperto.
+     *
+     * Tiene anche **dove** i soldi dovevano arrivare e **quanti**, che prima non
+     * si salvavano: senza quelli la cronologia sapeva dire solo "SOL verso Base"
+     * e non c'era modo, dopo, di andare a guardare se erano arrivati davvero.
+     */
+    data class Bridge(
+        val requestId: String, val signature: String, val from: String, val to: String, val toNetwork: String,
+        val at: Long, val exchange: String, val deposit: String = "",
+        val toAddress: String = "", val toAmount: Double = 0.0, val explorer: String = "",
+    )
+
+    private fun json(b: Bridge) = JSONObject()
+        .put("r", b.requestId).put("s", b.signature).put("f", b.from).put("t", b.to).put("n", b.toNetwork)
+        .put("at", b.at).put("e", b.exchange).put("d", b.deposit)
+        .put("da", b.toAddress).put("ta", b.toAmount).put("x", b.explorer)
+
+    private fun bridge(o: JSONObject) = Bridge(
+        o.optString("r"), o.optString("s"), o.optString("f"), o.optString("t"), o.optString("n"),
+        o.optLong("at"), o.optString("e"), o.optString("d"),
+        o.optString("da"), o.optDouble("ta", 0.0), o.optString("x"),
+    )
 
     fun remember(ctx: Context, b: Bridge) {
         val arr = JSONArray(ctx.getSharedPreferences("apex_bridges", Context.MODE_PRIVATE).getString("all", "[]"))
-        arr.put(JSONObject().put("r", b.requestId).put("s", b.signature).put("f", b.from).put("t", b.to).put("n", b.toNetwork).put("at", b.at).put("e", b.exchange).put("d", b.deposit))
+        arr.put(json(b))
         ctx.getSharedPreferences("apex_bridges", Context.MODE_PRIVATE).edit().putString("all", arr.toString()).apply()
     }
 
     fun bridges(ctx: Context): List<Bridge> = runCatching {
         val arr = JSONArray(ctx.getSharedPreferences("apex_bridges", Context.MODE_PRIVATE).getString("all", "[]"))
-        (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { Bridge(it.optString("r"), it.optString("s"), it.optString("f"), it.optString("t"), it.optString("n"), it.optLong("at"), it.optString("e"), it.optString("d")) } }
+        (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { bridge(it) } }
     }.getOrDefault(emptyList()).sortedByDescending { it.at }
 
     /** The deposit went out: keep its chain signature with the order, for `/status` later. */
@@ -201,10 +365,7 @@ object RocketX {
         val all = bridges(ctx)
         val hit = all.firstOrNull { it.deposit == deposit && it.signature.isEmpty() } ?: return
         val arr = JSONArray()
-        all.forEach { b ->
-            val x = if (b === hit) b.copy(signature = signature) else b
-            arr.put(JSONObject().put("r", x.requestId).put("s", x.signature).put("f", x.from).put("t", x.to).put("n", x.toNetwork).put("at", x.at).put("e", x.exchange).put("d", x.deposit))
-        }
+        all.forEach { b -> arr.put(json(if (b === hit) b.copy(signature = signature) else b)) }
         ctx.getSharedPreferences("apex_bridges", Context.MODE_PRIVATE).edit().putString("all", arr.toString()).apply()
     }
 

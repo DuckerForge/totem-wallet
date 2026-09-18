@@ -263,6 +263,12 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showMore by remember { mutableStateOf(false) }
         var showBridge by remember { mutableStateOf(false) }
         var bridgeMemo by remember { mutableStateOf<String?>(null) }
+        // Il patto gia' fatto con RocketX, che viaggia col pagamento fino alla firma.
+        var bridgeDeal by remember { mutableStateOf<RocketX.Deal?>(null) }
+        var showBridgeHistory by remember { mutableStateOf(false) }
+        // L'invio privato entra dal Manda ma gira nel ponte: qui si porta dietro
+        // quello che era gia' stato scritto di la'.
+        var privateSend by remember { mutableStateOf<Pair<String, String>?>(null) }
         var showContactTap by remember { mutableStateOf(false) }
         var showLinkBox by remember { mutableStateOf(false) }
         var showCustomize by remember { mutableStateOf(false) }
@@ -503,8 +509,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 prefillTo = request?.recipient, prefillAmount = request?.amount?.let { fmtUi(it) },
                 prefillMint = request?.let { it.mint ?: com.clearsign.core.NATIVE_SOL_MINT } ?: sendMint,
                 prefillMemo = bridgeMemo,
+                deal = bridgeDeal,
                 onGift = { showSend = false; showGift = true },
-            ) { showSend = false; sendMint = null; bridgeMemo = null; (ctx as? MainActivity)?.incoming = null }
+                onPrivate = { to, amt -> showSend = false; privateSend = to to amt; showBridge = true },
+            ) { showSend = false; sendMint = null; bridgeMemo = null; bridgeDeal = null; (ctx as? MainActivity)?.incoming = null }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
         // A page, not a sheet: it sits over everything, tab bar included, because
@@ -526,6 +534,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onSettings = { showMore = false; tab = Tab.SETTINGS },
                 onBridge = { showMore = false; showBridge = true },
                 onLink = { showMore = false; showLinkBox = true },
+                onGift = { showMore = false; showGift = true },
                 onContactTap = { showMore = false; showContactTap = true },
                 onCompanion = { showMore = false; showCompanion = true },
             ) { showMore = false }
@@ -537,7 +546,20 @@ fun HomeScreen(signer: SeedVaultSigner) {
         if (showCompanion) CompanionPage(owner) { showCompanion = false }
         if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
         if (showBridge && owner != null) {
-            BridgeSheet(owner, onSend = { req, memo -> showBridge = false; bridgeMemo = memo; (ctx as? MainActivity)?.incoming = req; showSend = true }) { showBridge = false }
+            BridgeSheet(
+                owner,
+                onSend = { req, memo, deal ->
+                    showBridge = false; bridgeMemo = memo; bridgeDeal = deal
+                    (ctx as? MainActivity)?.incoming = req; showSend = true
+                },
+                onHistory = { showBridge = false; showBridgeHistory = true },
+                startPrivate = privateSend != null,
+                startDest = privateSend?.first.orEmpty(),
+                startAmount = privateSend?.second.orEmpty(),
+            ) { showBridge = false; privateSend = null }
+        }
+        if (showBridgeHistory) {
+            BridgeHistorySheet { showBridgeHistory = false }
         }
         if (showHealth) HealthSheet(owner) { showHealth = false }
         if (showPnl) PnlSheet { showPnl = false }

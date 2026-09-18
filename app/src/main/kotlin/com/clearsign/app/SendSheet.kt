@@ -111,7 +111,20 @@ internal fun SendSheet(
     prefillMint: String? = null,
     /** A memo the recipient needs (an exchange deposit, a bridge). Written into the transaction, shown on the receipt. */
     prefillMemo: String? = null,
+    /** L'ordine gia' aperto dall'altra parte, quando si arriva dal ponte. Vedi [BridgeDealCard]. */
+    deal: RocketX.Deal? = null,
     onGift: () -> Unit = {},
+    /**
+     * La porta dell'invio privato, con quello che hai gia' scritto.
+     *
+     * La macchina sta nel ponte — preventivo, ordine, indirizzo di deposito —
+     * e li' resta: due copie dello stesso flusso divergono alla prima
+     * correzione. Ma uno che vuole mandare soldi apre **questa** pagina, non il
+     * ponte, perche' "privato" e' un aggettivo su un invio e non un tipo di
+     * ponte. Quindi la porta sta qui e porta di la' con l'indirizzo e la cifra
+     * gia' dentro.
+     */
+    onPrivate: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -150,6 +163,36 @@ internal fun SendSheet(
         if (match != null) asset = match
         else { amount = ""; formError = ctx.getString(R.string.send_wanted_missing, TokenSymbols.symbol(m)) }
         wantedMint = null
+    }
+
+    /**
+     * Dal ponte si arriva a cose fatte: niente modulo, si va allo scontrino.
+     *
+     * Il ponte chiedeva catena, indirizzo e cifra, apriva l'ordine, e poi
+     * passava la mano a questa pagina, che ricominciava da capo: di nuovo
+     * quanto, di nuovo quale moneta, e con la possibilita' di cambiarle. Solo
+     * che quei tre numeri l'ordine li ha gia' fissati con RocketX: quel
+     * deposito aspetta **quella** cifra in **quella** moneta, e mandargliene
+     * un'altra vuol dire un ordine che non torna, con i soldi gia' partiti.
+     * Chiedere due volte la stessa cosa e' fastidioso; chiederla in un modo che
+     * lascia cambiare quello che non si puo' piu' cambiare e' una trappola.
+     *
+     * Una volta sola: se lo scontrino blocca, si torna indietro e non si
+     * rientra qui dentro in tondo.
+     */
+    var dealStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(deal, asset, wantedMint) {
+        if (deal == null) return@LaunchedEffect
+        val a = asset ?: return@LaunchedEffect
+        if (dealStarted || wantedMint != null || state != SendState.Form) return@LaunchedEffect
+        val raw = parseAmount(amount, a.decimals) ?: return@LaunchedEffect
+        if (raw <= 0L) return@LaunchedEffect
+        dealStarted = true
+        state = SendState.Analyzing
+        state = try {
+            val (ixs, analyzed) = buildAndAnalyze(ctx, owner, to.trim(), a, raw, prefillMemo)
+            SendState.Review(analyzed, ixs, to.trim(), fmtUnits(raw, a.decimals) + " " + a.symbol)
+        } catch (e: Exception) { SendState.Error(e.message ?: ctx.getString(R.string.wa_no_blockhash)) }
     }
 
     LaunchedEffect(owner) {
@@ -314,10 +357,51 @@ internal fun SendSheet(
                             colors = fieldColors(Halo.stroke), shape = rs(14),
                         )
                         asset?.let { a -> Text(stringResource(R.string.send_available, fmtUnits(a.available, a.decimals) + " " + a.symbol), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, style = Tabular) }
+
+                        // Privato: una riga sua, larga, sotto la cifra.
+                        //
+                        // Era il quinto tondino della fila qui sopra, che scorre
+                        // in orizzontale: stava fuori dallo schermo e non lo
+                        // vedeva nessuno. Ma il posto era sbagliato comunque.
+                        // Incolla, Scansiona e Tocca **riempiono l'indirizzo**;
+                        // privato non dice dove mandare, dice **come**, e si
+                        // decide dopo aver scritto quanto.
+                        if (RocketX.enabled && deal == null) {
+                            Row(
+                                Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cyan.copy(alpha = 0.08f))
+                                    .border(1.dp, Halo.cyan.copy(alpha = 0.35f), rs(14))
+                                    .clickable { onPrivate(to.trim(), amount) }
+                                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                HaloIcon(HIcon.SWAP, Halo.cyan, 17.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(stringResource(R.string.send_private), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.cyan)
+                                    Text(stringResource(R.string.send_private_sub), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
+                                }
+                            }
+                        }
                         formError?.let { Banner(it, Halo.red, HIcon.WARNING) }
                         if (s is SendState.Analyzing) Working(stringResource(R.string.send_analyzing))
                     }
-                    is SendState.Review -> SignReceiptBody(s.analyzed.receipt, null)
+                    is SendState.Review -> {
+                        // Un ponte e' uno scambio, solo che la meta' che torna
+                        // indietro e' su un'altra catena e la simulazione non la
+                        // vede. Passandola come `pair`, lo scontrino disegna le
+                        // due gambe come per uno swap: prima si vedeva solo la
+                        // meta' in uscita, cioe' uno che manda via dei soldi.
+                        deal?.let { BridgeDealCard(it) }
+                        SignReceiptBody(
+                            s.analyzed.receipt, null,
+                            pair = deal?.let { d ->
+                                SwapPair(
+                                    asset?.mint ?: com.clearsign.core.NATIVE_SOL_MINT, asset?.symbol ?: "SOL", amount,
+                                    "", d.toSymbol, fmtUi(d.toAmount),
+                                )
+                            },
+                        )
+                    }
                     SendState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
                     is SendState.Done -> {
                         Banner(stringResource(R.string.send_done), Halo.mint, HIcon.CHECK)
@@ -387,7 +471,9 @@ internal fun SendSheet(
                                 Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
                             }
                             Spacer(Modifier.height(8.dp))
-                            GhostButton(stringResource(R.string.back)) { state = SendState.Form }
+                            // Dal ponte non c'e' un modulo dietro a cui tornare:
+                            // indietro vuol dire lasciar perdere.
+                            GhostButton(stringResource(R.string.back)) { if (deal != null) onDismiss() else state = SendState.Form }
                         } else {
                             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
@@ -411,7 +497,9 @@ internal fun SendSheet(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            GhostButton(stringResource(R.string.back)) { state = SendState.Form }
+                            // Dal ponte non c'e' un modulo dietro a cui tornare:
+                            // indietro vuol dire lasciar perdere.
+                            GhostButton(stringResource(R.string.back)) { if (deal != null) onDismiss() else state = SendState.Form }
                         }
                     }
                     is SendState.Done -> PrimaryButton(stringResource(R.string.done), danger = false) { onDismiss() }

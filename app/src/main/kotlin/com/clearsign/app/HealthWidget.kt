@@ -233,10 +233,31 @@ class HealthWidget : GlanceAppWidget() {
     }
 }
 
-/** The widget's own refresh tap: re-read the chain, then repaint every instance. */
+/**
+ * The widget's own refresh tap.
+ *
+ * Il lavoro **non si fa qui dentro**. Un tocco su un widget arriva come una
+ * trasmissione, e una trasmissione ha dieci secondi di vita: oltre quelli
+ * Android non aspetta, ferma tutto e mostra "L'app non risponde". E questo
+ * aggiornamento fa quattro chiamate di rete in fila — i conti token, il saldo,
+ * il prezzo, il cambio — che su una rete lenta i dieci secondi se li mangiano
+ * senza accorgersene. Successo davvero, il 18/09/2026, con l'utente fermo sulla
+ * schermata iniziale: `am_anr ... Broadcast of Intent { dat=glance-action:/… }`.
+ *
+ * Quindi qui si mette solo in coda. A farlo e' WorkManager, che di tempo ne ha,
+ * e che quando ha finito ridipinge lui i widget.
+ */
 class RefreshHealthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        HealthWidgetData.refresh(context)
+        HealthWidgetData.enqueue(context)
+    }
+}
+
+/** Il giro vero, fuori dai dieci secondi della trasmissione. */
+class WidgetRefreshWorker(ctx: Context, params: androidx.work.WorkerParameters) : androidx.work.CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result {
+        runCatching { HealthWidgetData.refresh(applicationContext) }
+        return Result.success()
     }
 }
 
@@ -303,6 +324,20 @@ object HealthWidgetData {
     fun isStale(ctx: Context): Boolean = (System.currentTimeMillis() - (load(ctx)?.at ?: 0L)) > STALE_MS
 
     /** Fetch score, balance and value for the connected wallet, then repaint the widgets. */
+    /**
+     * Mettilo in coda invece di farlo subito.
+     *
+     * `REPLACE`: se uno pigia il tasto cinque volte non partono cinque giri, ne
+     * resta uno solo, l'ultimo.
+     */
+    fun enqueue(ctx: Context) {
+        androidx.work.WorkManager.getInstance(ctx).enqueueUniqueWork(
+            "widget-refresh",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>().build(),
+        )
+    }
+
     suspend fun refresh(ctx: Context, updateWidgets: Boolean = true) = withContext(Dispatchers.IO) {
         val owner = Settings.watchWallet(ctx) ?: return@withContext
         val rpc = SolanaRpc.urlFor(null)

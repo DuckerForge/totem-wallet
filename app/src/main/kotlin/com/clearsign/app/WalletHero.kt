@@ -467,13 +467,27 @@ private fun BigTotal(total: Double, currency: String) {
     val shown by androidx.compose.animation.core.animateFloatAsState(
         total.toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "total",
     )
-    val sweep by androidx.compose.animation.core.rememberInfiniteTransition(label = "sweep").animateFloat(
-        -1f, 2f,
-        androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing),
-        ),
-        label = "sweepX",
-    )
+    // Il riflesso passa due volte e poi si ferma.
+    //
+    // Era infinito. E siccome dietro al numero c'e' uno sfocato vero
+    // (`RenderEffect` qui sotto), un gradiente che scorre per sempre vuol dire
+    // **rifare lo sfocato a ogni fotogramma, per sempre**: la pagina principale
+    // non andava mai in riposo. Misurato sul telefono mentre si scorre: 828
+    // fotogrammi, mediana 29 ms, novantesimo 38, su uno schermo a 120 Hz dove il
+    // fotogramma dura 8,3. Non e' uno scatto, e' esattamente quel ritardo
+    // leggero e continuo su tutta l'app.
+    //
+    // Il riflesso serviva a dire "questo numero e' appena cambiato", e quindi
+    // deve passare **quando cambia**, non sempre. Fermo a 2 il gradiente e'
+    // piatto e la pagina puo' stare zitta.
+    val sweepAnim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(2f) }
+    androidx.compose.runtime.LaunchedEffect(total) {
+        repeat(2) {
+            sweepAnim.snapTo(-1f)
+            sweepAnim.animateTo(2f, androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing))
+        }
+    }
+    val sweep = sweepAnim.value
     val ink = Halo.ink
     val lit = Halo.mint
     androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {

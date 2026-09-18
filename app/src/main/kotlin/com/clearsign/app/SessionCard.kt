@@ -551,6 +551,18 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
 
     fun sol(f: Float) = fmtSol((f * cap).toLong(), 4) + " SOL"
 
+    // Il tetto del giorno in lamport, uno solo per tutto il foglio.
+    //
+    // A cursore spento e' la paghetta **esatta**, non `cap`, che e' un Float: da
+    // qualche milione di lamport in su un Float perde gli ultimi, e arrotondando
+    // per difetto la riapertura rileggeva come "acceso al cento per cento" una
+    // regola che era stata spenta. Stesso comportamento, etichetta bugiarda.
+    //
+    // Ed e' anche il numero che leggono le righe qui sotto: prima usavano il
+    // cursore anche a tetto spento, cioe' dicevano quanto restava di un tetto
+    // che non c'era.
+    val dailyCap = if (dailyOn) (daily * cap).toLong() else session.capLamports
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
@@ -644,8 +656,8 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
             run {
                 val spent = remember { runCatching { SessionWallet.history(ctx).spentLast24hLamports }.getOrDefault(0L) }
                 Text(
-                    stringResource(R.string.rules_daily_used, fmtSol(spent, 4), fmtSol((daily * cap).toLong(), 4)),
-                    style = HaloType.small, color = if (spent >= (daily * cap).toLong()) Halo.amber else Halo.muted, lineHeight = 16.sp,
+                    stringResource(R.string.rules_daily_used, fmtSol(spent, 4), fmtSol(dailyCap, 4)),
+                    style = HaloType.small, color = if (spent >= dailyCap) Halo.amber else Halo.muted, lineHeight = 16.sp,
                 )
             }
             // Un cursore che non va piu' a destra e' un vicolo cieco finche' non
@@ -675,7 +687,9 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
             // get on its own, and the loop stops. That happened today.
             run {
                 val slicePart = minOf(perTx, askAbove.takeIf { it > 0f } ?: perTx) * (trade.slicePercent / 100f)
-                val moves = if (slicePart > 0f) (daily / slicePart).toInt() else 0
+                // A tetto spento la fetta della giornata e' la paghetta intera.
+                val dailyPart = if (dailyOn) daily else 1f
+                val moves = if (slicePart > 0f) (dailyPart / slicePart).toInt() else 0
                 if (trade.on) {
                     Text(
                         if (moves < 2) stringResource(R.string.rules_moves_few, sol(slicePart), moves)
@@ -817,7 +831,7 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 SessionWallet.setPolicy(
                     ctx,
                     policy.copy(
-                        perTxLamports = (perTx * cap).toLong(), dailyLamports = if (dailyOn) (daily * cap).toLong() else cap.toLong(), askAboveLamports = (askAbove * cap).toLong(),
+                        perTxLamports = (perTx * cap).toLong(), dailyLamports = dailyCap, askAboveLamports = (askAbove * cap).toLong(),
                         maxTxPerHour = perHour.toInt().coerceAtLeast(1), allowedMints = mints, allowAnyMint = anyMint,
                         allowedDestinations = whom + owner + session.pubkey,
                     ),

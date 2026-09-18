@@ -145,6 +145,8 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                     Text(stringResource(R.string.comp_face).uppercase(), style = HaloType.label, color = Halo.muted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
+                            CompanionPrefs.Face.ROTATE to R.string.comp_face_rotate,
+                            CompanionPrefs.Face.BUDGET to R.string.comp_face_budget,
                             CompanionPrefs.Face.AGENT to R.string.comp_face_agent, CompanionPrefs.Face.HEALTH to R.string.comp_face_health,
                             CompanionPrefs.Face.TOTAL to R.string.comp_face_total, CompanionPrefs.Face.COIN to R.string.comp_face_coin,
                         ).forEach { (f, label) ->
@@ -171,7 +173,11 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.comp_rows).uppercase(), style = HaloType.label, color = Halo.muted)
-                    listOf("total" to R.string.comp_row_total, "agent" to R.string.comp_row_agent, "health" to R.string.comp_row_health, "coin" to R.string.comp_row_coin).forEach { (k, label) ->
+                    // Il totale e il prezzo della moneta stanno gia' in cima al
+                    // pannello nuovo, con la barra e i due numeri della paghetta:
+                    // due interruttori per righe che non esistono piu' sarebbero
+                    // due interruttori che non fanno niente.
+                    listOf("agent" to R.string.comp_row_agent, "health" to R.string.comp_row_health).forEach { (k, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(label), style = HaloType.body, color = Halo.ink, modifier = Modifier.weight(1f))
                             Switch(checked = shows.value[k] == true, onCheckedChange = { on -> CompanionPrefs.setShow(ctx, k, on); shows.value = shows.value + (k to on); restart() })

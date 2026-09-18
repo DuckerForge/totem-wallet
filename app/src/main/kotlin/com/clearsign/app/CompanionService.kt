@@ -11,7 +11,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color as AColor
 import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.os.IBinder
 import android.util.TypedValue
@@ -32,12 +31,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The floating companion: Omni as a bubble that lives over every other app.
+ * The floating companion: the wallet as a bubble that lives over every other app.
  *
- * Collapsed it is the wallet-health ring — you always know, from inside any dApp
- * or browser, whether your wallet is clean and what it holds. Tapped it opens a
- * small panel with the balance, the top thing to fix and a way into the app.
- * Dragged it sticks wherever you leave it.
+ * Chiusa e' una sfera con due facce che si alternano: la moneta che l'agente ha
+ * in mano con quanto sta facendo, e la paghetta con quanto e' diventata. Aperta
+ * e' il pannello: la stessa moneta con l'obiettivo e lo stop disegnati, i due
+ * numeri che contano (quanto ci hai messo, quanto c'e' adesso) e i due tasti che
+ * decidono. Trascinata **resta dove l'hai lasciata**, anche dopo un riavvio del
+ * servizio.
+ *
+ * Tre cose imparate sul telefono e messe qui dentro:
+ *
+ *  * "Nascondi" stava in prima fila accanto ad "Apri" e si premeva per sbaglio,
+ *    e siccome spegneva il servizio la bolla tornava solo riaprendo l'app.
+ *    Adesso sta sotto la rotellina, e nascosta il servizio **resta vivo**: si
+ *    torna dal tasto sulla notifica, che e' sempre li';
+ *  * la posizione non si salvava, quindi bastava cambiare un'impostazione
+ *    qualsiasi per ritrovarsela in alto a sinistra;
+ *  * il pannello si intitolava "APEX", un nome morto da due nomi fa.
  *
  * Deliberately built from classic Views rather than Compose: an overlay window
  * has no Activity lifecycle to host a Composition, and a wallet's always-on
@@ -50,14 +61,54 @@ class CompanionService : Service() {
     private var root: FrameLayout? = null
     private var params: WindowManager.LayoutParams? = null
     private var expanded = false
+    private var settingsOpen = false
+    private var hidden = false
 
     private var bubble: ImageView? = null
     private var panel: LinearLayout? = null
-    private var totalLine: TextView? = null
+    private var mainBox: LinearLayout? = null
+    private var setBox: LinearLayout? = null
+
+    private var symbolLine: TextView? = null
+    private var pctLine: TextView? = null
+    private var targetLine: TextView? = null
+    private var barFill: View? = null
+    private var barTrack: View? = null
+    private var putLine: TextView? = null
+    private var nowLine: TextView? = null
+    private var nowPct: TextView? = null
     private var agentLine: TextView? = null
     private var healthLine: TextView? = null
-    private var coinLine: TextView? = null
+    private var sellButton: TextView? = null
+    private var stopButton: TextView? = null
+
     private var ticker: kotlinx.coroutines.Job? = null
+    private var spinner: kotlinx.coroutines.Job? = null
+    private var flip = false
+    private var last: Shot = Shot()
+
+    /** Tutto quello che le due facce e il pannello sanno in questo momento. */
+    private data class Shot(
+        val health: HealthWidgetData.Snapshot? = null,
+        val trading: Boolean = false,
+        val open: Int? = null,
+        val pos: Positions.Position? = null,
+        val posValue: Long? = null,
+        val fundedLamports: Long = 0,
+        val totalLamports: Long? = null,
+        val diffLamports: Long? = null,
+        val walletTotal: String? = null,
+        val coinSymbol: String? = null,
+        val coinChange: Double? = null,
+    ) {
+        val pct: Double? get() = if (fundedLamports > 0 && diffLamports != null) diffLamports * 100.0 / fundedLamports else null
+        val posPct: Double? get() {
+            val p = pos ?: return null
+            val v = posValue ?: return null
+            if (p.costLamports <= 0) return null
+            return (v - p.costLamports) * 100.0 / p.costLamports
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -71,7 +122,11 @@ class CompanionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
+        when (intent?.action) {
+            ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
+            ACTION_HIDE -> hide()
+            ACTION_SHOW -> show()
+        }
         return START_STICKY
     }
 
@@ -80,6 +135,39 @@ class CompanionService : Service() {
         scope.cancel()
         root?.let { runCatching { wm.removeView(it) } }
         root = null
+    }
+
+    // ---- nascosta, ma viva -------------------------------------------------
+
+    /**
+     * Via dallo schermo, non dalla memoria.
+     *
+     * Nascondere faceva `stopSelf()`: il servizio moriva, e per riavere la bolla
+     * bisognava aprire l'app e trovare l'interruttore. Ma una cosa che si
+     * nasconde con un dito deve tornare con un dito, e il posto dove sta gia'
+     * quel dito e' la notifica del servizio, che Android ci obbliga comunque a
+     * tenere accesa.
+     */
+    private fun hide() {
+        if (hidden) return
+        hidden = true
+        collapse()
+        root?.let { runCatching { wm.removeView(it) } }
+        root = null; bubble = null; panel = null
+        ticker?.cancel(); spinner?.cancel()
+        repost()
+    }
+
+    private fun show() {
+        if (!hidden && root != null) return
+        hidden = false
+        attach()
+        refresh()
+        repost()
+    }
+
+    private fun repost() {
+        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification()) }
     }
 
     // ---- window ------------------------------------------------------------
@@ -95,7 +183,6 @@ class CompanionService : Service() {
         val ring = ImageView(this).apply { layoutParams = FrameLayout.LayoutParams(dp(size), dp(size)) }
         container.addView(ring)
 
-        // Expanded: the rows the person switched on, then the two buttons.
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -105,32 +192,88 @@ class CompanionService : Service() {
                 setStroke(dp(1f), p.stroke.toArgb())
             }
             setPadding(dp(14f), dp(12f), dp(14f), dp(12f))
-            layoutParams = FrameLayout.LayoutParams(dp(248f), FrameLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = FrameLayout.LayoutParams(dp(PANEL_DP), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
-        fun line(size: Float, tint: Int, bold: Boolean = false, lines: Int = 2) = TextView(this).apply {
-            setTextColor(tint); textSize = size; maxLines = lines
-            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setPadding(0, dp(3f), 0, dp(3f))
-        }
-        val title = line(10f, p.muted.toArgb(), bold = true).apply { text = "APEX" }
-        val total = line(20f, p.ink.toArgb(), bold = true, lines = 1)
-        val agent = line(12f, p.accent.toArgb())
-        val health = line(12f, p.amber.toArgb())
-        val coin = line(13f, p.accent2.toArgb(), bold = true, lines = 1)
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10f), 0, 0) }
-        actions.addView(button(getString(R.string.companion_open), p.accent.toArgb()) {
-            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            collapse()
-        })
-        actions.addView(button(getString(R.string.companion_agent), p.accent2.toArgb()) {
-            startActivity(Intent(this, MainActivity::class.java).putExtra("open", "agent").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            collapse()
-        })
-        actions.addView(button(getString(R.string.companion_hide), p.muted.toArgb()) { stopSelf() })
 
-        card.addView(title); card.addView(total); card.addView(agent); card.addView(health); card.addView(coin); card.addView(actions)
+        // ---- il pannello ---------------------------------------------------
+        val main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val symbol = TextView(this).apply {
+            setTextColor(p.ink.toArgb()); textSize = 15f; maxLines = 1
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val pct = TextView(this).apply {
+            setTextColor(p.accent.toArgb()); textSize = 15f; maxLines = 1
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, dp(8f), 0)
+        }
+        val gear = glyph(Glyph.GEAR, p.muted.toArgb()) { openSettings() }
+        val close = glyph(Glyph.CLOSE, p.muted.toArgb()) { collapse() }
+        head.addView(symbol); head.addView(pct); head.addView(gear); head.addView(close)
+
+        val targets = TextView(this).apply {
+            setTextColor(p.muted.toArgb()); textSize = 11f; maxLines = 1
+            setPadding(0, dp(2f), 0, dp(6f))
+        }
+
+        // La barra: da meno lo stop a piu' l'obiettivo, col punto dove sei.
+        val track = View(this).apply {
+            background = GradientDrawable().apply { cornerRadius = dp(3f).toFloat(); setColor(p.stroke.toArgb()) }
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(6f))
+        }
+        val fill = View(this).apply {
+            background = GradientDrawable().apply { cornerRadius = dp(3f).toFloat(); setColor(p.accent.toArgb()) }
+            layoutParams = FrameLayout.LayoutParams(0, dp(6f))
+        }
+        val bar = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(6f))
+            addView(track); addView(fill)
+        }
+
+        val money = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(10f), 0, 0) }
+        val putRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val putLabel = small(getString(R.string.env_put_in), p.muted.toArgb(), dp(96f))
+        val put = mono(p.ink.toArgb())
+        putRow.addView(putLabel); putRow.addView(put)
+        val nowRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val nowLabel = small(getString(R.string.env_now), p.muted.toArgb(), dp(96f))
+        val now = mono(p.ink.toArgb()).apply { setTypeface(typeface, android.graphics.Typeface.BOLD) }
+        val nowP = TextView(this).apply { textSize = 11.5f; setPadding(dp(8f), 0, 0, 0); setTextColor(p.accent.toArgb()) }
+        nowRow.addView(nowLabel); nowRow.addView(now); nowRow.addView(nowP)
+        money.addView(putRow); money.addView(nowRow)
+
+        val agent = TextView(this).apply { setTextColor(p.accent.toArgb()); textSize = 11.5f; maxLines = 2; setPadding(0, dp(8f), 0, 0) }
+        val health = TextView(this).apply { setTextColor(p.amber.toArgb()); textSize = 11.5f; maxLines = 2; setPadding(0, dp(3f), 0, 0) }
+
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(12f), 0, 0) }
+        val sell = button(getString(R.string.notif_sell_now), p.accent.toArgb()) { sellNow() }
+        val stop = button(getString(R.string.notif_stop), p.amber.toArgb()) { stopAgent() }
+        actions.addView(sell); actions.addView(stop)
+
+        main.addView(head); main.addView(targets); main.addView(bar)
+        main.addView(money); main.addView(agent); main.addView(health); main.addView(actions)
+
+        // ---- la rotellina --------------------------------------------------
+        val settings = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        val shead = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val stitle = TextView(this).apply {
+            text = getString(R.string.comp_settings); setTextColor(p.ink.toArgb()); textSize = 13f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        shead.addView(stitle); shead.addView(glyph(Glyph.BACK, p.muted.toArgb()) { closeSettings() })
+        settings.addView(shead)
+        settings.addView(wide(getString(R.string.companion_hide), p.muted.toArgb()) { hide() })
+        settings.addView(wide(getString(R.string.companion_open), p.accent.toArgb()) { open(null) })
+        settings.addView(wide(getString(R.string.companion_agent), p.accent2.toArgb()) { open("agent") })
+        settings.addView(wide(getString(R.string.comp_page_title), p.muted.toArgb()) { open("companion") })
+
+        card.addView(main); card.addView(settings)
         container.addView(card)
 
+        // Dove l'hai lasciata, o il primo posto ragionevole.
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -139,32 +282,132 @@ class CompanionService : Service() {
             android.graphics.PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dp(12f); y = dp(220f)
+            x = CompanionPrefs.spotX(this@CompanionService).takeIf { it >= 0 } ?: dp(12f)
+            y = CompanionPrefs.spotY(this@CompanionService).takeIf { it >= 0 } ?: dp(220f)
         }
 
         container.setOnTouchListener(dragAndTap(lp))
         runCatching { wm.addView(container, lp) }.onFailure { stopSelf(); return }
 
         root = container; params = lp
-        bubble = ring; panel = card
-        totalLine = total; agentLine = agent; healthLine = health; coinLine = coin
+        bubble = ring; panel = card; mainBox = main; setBox = settings
+        symbolLine = symbol; pctLine = pct; targetLine = targets; barFill = fill; barTrack = track
+        putLine = put; nowLine = now; nowPct = nowP; agentLine = agent; healthLine = health
+        sellButton = sell; stopButton = stop
 
-        // Alive on its own: every minute the face and the rows are read again.
+        // Alive on its own: every minute the numbers are read again.
         ticker?.cancel()
         ticker = scope.launch { while (true) { kotlinx.coroutines.delay(60_000); refresh() } }
+        startSpinner()
+    }
+
+    /**
+     * Le due facce a turno, senza chiedere niente alla rete.
+     *
+     * Gira ogni quattro secondi ma **non ricarica**: ridisegna la stessa
+     * fotografia con l'altra faccia. I dati li porta il giro da sessanta
+     * secondi. Una bolla che interroga la rete ogni quattro secondi sarebbe una
+     * bolla che ti scarica il telefono per farti vedere lo stesso numero.
+     */
+    private fun startSpinner() {
+        spinner?.cancel()
+        if (CompanionPrefs.face(this) != CompanionPrefs.Face.ROTATE) return
+        spinner = scope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(4_000)
+                flip = !flip
+                if (!expanded) paintFace()
+            }
+        }
+    }
+
+    // ---- i pezzi di interfaccia -------------------------------------------
+
+    private fun small(label: String, tint: Int, width: Int) = TextView(this).apply {
+        text = label; setTextColor(tint); textSize = 11.5f
+        layoutParams = LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT)
+    }
+
+    private fun mono(tint: Int) = TextView(this).apply {
+        setTextColor(tint); textSize = 12f
+        typeface = android.graphics.Typeface.MONOSPACE
     }
 
     private fun button(label: String, tint: Int, onClick: () -> Unit) = TextView(this).apply {
         text = label
         setTextColor(tint); textSize = 12f
         setTypeface(typeface, android.graphics.Typeface.BOLD)
-        setPadding(dp(12f), dp(7f), dp(12f), dp(7f))
+        setPadding(dp(12f), dp(9f), dp(12f), dp(9f))
         background = GradientDrawable().apply {
             cornerRadius = dp(10f).toFloat()
             setColor(AColor.argb(34, AColor.red(tint), AColor.green(tint), AColor.blue(tint)))
         }
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8f) }
         gravity = Gravity.CENTER
+        setOnClickListener { onClick() }
+    }
+
+    /** Una voce della rotellina: tutta la riga, una sotto l'altra. */
+    private fun wide(label: String, tint: Int, onClick: () -> Unit) = TextView(this).apply {
+        text = label
+        setTextColor(tint); textSize = 12.5f
+        setTypeface(typeface, android.graphics.Typeface.BOLD)
+        setPadding(dp(12f), dp(10f), dp(12f), dp(10f))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(10f).toFloat()
+            setColor(AColor.argb(30, AColor.red(tint), AColor.green(tint), AColor.blue(tint)))
+        }
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = dp(8f) }
+        gravity = Gravity.CENTER
+        setOnClickListener { onClick() }
+    }
+
+    private enum class Glyph { GEAR, CLOSE, BACK }
+
+    /**
+     * I tre segni, disegnati a mano.
+     *
+     * Nel resto dell'app le icone sono un set disegnato a mano e non si usano
+     * ne' emoji ne' icone di sistema. Qui siamo fuori da Compose e quel set non
+     * si puo' chiamare, quindi si disegnano con le stesse due righe di Canvas
+     * invece di infilare un carattere tipografico che cambia faccia su ogni
+     * telefono.
+     */
+    private fun glyph(kind: Glyph, tint: Int, onClick: () -> Unit) = ImageView(this).apply {
+        val px = dp(22f)
+        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        val s = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = tint; style = Paint.Style.STROKE; strokeWidth = px * 0.09f
+            strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        }
+        val m = px / 2f
+        when (kind) {
+            Glyph.CLOSE -> {
+                c.drawLine(px * 0.3f, px * 0.3f, px * 0.7f, px * 0.7f, s)
+                c.drawLine(px * 0.7f, px * 0.3f, px * 0.3f, px * 0.7f, s)
+            }
+            Glyph.BACK -> {
+                c.drawLine(px * 0.68f, px * 0.5f, px * 0.32f, px * 0.5f, s)
+                c.drawLine(px * 0.32f, px * 0.5f, px * 0.46f, px * 0.36f, s)
+                c.drawLine(px * 0.32f, px * 0.5f, px * 0.46f, px * 0.64f, s)
+            }
+            Glyph.GEAR -> {
+                c.drawCircle(m, m, px * 0.17f, s)
+                val teeth = Paint(s).apply { strokeWidth = px * 0.11f }
+                repeat(8) { i ->
+                    val a = Math.toRadians(i * 45.0)
+                    val x0 = m + (px * 0.27f) * kotlin.math.cos(a).toFloat()
+                    val y0 = m + (px * 0.27f) * kotlin.math.sin(a).toFloat()
+                    val x1 = m + (px * 0.40f) * kotlin.math.cos(a).toFloat()
+                    val y1 = m + (px * 0.40f) * kotlin.math.sin(a).toFloat()
+                    c.drawLine(x0, y0, x1, y1, teeth)
+                }
+            }
+        }
+        setImageBitmap(bmp)
+        layoutParams = LinearLayout.LayoutParams(px, px).apply { marginStart = dp(6f) }
         setOnClickListener { onClick() }
     }
 
@@ -192,8 +435,10 @@ class CompanionService : Service() {
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!moved && System.currentTimeMillis() - downAt < 400) {
-                        // A tap on the panel's buttons is handled by them; here it toggles.
+                    if (moved) {
+                        // Dove l'hai lasciata se lo ricorda, anche se il servizio riparte.
+                        CompanionPrefs.setSpot(this@CompanionService, lp.x, lp.y)
+                    } else if (System.currentTimeMillis() - downAt < 400) {
                         if (expanded) collapse() else expand()
                     }
                     return true
@@ -205,64 +450,195 @@ class CompanionService : Service() {
 
     private fun expand() {
         expanded = true
+        settingsOpen = false
+        setBox?.visibility = View.GONE
+        mainBox?.visibility = View.VISIBLE
         bubble?.visibility = View.GONE
         panel?.visibility = View.VISIBLE
+        // Il pannello e' largo dieci volte la bolla: se la bolla sta a destra o
+        // in basso, aperto uscirebbe dallo schermo. L'ancora si sposta quel
+        // tanto che basta per restare dentro, e quando si richiude torna dov'era.
+        params?.let { lp ->
+            val m = resources.displayMetrics
+            val w = dp(PANEL_DP)
+            if (lp.x + w > m.widthPixels) { lp.x = (m.widthPixels - w).coerceAtLeast(0); runCatching { wm.updateViewLayout(root, lp) } }
+        }
         refresh()
     }
 
     private fun collapse() {
         expanded = false
+        settingsOpen = false
+        setBox?.visibility = View.GONE
+        mainBox?.visibility = View.VISIBLE
         panel?.visibility = View.GONE
         bubble?.visibility = View.VISIBLE
+        params?.let { lp ->
+            val x = CompanionPrefs.spotX(this)
+            if (x >= 0 && x != lp.x) { lp.x = x; runCatching { wm.updateViewLayout(root, lp) } }
+        }
+    }
+
+    private fun openSettings() {
+        settingsOpen = true
+        mainBox?.visibility = View.GONE
+        setBox?.visibility = View.VISIBLE
+    }
+
+    private fun closeSettings() {
+        settingsOpen = false
+        setBox?.visibility = View.GONE
+        mainBox?.visibility = View.VISIBLE
+    }
+
+    private fun open(where: String?) {
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .apply { if (where != null) putExtra("open", where) }
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        collapse()
+    }
+
+    // ---- i due tasti che decidono -----------------------------------------
+
+    /**
+     * Vendere da qui e' vendere da dentro l'app.
+     *
+     * Passa dalla stessa porta della notifica e della riga in-app:
+     * `SessionActions.sellSaid`, cioe' il collare. Sotto la soglia silenziosa
+     * firma da sola, sopra apre lo scontrino e chiede l'impronta. La bolla non
+     * decide niente: chiede.
+     */
+    private fun sellNow() {
+        val pos = last.pos ?: return
+        sellButton?.isEnabled = false
+        scope.launch {
+            val said = runCatching { SessionActions.sellSaid(this@CompanionService, pos, AgentBroker.Job.Source.LINK) }.getOrNull()
+            sellButton?.isEnabled = true
+            said?.let { AgentBroker.warn(this@CompanionService, pos.symbol, it.text, rhythm = AgentBroker.Rhythm.STOP) }
+            refresh()
+        }
+    }
+
+    private fun stopAgent() {
+        TraderLoop.stopSelf(this, getString(R.string.notif_stopped_by_you))
+        refresh()
     }
 
     // ---- data --------------------------------------------------------------
 
     private fun refresh() {
-        render(HealthWidgetData.load(this), null, null)
+        if (root == null) return
+        render()
         scope.launch {
-            // Health, the wallet's total, and the chosen coin, each only when asked for.
             val ctx = this@CompanionService
-            val owner = Settings.watchWallet(ctx)
-            val currency = Settings.currency.value
+            val trading = TraderLoop.config(ctx).on
+            val opens = Positions.open(ctx)
+            val pos = opens.firstOrNull()
             val health = withContext(Dispatchers.IO) {
                 if (HealthWidgetData.isStale(ctx)) runCatching { HealthWidgetData.refresh(ctx, updateWidgets = false) }
                 HealthWidgetData.load(ctx)
             }
-            val total = if (owner != null && (CompanionPrefs.show(ctx, "total") || CompanionPrefs.face(ctx) == CompanionPrefs.Face.TOTAL)) withContext(Dispatchers.IO) {
-                Portfolio.cached(owner, currency) ?: runCatching { Portfolio.load(this@CompanionService, owner, currency) }.getOrNull()
+            // La paghetta: quanto ci hai messo, e quanto vale adesso fra SOL
+            // libero e monete in mano. Stesso conto della scheda Agente.
+            val s = SessionWallet.current(ctx)
+            var funded = 0L; var total: Long? = null; var diff: Long? = null; var posValue: Long? = null
+            if (s != null) {
+                funded = s.fundedLamports
+                val free = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() }
+                val inCoins = opens.sumOf { runCatching { quote(it) }.getOrNull() ?: 0L }
+                posValue = pos?.let { runCatching { quote(it) }.getOrNull() }
+                if (free != null) {
+                    total = free + inCoins
+                    diff = total - funded + s.harvestedLamports
+                }
+            }
+            val owner = Settings.watchWallet(ctx)
+            val currency = Settings.currency.value
+            val wallet = if (owner != null && CompanionPrefs.face(ctx) == CompanionPrefs.Face.TOTAL) withContext(Dispatchers.IO) {
+                Portfolio.cached(owner, currency) ?: runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull()
             } else null
             val mint = CompanionPrefs.coin(ctx)
-            val coin = if (mint != null && (CompanionPrefs.show(ctx, "coin") || CompanionPrefs.face(ctx) == CompanionPrefs.Face.COIN)) withContext(Dispatchers.IO) {
-                runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()?.let { q -> Triple(TokenSymbols.symbol(mint), q.usd, q.change24h) }
+            val watched = if (mint != null && CompanionPrefs.face(ctx) == CompanionPrefs.Face.COIN) withContext(Dispatchers.IO) {
+                runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()?.let { q -> TokenSymbols.symbol(mint) to q.change24h }
             } else null
-            render(health, total, coin)
+
+            last = Shot(
+                health = health, trading = trading, open = if (trading) opens.size else null,
+                pos = pos, posValue = posValue,
+                fundedLamports = funded, totalLamports = total, diffLamports = diff,
+                walletTotal = wallet?.let { compact(it.total, it.currency) },
+                coinSymbol = watched?.first, coinChange = watched?.second,
+            )
+            render()
         }
     }
 
-    private fun render(d: HealthWidgetData.Snapshot?, total: PortfolioView?, coin: Triple<String, Double?, Double?>?) {
-        val ctx = this
-        val p = Halo.palette
-        val trading = TraderLoop.config(ctx).on
-        val open = if (trading) Positions.open(ctx).size else null
-        val totalText = total?.let { fmtFiat(it.total, it.currency) }
-        val faceTotal = total?.let { compact(it.total, it.currency) }
+    private suspend fun quote(pos: Positions.Position): Long? = SessionActions.quoteValue(this, pos)
+
+    /** La faccia da sola: quella che cambia ogni quattro secondi. */
+    private fun paintFace() {
+        val chosen = CompanionPrefs.face(this)
+        val face = if (chosen != CompanionPrefs.Face.ROTATE) chosen else {
+            // A turno la moneta e la paghetta. Senza niente di aperto la moneta
+            // non ha niente da dire, e al suo posto va il pallino dell'agente.
+            if (flip || last.pos == null) CompanionPrefs.Face.BUDGET else CompanionPrefs.Face.COIN
+        }
+        val sym = last.pos?.symbol ?: last.coinSymbol
+        val change = last.posPct ?: last.coinChange
         bubble?.setImageBitmap(
             CompanionPrefs.faceBitmap(
-                dp(CompanionPrefs.size(ctx).toFloat()), CompanionPrefs.face(ctx),
-                CompanionPrefs.FaceData(d?.score, open, faceTotal, coin?.first, coin?.third, trading),
+                dp(CompanionPrefs.size(this).toFloat()), face,
+                CompanionPrefs.FaceData(
+                    last.health?.score, last.open, last.walletTotal, sym, change, last.trading,
+                    budgetText = last.totalLamports?.let { fmtSol(it, 3) + " SOL" },
+                    budgetChange = last.pct,
+                ),
             ),
         )
+    }
+
+    private fun render() {
+        val ctx = this
+        val p = Halo.palette
+        paintFace()
+
+        val pos = last.pos
+        val move = last.posPct
+        symbolLine?.text = pos?.symbol ?: getString(if (last.trading) R.string.trader_idle else R.string.companion_agent_off)
+        pctLine?.text = move?.let { String.format(java.util.Locale.ROOT, "%+.1f%%", it) } ?: ""
+        pctLine?.setTextColor((if ((move ?: 0.0) >= 0) p.accent else p.red).toArgb())
+        targetLine?.visibility = if (pos == null) View.GONE else View.VISIBLE
+        targetLine?.text = pos?.let { getString(R.string.comp_targets, it.takeProfitPct, it.stopLossPct) }
+
+        // La barra va da −stop a +obiettivo, e il pieno e' dove sei adesso.
+        barTrack?.visibility = if (pos == null) View.GONE else View.VISIBLE
+        barFill?.visibility = if (pos == null) View.GONE else View.VISIBLE
+        if (pos != null) {
+            val lo = -pos.stopLossPct.toDouble()
+            val hi = pos.takeProfitPct.toDouble()
+            val k = (((move ?: 0.0) - lo) / (hi - lo)).coerceIn(0.0, 1.0)
+            val full = panel?.width?.takeIf { it > 0 }?.minus(dp(28f)) ?: dp(PANEL_DP - 28f)
+            barFill?.layoutParams = FrameLayout.LayoutParams((full * k).toInt().coerceAtLeast(dp(4f)), dp(6f))
+            barFill?.requestLayout()
+            (barFill?.background as? GradientDrawable)?.setColor((if ((move ?: 0.0) >= 0) p.accent else p.red).toArgb())
+        }
+
+        putLine?.text = fmtSol(last.fundedLamports, 4) + " SOL"
+        nowLine?.text = last.totalLamports?.let { fmtSol(it, 4) + " SOL" } ?: "…"
+        nowLine?.setTextColor((if ((last.diffLamports ?: 0L) >= 0) p.accent else p.red).toArgb())
+        nowPct?.text = last.pct?.let { String.format(java.util.Locale.ROOT, "%+.1f%%", it) } ?: ""
+        nowPct?.setTextColor((if ((last.diffLamports ?: 0L) >= 0) p.accent else p.red).toArgb())
+
         fun show(v: TextView?, on: Boolean, text: String?) { v?.text = text ?: ""; v?.visibility = if (on && !text.isNullOrEmpty()) View.VISIBLE else View.GONE }
-        show(totalLine, CompanionPrefs.show(ctx, "total"), totalText)
-        val last = if (trading) TraderLoop.lastNote(ctx) ?: getString(R.string.trader_idle) else getString(R.string.companion_agent_off)
-        show(agentLine, CompanionPrefs.show(ctx, "agent"), (open?.let { getString(R.string.companion_agent_line, it) + " · " } ?: "") + last)
-        show(healthLine, CompanionPrefs.show(ctx, "health"), d?.let { getString(R.string.companion_health_line, it.score) + " · " + (it.alert ?: getString(R.string.widget_clean)) })
-        healthLine?.setTextColor((if (d?.alert == null) p.accent else p.amber).toArgb())
-        show(coinLine, CompanionPrefs.show(ctx, "coin"), coin?.let { (sym, usd, ch) ->
-            sym + " " + (usd?.let { fmtPrice(it, "USD") } ?: "…") + (ch?.let { String.format(java.util.Locale.ROOT, "  %+.1f%%", it) } ?: "")
-        })
-        coinLine?.setTextColor((if ((coin?.third ?: 0.0) >= 0) p.accent else p.red).toArgb())
+        val note = if (last.trading) TraderLoop.lastNote(ctx) ?: getString(R.string.trader_idle) else getString(R.string.companion_agent_off)
+        show(agentLine, CompanionPrefs.show(ctx, "agent"), note)
+        show(healthLine, CompanionPrefs.show(ctx, "health"), last.health?.let { getString(R.string.companion_health_line, it.score) + " · " + (it.alert ?: getString(R.string.widget_clean)) })
+        healthLine?.setTextColor((if (last.health?.alert == null) p.accent else p.amber).toArgb())
+
+        sellButton?.visibility = if (pos == null) View.GONE else View.VISIBLE
+        stopButton?.text = if (last.trading) getString(R.string.notif_stop) else getString(R.string.agent_start)
     }
 
     /** "80 €", "1,2k €": a total that fits a circle. */
@@ -277,47 +653,6 @@ class CompanionService : Service() {
         return "$n $sym"
     }
 
-    /**
-     * Same ring as the home-screen widget, sized for the bubble.
-     *
-     * [openPositions] is non-null only while the agent is trading, and then it
-     * takes over the face: a full ring in the accent colour with the number of
-     * coins it is holding. A wallet health of 100 that has been 100 for a week
-     * is not news; an agent spending money on its own is.
-     */
-    private fun ringBitmap(score: Int?, openPositions: Int?): Bitmap {
-        val p = Halo.palette
-        val px = dp(54f).coerceAtLeast(96)
-        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val tint = when {
-            openPositions != null -> p.accent
-            score == null -> p.muted
-            score >= 80 -> p.accent
-            score >= 50 -> p.amber
-            else -> p.red
-        }.toArgb()
-        // Opaque disc so the bubble reads on any wallpaper.
-        c.drawCircle(px / 2f, px / 2f, px / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.ground.toArgb() })
-        val w = px * 0.1f
-        val rect = RectF(w, w, px - w, px - w)
-        val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = w; strokeCap = Paint.Cap.ROUND }
-        arc.color = p.stroke.toArgb(); c.drawArc(rect, 0f, 360f, false, arc)
-        val sweep = if (openPositions != null) 360f else if (score != null) 360f * score.coerceIn(0, 100) / 100f else 0f
-        if (sweep > 0f) { arc.color = tint; c.drawArc(rect, -90f, sweep, false, arc) }
-        val t = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = p.ink.toArgb(); textAlign = Paint.Align.CENTER; textSize = px * 0.34f; isFakeBoldText = true
-        }
-        val face = openPositions?.toString() ?: score?.toString() ?: "\u2013"
-        c.drawText(face, px / 2f, px / 2f + t.textSize * 0.35f, t)
-        // A small mark so a "0" while it hunts cannot be mistaken for a health score.
-        if (openPositions != null) {
-            val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint }
-            c.drawCircle(px * 0.82f, px * 0.18f, px * 0.09f, dot)
-        }
-        return bmp
-    }
-
     // ---- foreground notification ------------------------------------------
 
     private fun notification(): Notification {
@@ -328,23 +663,32 @@ class CompanionService : Service() {
                     .apply { setShowBadge(false) },
             )
         }
-        val stop = PendingIntent.getService(
-            this, 1, Intent(this, CompanionService::class.java).setAction(ACTION_STOP),
+        fun pi(action: String, code: Int) = PendingIntent.getService(
+            this, code, Intent(this, CompanionService::class.java).setAction(action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        return Notification.Builder(this, CHANNEL)
+        val b = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.companion_title))
-            .setContentText(getString(R.string.companion_running))
-            .addAction(Notification.Action.Builder(null, getString(R.string.companion_hide), stop).build())
+            .setContentText(getString(if (hidden) R.string.comp_hidden else R.string.companion_running))
             .setOngoing(true)
-            .build()
+        // Nascosta si torna da qui, che e' dove sta gia' il dito.
+        if (hidden) {
+            b.addAction(Notification.Action.Builder(null, getString(R.string.comp_show), pi(ACTION_SHOW, 2)).build())
+        } else {
+            b.addAction(Notification.Action.Builder(null, getString(R.string.companion_hide), pi(ACTION_HIDE, 3)).build())
+        }
+        b.addAction(Notification.Action.Builder(null, getString(R.string.watch_disable), pi(ACTION_STOP, 1)).build())
+        return b.build()
     }
 
     companion object {
         private const val CHANNEL = "companion"
         private const val NOTIF_ID = 4711
+        private const val PANEL_DP = 300f
         const val ACTION_STOP = "com.clearsign.app.COMPANION_STOP"
+        const val ACTION_HIDE = "com.clearsign.app.COMPANION_HIDE"
+        const val ACTION_SHOW = "com.clearsign.app.COMPANION_SHOW"
 
         /** True when Android will let us draw over other apps. */
         fun canRun(ctx: Context): Boolean = android.provider.Settings.canDrawOverlays(ctx)

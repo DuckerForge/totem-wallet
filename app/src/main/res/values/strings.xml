@@ -557,7 +557,7 @@
     <string name="pnl_since">since %1$s</string>
     <string name="swapfees_title">SWAP FEES</string>
     <string name="swapfees_sub">One-time setup</string>
-    <string name="swapfees_note">Create the fee wallet token accounts on the main mints so the 0.5% swap fee always lands. Idempotent.</string>
+    <string name="swapfees_note" formatted="false">Create the fee wallet token accounts on the main mints so the 0.5% swap fee always lands. Idempotent.</string>
     <string name="swapfees_btn">Activate swap fees</string>
     <string name="swapfees_done">Swap fee accounts are ready.</string>
     <string name="swapfees_pending">%1$d accounts missing, across the coins you follow and the ones you hold. Opening them costs about %2$s SOL in rent, which stays yours.</string>

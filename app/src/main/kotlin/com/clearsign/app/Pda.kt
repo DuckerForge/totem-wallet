@@ -20,9 +20,16 @@ object Pda {
     }
 
     // ---- ed25519 point decompression (RFC 8032 §5.1.3) --------------------------
-    private val P = BigInteger.TWO.pow(255).subtract(BigInteger.valueOf(19))
+    //
+    // `BigInteger.TWO` esiste da API 33 e il minSdk qui e' 31. Questo e' un
+    // `object`: il campo che manca non fa fallire una chiamata, fa fallire
+    // l'inizializzazione della classe, e con lei tutto quello che deriva un PDA
+    // (token account, swap, burn, rent). Su Android 12 l'app non avrebbe mai
+    // mandato una moneta. Sul Seeker, che e' API 34, non si vedeva.
+    private val TWO = BigInteger.valueOf(2)
+    private val P = TWO.pow(255).subtract(BigInteger.valueOf(19))
     private val D = BigInteger.valueOf(-121665).multiply(BigInteger.valueOf(121666).modInverse(P)).mod(P)
-    private val I = BigInteger.TWO.modPow(P.subtract(BigInteger.ONE).divide(BigInteger.valueOf(4)), P) // sqrt(-1)
+    private val I = TWO.modPow(P.subtract(BigInteger.ONE).divide(BigInteger.valueOf(4)), P) // sqrt(-1)
 
     /** True when [pubkey] is a valid compressed ed25519 point (i.e. a possible user key, not a PDA). */
     fun isOnCurve(pubkey: ByteArray): Boolean {

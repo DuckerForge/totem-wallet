@@ -1,8 +1,10 @@
-# Seeker Wallet (working name)
+# Velum Wallet
 
 **A wallet for the Solana Seeker that reads every transaction before you sign it, and an agent that trades a small budget on its own, inside a collar you set.**
 
-Built for **Clock In, the Solana Mobile hackathon** (deadline 8 October 2026). Android native, Jetpack Compose, Seed Vault, Mobile Wallet Adapter. The name is provisional. Public page: https://duckerforge.github.io/apex/
+Built for **Clock In, the Solana Mobile hackathon** (deadline 8 October 2026). Android native, Jetpack Compose, Seed Vault, Mobile Wallet Adapter. Public page: https://duckerforge.github.io/apex/
+
+> The `apex/` path in the URL, the `web/apex` folder and the `clearsign.*` keys in `local.properties` keep older names on purpose. The page path is baked into verified Android App Links and into gift links already handed out, and the property keys are read by the build. Renaming them breaks working things for nothing.
 
 ---
 

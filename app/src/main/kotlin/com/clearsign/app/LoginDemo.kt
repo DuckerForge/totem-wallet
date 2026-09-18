@@ -36,10 +36,15 @@ import kotlin.math.min
 /**
  * Il marchio, fatto da due telefoni.
  *
- * Due telefoni arrivano dal buio e si posano inclinati finche' non formano la V
- * del logo. Poi il tratto al neon si disegna da solo attraverso di loro, dal
- * viola in basso al ciano in alto, e resta acceso un momento prima che tutto
- * ricominci.
+ * Prima una riga di luce che si scrive da sola sul buio, dal viola in basso al
+ * ciano in alto. Poi, sotto di lei, si accendono due telefoni gia' in posa, e si
+ * scopre che quella riga e' la piega fra i due: la V del marchio. Poi i telefoni
+ * se ne vanno nella luce e il marchio resta.
+ *
+ * L'ordine e' quello perche' e' quello che dice la cosa. Con i telefoni per
+ * primi si vedeva una V di telefoni a cui veniva aggiunta una riga: un disegno
+ * finito e poi un ornamento. Col tratto per primo, il marchio si scrive e poi si
+ * scopre di cosa e' fatto.
  *
  * Non e' decorazione. La V del marchio **e' due telefoni che si toccano**, cioe'
  * la cosa che quest'app sa fare e le altre no: avvicinarne due e far passare dei
@@ -95,23 +100,26 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
 
         // --- i tempi, che sono il racconto ---------------------------------
         //
-        // Due telefoni arrivano e si mettono in V. Restano fermi un attimo,
-        // perche' una cosa che non si ferma mai non la vedi. Poi il braccio
-        // destro si accende, e nella luce i telefoni se ne vanno e resta il
-        // marchio: non un dissolvenza incrociata, che sarebbe uno scambio di
-        // figurine, ma una cosa che diventa l'altra dentro un lampo.
-        // I due telefoni sono **gia' li'** al primo fotogramma. Prima entravano
-        // da fuori, e quell'arrivo costava un terzo del racconto per dire una
-        // cosa che si vede da sola: che sono due telefoni. La scena si apre
-        // sulla V gia' fatta, e quello che succede dopo e' l'unica cosa che
-        // succede.
-        val hold = seg(t, 0.04f, 0.20f)
-        val spark = ease(seg(t, 0.22f, 0.50f))
-        // Fra la fine del tratto e la dissolvenza c'e' una battuta ferma: la V
-        // di due Seeker con il bordo acceso. Prima `become` partiva a 0,50 e il
-        // tratto cominciava a scivolare **mentre** lo stavo ancora disegnando,
-        // quindi si staccava dal telefono a meta' corsa.
-        val become = ease(seg(t, 0.62f, 0.80f))
+        // Prima il tratto, poi quello di cui e' fatto.
+        //
+        // Sul buio non c'e' niente, e una riga di luce si disegna da sola. Per un
+        // momento e' l'unica cosa sullo schermo: il marchio che si scrive. Quando
+        // e' acceso e fermo, sotto di lui si accendono i due Seeker, gia' in posa
+        // e gia' al loro posto sotto la riga, e si scopre che quella riga e' la
+        // piega fra due telefoni che si toccano. Poi i telefoni se ne vanno nella
+        // luce e resta il marchio.
+        //
+        // I telefoni erano li' dal primo fotogramma e il tratto arrivava dopo: si
+        // vedeva una V di telefoni a cui veniva aggiunta una riga.
+        val spark = ease(seg(t, 0.05f, 0.30f))
+        // Una battuta ferma col tratto acceso e niente sotto. Senza, i telefoni
+        // entrerebbero mentre lo sto ancora disegnando, e non si vedrebbe ne' la
+        // riga che si scrive ne' loro che arrivano.
+        val arrive = ease(seg(t, 0.38f, 0.55f))
+        // E un'altra a V intera, prima della dissolvenza. Prima `become` partiva
+        // troppo presto e il tratto cominciava a scivolare **mentre** lo stavo
+        // ancora disegnando, quindi si staccava dal telefono a meta' corsa.
+        val become = ease(seg(t, 0.68f, 0.84f))
 
         // L'apertura della porta non salta il racconto, lo lascia finire e poi
         // ritira tutto.
@@ -126,12 +134,13 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         // lineare il corpo sparisce ma le isole della fotocamera restano
         // leggibili, e sembrano due macchie che galleggiano sul marchio.
         val gone = (1f - become).let { it * it * it }
-        val phoneAlpha = gone * leaving
+        // Si accendono, non arrivano: nessuno spostamento, si scoprono sotto una
+        // luce che c'era gia'.
+        val phoneAlpha = arrive * gone * leaving
         // Niente smorzatura in coda: serviva a nascondere lo stacco quando il
         // giro ripartiva, e il giro non riparte piu'. Lasciandola, il marchio
         // restava per sempre al quarantacinque per cento.
         val markAlpha = become * leaving
-        val glow = spark * (1f - seg(t, 0.84f, 0.96f) * 0.6f)
 
         // --- il respiro dietro ---------------------------------------------
         drawCircle(
@@ -165,17 +174,21 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
                 // modo diverso andava pure specchiato quello di sinistra, che e'
                 // una toppa. Cosi' invece i due lati del telefono si vedono
                 // tutti e due, e il tratto corre sul dorso, dove sta nel marchio.
-                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, hold * 0.4f + spark, back = side > 0f)
+                // Arrivano gia' caldi: la luce sopra di loro e' accesa da prima.
+                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, arrive * (0.4f + spark), back = side > 0f)
             }
         }
 
-        // --- la scintilla lungo il telefono destro --------------------------
-        // Solo mentre i telefoni ci sono ancora: e' la cosa che li trasforma. Il
-        // marchio, una volta arrivato, il suo tratto ce l'ha gia' dipinto dentro.
+        // --- la riga di luce, che viene per prima ---------------------------
+        // Si disegna sul buio e resta accesa finche' i telefoni non sono andati.
+        // Il marchio, una volta arrivato, il suo tratto ce l'ha gia' dipinto
+        // dentro, quindi qui sparisce.
         //
         // Il tratto corre **sul vetro**, non accanto: stesso centro e stessa
         // lunghezza del telefono destro, rientrato di un raggio d'angolo perche'
-        // la punta tonda si fermi dentro il bordo. Prima andava da vertice a
+        // la punta tonda si fermi dentro il bordo. Il conto non guarda se il
+        // telefono c'e': il tratto si disegna dove il telefono **sara'**, e per
+        // questo, quando arriva, gli casca addosso invece di avvicinarglisi. Prima andava da vertice a
         // punta e sbordava di un decimo per parte, e quando i telefoni venivano
         // tirati dentro restava dov'era: due oggetti vicini invece di uno.
         if (spark > 0f && become < 1f) {

@@ -1,0 +1,138 @@
+"""
+La scaletta, come dati.
+
+Le battute sono copiate **parola per parola** da `docs/DEMO-SCRIPT.md`, che le
+ha gia' scritte in inglese con i tempi. Non si riscrivono qui: se una frase va
+cambiata si cambia li', e qui si ricopia. Un video con due copie dello stesso
+testo finisce con due testi diversi.
+
+Rispetto alla scaletta del 16/09 cambia una cosa sola, e per una ragione: i due
+documenti litigavano. `HACKATHON-PLAN.md` chiama l'Agent Gate — l'agente che
+mente e viene bloccato — la parte che non si taglia mai; la scaletta riscritta
+spende quel minuto sulla paghetta e il Gate non lo mostra affatto. Qui il blocco
+1:05–1:45 si divide in due da venti secondi, e i dieci secondi mancanti si
+prendono dal censimento, che e' un bel numero ma non e' il prodotto.
+
+    0:00   3s   la porta            il marchio che si forma
+    0:03   9s   l'amo              la dApp che chiede e non mostra
+    0:12  33s   lo scontrino       drain e approvazione illimitata, rifiutati
+    0:45  20s   la firma vera      tieni premuto, stacco, nel registro
+    1:05  20s   la paghetta        il collare e la riga in dollari
+    1:25  20s   l'Agent Gate       l'onesto passa, il bugiardo e' bloccato
+    1:45  10s   il censimento      meta' dei Seeker tiene SKR in staking
+    1:55  25s   il telefono        tocco fra due telefoni, mano sullo schermo
+    2:20  20s   la chiusura        ponte, registro, marchio
+                                   ------
+                                   2:40
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Beat:
+    key: str            # il nome del file girato: beat_<key>.mp4
+    seconds: float
+    label: str | None   # l'etichetta corta sopra il sottotitolo
+    text: str | None    # la battuta, verbatim dalla scaletta
+    shot: str           # cosa si vede, per chi gira
+    hands: bool = False # True se serve l'impronta, cioe' se serve l'utente
+    start: float = 0.0  # da che punto della registrazione tagliare
+
+
+SCRIPT: list[Beat] = [
+    Beat(
+        "door", 3.0, None, None,
+        "La porta: due Seeker che diventano la V del marchio. Si apre l'app da fredda.",
+    ),
+    Beat(
+        "hook", 9.0, "01 · blind",
+        "A phone can ask you to sign something and show you nothing but a name and a button.",
+        "La dApp che chiede di firmare, con il suo nome e un tasto e basta.",
+    ),
+    Beat(
+        "receipt", 33.0, "02 · the receipt",
+        "Every transaction is simulated on chain first. The receipt is built from what the "
+        "network says will happen, not from what the app claims.",
+        "Dal :testdapp: il drain, lo scontrino che dice la cifra vera e il rischio in rosso, "
+        "rifiutato. Poi l'approvazione illimitata: pericolo, un tocco solo bloccato.",
+    ),
+    Beat(
+        "sign", 20.0, "03 · a real payment",
+        "A real payment reads the same way. Hold to confirm, then the Seed Vault.",
+        "Manda, lo scontrino, la fiducia dell'indirizzo, tieni premuto. STACCO. "
+        "Riprende dal registro con il valore in euro, poi la prova QR.",
+        hands=True,
+    ),
+    Beat(
+        "budget", 20.0, "04 · the budget",
+        "A budget kept apart from the wallet. It never sees the seed.",
+        "La paghetta: creala, il collare coi tetti, la riga del calcolo in dollari.",
+        hands=True,
+    ),
+    Beat(
+        "gate", 20.0, "05 · the agent that lies",
+        "It looks for a coin, buys a slice, sells at a target or a stop, and asks for a "
+        "fingerprint above its limits.",
+        "scripts/test-agent.sh honest: 'Intento agente OK', si firma. Poi liar: dichiara "
+        "0,1 SOL, la transazione ne manda 5 a un indirizzo mai visto. Bloccato, in rosso.",
+        hands=True,
+    ),
+    Beat(
+        "crowd", 10.0, "06 · the crowd",
+        "It also reads the crowd it lives in.",
+        "Il censimento: meta' dei Seeker tiene SKR in staking dai Guardiani. Poi i soldi "
+        "dimenticati, le commissioni mai riscosse lette dalla catena senza chiavi.",
+    ),
+    Beat(
+        "hardware", 25.0, "07 · the phone itself",
+        "It uses the hardware the Seeker actually has.",
+        "Pagamento col tocco fra due telefoni, oppure la richiesta scritta su un adesivo NFC. "
+        "Poi la mano sullo schermo: i numeri spariscono, l'impronta li riporta.",
+    ),
+    Beat(
+        "close", 20.0, "08 · everywhere",
+        "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, and on "
+        "everything the agent does.",
+        "Il preventivo del ponte, il registro della giornata, l'icona. Ultima riga: "
+        "What you see is what you sign.",
+    ),
+]
+
+
+def total() -> float:
+    return sum(b.seconds for b in SCRIPT)
+
+
+def needs_hands() -> list[Beat]:
+    """Le scene in cui serve il dito dell'utente: si registra mentre tocca lui."""
+    return [b for b in SCRIPT if b.hands]
+
+
+def timeline() -> list[tuple[float, Beat]]:
+    t, out = 0.0, []
+    for b in SCRIPT:
+        out.append((t, b))
+        t += b.seconds
+    return out
+
+
+def as_script() -> str:
+    """La traccia per la voce, coi minutaggi. Si legge e si registra."""
+    rows = []
+    for at, b in timeline():
+        m, s = divmod(int(at), 60)
+        rows.append(f"{m}:{s:02d}  {b.text or '(nessuna voce, solo il marchio)'}")
+    return "\n".join(rows)
+
+
+if __name__ == "__main__":
+    for at, b in timeline():
+        m, s = divmod(int(at), 60)
+        mark = " [impronta]" if b.hands else ""
+        print(f"{m}:{s:02d}  {b.seconds:>4.0f}s  {b.key:<9}{mark}")
+    m, s = divmod(int(total()), 60)
+    print(f"\ntotale {m}:{s:02d}   (tetto 2:50)")
+    print(f"scene con impronta: {', '.join(b.key for b in needs_hands())}")

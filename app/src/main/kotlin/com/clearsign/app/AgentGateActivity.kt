@@ -26,7 +26,7 @@ import org.json.JSONObject
  * The Agent Gate: the hardware co-signer for AI agents.
  *
  * An agent — running anywhere: another app on the phone, a script on a laptop
- * that opens a link, a browser — never holds a key. It hands Omni a transaction
+ * that opens a link, a browser — never holds a key. It hands Velum a transaction
  * plus a *declared intent* ("swap 0.1 SOL → USDC for rebalancing") via
  *
  *   apex://agent/sign?tx=<base64>&intent=<json>[&account=<pubkey>][&cluster=…][&callback=<uri>][&send=0|1]

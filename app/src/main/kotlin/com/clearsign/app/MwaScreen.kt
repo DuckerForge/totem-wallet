@@ -165,10 +165,19 @@ fun HaloRoot(content: @Composable () -> Unit) {
 @Composable
 fun MwaScreen(ui: MwaUi) {
     HaloRoot {
-        val danger = ui is MwaUi.Error || (ui is MwaUi.SignRequest && ui.receipts.any { it.blocksApproval }) ||
+        // Un errore non e' un pericolo, e vanno tenuti separati.
+        //
+        // Qui dentro `Error` faceva scattare tutto l'apparato dell'allarme:
+        // schermo rosso, "Rischio rilevato" sotto il nome, e la vibrazione di
+        // avvertimento. Per una dApp che non si e' connessa. Non e' successo
+        // niente di pericoloso: e' solo non successo niente. Gridare al lupo su
+        // un non evento e' il modo piu' rapido di insegnare a qualcuno a
+        // ignorare il rosso il giorno che il lupo c'e' davvero.
+        val problem = ui is MwaUi.Error
+        val danger = (ui is MwaUi.SignRequest && ui.receipts.any { it.blocksApproval }) ||
             (ui is MwaUi.SignInRequest && ui.domainMismatch)
         val haloColor by animateFloatAsState(if (danger) 1f else 0f, tween(600), label = "halo")
-        val accent = lerp(Halo.cyan, Halo.red, haloColor)
+        val accent = lerp(if (problem) Halo.amber else Halo.cyan, Halo.red, haloColor)
         Box(
             Modifier.fillMaxSize()
                 .background(Brush.verticalGradient(listOf(Halo.ground2, Halo.ground)))
@@ -185,7 +194,7 @@ fun MwaScreen(ui: MwaUi) {
                 Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 14.dp),
             ) {
-                Header(danger = danger, dApp = ui.dAppOrNull)
+                Header(danger = danger, problem = problem, dApp = ui.dAppOrNull)
                 Spacer(Modifier.height(18.dp))
                 AnimatedContent(
                     targetState = ui,
@@ -324,7 +333,7 @@ internal fun lerp(a: Color, b: Color, t: Float) = Color(
 )
 
 @Composable
-private fun Header(danger: Boolean, dApp: DappId?) {
+private fun Header(danger: Boolean, problem: Boolean, dApp: DappId?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(32.dp).clip(rs(10))
@@ -335,8 +344,13 @@ private fun Header(danger: Boolean, dApp: DappId?) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.app_name), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
             Text(
-                if (danger) stringResource(R.string.header_danger) else stringResource(R.string.tagline),
-                fontFamily = Inter, fontSize = 11.5.sp, color = if (danger) Halo.red else Halo.muted,
+                when {
+                    danger -> stringResource(R.string.header_danger)
+                    problem -> stringResource(R.string.header_problem)
+                    else -> stringResource(R.string.tagline)
+                },
+                fontFamily = Inter, fontSize = 11.5.sp,
+                color = if (danger) Halo.red else if (problem) Halo.amber else Halo.muted,
             )
         }
         if (dApp != null) DappPill(dApp)

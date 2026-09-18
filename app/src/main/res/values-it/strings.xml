@@ -557,7 +557,7 @@
     <string name="pnl_since">dal %1$s</string>
     <string name="swapfees_title">FEE SWAP</string>
     <string name="swapfees_sub">Configurazione una tantum</string>
-    <string name="swapfees_note">Crea i token account del wallet fee sui mint principali cosi la fee dello 0,5% arriva sempre. Idempotente.</string>
+    <string name="swapfees_note" formatted="false">Crea i token account del wallet fee sui mint principali così la fee dello 0,5% arriva sempre. Idempotente.</string>
     <string name="swapfees_btn">Attiva le fee swap</string>
     <string name="swapfees_done">Account per le fee swap pronti.</string>
     <string name="swapfees_pending">Mancano %1$d conti, fra le monete che segui e quelle che hai. Aprirli costa circa %2$s SOL di affitto, che resta tuo.</string>

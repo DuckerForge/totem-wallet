@@ -340,6 +340,7 @@ internal fun AgentConsole() {
                     color = when (line.kind) {
                         AgentTrace.Kind.ACTED -> Halo.mint
                         AgentTrace.Kind.REFUSED -> Halo.amber
+                        AgentTrace.Kind.WARN -> Halo.amber
                         AgentTrace.Kind.FOUND -> Halo.ink
                         else -> Halo.muted
                     },

@@ -47,8 +47,33 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
     if (rows.isEmpty()) return
 
     val yours = stats.firstOrNull { it.rule == ExitRule.YOURS }
-    val best = stats.filter { it.closed > 0 }.maxByOrNull { it.netLamports }
     val closed = yours?.closed ?: 0
+
+    /**
+     * La riga che mancava: **non fare niente**.
+     *
+     * Il libro ombra confrontava le regole di uscita fra loro — vendi al 15,
+     * vendi al 50, insegui il massimo — e mai con la cosa piu' ovvia del mondo,
+     * cioe' non comprare. Cosi' la domanda era sempre "quale regola perde meno",
+     * mai "conveniva muoversi".
+     *
+     * E qui costa zero, perche' tutto questo libro e' gia' misurato **in SOL**:
+     * chi tiene i suoi SOL e non tocca niente sta esattamente a zero. Non un
+     * numero stimato, non una serie di prezzi da scaricare: zero.
+     *
+     * Non e' una regola vera nel motore di proposito. Aggiungerla a
+     * `ExitRule.all()` come `Fixed(HOLD, 0, 0)` avrebbe due difetti misurati nel
+     * codice: `step` protegge entrambe le soglie con `> 0`, quindi quella riga
+     * resterebbe aperta per sempre e non entrerebbe mai nelle statistiche; e
+     * `netLamports` toglie comunque due commissioni piu' l'affitto del conto,
+     * quindi **dichiarerebbe una perdita di 0,00205 SOL per non aver fatto
+     * niente**, che e' una bugia.
+     */
+    val doNothing = Paper.Stat(rule = HOLD, closed = closed, wins = 0, netLamports = 0L)
+    val table = (stats + doNothing).sortedByDescending { it.netLamports }
+    // Il migliore fra le regole vere: "non fare niente" non si puo' applicare
+    // col tasto, e proporlo accenderebbe una scatola col tasto morto dentro.
+    val best = stats.filter { it.closed > 0 }.maxByOrNull { it.netLamports }
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -60,7 +85,7 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
             }
             Text(stringResource(R.string.shadow_sub), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
 
-            stats.forEach { s ->
+            table.forEach { s ->
                 val lead = best != null && s.rule == best.rule && s.closed > 0
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -68,10 +93,12 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
                         fontFamily = Inter, fontWeight = if (lead) FontWeight.Bold else FontWeight.Normal,
                         fontSize = 12.5.sp, color = if (lead) Halo.mint else Halo.ink, modifier = Modifier.weight(1f),
                     )
-                    Text(
-                        stringResource(R.string.shadow_trades, s.closed, s.wins),
-                        fontFamily = Mono, fontSize = 11.sp, color = Halo.muted,
-                    )
+                    if (s.rule != HOLD) {
+                        Text(
+                            stringResource(R.string.shadow_trades, s.closed, s.wins),
+                            fontFamily = Mono, fontSize = 11.sp, color = Halo.muted,
+                        )
+                    }
                     Spacer(Modifier.width(10.dp))
                     Text(
                         (if (s.netLamports >= 0) "+" else "−") + fmtSol(kotlin.math.abs(s.netLamports), 4),
@@ -129,7 +156,17 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
     }
 }
 
+/**
+ * Il nome della riga che non e' una regola.
+ *
+ * Va prima di tutte nel `when`, perche' il ramo finale di questa funzione e'
+ * `else -> shadow_rule_timed`: una riga con un nome che non conosce si
+ * presenterebbe come "A tempo, sei ore" senza dire niente a nessuno.
+ */
+private const val HOLD = "hold"
+
 private fun ruleName(rule: String) = when (rule) {
+    HOLD -> R.string.shadow_rule_hold
     ExitRule.YOURS -> R.string.shadow_rule_yours
     ExitRule.QUICK -> R.string.shadow_rule_quick
     ExitRule.PATIENT -> R.string.shadow_rule_patient

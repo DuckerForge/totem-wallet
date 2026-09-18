@@ -325,6 +325,19 @@ object SessionWallet {
         )
     }
 
+    /**
+     * Quando il contatore del giorno torna a respirare.
+     *
+     * "Riprende domani" non e' vero e non aiuta: le ventiquattro ore non sono la
+     * mezzanotte, sono una finestra che scorre. Quello che blocca adesso e' la
+     * riga piu' vecchia ancora dentro la finestra, e si libera esattamente
+     * ventiquattro ore dopo che e' stata scritta. Un orario si legge e si
+     * aspetta; "domani" fa chiudere l'app.
+     */
+    fun freesAt(ctx: Context, now: Long = System.currentTimeMillis()): Long? =
+        spendLog(ctx).filter { it.first > now - 86_400_000L && it.second > 0L }
+            .minOfOrNull { it.first }?.plus(86_400_000L)
+
     private fun spendLog(ctx: Context): List<Pair<Long, Long>> = runCatching {
         val a = JSONArray(prefs(ctx).getString("spend", "[]") ?: "[]")
         (0 until a.length()).map { i -> val e = a.getJSONArray(i); e.getLong(0) to e.getLong(1) }

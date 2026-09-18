@@ -258,6 +258,44 @@ internal fun ageScore(minutes: Double?, gate: ScanGate): Double {
 }
 
 /**
+ * La moneta batte la base, o conviene tenere la base?
+ *
+ * Il ciclo sapeva rispondere a due domande — "questa moneta e' una trappola?" e
+ * "quale di queste cinque e' la migliore?" — e non alla terza, che e' quella che
+ * conta nelle giornate in cui sale tutto: **conviene comprare qualcosa, o tenere
+ * i SOL che gia' hai?**
+ *
+ * Misurato il 18/09/2026 su una paghetta vera: 0,1761 SOL diventati 0,1671 in
+ * trentatre ore, meno cinque virgola uno per cento, in una giornata in cui SOL
+ * faceva piu' dieci virgola quattro. Le commissioni di quelle sei operazioni
+ * erano lo zero virgola nove per cento della perdita: non e' il traffico a
+ * costare, sono le monete. E la moneta non veniva mai confrontata con la cosa
+ * piu' ovvia del mondo, cioe' non comprarla.
+ *
+ * Torna **il motivo a parole**, come [passesGate], o null se si puo' comprare.
+ * La frase che legge la persona nasce qui, dove nasce la decisione, e non viene
+ * ricostruita a valle da un booleano.
+ *
+ * [baseChange24hPct] null vuol dire che non sappiamo come va la base, e allora
+ * si passa: e' la regola della casa di questo file, quello che non si sa non
+ * blocca mai. Vale anche al contrario: una moneta senza finestra a 24 ore non
+ * viene bocciata per questo.
+ *
+ * [marginPct] e' quanto deve battere la base per valerne la pena. Non zero:
+ * pareggiare con SOL prendendosi il rischio di una moneta piccola non e' un
+ * affare, e' lo stesso affare con piu' modi di finire male.
+ */
+fun beatsBase(c: Candidate, baseChange24hPct: Double?, marginPct: Double = 3.0): String? {
+    val base = baseChange24hPct ?: return null
+    val mine = c.s24h?.priceChange ?: return null
+    if (mine >= base + marginPct) return null
+    return "SOL is up " + pct(base) + " today and this is " + pct(mine) + " — holding SOL is the better trade"
+}
+
+/** Una percentuale come la direbbe una persona: col segno, senza decimali inutili. */
+private fun pct(v: Double): String = (if (v >= 0) "+" else "") + (if (v == v.toInt().toDouble()) v.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", v)) + "%"
+
+/**
  * The shape of the chart, from the windows we already have.
  *
  * This exists because of a specific failure: a coin can look excellent on every

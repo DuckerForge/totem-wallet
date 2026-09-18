@@ -196,6 +196,23 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                         )
                     }
                 }
+                // Da dove e' partita a dove sta adesso.
+                //
+                // Il totale grande e la differenza col segno c'erano gia', ma la
+                // differenza da sola non dice mai da dove viene: "+0,008" e'
+                // tanto o poco a seconda di quanto ci hai messo, e quel numero
+                // non stava da nessuna parte su questa pagina. Due righe, i due
+                // capi, e in mezzo la strada.
+                if (balance != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.env_put_in), style = HaloType.small, color = Halo.muted, modifier = Modifier.width(96.dp))
+                        Text(fmtSol(session.fundedLamports, 4) + " SOL", fontFamily = Mono, fontSize = 12.sp, color = Halo.ink, style = Tabular)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.env_now), style = HaloType.small, color = Halo.muted, modifier = Modifier.width(96.dp))
+                        Text(fmtSol(total, 4) + " SOL", fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if ((diff ?: 0L) >= 0) Halo.mint else Halo.red, style = Tabular)
+                    }
+                }
                 Text(
                     if (openCount > 0) stringResource(R.string.agent_hero_line, fmtSol(balance ?: 0L, 3), openCount, fmtSol(inCoins, 3), fmtSol(history.spentLast24hLamports, 3), fmtSol(policy.dailyLamports, 3))
                     else stringResource(R.string.agent_hero_line_flat, fmtSol(balance ?: 0L, 3), fmtSol(history.spentLast24hLamports, 3), fmtSol(policy.dailyLamports, 3)),

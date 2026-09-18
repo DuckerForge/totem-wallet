@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -209,7 +208,18 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
             }
         }
 
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        // In cima si scansava la barra di stato, in fondo niente: non c'era
+        // niente in fondo da scansare. Da quando il tasto di accensione sta li',
+        // la barra dei gesti gli passava sopra e la parola veniva tagliata a
+        // meta' dal bordo dello schermo.
+        // Le due barre di sistema, tolte a mano perche' qui dentro nessuno le
+        // toglie. Vedi [systemBars].
+        val bars = systemBars()
+        Column(
+            Modifier.padding(top = bars.top, bottom = bars.bottom)
+                .fillMaxWidth().height(bars.usable)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // The clock: an outer arc that drains to the next look, an inner
                 // arc to the next hunt, and the dot in the middle that breathes
@@ -272,32 +282,6 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                     }
                 }
                 Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp) }
-            }
-            // Una riga sua, non spalla a spalla col titolo.
-            //
-            // Stretto fra la frase e la croce si prendeva la larghezza che
-            // serviva al testo, che andava a capo sotto di lui, e le parentesi
-            // quadre finivano appiccicate alla parola. Il tasto che accende una
-            // macchina che spende da sola non e' un accessorio del titolo.
-            if (!cfg.on) {
-                val pulse by rememberInfiniteTransition(label = "arm").animateFloat(
-                    0.28f, 0.85f,
-                    infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Reverse),
-                    label = "armPulse",
-                )
-                Spacer(Modifier.height(10.dp))
-                Box(
-                    Modifier.fillMaxWidth().clip(rs(6)).background(Halo.mint.copy(alpha = 0.10f))
-                        .border(1.dp, Halo.mint.copy(alpha = pulse), rs(6))
-                        .clickable { onStart() }.padding(vertical = 11.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "[  " + stringResource(R.string.agent_start).uppercase() + "  ]",
-                        fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.5.sp,
-                        color = Halo.mint, style = Tabular,
-                    )
-                }
             }
             busy?.let { Working(it) }
             said?.let { Banner(it, Halo.amber, HIcon.INFO) }
@@ -426,6 +410,45 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                         }
                     }
                 }
+                // Il tasto che accende, appena sotto la riga in cui gli si parla.
+                //
+                // Era in cima, sopra tutto, con due terzi di schermo vuoto sotto. Poi
+                // inchiodato in fondo allo schermo, che e' peggio: da solo in mezzo al
+                // vuoto, lontano da tutto quello a cui si riferisce. Le due cose che si
+                // fanno qui sono chiedergli una cosa e accenderlo, e stanno una sotto
+                // l'altra a un dito di distanza.
+                if (!cfg.on) {
+                ArmBar(stringResource(R.string.agent_start)) { onStart() }
+            } else {
+                // Acceso, la barra non spariva: restava un piede vuoto.
+                //
+                // E mancavano le due cose che servono appena hai venduto. I tre
+                // tasti (vendi, compra ancora, vendine una e cercane un'altra)
+                // stanno **sulla riga della moneta**, quindi appena la riga
+                // sparisce non c'e' piu' niente: ne' un modo di dirgli "cerca
+                // adesso", ne' un modo di fermarlo. Restava aspettare fino a sei
+                // minuti davanti a uno schermo senza tasti.
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        ArmBar(stringResource(R.string.eyes_hunt_now)) {
+                            run(hunting) { TraderLoop.tick(ctx, mayHunt = true).summary }
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        stringResource(R.string.trader_stop_action),
+                        fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.5.sp,
+                        color = Halo.amber, style = Tabular,
+                        modifier = Modifier.clip(rs(6)).background(Halo.amber.copy(alpha = 0.10f))
+                            .border(1.dp, Halo.amber.copy(alpha = 0.45f), rs(6))
+                            .clickable {
+                                TraderLoop.stopSelf(ctx, ctx.getString(R.string.trader_stopped_by_you))
+                                TraderKeeper.sync(ctx); refresh++
+                            }
+                            .padding(horizontal = 14.dp, vertical = 16.dp),
+                    )
+                }
+            }
                 if (open.size > 1 && busy == null) {
                     GhostButton(stringResource(R.string.eyes_sell_all), Modifier.fillMaxWidth(), HIcon.SWAP, tint = Halo.amber) {
                         run(sellingLabel) {
@@ -461,12 +484,14 @@ private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
         AgentTrace.Kind.STEP -> Halo.muted
         AgentTrace.Kind.FOUND -> Halo.cyan
         AgentTrace.Kind.REFUSED -> Halo.red
+        AgentTrace.Kind.WARN -> Halo.amber
         AgentTrace.Kind.ACTED -> Halo.mint
     }
     val sigil = when (l.kind) {
         AgentTrace.Kind.STEP -> ">"
         AgentTrace.Kind.FOUND -> "+"
         AgentTrace.Kind.REFUSED -> "x"
+        AgentTrace.Kind.WARN -> "!"
         AgentTrace.Kind.ACTED -> "$"
     }
     val shown = remember(l) { Animatable(if (last) 0f else 1f) }
@@ -510,4 +535,122 @@ private fun Caret() {
         0f, 1f, infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse), label = "blink",
     )
     Box(Modifier.padding(start = 66.dp).width(8.dp).height(13.dp).background(Halo.mint.copy(alpha = blink)))
+}
+
+/**
+ * L'interruttore di accensione, in fondo e per tutta la riga.
+ *
+ * Questa pagina e' l'unica dell'app che sta a guardare una macchina mentre
+ * lavora, e il suo linguaggio e' gia' quello: monospaziato, righe con un segno
+ * davanti, un anello che pulsa. Il tasto per accenderla era un rettangolo con
+ * un bordo che respira, cioe' un bottone qualunque con le parentesi intorno.
+ *
+ * Adesso e' un quadro strumenti: quattro angoli invece di una cornice chiusa,
+ * una luce che scorre da sinistra a destra come una scansione, e la parola in
+ * mezzo con le lettere larghe. Gli angoli sono la differenza che si legge senza
+ * accorgersene: una cornice intera e' un bottone, quattro angoli sono una cosa
+ * **inquadrata**, cioe' una macchina che sta per partire.
+ *
+ * Niente di piu'. Un colore solo, quello del tema, e nessun bagliore addosso al
+ * testo: la pagina sotto e' fatta di numeri, e se il tasto brilla piu' dei
+ * numeri la pagina l'ha persa.
+ */
+@Composable
+private fun ArmBar(label: String, onStart: () -> Unit) {
+    val anim = rememberInfiniteTransition(label = "arm")
+    val sweep by anim.animateFloat(
+        -0.25f, 1.25f,
+        infiniteRepeatable(tween(2600, easing = LinearEasing)),
+        label = "sweep",
+    )
+    val pulse by anim.animateFloat(
+        0.34f, 0.9f,
+        infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Reverse),
+        label = "armPulse",
+    )
+    Box(
+        Modifier.fillMaxWidth().height(52.dp).clip(rs(6)).clickable { onStart() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            val w = size.width
+            val h = size.height
+            drawRect(Halo.mint.copy(alpha = 0.07f))
+            // La scansione: una banda tenue che attraversa e riparte. E' quello
+            // che fa capire, senza scriverlo, che la macchina e' pronta e ferma.
+            val x = w * sweep
+            drawRect(
+                Brush.horizontalGradient(
+                    listOf(androidx.compose.ui.graphics.Color.Transparent, Halo.mint.copy(alpha = 0.20f), androidx.compose.ui.graphics.Color.Transparent),
+                    startX = x - w * 0.22f, endX = x + w * 0.22f,
+                ),
+            )
+            val k = 15.dp.toPx()
+            val sw = 1.7.dp.toPx()
+            val i = sw / 2f
+            val c = Halo.mint.copy(alpha = pulse)
+            fun corner(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) {
+                drawLine(c, androidx.compose.ui.geometry.Offset(x1, y1), androidx.compose.ui.geometry.Offset(x2, y2), sw)
+                drawLine(c, androidx.compose.ui.geometry.Offset(x2, y2), androidx.compose.ui.geometry.Offset(x3, y3), sw)
+            }
+            corner(i, i + k, i, i, i + k, i)
+            corner(w - i - k, i, w - i, i, w - i, i + k)
+            corner(w - i, h - i - k, w - i, h - i, w - i - k, h - i)
+            corner(i + k, h - i, i, h - i, i, h - i - k)
+        }
+        Text(
+            label.uppercase(),
+            fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+            color = Halo.mint, style = Tabular, letterSpacing = 4.sp,
+        )
+    }
+}
+
+/** Le due barre di sistema e quello che resta in mezzo. Vedi [systemBars]. */
+private data class Bars(
+    val top: androidx.compose.ui.unit.Dp,
+    val bottom: androidx.compose.ui.unit.Dp,
+    val usable: androidx.compose.ui.unit.Dp,
+)
+
+/**
+ * Quanto si prendono le barre di sistema, e quanto schermo resta.
+ *
+ * Questa pagina vive dentro un `Dialog`, e li' dentro le cose normali non
+ * funzionano, per tre motivi che si sommavano. Tutti e tre finivano nello
+ * stesso punto: il tasto di accensione in fondo, tagliato a meta' dal bordo.
+ *
+ *  * `navigationBarsPadding()` vale **zero** dentro un Dialog. Due schermate
+ *    prese prima e dopo averlo aggiunto avevano il tasto sulla stessa identica
+ *    riga di pixel;
+ *  * il primo conto fatto a mano tornava zero lo stesso, perche' li' dentro
+ *    `LocalContext` non e' l'Activity ma un involucro e il cast falliva in
+ *    silenzio. Il difetto peggiore di un numero e' tornare zero invece di
+ *    rompersi;
+ *  * e anche con i numeri giusti, un margine qui **sposta in giu' senza
+ *    accorciare**: la colonna si prendeva comunque tutta l'altezza della
+ *    finestra, e usciva sotto di quanto l'avevi spostata.
+ *
+ * Quindi niente margini che dovrebbero accorciare: si misura la finestra vera,
+ * si tolgono le due barre, e l'altezza che resta si da' alla colonna come
+ * numero. Un'altezza esatta non la sposta nessuno.
+ */
+@Composable
+private fun systemBars(): Bars {
+    val ctx = LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    return remember(view) {
+        var c: android.content.Context? = ctx
+        while (c != null && c !is android.app.Activity) c = (c as? android.content.ContextWrapper)?.baseContext
+        val decor = (c as? android.app.Activity)?.window?.decorView
+        val insets = decor?.rootWindowInsets?.let {
+            androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(it)
+                .getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+        val top = insets?.top ?: 0
+        val bottom = insets?.bottom ?: 0
+        val tall = decor?.height?.takeIf { it > 0 } ?: ctx.resources.displayMetrics.heightPixels
+        with(density) { Bars(top.toDp(), bottom.toDp(), (tall - top - bottom).coerceAtLeast(0).toDp()) }
+    }
 }

@@ -271,4 +271,53 @@ class MarketScanTest {
         assertEquals(10.0, momentumBlend(c)!!, 0.001, "one window present means that window")
         assertNull(momentumBlend(healthy().copy(s1h = null, s6h = null, s24h = null)))
     }
+    // ---- beatsBase: conviene comprare, o tenere la base? --------------------
+
+    /**
+     * Il caso vero del 18/09/2026: SOL faceva +10,4% e la paghetta perdeva il
+     * 5,1% comprando monete piccole. Una moneta che fa meno della base non e'
+     * un affare, e' lo stesso affare con piu' modi di finire male.
+     */
+    @Test
+    fun aCoinThatLagsTheBaseIsNotWorthBuying() {
+        val c = healthy().copy(s24h = ScanWindow(priceChange = 2.0))
+        val why = beatsBase(c, baseChange24hPct = 10.4)
+        assertNotNull(why)
+        assertTrue(why.contains("+10.4%"), why)
+        assertTrue(why.contains("+2%"), why)
+    }
+
+    @Test
+    fun aCoinThatBeatsTheBaseByTheMarginPasses() {
+        val c = healthy().copy(s24h = ScanWindow(priceChange = 14.0))
+        assertNull(beatsBase(c, baseChange24hPct = 10.4))
+    }
+
+    /** Il margine esiste: pareggiare con la base non basta. */
+    @Test
+    fun matchingTheBaseIsNotEnough() {
+        val c = healthy().copy(s24h = ScanWindow(priceChange = 10.4))
+        assertNotNull(beatsBase(c, baseChange24hPct = 10.4))
+        assertNull(beatsBase(c, baseChange24hPct = 10.4, marginPct = 0.0))
+    }
+
+    /**
+     * La regola della casa, e quella che si rompe per prima quando qualcuno
+     * tocca questo file: **quello che non si sa non blocca mai**. Senza il dato
+     * della base, o senza la finestra a 24 ore della moneta, si passa.
+     */
+    @Test
+    fun missingDataNeverBlocks() {
+        val c = healthy().copy(s24h = ScanWindow(priceChange = -30.0))
+        assertNull(beatsBase(c, baseChange24hPct = null))
+        val blind = healthy().copy(s24h = null)
+        assertNull(beatsBase(blind, baseChange24hPct = 10.4))
+    }
+
+    /** Con la base in rosso, una moneta che scende meno resta comprabile. */
+    @Test
+    fun whenTheBaseFallsACoinThatFallsLessStillPasses() {
+        val c = healthy().copy(s24h = ScanWindow(priceChange = -1.0))
+        assertNull(beatsBase(c, baseChange24hPct = -8.0))
+    }
 }

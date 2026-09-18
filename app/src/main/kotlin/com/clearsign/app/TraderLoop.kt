@@ -353,6 +353,26 @@ object TraderLoop {
         val open = Positions.open(ctx)
         if (open.size >= cfg.maxPositions) return finish(Tick("full", acted = false))
 
+        // Il cancello che c'era gia' e non era montato.
+        //
+        // `MarketMood` legge tre fonti gratuite e si descrive da solo cosi':
+        // "useful as a gate — do not go hunting while everything is bleeding —
+        // and useless as a forecast". Scritto, documentato, e chiamato **solo**
+        // da uno strumento della chat, perche' il modello ne parlasse. Il ciclo
+        // non lo importava nemmeno.
+        //
+        // Sta qui e non piu' in basso perche' riguarda la caccia e nient'altro:
+        // le uscite sono gia' passate, e una posizione aperta va guardata anche
+        // mentre il mondo brucia. E se la lettura non arriva si va a caccia lo
+        // stesso: quello che non si sa non blocca mai.
+        val mood = withContext(Dispatchers.IO) { runCatching { MarketMood.read() }.getOrNull() }
+        if (mood != null && !mood.riskOn) {
+            val said = ctx.getString(R.string.trader_mood_red)
+            AgentTrace.say(said, AgentTrace.Kind.WARN)
+            note(ctx, said)
+            return finish(Tick(said, acted = false))
+        }
+
         val rpc = SolanaRpc.urlFor(null)
         val balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(rpc, s.pubkey) }.getOrNull() } ?: 0L
         if (balance < slice + FEE * 4) return finish(Tick("no room", acted = false))
@@ -632,8 +652,33 @@ object TraderLoop {
         scan.rejected.maxByOrNull { it.value }?.let { (why, n) ->
             if (picks.isEmpty()) AgentTrace.say(ctx.getString(R.string.trace_rejected, n, why), AgentTrace.Kind.REFUSED)
         }
+        // Quanto fa la base oggi. Una chiamata sola, prima del ciclo.
+        //
+        // La domanda giusta non e' "questa moneta batte SOL", e' **nessuna di
+        // queste cinque batte SOL**: la prima si risponde cinque volte, la
+        // seconda una. Il numero e' gia' in casa comunque, perche' il controllo
+        // dello spread qui sotto chiede gia' il prezzo di SOL e di `change24h`
+        // non se ne faceva niente.
+        val baseMove = withContext(Dispatchers.IO) {
+            runCatching { Prices.quotes(listOf(com.clearsign.core.NATIVE_SOL_MINT))[com.clearsign.core.NATIVE_SOL_MINT]?.change24h }.getOrNull()
+        }
+        var baseBeat: String? = null
         for (pick in picks) {
             val t = pick.c
+            // Comprare o tenere quello che hai gia'.
+            //
+            // Il ciclo sapeva rispondere a "questa e' una trappola?" e a "quale
+            // delle cinque e' la migliore?", e non alla terza domanda, che e'
+            // quella che conta nelle giornate in cui sale tutto. Il 18/09/2026:
+            // paghetta a meno cinque virgola uno per cento mentre SOL faceva
+            // piu' dieci virgola quattro, e le commissioni erano lo zero virgola
+            // nove per cento della perdita. Non erano i costi: erano le monete.
+            val lagsBase = com.clearsign.core.beatsBase(t, baseMove)
+            if (lagsBase != null) {
+                baseBeat = lagsBase
+                AgentTrace.say(lagsBase, AgentTrace.Kind.WARN)
+                continue
+            }
             // The scan says it is worth looking at. Before money moves, the other
             // question: can this be sold back at all.
             AgentTrace.say(ctx.getString(R.string.trace_looking, t.symbol), AgentTrace.Kind.FOUND)
@@ -791,7 +836,21 @@ object TraderLoop {
                 shadow("collar")
                 AgentTrace.say(ctx.getString(R.string.trace_asked, t.symbol), AgentTrace.Kind.REFUSED)
                 val m = when (v.rule) {
-                    "daily" -> ctx.getString(R.string.trader_daily_full, fmtSol(p.dailyLamports, 4))
+                    // Il tetto del giorno, detto in modo che si possa fare
+                    // qualcosa. Diceva solo "e' esaurito, alzalo nelle regole",
+                    // e quando il tetto e' gia' tutta la paghetta non c'e'
+                    // niente da alzare: era un consiglio impossibile davanti a
+                    // un cursore gia' al massimo. Adesso dice quanto ne resta,
+                    // a che ora si libera, e manda ad alzarlo solo se si puo'.
+                    "daily" -> {
+                        val left = (p.dailyLamports - SessionWallet.history(ctx).spentLast24hLamports).coerceAtLeast(0L)
+                        val free = SessionWallet.freesAt(ctx)?.let { at ->
+                            java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(at))
+                        } ?: "—"
+                        val cap = SessionWallet.current(ctx)?.capLamports ?: 0L
+                        if (p.dailyLamports >= cap) ctx.getString(R.string.trader_daily_full_max, fmtSol(p.dailyLamports, 4), fmtSol(left, 4), free)
+                        else ctx.getString(R.string.trader_daily_full, fmtSol(p.dailyLamports, 4), fmtSol(left, 4), free)
+                    }
                     "per_tx" -> ctx.getString(R.string.trader_per_tx_full, fmtSol(slice, 4), fmtSol(p.perTxLamports, 4))
                     "silent_threshold" -> ctx.getString(R.string.trader_above_silent, fmtSol(slice, 4), fmtSol(p.askAboveLamports, 4))
                     null -> ctx.getString(R.string.trader_too_small_why, fmtSol(slice, 4), fmtSol(ATA_RENT, 4))
@@ -846,6 +905,14 @@ object TraderLoop {
                 }
             }
             return Tick("waiting on you", acted = false)
+        }
+        // Nessuna delle cinque batteva quello che hai gia' in mano. Non e' un
+        // fallimento della caccia, e' una risposta: e va detta, se no la scheda
+        // resta ferma sull'ultimo acquisto e sembra che non sia successo niente.
+        baseBeat?.let {
+            val said = ctx.getString(R.string.trader_base_wins, String.format(java.util.Locale.ROOT, "%+.1f%%", baseMove ?: 0.0))
+            note(ctx, said)
+            return Tick(said, acted = false)
         }
         return Tick("nothing passed", acted = false)
     }
@@ -909,7 +976,7 @@ object TraderLoop {
             // is 3.60 dollars, and its target 4.68, both under the floor.
             JupiterTrigger.Placed.TooSmall -> {
                 Positions.note(ctx, mint, ctx.getString(R.string.trader_no_onchain_small))
-                AgentTrace.say(ctx.getString(R.string.trader_no_onchain_small), AgentTrace.Kind.REFUSED)
+                AgentTrace.say(ctx.getString(R.string.trader_no_onchain_small), AgentTrace.Kind.WARN)
             }
             // Qualsiasi altro no, detto. Era `else -> Unit`: l'app aveva appena
             // promesso un ordine in catena e poi taceva, e la posizione restava
@@ -919,12 +986,12 @@ object TraderLoop {
             is JupiterTrigger.Placed.Failed -> {
                 val why = ctx.getString(R.string.trader_no_onchain_why, r.reason)
                 Positions.note(ctx, mint, why)
-                AgentTrace.say(why, AgentTrace.Kind.REFUSED)
+                AgentTrace.say(why, AgentTrace.Kind.WARN)
             }
             null -> {
                 val why = ctx.getString(R.string.trader_no_onchain_why, "?")
                 Positions.note(ctx, mint, why)
-                AgentTrace.say(why, AgentTrace.Kind.REFUSED)
+                AgentTrace.say(why, AgentTrace.Kind.WARN)
             }
         }
     }

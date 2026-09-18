@@ -24,7 +24,20 @@ import androidx.compose.runtime.mutableStateOf
 object AgentTrace {
     private const val MAX = 60
 
-    enum class Kind { STEP, FOUND, REFUSED, ACTED }
+    /**
+     * Che riga e'.
+     *
+     * `REFUSED` e' rosso con la ics, ed e' giusto cosi': vuol dire che qualcosa
+     * e' stato **fermato**. Ma ci finiva dentro anche "non sono riuscito a
+     * mettere l'ordine su Jupiter", che non e' un rifiuto e non e' un pericolo:
+     * e' una cosa che non si puo' fare e che cambia chi tiene d'occhio la
+     * posizione. Letta in rosso con la ics, subito dopo un acquisto, sembra che
+     * la moneta appena comprata sia esplosa.
+     *
+     * `WARN` e' ambra col punto esclamativo: guarda, sappilo, ma non e' andato
+     * storto niente.
+     */
+    enum class Kind { STEP, FOUND, REFUSED, WARN, ACTED }
 
     data class Line(val at: Long, val text: String, val kind: Kind)
 

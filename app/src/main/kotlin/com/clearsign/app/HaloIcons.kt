@@ -68,6 +68,8 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
     fun dot(cx: Float, cy: Float, r: Float = 1.3f) = circle(cx, cy, r, fill = true)
     fun arc(cx: Float, cy: Float, r: Float, start: Float, sweep: Float) =
         s.drawArc(tint, start, sweep, false, p(cx - r, cy - r), Size(2 * r * u, 2 * r * u), style = stroke)
+    /** Lo stesso disegno in un altro colore. Solo per le pochissime icone che ne vogliono due. */
+    fun two(c: Color, body: G.() -> Unit) = G(s, u, c, sw).body()
     fun poly(vararg pts: Float, close: Boolean = false, fill: Boolean = false) = path(fill, close) {
         moveTo(pts[0], pts[1]); var i = 2; while (i < pts.size) { lineTo(pts[i], pts[i + 1]); i += 2 }
     }
@@ -276,11 +278,28 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 path { moveTo(9f, 16.6f); quadTo(12f, 18.2f, 15f, 16.6f) }
             }
             HIcon.BRIDGE -> {
-                path { moveTo(3f, 17f); lineTo(21f, 17f) }
-                path { moveTo(4.5f, 17f); quadTo(12f, 5f, 19.5f, 17f) }
-                path { moveTo(8f, 17f); lineTo(8f, 12.2f) }
-                path { moveTo(12f, 17f); lineTo(12f, 10.4f) }
-                path { moveTo(16f, 17f); lineTo(16f, 12.2f) }
+                // Era un ponte: arcata, piloni e strada. Disegnava la parola, non
+                // la cosa. A ventiquattro punti si legge "ponte sul fiume", e
+                // quello che succede qui e' che dei soldi passano su un'altra
+                // catena e qualcosa torna indietro.
+                //
+                // Due archi e due punte: uno va di la', l'altro e' quello che
+                // torna.
+                //
+                // Erano di due colori, ciano e ambra. Ma sulla prima pagina i
+                // cerchi sono otto e sono neutri **apposta**: se uno solo si
+                // accende, l'accento smette di voler dire "questa e' l'azione" e
+                // torna a essere decorazione. Un'icona che urla in mezzo a sette
+                // che parlano piano non si legge meglio, si legge storta.
+                //
+                // Le due direzioni si distinguono lo stesso, dentro la stessa
+                // tinta: quella che torna e' piu' spenta.
+                path { moveTo(4.5f, 12f); quadTo(12f, 3.8f, 19.5f, 12f) }
+                poly(16.1f, 10.8f, 19.5f, 12f, 18.6f, 8.5f)
+                two(tint.copy(alpha = 0.5f)) {
+                    path { moveTo(19.5f, 13.4f); quadTo(12f, 21.6f, 4.5f, 13.4f) }
+                    poly(7.9f, 14.6f, 4.5f, 13.4f, 5.4f, 16.9f)
+                }
             }
             HIcon.GEM -> {
                 path(fill = true) { moveTo(12f, 2.5f); lineTo(21.5f, 12f); lineTo(12f, 21.5f); lineTo(2.5f, 12f); close() }

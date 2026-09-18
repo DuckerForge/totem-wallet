@@ -150,7 +150,15 @@ object Settings {
         homeActionsTick.value++
     }
     val homeActionsTick = mutableStateOf(0)
-    val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "LINK", "AGENT")
+    // Il ponte al posto del link.
+    //
+    // Il link e' il modo di **chiedere** soldi a qualcuno, e si usa quando c'e'
+    // qualcuno dall'altra parte: e' una cosa che capita, non una cosa che fai.
+    // Il ponte lo fai da solo, ed e' l'unico modo che questo portafoglio ha di
+    // portare i soldi fuori da Solana. Chi lo vuole indietro lo rimette da
+    // Personalizza: sono le stesse nove, cambia solo quale sta sulla prima
+    // pagina.
+    val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "BRIDGE", "AGENT")
 
     /**
      * A hand over the screen (the proximity sensor) covers the numbers. **Off by default.**

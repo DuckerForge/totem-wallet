@@ -350,7 +350,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onGift: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -364,6 +364,12 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             Text(stringResource(R.string.home_act_more), style = HaloType.title, color = Halo.ink)
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
+            // Mandare soldi con un link non stava qui dentro, perche' stava
+            // sempre sulla prima pagina. Quando il ponte ha preso il suo posto e'
+            // rimasto raggiungibile solo dal Manda e da Personalizza, cioe' per
+            // chi sapeva gia' dov'era. Una cosa che esce dalla prima pagina deve
+            // entrare in questa lista nello stesso momento.
+            MoreRow(HIcon.GIFT, stringResource(R.string.gift_title), onGift)
             MoreRow(HIcon.SPARK, stringResource(R.string.blink_open), onLink)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)

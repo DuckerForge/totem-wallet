@@ -69,6 +69,10 @@ object TraderLoop {
      */
     fun breath(ctx: Context): Long = if (Positions.open(ctx).isEmpty()) HUNT_EVERY_MS else EXIT_EVERY_MS
 
+    /** Ogni quanti giri si confronta il libro con la catena. Vedi `tickInner`. */
+    private const val RECONCILE_EVERY = 5
+    private var sinceReconcile = 0
+
     /**
      * What the person asked for, in one place.
      *
@@ -326,7 +330,20 @@ object TraderLoop {
 
         // The book is written from simulations, and the chain is what is. Put the
         // two side by side before a single decision is priced off the book.
-        val ghosts = reconcile(ctx, s.pubkey)
+        //
+        // Su un orologio piu' lento del giro, pero'. Costa due letture della
+        // catena e girava ogni novanta secondi, cioe' due terzi di tutto quello
+        // che un telefono con una posizione aperta chiede in un giorno, per
+        // scoprire un disallineamento che capita una volta ogni tanto.
+        //
+        // Rallentarlo e' sicuro per due ragioni misurate, non sperate. Una
+        // vendita legge il borsello **fresco per conto suo** (`heldRaw` con
+        // `force`), quindi non decide mai su un libro vecchio. E una riga
+        // fantasma, cioe' una moneta che il libro ha e il borsello no, e' gia'
+        // gestita qui sotto senza contarla come fallimento: costa una lettura a
+        // vuoto per qualche giro, finche' la riconciliazione non passa e la
+        // toglie.
+        val ghosts = if (sinceReconcile++ % RECONCILE_EVERY == 0) reconcile(ctx, s.pubkey) else null
 
         // The shadow book moves with the same market, on its own slower clock.
         // Nothing here signs: it is a notebook that costs one quote per open row.

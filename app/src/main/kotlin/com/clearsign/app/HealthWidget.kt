@@ -268,7 +268,21 @@ class HealthWidgetReceiver : GlanceAppWidgetReceiver() {
 /** Cached widget values and the refresh that fills them. */
 object HealthWidgetData {
     private const val PREFS = "clearsign_widget"
-    private const val STALE_MS = 15 * 60_000L
+
+    /**
+     * Quando la foto e' troppo vecchia per ridisegnarla e si va sulla catena.
+     *
+     * Erano quindici minuti, e il widget si sveglia ogni mezz'ora: quindi ogni
+     * risveglio trovava la foto scaduta e rileggeva tutto, una decina di
+     * chiamate, quarantotto volte al giorno. Erano piu' chiamate di un agente
+     * acceso a mani vuote, e le faceva anche chi l'agente non l'ha mai toccato.
+     *
+     * Due ore, perche' questa foto non e' uno strumento per operare: e' un numero
+     * da guardare di sfuggita sulla schermata home. E resta fresca lo stesso
+     * quando conta, perche' si rilegge da sola all'apertura dell'app, dopo ogni
+     * operazione dell'agente, e a ogni giro della torre di guardia.
+     */
+    private const val STALE_MS = 2 * 3600_000L
 
     data class Snapshot(
         val score: Int,

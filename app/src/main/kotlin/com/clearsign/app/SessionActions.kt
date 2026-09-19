@@ -74,10 +74,18 @@ object SessionActions {
      * The loop needs this before it believes its own book, and the panel needs it
      * before it offers a button that sells something.
      */
-    suspend fun heldRaw(ctx: Context, owner: String): Map<String, Long>? = withContext(Dispatchers.IO) {
+    /**
+     * [force] quando il numero deve essere quello di adesso e non di un minuto
+     * fa: una vendita scambia esattamente le unita' che legge qui, e una lettura
+     * vecchia che dice piu' di quello che c'e' fa fallire lo scambio sulla
+     * catena. Per riconciliare il libro invece va benissimo quella di un minuto
+     * fa, ed e' li' che la cache fa risparmiare una lettura doppia nello stesso
+     * giro.
+     */
+    suspend fun heldRaw(ctx: Context, owner: String, force: Boolean = false): Map<String, Long>? = withContext(Dispatchers.IO) {
         // Null when the chain did not answer, never an empty map: the loop treats
         // an empty map as "the coins are gone", and a rate-limited node is not that.
-        runCatching { SolanaRpc.tokensOf(SolanaRpc.urlFor(null), owner) }
+        runCatching { SolanaRpc.tokensOf(SolanaRpc.urlFor(null), owner, force) }
             .getOrNull()
             ?.filter { it.amount > 0 }
             ?.associate { it.mint to it.amount }
@@ -172,7 +180,7 @@ object SessionActions {
         acceptReal: Boolean = false,
     ): Sale {
         val s = SessionWallet.current(ctx) ?: return Sale.Nothing
-        val held = heldRaw(ctx, s.pubkey) ?: return Sale.Unreachable
+        val held = heldRaw(ctx, s.pubkey, force = true) ?: return Sale.Unreachable
         val raw = held[pos.mint] ?: return Sale.Nothing
         if (raw <= 0L) return Sale.Nothing
         // Wider slippage on the way out than on the way in: a stop that does not
@@ -217,7 +225,7 @@ object SessionActions {
     /* What the whole holding would fetch in lamports right now, or null. */
     suspend fun quoteValue(ctx: Context, pos: Positions.Position): Long? {
         val s = SessionWallet.current(ctx) ?: return null
-        val raw = heldRaw(ctx, s.pubkey)?.get(pos.mint) ?: return null
+        val raw = heldRaw(ctx, s.pubkey, force = true)?.get(pos.mint) ?: return null
         if (raw <= 0L) return null
         return withContext(Dispatchers.IO) {
             runCatching { Jupiter.quote(pos.mint, Jupiter.SOL_MINT, raw, feeBps = 0) }.getOrNull()?.outAmount

@@ -52,8 +52,10 @@ class AgentPolicyTest {
         stats = stats(*programs),
     )
 
-    private fun decide(r: Receipt, p: AgentPolicy = policy, g: Risk = ok, h: SpendHistory = quiet, vault: String? = null, writable: Set<String> = emptySet()) =
-        PolicyEngine.decide(p, r, g, h, price, now, "en", vault, writable)
+    private fun decide(
+        r: Receipt, p: AgentPolicy = policy, g: Risk = ok, h: SpendHistory = quiet,
+        vault: String? = null, writable: Set<String> = emptySet(), ours: Boolean = false,
+    ) = PolicyEngine.decide(p, r, g, h, price, now, "en", vault, writable, ours)
 
     @Test fun smallTransferToContactIsSilent() {
         assertEquals(Decision.Auto, decide(transferTo(luca, 0.01)))
@@ -308,6 +310,55 @@ class AgentPolicyTest {
         // No exchange program: the destination list applies, and the pool "authority" is a stranger.
         val d = decide(swap(0.01, usdc, "USDC", 0.0001, AgentPolicy.SYSTEM, AgentPolicy.TOKEN))
         assertTrue(d is Decision.Refuse && d.code == "destination", d.toString())
+    }
+
+    // ---- la rotta la scegliamo noi -------------------------------------------
+    //
+    // Ultra non passa sempre dallo stesso programma: certe volte la vendita la
+    // riempie un market maker e nella transazione non c'e' nessun aggregatore,
+    // solo dei trasferimenti di token verso un indirizzo che nessuna lista di
+    // destinatari potra' mai contenere. Da byte di un agente questo resta un
+    // trasferimento e si rifiuta. Da una rotta nostra e' una vendita, e va
+    // firmata: e' lo stesso colpo che deve sparare uno stop loss.
+
+    /** Una vendita riempita da un market maker: niente aggregatore fra i programmi. */
+    private val maker = "MakerXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    private val unknownProgram = "RfqProgramXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    private fun rfqSale(solBack: Double, usdcOut: Double = 1.0) = Receipt(
+        primaryRecipient = maker, recipientLabel = null, recipientTrust = TrustLevel.NEW,
+        outflows = listOf(d(env, usdc, "USDC", 6, -usdcOut)),
+        inflows = listOf(d(env, NATIVE_SOL_MINT, "SOL", 9, solBack)),
+        feeLamports = 5_000, risks = emptyList(),
+        distributions = listOf(RecipientShare(maker, null, TrustLevel.NEW, d(maker, usdc, "USDC", 6, usdcOut), 1.0)),
+        stats = stats(AgentPolicy.COMPUTE_BUDGET, AgentPolicy.TOKEN, unknownProgram),
+    )
+
+    @Test fun aSaleWeRoutedOurselvesIsSigned() {
+        assertEquals(Decision.Auto, decide(rfqSale(0.01), ours = true))
+    }
+
+    @Test fun theSameBytesFromAnAgentAreStillRefused() {
+        val d = decide(rfqSale(0.01))
+        assertTrue(d is Decision.Refuse && d.code == "destination", d.toString())
+    }
+
+    @Test fun ourRouteDoesNotExcuseATransferWearingASwapsClothes() {
+        // Un pulviscolo di ritorno passa la forma e cade sulla misura: la regola
+        // dieci confronta quanto esce con quanto rientra, ed e' quella che
+        // proteggeva i soldi anche prima.
+        val d = decide(rfqSale(0.000001), ours = true)
+        assertTrue(d is Decision.Refuse && d.code == "rate_quality", d.toString())
+    }
+
+    @Test fun ourRouteDoesNotExcuseTheRestOfTheCollar() {
+        // Il conto principale resta intoccabile, e i pericoli restano pericoli.
+        val d = decide(rfqSale(0.01), g = lie, ours = true)
+        assertTrue(d is Decision.Refuse && d.code == "intent_mismatch", d.toString())
+    }
+
+    @Test fun ourSaleDoesNotSpendTheDay() {
+        assertTrue(staysInPocket(rfqSale(0.01), policy, routeIsOurs = true))
+        assertFalse(staysInPocket(rfqSale(0.01), policy))
     }
 
     @Test fun italianReasonsReadNaturally() {

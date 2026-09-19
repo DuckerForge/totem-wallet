@@ -772,6 +772,7 @@
     <string name="agent_last_expired">No answer in time: %1$s</string>
     <string name="agent_notif_refused">Velum refused an agent request</string>
     <string name="agent_notif_signed">The agent acted inside the budget</string>
+    <string name="agent_notif_sold">Sold, and the value is back in the budget</string>
     <string name="agent_notif_ask">The agent asks: %1$s</string>
     <string name="agent_ask_timeout">nobody answered before the request expired</string>
     <string name="agent_declined">declined by the user</string>
@@ -1653,6 +1654,10 @@
     <string name="companion_agent_line">%1$d in play</string>
     <string name="companion_health_line">Health %1$d</string>
     <string name="send_memo_line">Memo in the transaction: %1$s</string>
+    <string name="rpc_title">Your own Solana node</string>
+    <string name="rpc_sub">Where this phone reads the chain</string>
+    <string name="rpc_hint">https://…  (empty = the one that ships with the app)</string>
+    <string name="rpc_note">The app ships with a shared node. With the agent running, one phone makes a few thousand calls a day, so a busy wallet is better off with its own: Helius, QuickNode and Alchemy all give a free key. Nothing else changes, and the key never leaves this phone.</string>
     <string name="speed_title">Speed of what you send</string>
     <string name="speed_sub">A priority fee on transfers, orders and closes we build ourselves.</string>
     <string name="speed_normal">Normal</string>

@@ -104,29 +104,63 @@ sealed class Decision(val code: String) {
  * agente. Misurato il 17/09: comprato, rivenduto con i soldi tornati indietro, e
  * le due compere successive fermate dal tetto.
  *
- * La condizione e' la stessa che rende uno scambio uno scambio, ed e' per questo
- * che l'esenzione non si puo' sfruttare: serve che la rotta sia passata da un
- * programma di scambio **ammesso** e che sia tornata indietro una moneta diversa
- * nello stesso borsello. Un trasferimento travestito da scambio non arriva
- * nemmeno qui: lo ferma prima la regola cinque.
+ * La condizione e' la stessa che rende uno scambio uno scambio ([isExchange]), ed
+ * e' per questo che l'esenzione non si puo' sfruttare: serve che sia tornata
+ * indietro una moneta diversa nello stesso borsello. Un trasferimento travestito
+ * da scambio non arriva nemmeno qui: lo ferma prima la regola cinque, o la dieci
+ * quando la rotta e' nostra.
  *
  * Quello che questo **non** esenta: un trasferimento fuori, una spesa che non
  * torna, e il tetto per singola operazione, che resta intero. Cambia solo la
  * somma della giornata.
  */
-fun staysInPocket(receipt: Receipt, policy: AgentPolicy): Boolean {
-    val programs = receipt.stats?.programs.orEmpty()
-    val exchange = programs.any { p -> p in AgentPolicy.EXCHANGE_PROGRAMS && p in policy.allowedPrograms }
-    if (!exchange) return false
+fun staysInPocket(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean = false): Boolean {
+    if (!isExchange(receipt, policy, routeIsOurs)) return false
     val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
     val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
     if (outs.isEmpty() || ins.isEmpty()) return false
     return ins.any { d -> outs.none { o -> o.mint == d.mint } }
 }
 
-object PolicyEngine {
-    private val EXCHANGE_PROGRAMS get() = AgentPolicy.EXCHANGE_PROGRAMS
+/**
+ * Uno scambio, e non un pagamento.
+ *
+ * Due modi di saperlo, e il secondo esiste perche' il primo da' una risposta
+ * sbagliata a una vendita vera. Il primo e' il nome del programma: se passa da
+ * uno scambio in lista e' uno scambio, e questo vale per dei byte che arrivano
+ * da un agente, di cui non si sa niente.
+ *
+ * Il secondo e' per i byte che **abbiamo chiesto noi**: la rotta la scegliamo
+ * qui dentro, il taker e' questa paghetta, e la risposta viene da Jupiter. Ultra
+ * pero' non passa sempre dallo stesso programma — a volte la riempie un market
+ * maker, e in quel caso nella transazione non c'e' nessun aggregatore, solo dei
+ * trasferimenti di token — e allora la regola cinque guardava l'indirizzo che
+ * incassa, non lo trovava in nessuna lista (una piscina o un market maker non ci
+ * possono stare) e rifiutava. Misurato il 19/09: premuto «vendi ora» su una
+ * posizione in guadagno, «non e' fra i destinatari ammessi», e al secondo tocco
+ * la stessa vendita e' passata perche' la rotta era cambiata. Una vendita che
+ * riesce a tentativi non e' un collare, e' un dado: e' la cosa peggiore che
+ * possa capitare a uno stop loss.
+ *
+ * Quando la rotta e' nostra allora, la forma la **misuriamo**: qualcosa esce e
+ * torna indietro una moneta diversa nello stesso borsello. Non e' un buco,
+ * perche' cio' che proteggeva davvero i soldi qui non era l'elenco dei
+ * programmi: e' la regola dieci, che confronta quanto esce con quanto rientra e
+ * rifiuta uno scambio che non restituisce almeno la meta'. Un trasferimento
+ * travestito da scambio, con un pulviscolo di un'altra moneta di ritorno, cade
+ * la' con un messaggio che dice il perche'. E il resto del collare non si muove
+ * di un passo: niente DANGER, il conto principale intoccabile, i tetti, il ritmo.
+ */
+internal fun isExchange(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean): Boolean {
+    val programs = receipt.stats?.programs.orEmpty()
+    if (programs.any { p -> p in AgentPolicy.EXCHANGE_PROGRAMS && p in policy.allowedPrograms }) return true
+    if (!routeIsOurs) return false
+    val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
+    val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
+    return outs.isNotEmpty() && ins.any { d -> outs.none { o -> o.mint == d.mint } }
+}
 
+object PolicyEngine {
     /**
      * Decide what to do with a transaction the agent submitted, given the
      * *simulated* receipt (never the agent's claim) and the intent check.
@@ -144,6 +178,12 @@ object PolicyEngine {
         vault: String? = null,
         /** Accounts this transaction can modify, from the decoded message. */
         writableKeys: Set<String> = emptySet(),
+        /**
+         * True quando questi byte vengono da una rotta chiesta da noi (Jupiter,
+         * con questa paghetta come taker) e non da un agente. Vedi [isExchange]:
+         * cambia solo come si riconosce uno scambio, non cosa gli e' permesso.
+         */
+        routeIsOurs: Boolean = false,
     ): Decision {
         val it = locale == "it"
 
@@ -155,7 +195,7 @@ object PolicyEngine {
         // What the transaction is, read once: the rules below all need it, and so
         // does the drain exemption immediately after.
         val programs = receipt.stats?.programs.orEmpty()
-        val exchange = programs.any { p -> p in EXCHANGE_PROGRAMS && p in policy.allowedPrograms }
+        val exchange = isExchange(receipt, policy, routeIsOurs)
         val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         /**
@@ -254,13 +294,23 @@ object PolicyEngine {
         }
 
         // 7. A program the collar has never seen.
-        programs.firstOrNull { p -> p !in policy.allowedPrograms }?.let { p ->
-            return Decision.Ask("program", if (it) "usa un programma non in lista: ${short(p)}" else "uses a program not on the list: ${short(p)}")
+        //
+        //    Salta su uno scambio costruito da noi, e per lo stesso motivo della
+        //    regola cinque: Ultra sceglie la rotta al momento, quindi i programmi
+        //    che ci passano non sono prevedibili e metterli in lista si potrebbe
+        //    fare solo tirando a indovinare degli id. Qui la domanda non e' «chi
+        //    ha firmato questo programma», e' «cosa succede ai soldi»: lo dicono
+        //    la regola due sui pericoli, la dieci sul cambio e i tetti. Vedi
+        //    [isExchange].
+        if (!(routeIsOurs && exchange)) {
+            programs.firstOrNull { p -> p !in policy.allowedPrograms }?.let { p ->
+                return Decision.Ask("program", if (it) "usa un programma non in lista: ${short(p)}" else "uses a program not on the list: ${short(p)}")
+            }
         }
 
         // 8. Is the agent coming home? A coin it holds, turned back into the money
         //    the budget is kept in, landing in the same pocket it left.
-        val unwind = isUnwind(policy, receipt)
+        val unwind = isUnwind(policy, receipt, routeIsOurs)
 
         // 9. Value. Nothing of unknown worth is signed silently. A coming home is
         //    the exception: what matters there is what arrives, and what arrives
@@ -335,17 +385,16 @@ object PolicyEngine {
      * rule can have. It also meant a stop-loss turning into a ninety-second wait
      * for a fingerprint that nobody was there to give.
      *
-     * Deliberately narrow: it must be a real exchange through an allowed program,
-     * nothing of the budget's base money may leave, and everything arriving must
-     * be base money. A swap into another coin is not a coming home, and neither is
+     * Deliberately narrow: it must be a real exchange ([isExchange]), nothing of
+     * the budget's base money may leave, and everything arriving must be base
+     * money. A swap into another coin is not a coming home, and neither is
      * a transfer wearing a swap's clothes.
      *
      * [receipt] is the *simulated* receipt, whose legs are already only the
      * budget's own, so this reads what will happen and never what was claimed.
      */
-    fun isUnwind(policy: AgentPolicy, receipt: Receipt): Boolean {
-        val programs = receipt.stats?.programs.orEmpty()
-        if (programs.none { p -> p in EXCHANGE_PROGRAMS && p in policy.allowedPrograms }) return false
+    fun isUnwind(policy: AgentPolicy, receipt: Receipt, routeIsOurs: Boolean = false): Boolean {
+        if (!isExchange(receipt, policy, routeIsOurs)) return false
         val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         if (outs.isEmpty() || ins.isEmpty()) return false

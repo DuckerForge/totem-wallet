@@ -128,9 +128,15 @@ object AgentBroker {
         // the writable set comes from the decoded message, not from the claim.
         val vault = Settings.watchWallet(ctx)
         val writable = SolanaTx.decode(job.tx)?.writableKeys?.toSet().orEmpty()
+        // Chi ha scelto la rotta. Un requestId di Ultra ce l'hanno solo i byte
+        // che abbiamo chiesto noi a Jupiter, per questa paghetta come taker:
+        // nessun link da fuori lo porta, e il collare lo usa per riconoscere uno
+        // scambio dalla forma invece che dal nome del programma, perche' Ultra
+        // cambia rotta a ogni chiamata. Vedi isExchange in AgentPolicy.
+        val routeIsOurs = job.ultraRequestId != null
         val decision = PolicyEngine.decide(
             policy, receipt, guard, SessionWallet.history(ctx), prices,
-            locale = locale, vault = vault, writableKeys = writable,
+            locale = locale, vault = vault, writableKeys = writable, routeIsOurs = routeIsOurs,
         )
         val what = IntentGuard.summary(intent, locale == "it")
         val effect = Effects.summary(receipt, locale)
@@ -165,16 +171,16 @@ object AgentBroker {
                 // move ceiling, so that ceiling is the honest worst case.
                 val legs = receipt.outflows.filter { it.rawAmount < 0 }.map { prices(it) }
                 val value = when {
-                    PolicyEngine.isUnwind(policy, receipt) -> 0L
+                    PolicyEngine.isUnwind(policy, receipt, routeIsOurs) -> 0L
                     legs.any { it == null } -> policy.perTxLamports
                     else -> legs.sumOf { it ?: 0L }
                 }
-                signAndSend(ctx, job, session.pubkey, receipt, value, what).explained()
+                signAndSend(ctx, job, session.pubkey, receipt, value, what, routeIsOurs).explained()
             }
         }
     }
 
-    private suspend fun signAndSend(ctx: Context, job: Job, envelope: String, receipt: Receipt, valueLamports: Long, what: String): Verdict {
+    private suspend fun signAndSend(ctx: Context, job: Job, envelope: String, receipt: Receipt, valueLamports: Long, what: String, routeIsOurs: Boolean): Verdict {
         val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(job.tx)) ?: return Verdict.Refused(ctx.getString(R.string.env_key_missing))
         val idx = SolanaTx.decode(job.tx)?.let { d -> d.staticAccountKeys.indexOf(envelope).takeIf { it in 0 until d.numRequiredSignatures } } ?: 0
         val signed = SolanaTx.attachSignature(job.tx, idx, sig)
@@ -200,7 +206,7 @@ object AgentBroker {
         // riporta: lamport col segno meno, e comunque una riga, perche' resta una
         // mossa. Vedi staysInPocket e recordSpend.
         val pol = SessionWallet.policy(ctx)
-        val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol)
+        val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol, routeIsOurs)
         SessionWallet.recordSpend(ctx, if (homeAgain) -valueLamports else valueLamports)
         // The book of what the agent is holding, and what it paid. Kept here and
         // not in the loop so a coin bought or sold from the chat is tracked too.
@@ -210,7 +216,11 @@ object AgentBroker {
         }
         record(ctx, receipt, envelope, job, "auto", txSig, true, null)
         AgentLink.noteAction(ctx, ctx.getString(R.string.agent_last_signed, what))
-        notify(ctx, ctx.getString(R.string.agent_notif_signed), what, txSig)
+        // «Ha speso dalla paghetta» era falso su una vendita, ed e' la meta' dei
+        // casi: una vendita non spende niente, riporta dei soldi dentro lo stesso
+        // borsello. Lo stesso avviso diceva quella frase sotto una vendita che
+        // aveva chiesto la persona, col dito sul pulsante.
+        notify(ctx, ctx.getString(if (homeAgain) R.string.agent_notif_sold else R.string.agent_notif_signed), what, txSig)
         runCatching { HealthWidgetData.refresh(ctx) }
         return Verdict.SignedSilently(txSig)
     }
@@ -227,6 +237,9 @@ object AgentBroker {
             .build()
         val open = Intent(ctx, AgentGateActivity::class.java).setData(uri)
             .putExtra("signer", "envelope").putExtra("job", job.id).putExtra("agent", job.agent).putExtra("why", why)
+            // Chi fa atterrare i byte, se la persona dice sì: una rotta di Ultra
+            // la spedisce Jupiter, non il nostro RPC. Vedi AgentGateActivity.
+            .putExtra("ultra", job.ultraRequestId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         if (job.source == Job.Source.LINK) {
             // From a background service starting an activity may be blocked, so the

@@ -89,6 +89,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
         }
 
         SettingsGroup(stringResource(R.string.set_g_adv), stringResource(R.string.set_g_adv_sub), HIcon.KEY) {
+            RpcCard()
             SpeedCard()
             AttestationCard()
             SwapFeesCard(signer, owner)
@@ -270,6 +271,40 @@ private fun CompanionCard() {
                 }
                 Text(stringResource(R.string.companion_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
             }
+        }
+    }
+}
+
+/**
+ * Il nodo con cui questo telefono parla con Solana.
+ *
+ * L'app ne porta dentro uno, di chi la pubblica, e tutte le installazioni se lo
+ * dividono. Con l'agente acceso un telefono solo fa qualche migliaio di chiamate
+ * al giorno: mille telefoni finiscono un piano intero, e lo finiscono per tutti
+ * nello stesso momento, compreso chi sta solo guardando il saldo. Quindi chi
+ * macina puo' portare il suo, come porta la sua chiave del modello. Vuoto vuol
+ * dire quello di serie.
+ */
+@Composable
+private fun RpcCard() {
+    val ctx = LocalContext.current
+    var v by remember { mutableStateOf(Settings.rpcUrl.value) }
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle(stringResource(R.string.rpc_title), stringResource(R.string.rpc_sub), HIcon.SPARK)
+            androidx.compose.material3.OutlinedTextField(
+                value = v, onValueChange = { v = it; Settings.setRpcUrl(ctx, it) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.rpc_hint), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted) },
+                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 12.sp, color = Halo.ink),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Halo.mint, unfocusedBorderColor = Halo.stroke,
+                    focusedContainerColor = Halo.cardSoft, unfocusedContainerColor = Halo.cardSoft, cursorColor = Halo.mint,
+                ),
+                shape = rs(12),
+            )
+            Text(stringResource(R.string.rpc_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
         }
     }
 }

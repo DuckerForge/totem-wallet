@@ -18,6 +18,7 @@ object Settings {
     private const val KEY_WEB_CHECK = "web_check"
     private const val KEY_AGENT_PRO = "agent_pro"
     private const val KEY_WALLET_OPEN = "wallet_open"
+    private const val KEY_RPC = "rpc_url"
 
     val currency = mutableStateOf("USD")
     val onboarded = mutableStateOf(true)
@@ -60,8 +61,26 @@ object Settings {
      *  somebody has deliberately closed should stay closed tomorrow morning. */
     val walletOpen = mutableStateOf(true)
 
+    /**
+     * Il nodo con cui questo telefono parla con Solana, quando la persona ne
+     * porta uno suo.
+     *
+     * L'app nasce con un nodo compilato dentro, che e' di chi pubblica l'app e
+     * che tutte le installazioni si dividono. Va benissimo finche' sono poche.
+     * Con l'agente acceso un telefono fa qualche migliaio di chiamate al giorno,
+     * e mille telefoni sono milioni: a quel punto il nodo di chi pubblica finisce,
+     * e finisce **per tutti insieme**, compreso chi non ha l'agente acceso e sta
+     * solo guardando il saldo.
+     *
+     * Quindi si puo' portare il proprio, come si porta la propria chiave del
+     * modello. Vuoto vuol dire quello compilato, cioe' come prima.
+     */
+    val rpcUrl = mutableStateOf("")
+
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        rpcUrl.value = p.getString(KEY_RPC, null).orEmpty()
+        applyRpc()
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
         onboarded.value = p.getBoolean(KEY_ONBOARDED, false)
         watchtower.value = p.getBoolean(KEY_WATCH, false)
@@ -71,6 +90,23 @@ object Settings {
         webCheck.value = p.getBoolean(KEY_WEB_CHECK, false)
         agentPro.value = p.getBoolean(KEY_AGENT_PRO, false)
         walletOpen.value = p.getBoolean(KEY_WALLET_OPEN, true)
+    }
+
+    /**
+     * Solo https, e solo un indirizzo che sta in piedi. Un nodo scritto male
+     * spegnerebbe la catena per chi l'ha scritto, senza dire perche'.
+     */
+    fun setRpcUrl(ctx: Context, url: String) {
+        val v = url.trim().takeIf { it.startsWith("https://") && it.length > 12 }.orEmpty()
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_RPC, v.ifEmpty { null }).apply()
+        rpcUrl.value = v
+        applyRpc()
+    }
+
+    /** Il proprio se c'e', quello compilato se no. */
+    private fun applyRpc() {
+        SolanaRpc.customRpc = rpcUrl.value.takeIf { it.isNotBlank() }
+            ?: BuildConfig.HELIUS_RPC_URL.takeIf { it.isNotBlank() }
     }
 
     fun setWalletOpen(ctx: Context, on: Boolean) {

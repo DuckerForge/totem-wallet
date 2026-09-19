@@ -295,10 +295,41 @@ class CompanionService : Service() {
         putLine = put; nowLine = now; nowPct = nowP; agentLine = agent; healthLine = health
         sellButton = sell; stopButton = stop
 
-        // Alive on its own: every minute the numbers are read again.
+        // Viva per conto sua: ogni minuto i numeri si ridisegnano.
+        //
+        // Il battito resta di un minuto perche' la parte che si muove davvero e'
+        // il valore di quello che teniamo in mano, e quello lo chiede a Jupiter,
+        // non alla catena. Quello che **non** si chiede piu' a ogni battito e' il
+        // saldo: vedi [chainEvery]. Una bolla accesa chiedeva il saldo 1.440
+        // volte al giorno, piu' di un agente che lavora, per un numero che
+        // cambia solo quando l'agente compra o vende.
         ticker?.cancel()
         ticker = scope.launch { while (true) { kotlinx.coroutines.delay(60_000); refresh() } }
         startSpinner()
+    }
+
+    /** Ogni quanto si disturba la catena per il saldo. Il battito e' un minuto. */
+    private val chainEvery = 5 * 60_000L
+    private var freeAt = 0L
+    private var freeCached: Long? = null
+
+    /**
+     * Il SOL libero della paghetta, chiesto alla catena al massimo ogni cinque
+     * minuti.
+     *
+     * Fra una lettura e l'altra si ridisegna l'ultimo numero saputo, che e'
+     * ancora vero: il saldo di una paghetta cambia solo quando l'agente compra o
+     * vende, e quando succede chi ha mosso i soldi aggiorna comunque lo schermo.
+     * Una lettura fallita non cancella quella di prima, per la stessa ragione
+     * scritta in HealthWidgetData.refresh: un nodo che non risponde non e' un
+     * borsello vuoto.
+     */
+    private suspend fun freeLamports(pubkey: String): Long? {
+        val now = System.currentTimeMillis()
+        if (freeCached != null && now - freeAt < chainEvery) return freeCached
+        val read = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pubkey) }.getOrNull() }
+        if (read != null) { freeCached = read; freeAt = now }
+        return read ?: freeCached
     }
 
     /**
@@ -546,7 +577,7 @@ class CompanionService : Service() {
             var funded = 0L; var total: Long? = null; var diff: Long? = null; var posValue: Long? = null
             if (s != null) {
                 funded = s.fundedLamports
-                val free = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() }
+                val free = freeLamports(s.pubkey)
                 val inCoins = opens.sumOf { runCatching { quote(it) }.getOrNull() ?: 0L }
                 posValue = pos?.let { runCatching { quote(it) }.getOrNull() }
                 if (free != null) {

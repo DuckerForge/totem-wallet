@@ -53,6 +53,23 @@ object TraderLoop {
     const val HUNT_EVERY_MS = 360_000L
 
     /**
+     * Quanto aspettare prima del prossimo giro.
+     *
+     * I novanta secondi esistono per una cosa sola: lo stop loss, che deve
+     * accorgersi in fretta se quello che teniamo sta cadendo. **A mani vuote non
+     * c'e' niente da guardare cadere.** Il giro faceva lo stesso il suo respiro
+     * corto, e ogni volta chiedeva il saldo alla catena per sapere se c'era da
+     * raccogliere: 960 chiamate al giorno per non fare niente.
+     *
+     * Non e' un dettaglio quando le installazioni sono tante. Il nodo compilato
+     * dentro l'app e' uno solo per tutti, e la maggior parte dei telefoni, in un
+     * momento qualsiasi, non tiene niente in mano: sono proprio quelli che
+     * pagavano di piu'. A mani vuote si respira come la caccia, che tanto la
+     * caccia e' l'unica cosa che puo' succedere.
+     */
+    fun breath(ctx: Context): Long = if (Positions.open(ctx).isEmpty()) HUNT_EVERY_MS else EXIT_EVERY_MS
+
+    /**
      * What the person asked for, in one place.
      *
      * [slicePercent] is a share of the per-move cap rather than an absolute
@@ -926,7 +943,11 @@ object TraderLoop {
      * and the trace say why this coin and not another.
      */
     private suspend fun scoutPicks(ctx: Context, cfg: Config, held: Set<String>): List<com.clearsign.core.Scored> {
-        val feed = withContext(Dispatchers.IO) { runCatching { SeekerFeed.refresh(ctx) ?: SeekerFeed.cached(ctx) }.getOrNull() } ?: return emptyList()
+        // La finestra lenta: nessuno sta guardando, e il segnale della folla
+        // arriva in ritardo per scelta. Vedi SeekerFeed.SLOW_FRESH_MS.
+        val feed = withContext(Dispatchers.IO) {
+            runCatching { SeekerFeed.refresh(ctx, SeekerFeed.SLOW_FRESH_MS) ?: SeekerFeed.cached(ctx) }.getOrNull()
+        } ?: return emptyList()
         val follows = Follows.all(ctx)
         val signals = com.clearsign.core.SeekerCrowd.signals(feed.events, follows, System.currentTimeMillis())
             .filter { it.mint !in held }.take(4)

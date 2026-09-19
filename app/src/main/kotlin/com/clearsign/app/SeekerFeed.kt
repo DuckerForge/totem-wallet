@@ -34,7 +34,23 @@ object SeekerFeed {
      */
     private const val FRESH_MS = 150_000L
 
-    val available: Boolean get() = BuildConfig.CROWD_URL.isNotBlank()
+    /**
+     * La stessa lista, per chi non la sta guardando.
+     *
+     * Due e mezzo e' la finestra giusta per una persona davanti allo schermo. Per
+     * il ciclo, che va a caccia ogni sei minuti con l'app chiusa, e' uno spreco:
+     * il servizio pubblica ogni dieci minuti, quindi due letture su tre tornano
+     * la stessa identica cosa. Il segnale della folla per giunta arriva in
+     * ritardo per scelta ("a few minutes late by design"), quindi un quarto d'ora
+     * non gli toglie niente.
+     *
+     * Conta perche' si moltiplica: 240 letture al giorno per telefono diventano
+     * 96, e a diecimila telefoni quella differenza e' un giga e mezzo di traffico
+     * al giorno.
+     */
+    const val SLOW_FRESH_MS = 900_000L
+
+    val available: Boolean get() = BuildConfig.CROWD_URL.isNotBlank() || BuildConfig.ARCHIVE_URL.isNotBlank()
 
     data class Feed(val at: Long, val followed: Int, val rows: List<CrowdRank>, val events: List<com.clearsign.core.CrowdBuy> = emptyList())
 
@@ -45,17 +61,27 @@ object SeekerFeed {
     }.getOrNull()
 
     /** Fetch when the cached copy has aged out; the cached copy otherwise. */
-    fun refresh(ctx: Context): Feed? {
+    fun refresh(ctx: Context, freshMs: Long = FRESH_MS): Feed? {
         if (!available) return null
         val f = File(ctx.filesDir, CACHE)
-        if (f.exists() && System.currentTimeMillis() - f.lastModified() < FRESH_MS) return cached(ctx)
-        val body = get(BuildConfig.CROWD_URL) ?: return cached(ctx)
+        if (f.exists() && System.currentTimeMillis() - f.lastModified() < freshMs) return cached(ctx)
+        // L'archivio prima, il servizio poi. Sono lo stesso identico corpo: il
+        // worker lo scrive nei due posti a ogni pubblicazione. La differenza e'
+        // chi paga: una lettura dell'archivio non e' un'invocazione del worker,
+        // e il piano gratuito di Cloudflare conta le invocazioni.
+        val body = archive() ?: get(BuildConfig.CROWD_URL) ?: return cached(ctx)
         // Names before parsing: the feed publishes mints, and a mint on screen is
         // an address nobody reads. One search per fifty, then every row has a name.
         runCatching { warmNames(JSONObject(body)) }
         val parsed = runCatching { parse(JSONObject(body)) }.getOrNull() ?: return cached(ctx)
         runCatching { f.writeText(body) }
         return parsed
+    }
+
+    /** La classifica come la scrive il worker, dall'archivio, senza chiave. */
+    private fun archive(): String? {
+        val base = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() } ?: return null
+        return get(base.trimEnd('/') + "/clearsign/crowd.json")
     }
 
     private fun warmNames(o: JSONObject) {

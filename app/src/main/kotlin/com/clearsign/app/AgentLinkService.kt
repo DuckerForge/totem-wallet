@@ -136,7 +136,7 @@ class AgentLinkService : Service() {
                     .getOrElse { e -> Log.e(TAG, "tick failed", e); TraderLoop.Tick("error", acted = false) }
                 if (t.acted || t.stopped) refreshNotification()
                 if (t.stopped) break
-                delay(TraderLoop.EXIT_EVERY_MS)
+                delay(TraderLoop.breath(this@AgentLinkService))
             }
             refreshNotification()
             // Nothing left to hold the service up.

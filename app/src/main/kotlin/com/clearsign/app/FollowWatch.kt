@@ -64,7 +64,8 @@ object FollowWatch {
             if (follows.isEmpty()) return Result.success()
 
             val feed = withContext(Dispatchers.IO) {
-                runCatching { SeekerFeed.refresh(ctx) }.getOrNull() ?: runCatching { SeekerFeed.cached(ctx) }.getOrNull()
+                runCatching { SeekerFeed.refresh(ctx, SeekerFeed.SLOW_FRESH_MS) }.getOrNull()
+                    ?: runCatching { SeekerFeed.cached(ctx) }.getOrNull()
             } ?: return Result.success()
 
             val since = Follows.lastSeenAt(ctx)

@@ -96,6 +96,10 @@ class AgentGateActivity : ComponentActivity() {
         // outright rather than quietly falling back to the Seed Vault, so the
         // caller cannot use this screen to get a signature it did not ask for.
         if (askedEnvelope && envelopeJob == null) { fail(getString(R.string.agent_bad_link)); return }
+        // La rotta di Ultra: chiesta da noi a Jupiter, e Jupiter la fa atterrare.
+        // Vale solo dentro un lavoro che il collare sta aspettando, come tutto il
+        // resto di questo ramo.
+        val ultraId = intent?.getStringExtra("ultra")?.takeIf { envelopeJob != null && it.isNotBlank() }
         val envelope = envelopeJob?.let { SessionWallet.current(this)?.pubkey }
         if (envelopeJob != null && envelope == null) { fail(getString(R.string.env_none_short)); return }
         val owner = envelope ?: data.getQueryParameter("account")?.takeIf { it.isNotBlank() } ?: Settings.watchWallet(this)
@@ -167,8 +171,20 @@ class AgentGateActivity : ComponentActivity() {
                             var txSig: String? = null
                             if (send) {
                                 ui = MwaUi.Working(getString(R.string.w_sending))
-                                val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(cluster), signed) }
-                                txSig = out.signature ?: run { ui = MwaUi.Error(getString(R.string.err_send, out.error ?: "?")); deliverError(out.error ?: "send failed"); return@launch }
+                                txSig = if (ultraId != null) {
+                                    // Una rotta di Ultra la manda indietro a Jupiter chi
+                                    // l'ha chiesta. Dal nostro RPC una vendita senza gas,
+                                    // o riempita da un market maker, non parte nemmeno: il
+                                    // pagatore delle commissioni è Jupiter e la sua firma
+                                    // manca ancora. Il broker fa così quando firma da solo;
+                                    // qui, dopo l'impronta, si faceva altro.
+                                    val ex = withContext(Dispatchers.IO) { JupiterUltra.execute(signed, ultraId) }
+                                    ex.signature?.takeIf { ex.error == null }
+                                        ?: run { ui = MwaUi.Error(getString(R.string.err_send, ex.error ?: ex.status)); deliverError(ex.error ?: "send failed"); return@launch }
+                                } else {
+                                    val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(cluster), signed) }
+                                    out.signature ?: run { ui = MwaUi.Error(getString(R.string.err_send, out.error ?: "?")); deliverError(out.error ?: "send failed"); return@launch }
+                                }
                             }
                             record(receipt, owner, dApp.name, callerPkg, cluster, tx, txSig, send, how = if (envelopeJob != null) "asked" else null)
                             val signedB64 = Base64.encodeToString(signed, Base64.NO_WRAP)
@@ -187,7 +203,7 @@ class AgentGateActivity : ComponentActivity() {
                                     val spent = if (allSol) out.sumOf { kotlin.math.abs(it.rawAmount) }
                                     else SessionWallet.policy(this@AgentGateActivity)?.perTxLamports ?: 0L
                                     val pol = SessionWallet.policy(this@AgentGateActivity)
-                                    val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol)
+                                    val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol, ultraId != null)
                                     SessionWallet.recordSpend(this@AgentGateActivity, if (homeAgain) -spent else spent)
                                 }
                                 AgentBroker.complete(j, AgentBroker.Verdict.Confirmed(txSig))

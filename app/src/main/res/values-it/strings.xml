@@ -772,6 +772,7 @@
     <string name="agent_last_expired">Nessuna risposta in tempo: %1$s</string>
     <string name="agent_notif_refused">Velum ha rifiutato una richiesta dell\'agente</string>
     <string name="agent_notif_signed">L\'agente ha speso dalla paghetta</string>
+    <string name="agent_notif_sold">Venduto, il valore è tornato nella paghetta</string>
     <string name="agent_notif_ask">L\'agente chiede: %1$s</string>
     <string name="agent_ask_timeout">nessuno ha risposto prima della scadenza</string>
     <string name="agent_declined">rifiutato dall\'utente</string>
@@ -1653,6 +1654,10 @@
     <string name="companion_agent_line">%1$d in gioco</string>
     <string name="companion_health_line">Salute %1$d</string>
     <string name="send_memo_line">Memo nella transazione: %1$s</string>
+    <string name="rpc_title">Il tuo nodo Solana</string>
+    <string name="rpc_sub">Da dove questo telefono legge la catena</string>
+    <string name="rpc_hint">https://…  (vuoto = quello di serie)</string>
+    <string name="rpc_note">L\'app ne porta dentro uno, condiviso da tutti. Con l\'agente acceso un telefono fa qualche migliaio di chiamate al giorno, quindi chi macina sta meglio col suo: Helius, QuickNode e Alchemy danno una chiave gratis. Non cambia nient\'altro, e la chiave non esce da questo telefono.</string>
     <string name="speed_title">Velocità di quello che invii</string>
     <string name="speed_sub">Una commissione di priorità sugli invii, gli ordini e le chiusure che costruiamo noi.</string>
     <string name="speed_normal">Normale</string>

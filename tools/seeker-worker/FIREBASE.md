@@ -23,6 +23,34 @@ qualsiasi ora.
 ## Come è fatto
 
 - `/clearsign/holdings/<indirizzo>` = `{ at, top: [{m, q, u}], unpriced }`.
+- `/clearsign/coin/<mint>` = `{ at, v: { "<installazione>": { s, w, at } } }`, il
+  verdetto sul web di una moneta. `s` vale 1 per uno stop. Lo scrivono i
+  telefoni, attraverso il worker (`POST /?cc=<mint>`), e lo legge chiunque.
+
+  Serve a non pagare mille volte la stessa risposta: la ricerca costa un
+  centesimo e la domanda «questa moneta è una truffa» non dipende da chi la fa.
+  Chi arriva primo paga e lascia il verdetto; i prossimi lo trovano. Funziona
+  anche per i telefoni senza nessuna chiave, che prima quella rete non ce
+  l'avevano proprio.
+
+  **Un no vale da chiunque, un sì vale da due.** Quelle righe le scrive della
+  gente, e un APK modificato ci mette quello che vuole. Ma le due bugie non
+  costano uguale: «stop su una moneta buona» fa saltare un acquisto, «pulita su
+  una truffa» fa comprare una truffa a tutti. Quindi uno stop vale subito e da
+  uno solo, mentre un «pulita» conta solo quando lo dicono due installazioni
+  diverse (`CoinCheck.Shared.MIN_CLEAN`). Il mondo paga due ricerche per moneta
+  invece di mille, e chi volesse togliere quel controllo agli altri deve
+  arrivare primo su quel mint con due installazioni, ottenendo di far saltare un
+  cancello su sette e nient'altro: tutti gli altri girano sul telefono.
+
+  Chi scrive si firma con **un numero a caso fatto una volta**, non col
+  portafoglio. Scrivere «la paghetta X sta controllando il mint Y» in un archivio
+  pubblico direbbe al mondo che quella paghetta sta per comprare quella moneta,
+  qualche secondo prima che lo faccia. Per contare due installazioni diverse
+  basta che siano diverse, non sapere quali.
+
+  Il worker tiene al massimo sei righe per moneta, le più recenti, e butta quelle
+  più vecchie di una settimana. Non tocca il KV.
 - Il worker scrive con il segreto, che sta in `FB_SECRET` fra i segreti di
   Cloudflare. **Mai in un file, mai nel repo, mai dentro l'APK.**
 - Il telefono legge senza chiave, perché il ramo è pubblico in lettura e sono

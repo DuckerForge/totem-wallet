@@ -328,7 +328,15 @@ async function sweep(env) {
 
   // Lo stato (con i saldi dentro) sempre, il pubblicato solo se è cambiato: le
   // scritture del piano gratuito sono mille al giorno e questo le tiene sotto.
-  if (fp !== state.crowd) await env.SEEKER.put("crowd", out);
+  // In KV per chi passa dal worker, e in archivio perche' i telefoni lo leggano
+  // senza svegliare il worker. Mille telefoni che chiedono la classifica ogni
+  // sei minuti sono 240.000 invocazioni al giorno e il piano gratuito ne da'
+  // centomila: la stessa lettura sull'archivio non costa nessuna invocazione e
+  // nessuna scrittura, perche' Firebase conta lo spazio e il traffico.
+  if (fp !== state.crowd) {
+    await env.SEEKER.put("crowd", out);
+    if (fbOn(env)) await fbPut(env, "crowd", out).catch(() => {});
+  }
   await env.SEEKER.put(
     "state2",
     JSON.stringify({
@@ -402,6 +410,48 @@ async function fbGet(env, path) {
 async function fbPut(env, path, body) {
   const r = await fetch(fbUrl(env, path), { method: "PUT", body });
   return r.ok;
+}
+
+/**
+ * Il verdetto sul web di una moneta, scritto dai telefoni e letto da tutti.
+ *
+ * Il telefono paga la ricerca una volta e la lascia qui. Il prossimo la trova.
+ * Mille utenti pagano due ricerche per moneta invece di mille: la regola che
+ * rende possibile condividerle sta sul telefono, in `CoinCheck.Shared`, ed è
+ * che uno STOP vale da chiunque mentre un «pulita» vale solo da due
+ * installazioni diverse.
+ *
+ * Qui dentro c'è solo il buttafuori, e fa tre cose:
+ *
+ *  * una riga per installazione, così chi scrive mille volte resta uno;
+ *  * al massimo [CC_MAX] righe per moneta, le più recenti, così una moneta non
+ *    diventa un archivio;
+ *  * niente testo lungo e niente campi inventati.
+ *
+ * Non tocca il KV: le scritture KV del piano gratuito sono mille al giorno e se
+ * le mangia già la scansione. Firebase conta lo spazio, non le scritture.
+ */
+const CC_MAX = 6;
+const CC_KEEP_MS = 7 * 24 * 3600_000;
+
+async function ccPut(env, mint, body) {
+  const id = String(body.i || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 32);
+  if (!id) return false;
+  const stop = body.s === 1 || body.s === "1";
+  const why = String(body.w || "").slice(0, 120);
+  const now = Date.now();
+
+  const row = JSON.parse((await fbGet(env, "coin/" + mint)) || "{}") || {};
+  const v = row.v && typeof row.v === "object" ? row.v : {};
+  v[id] = { s: stop ? 1 : 0, w: stop ? why : "", at: now };
+
+  // Le più recenti, e via quelle scadute: la riga resta piccola da sola.
+  const live = Object.entries(v)
+    .filter(([, e]) => e && now - (e.at || 0) < CC_KEEP_MS)
+    .sort((a, b) => (b[1].at || 0) - (a[1].at || 0))
+    .slice(0, CC_MAX);
+
+  return fbPut(env, "coin/" + mint, JSON.stringify({ at: now, v: Object.fromEntries(live) }));
 }
 
 /** L'ora scritta dentro il corpo, o zero se il corpo non si legge. */
@@ -629,6 +679,19 @@ export default {
       if (!out) return new Response('{"error":"no"}', { status: 502, headers: { "content-type": "application/json" } });
       return new Response(out.text, {
         status: out.status,
+        headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
+      });
+    }
+
+    // Il verdetto sul web di una moneta. Solo scrittura: il telefono legge
+    // l'archivio da sé, senza chiave e senza svegliare questo worker.
+    const cc = url.searchParams.get("cc");
+    if (cc && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(cc)) {
+      if (request.method !== "POST") return new Response('{"error":"post"}', { status: 405, headers: { "content-type": "application/json" } });
+      if (!fbOn(env)) return new Response('{"ok":false}', { headers: { "content-type": "application/json" } });
+      const body = await request.json().catch(() => null);
+      const ok = body ? await ccPut(env, cc, body).catch(() => false) : false;
+      return new Response(JSON.stringify({ ok }), {
         headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
       });
     }

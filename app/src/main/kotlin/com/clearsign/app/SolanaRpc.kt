@@ -187,13 +187,28 @@ object SolanaRpc {
         runCatching { tokenAccountsOf(rpcUrl, owner, force = true) }
     }
 
-    /** The owner's token accounts (both token programs), cached for a minute unless [force]. */
+    /**
+     * The owner's token accounts (both token programs), cached for a minute unless [force].
+     *
+     * Lenient on purpose: una chiamata fallita vale lista vuota, che e' la forma
+     * giusta per una schermata che deve disegnare qualcosa. Ma **una risposta a
+     * meta' non si mette in cache**. I due programmi token si chiedono con due
+     * chiamate, e quando la seconda non rispondeva la lista troncata restava li'
+     * per sessanta secondi buoni: tutti quelli che passavano in quel minuto
+     * vedevano meno monete di quante ce ne sono, e `WalletHealth` dava un
+     * punteggio a quella lista come se fosse intera. Il costo di non metterla in
+     * cache e' una rilettura; il costo di metterla e' un numero sbagliato dato
+     * per buono a chiunque passi.
+     */
     fun tokenAccountsOf(rpcUrl: String, owner: String, force: Boolean = false): List<TokenAccountInfo> {
         val key = "$rpcUrl|$owner"
         val now = System.currentTimeMillis()
         if (!force) tokenListCache[key]?.let { if (now - it.at < TOKEN_LIST_TTL_MS) return it.value }
-        val list = getTokenAccounts(rpcUrl, owner)
-        tokenListCache[key] = Cached(list, now)
+        val parts = readTokenAccounts(rpcUrl, owner)
+        val list = parts.flatMap { it.orEmpty() }
+        // Learn the symbols of whatever tokens this wallet holds (one DAS call, cached).
+        TokenSymbols.resolve(list.map { it.mint })
+        if (parts.none { it == null }) tokenListCache[key] = Cached(list, now)
         return list
     }
 
@@ -270,9 +285,26 @@ object SolanaRpc {
             trackedDests = emptyList(); trackedFresh = emptyList()
             value = simulateValue(rpcUrl, txBytes, listOf(owner))
         }
-        val pre = preF.await() ?: emptyMap()
+        val pre = preF.await()
         if (value == null) { Log.i(TAG, "simulate Unavailable"); return SimOutcome.Unavailable }
         if (!value.isNull("err")) { Log.i(TAG, "simulate Failed: ${value.get("err")}"); return SimOutcome.Failed(value.get("err").toString()) }
+        // Senza lo stato di partenza non c'e' niente da cui sottrarre.
+        //
+        // Questa lettura fallita valeva una mappa vuota e si tirava dritto, e da
+        // li' in poi succedeva tutto in silenzio: `preBalances` restava senza il
+        // saldo in SOL, la differenza del proprietario non si calcolava affatto
+        // (lo scontrino mostrava un trasferimento da cui non esce niente), e in
+        // `RiskEngine.assessEffects` il cancello anti prosciugamento salta le
+        // monete di cui non conosce il saldo di partenza. Quindi DRAINS_BALANCE
+        // non scattava, il collare perdeva quel DANGER, e questa funzione
+        // restituiva lo stesso `Ok`. Nessun errore, da nessuna parte.
+        //
+        // Una simulazione senza lo stato di partenza non e' riuscita a meta':
+        // non si puo' usare. `Unavailable` a valle vuol dire «riprova», che e'
+        // la risposta giusta per una lettura che non e' arrivata, ed e' gia'
+        // distinto da `Failed`, che vuol dire «il nodo l'ha eseguita ed e'
+        // andata male».
+        if (pre == null || owner !in pre) { Log.i(TAG, "pre-state missing → Unavailable"); return SimOutcome.Unavailable }
 
         val computeUnits = if (value.isNull("unitsConsumed")) null else value.optLong("unitsConsumed")
         val logCount = value.optJSONArray("logs")?.length() ?: 0
@@ -440,15 +472,6 @@ object SolanaRpc {
     }
 
     /** Public SOL balance (lamports) for [pubkey], or null on failure. */
-    fun balanceOf(rpcUrl: String, pubkey: String): Long? = getBalance(rpcUrl, pubkey)
-
-    /** (SOL lamports or null, number of token types with a non-zero balance). */
-    fun assetsSummary(rpcUrl: String, pubkey: String): Pair<Long?, Int> {
-        val lamF = async { getBalance(rpcUrl, pubkey) }
-        val tokens = tokenAccountsOf(rpcUrl, pubkey).count { it.amount > 0 }
-        return lamF.await() to tokens
-    }
-
     /**
      * Balances for many accounts at once (the account picker): one read for all
      * the SOL balances, token counts fanned out concurrently. Also warms the
@@ -578,20 +601,20 @@ object SolanaRpc {
      * stranger's balances cannot eat the month that real trades depend on.
      * Blocking, two calls, so call it on IO and only when somebody asked.
      */
-    fun tokensOf(rpcUrl: String, owner: String): List<TokenAccountInfo>? {
+    fun tokensOf(rpcUrl: String, owner: String, force: Boolean = false): List<TokenAccountInfo>? {
+        val key = "$rpcUrl|$owner"
+        val now = System.currentTimeMillis()
+        // Scriveva questa cache e non la leggeva mai, quindi ogni chiamata erano
+        // due letture fresche anche quando la stessa risposta era arrivata un
+        // istante prima. Succede davvero: in un giro del ciclo il libro si
+        // riconcilia e subito dopo una vendita rilegge lo stesso borsello.
+        // Chi ha bisogno del numero esatto al centesimo chiede [force].
+        if (!force) tokenListCache[key]?.let { if (now - it.at < TOKEN_LIST_TTL_MS) return it.value }
         val parts = readTokenAccounts(rpcUrl, owner)
         if (parts.any { it == null }) return null
         val list = parts.flatMap { it.orEmpty() }
         TokenSymbols.resolve(list.map { it.mint })
-        tokenListCache["$rpcUrl|$owner"] = Cached(list, System.currentTimeMillis())
-        return list
-    }
-
-    /* Both token programs queried concurrently (they're independent). A failed call reads as empty. */
-    private fun getTokenAccounts(rpcUrl: String, owner: String): List<TokenAccountInfo> {
-        val list = readTokenAccounts(rpcUrl, owner).flatMap { it.orEmpty() }
-        // Learn the symbols of whatever tokens this wallet holds (one DAS call, cached).
-        TokenSymbols.resolve(list.map { it.mint })
+        tokenListCache[key] = Cached(list, now)
         return list
     }
 
@@ -661,9 +684,6 @@ object SolanaRpc {
         }
         return out
     }
-
-    fun dasSymbols(mints: List<String>): Map<String, String> =
-        dasAssets(mints).mapNotNull { (k, v) -> v.symbol?.let { k to it } }.toMap()
 
     // ---- building our own transactions ---------------------------------------
 
@@ -738,17 +758,36 @@ object SolanaRpc {
      * finalised without error; false on an error or when time runs out, which
      * the caller must treat as "not landed", never as "landed".
      */
+    /**
+     * Le pause fra un controllo e l'altro, in secondi.
+     *
+     * Erano fisse a un secondo e mezzo per trenta secondi, cioe' venti chiamate
+     * per ogni conferma, ognuna con la sua catena di ripiego. Un blocco su Solana
+     * dura meno di mezzo secondo ma la conferma arriva quando arriva: chiedere
+     * venti volte non la fa arrivare prima, e le prime volte e' quasi sempre
+     * troppo presto. A passo crescente sono sette chiamate nel caso peggiore e
+     * tre o quattro in quello normale, nella stessa finestra di trenta secondi.
+     */
+    private val CONFIRM_STEPS_MS = longArrayOf(1_000, 1_000, 2_000, 3_000, 5_000, 8_000, 10_000)
+
     fun confirmed(rpcUrl: String, signature: String, timeoutMs: Long = 30_000L): Boolean {
         val until = System.currentTimeMillis() + timeoutMs
+        var step = 0
         while (System.currentTimeMillis() < until) {
-            val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", true)))
+            // L'ultimo tentativo cerca anche nello storico, gli altri no. Su una
+            // transazione appena spedita lo storico non vuol dire niente, e su
+            // parecchi nodi quella opzione costa molto di piu'.
+            val deep = step >= CONFIRM_STEPS_MS.size - 1
+            val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", deep)))
             val st = resp?.optJSONObject("result")?.optJSONArray("value")?.optJSONObject(0)
             if (st != null) {
                 if (!st.isNull("err")) return false
                 val c = st.optString("confirmationStatus")
                 if (c == "confirmed" || c == "finalized") return true
             }
-            try { Thread.sleep(1_500) } catch (_: InterruptedException) { return false }
+            val wait = CONFIRM_STEPS_MS[step.coerceAtMost(CONFIRM_STEPS_MS.size - 1)]
+            step++
+            try { Thread.sleep(wait) } catch (_: InterruptedException) { return false }
         }
         return false
     }
@@ -771,12 +810,41 @@ object SolanaRpc {
         }
     }
 
-    fun epoch(rpcUrl: String): Long? = post(rpcUrl, "getEpochInfo", JSONArray())?.optJSONObject("result")?.optLong("epoch")
+    /**
+     * Due costanti della rete, ricordate per sei ore.
+     *
+     * Un'epoca dura circa due giorni e il tasso di inflazione si muove una volta
+     * all'anno. Si chiedevano a ogni caricamento del portafoglio di chi ha del
+     * SOL in stake, per due numeri che non erano cambiati.
+     */
+    private val netConst = ConcurrentHashMap<String, Cached<Double>>()
+    private const val NET_CONST_TTL_MS = 6 * 3600_000L
+
+    private fun netConstant(key: String, read: () -> Double?): Double? {
+        val now = System.currentTimeMillis()
+        netConst[key]?.let { if (now - it.at < NET_CONST_TTL_MS) return it.value }
+        val v = read() ?: return null
+        netConst[key] = Cached(v, now)
+        return v
+    }
+
+    fun epoch(rpcUrl: String): Long? = netConstant("epoch|$rpcUrl") {
+        post(rpcUrl, "getEpochInfo", JSONArray())?.optJSONObject("result")?.optLong("epoch")?.toDouble()
+    }?.toLong()
 
     fun stakeAccounts(rpcUrl: String, owner: String): List<StakeAccount> {
+        // `dataSize` prima del memcmp, se no e' una scansione di tutto il programma
+        // Stake. Un `getProgramAccounts` senza filtro sulla dimensione e' la
+        // chiamata piu' cara che esista e il modo classico di farsi sospendere una
+        // chiave, e questa partiva a ogni caricamento del portafoglio. Un conto di
+        // stake e' lungo 200 byte: con il filtro il nodo cerca in un indice invece
+        // che in tutto lo stato del programma.
         val params = JSONArray().put("Stake11111111111111111111111111111111111111").put(
             JSONObject().put("encoding", "jsonParsed").put(
-                "filters", JSONArray().put(JSONObject().put("memcmp", JSONObject().put("offset", 44).put("bytes", owner))),
+                "filters",
+                JSONArray()
+                    .put(JSONObject().put("dataSize", 200))
+                    .put(JSONObject().put("memcmp", JSONObject().put("offset", 44).put("bytes", owner))),
             ),
         )
         val arr = post(rpcUrl, "getProgramAccounts", params)?.optJSONArray("result") ?: return emptyList()
@@ -797,13 +865,11 @@ object SolanaRpc {
     }
 
     /** The network's inflation, validator share, as a fraction per year. */
-    fun inflationRate(rpcUrl: String): Double? =
+    fun inflationRate(rpcUrl: String): Double? = netConstant("inflation|$rpcUrl") {
         post(rpcUrl, "getInflationRate", JSONArray())?.optJSONObject("result")?.optDouble("validator")?.takeIf { !it.isNaN() && it > 0 }
+    }
 
     /** Total supply of a mint, raw. */
-    fun tokenSupply(rpcUrl: String, mint: String): Long? =
-        post(rpcUrl, "getTokenSupply", JSONArray().put(mint))?.optJSONObject("result")?.optJSONObject("value")?.optString("amount")?.toLongOrNull()
-
     /** The raw bytes of one account, or null. */
     fun accountBytes(rpcUrl: String, pubkey: String): ByteArray? {
         val v = post(rpcUrl, "getAccountInfo", JSONArray().put(pubkey).put(JSONObject().put("encoding", "base64")))

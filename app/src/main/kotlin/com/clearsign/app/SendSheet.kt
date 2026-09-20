@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -91,6 +92,9 @@ private sealed interface Asset {
     }
 }
 
+/** Il saldo in unita' intere, per contarlo e per moltiplicarlo per un prezzo. */
+private fun Asset.units(): Double = BigDecimal.valueOf(available).movePointLeft(decimals).toDouble()
+
 private sealed interface SendState {
     data object Form : SendState
     data object Analyzing : SendState
@@ -135,8 +139,17 @@ internal fun SendSheet(
     var to by remember { mutableStateOf(prefillTo.orEmpty()) }
     var amount by remember { mutableStateOf(prefillAmount.orEmpty()) }
     var assets by remember { mutableStateOf<List<Asset>>(emptyList()) }
+    /**
+     * Quanto vale una unita' di ogni moneta, nella valuta di chi guarda.
+     *
+     * Una chiamata sola quando la lista arriva. Serve ai tondini delle monete:
+     * un saldo senza il suo controvalore non risponde alla domanda che uno si
+     * fa li', che e' "quale di queste mando".
+     */
+    var unitFiat by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var asset by remember { mutableStateOf<Asset?>(null) }
     var formError by remember { mutableStateOf<String?>(null) }
+    val currency by Settings.currency
     var tapping by remember { mutableStateOf(false) }
     val contacts = remember { Contacts.allowlist(ctx) }
 
@@ -233,6 +246,15 @@ internal fun SendSheet(
     val lookalike = remember(to, known) { com.clearsign.core.AddressPoison.lookalike(to, known) }
     var poisonAck by remember(to) { mutableStateOf(false) }
 
+    LaunchedEffect(assets, currency) {
+        if (assets.isEmpty()) return@LaunchedEffect
+        unitFiat = withContext(Dispatchers.IO) {
+            val usd = runCatching { Prices.usd(assets.map { it.mint }) }.getOrDefault(emptyMap())
+            val rate = runCatching { Prices.usdTo(currency) }.getOrNull() ?: 1.0
+            usd.mapValues { it.value * rate }
+        }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.94f).imePadding()) {
             SheetHeader(
@@ -313,23 +335,49 @@ internal fun SendSheet(
 
                         // ---- asset ----------------------------------------------
                         FieldLabel(stringResource(R.string.send_asset))
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            assets.forEach { a ->
-                                val active = a == asset
-                                Box(
-                                    Modifier.clip(rs(12)).background(if (active) Halo.mint.copy(alpha = 0.14f) else Color.Transparent)
-                                        .border(1.dp, if (active) Halo.mint else Halo.stroke, rs(12))
-                                        .clickable { asset = a; amount = ""; Haptics.tick(ctx) }.padding(horizontal = 12.dp, vertical = 8.dp),
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        TokenLogo(a.mint, a.symbol, TokenSymbols.image(a.mint), 24.dp)
-                                        Spacer(Modifier.width(8.dp))
-                                        Column {
-                                            Text(a.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (active) Halo.mint else Halo.ink)
-                                            Text(fmtSol(a.available, minOf(a.decimals, 4)).let { if (a.decimals == 9) it else fmtUnits(a.available, a.decimals) }, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, style = Tabular)
+                        // La fila delle monete, leggibile.
+                        //
+                        // Sotto ogni simbolo c'era il saldo grezzo, con i
+                        // decimali di quella moneta: 1,0415 accanto a 1000
+                        // accanto a 0,937878. Tre numeri senza unita' di misura
+                        // in comune, e la domanda "quale mando" si fa in soldi,
+                        // non in unita'. Ora i decimali sono gli stessi per
+                        // tutte e sotto c'e' quanto vale.
+                        //
+                        // E la fila scorre: l'ultimo tondino veniva tagliato dal
+                        // bordo senza che niente dicesse che ce n'erano altri.
+                        // La sfumatura lo dice, e c'e' solo quando c'e' altro.
+                        val assetScroll = rememberScrollState()
+                        Box {
+                            Row(Modifier.horizontalScroll(assetScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                assets.forEach { a ->
+                                    val active = a == asset
+                                    Box(
+                                        Modifier.clip(rs(12)).background(if (active) Halo.mint.copy(alpha = 0.14f) else Color.Transparent)
+                                            .border(1.dp, if (active) Halo.mint else Halo.stroke, rs(12))
+                                            .clickable { asset = a; amount = ""; Haptics.tick(ctx) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TokenLogo(a.mint, a.symbol, TokenSymbols.image(a.mint), 24.dp)
+                                            Spacer(Modifier.width(8.dp))
+                                            Column {
+                                                Text(a.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (active) Halo.mint else Halo.ink)
+                                                Text(fmtUi(a.units()), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, style = Tabular)
+                                                Text(
+                                                    unitFiat[a.mint]?.let { fmtFiat(it * a.units(), currency) } ?: "—",
+                                                    fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 10.5.sp,
+                                                    color = if (active) Halo.mint else Halo.ink, style = Tabular,
+                                                )
+                                            }
                                         }
                                     }
                                 }
+                            }
+                            if (assetScroll.canScrollForward) {
+                                Box(
+                                    Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(28.dp)
+                                        .background(Brush.horizontalGradient(listOf(Color.Transparent, Halo.ground2))),
+                                )
                             }
                         }
 
@@ -367,10 +415,39 @@ internal fun SendSheet(
                         // privato non dice dove mandare, dice **come**, e si
                         // decide dopo aver scritto quanto.
                         if (RocketX.enabled && deal == null) {
+                            // La strada privata parte da SOL o da USDC, e da
+                            // nient'altro. Con una moneta diversa il cartellino
+                            // resta e lo dice: e' qui che si scopre che esiste,
+                            // e sparire sarebbe il modo piu' sicuro di non farlo
+                            // sapere a nessuno. Toccandolo si passa a SOL, senza
+                            // portarsi dietro una cifra contata in un'altra
+                            // moneta, che di la' vorrebbe dire un'altra cosa.
+                            val mint = asset?.mint
+                            val switches = mint != null && mint != com.clearsign.core.NATIVE_SOL_MINT && mint != USDC_MINT
+                            // Null e' SOL: e' cosi' che RocketX chiama la moneta nativa di una catena.
+                            val privCoin = USDC_MINT.takeIf { mint == USDC_MINT }
+                            val privSym = if (switches) "SOL" else asset?.symbol.orEmpty()
+                            // Si parte dall'ultimo minimo visto, non dal vuoto.
+                            var priv by remember(privSym) { mutableStateOf(RocketX.recallFloor(ctx, privSym)) }
+                            LaunchedEffect(switches, privCoin, amount) {
+                                // Aspettare mezzo secondo ha senso mentre uno
+                                // scrive la cifra. All'apertura non c'e' niente
+                                // da aspettare, e sono mezzo secondo di riga muta.
+                                if (amount.isNotEmpty()) kotlinx.coroutines.delay(600)
+                                // Con una moneta che questa strada non porta, la
+                                // cifra scritta non c'entra: si chiede solo il
+                                // minimo, che e' l'unica cosa vera da dire.
+                                val a = if (switches) null else amount.replace(',', '.').toDoubleOrNull()
+                                val fresh = withContext(Dispatchers.IO) {
+                                    runCatching { RocketX.privately(privCoin, a) }.getOrNull()
+                                }
+                                if (fresh != null) priv = fresh
+                                fresh?.minAmount?.let { RocketX.rememberFloor(ctx, privSym, it, fresh.minUsd) }
+                            }
                             Row(
                                 Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cyan.copy(alpha = 0.08f))
                                     .border(1.dp, Halo.cyan.copy(alpha = 0.35f), rs(14))
-                                    .clickable { onPrivate(to.trim(), amount) }
+                                    .clickable { onPrivate(to.trim(), if (switches) "" else amount) }
                                     .padding(horizontal = 14.dp, vertical = 11.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -378,7 +455,40 @@ internal fun SendSheet(
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(stringResource(R.string.send_private), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.cyan)
-                                    Text(stringResource(R.string.send_private_sub), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
+                                    Text(
+                                        stringResource(R.string.send_private_sub) +
+                                            (if (switches) " " + stringResource(R.string.send_private_switch) else ""),
+                                        style = HaloType.small, color = Halo.muted, lineHeight = 15.sp,
+                                    )
+                                    // Quanto costa questa cifra su questa strada,
+                                    // adesso, oppure quanto ci vuole come minimo.
+                                    // Finche' non si sa non si scrive niente: una
+                                    // percentuale inventata sta sullo schermo con
+                                    // la faccia di un dato.
+                                    val p = priv
+                                    val pct = p?.costPct ?: 0.0
+                                    when {
+                                        p?.costCoin != null -> Text(
+                                            stringResource(
+                                                R.string.bridge_route_cost2,
+                                                coinText(p.costCoin), privSym,
+                                                p.costUsd?.let { fmtPrice(it, "USD") } ?: "—",
+                                                String.format(java.util.Locale.ROOT, "%.1f", pct),
+                                            ),
+                                            fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.5.sp,
+                                            color = if (pct > 5) Halo.red else if (pct > 2) Halo.amber else Halo.mint,
+                                        )
+                                        // Il minimo si dice solo quando c'entra:
+                                        // con una cifra che lo supera gia', e'
+                                        // un numero vecchio che sta li' a fare
+                                        // scena mentre arriva il costo vero.
+                                        p?.minAmount != null && (switches || (amount.replace(',', '.').toDoubleOrNull() ?: 0.0) < p.minAmount) -> Text(
+                                            p.minUsd?.let { u ->
+                                                stringResource(R.string.bridge_floor_usd, minText(p.minAmount), privSym, fmtPrice(u, "USD"))
+                                            } ?: stringResource(R.string.bridge_floor, minText(p.minAmount), privSym),
+                                            fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = Halo.amber,
+                                        )
+                                    }
                                 }
                             }
                         }

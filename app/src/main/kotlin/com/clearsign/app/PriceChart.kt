@@ -91,7 +91,7 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
             }
             Spacer(Modifier.width(8.dp))
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
-                Gecko.Span.entries.forEach { s ->
+                Gecko.Span.small.forEach { s ->
                     val on = s == span
                     Box(
                         Modifier.padding(start = 5.dp).clip(rs(999))

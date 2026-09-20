@@ -1314,6 +1314,20 @@
     <string name="span_days">3mo</string>
     <string name="chart_none">No price history for this coin yet.</string>
     <string name="chart_change">%1$s in %2$s</string>
+    <string name="span_week">7d</string>
+    <string name="span_month">30d</string>
+    <string name="span_year">1y</string>
+    <string name="chart_src_pool">pool</string>
+    <string name="chart_src_market">market</string>
+    <string name="chart_ohlc">O %1$s · H %2$s · L %3$s · C %4$s</string>
+    <string name="chart_vol_at">vol %1$s</string>
+    <string name="chart_liquidity">Liquidity</string>
+    <string name="chart_volume24">Volume 24h</string>
+    <string name="chart_trades24">Buys / sells 24h</string>
+    <string name="chart_mcap">Market cap</string>
+    <string name="chart_fdv">Fully diluted</string>
+    <string name="chart_dex">Exchange</string>
+    <string name="chart_open_on">Open on %1$s</string>
     <string name="who_clock">updated %1$s ago · next in %2$s</string>
     <string name="who_clock2">next sweep in %1$s</string>
     <string name="who_clock_late">sweeping…</string>
@@ -1572,7 +1586,13 @@
     <string name="bridge_dest_hint">Your address on %1$s</string>
     <string name="bridge_quoting">Asking the routes…</string>
     <string name="bridge_no_route">No deposit route for this right now. Try another amount or chain.</string>
+    <string name="bridge_min">Below the minimum for this route. It takes at least %1$s %2$s.</string>
+    <string name="bridge_floor">At least %1$s %2$s.</string>
+    <string name="bridge_floor_usd">At least %3$s, that is %1$s %2$s.</string>
+    <string name="bridge_use_min">Use %1$s %2$s</string>
     <string name="bridge_quote_line">Fees and gas about %1$s $ · about %2$s min</string>
+    <string name="bridge_route_cost2">Costs %3$s · %1$s %2$s · %4$s%%</string>
+    <string name="bridge_quote_of_which">of which %1$s $ declared fees and gas · about %2$s min</string>
     <string name="bridge_go">Continue: open the order</string>
     <string name="bridge_opening">Opening the order…</string>
     <string name="bridge_open_failed">RocketX did not open the order. Try again.</string>
@@ -1790,8 +1810,8 @@
     <string name="bridge_mode_chain">To another chain</string>
     <string name="bridge_mode_private">Private, here on Solana</string>
     <string name="bridge_private_what">Same coin, same chain, another address of yours. The money goes through an exchange, which breaks the on-chain thread between what went in and what came out.</string>
-    <string name="bridge_route_cost">costs %1$s%% of what you send</string>
     <string name="bridge_truth_private">What this does: the chain no longer shows a line from your address to the other one. What it does not do: hide you from the exchange in the middle, which sees both sides and asks nobody who they are. It is not anonymity, it is a broken thread. The order gives a deposit address; the money goes there with the ordinary Send, receipt and fingerprint included, and comes back to this wallet if the exchange cannot finish.</string>
     <string name="send_private">Send privately</string>
-    <string name="send_private_sub">The chain no longer shows a line between the two addresses. Costs 1 to 2% and takes a few minutes.</string>
+    <string name="send_private_sub">The chain no longer shows a line between the two addresses. Takes a few minutes.</string>
+    <string name="send_private_switch">Switches to SOL.</string>
 </resources>

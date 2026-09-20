@@ -593,8 +593,12 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 androidx.compose.material3.Switch(checked = moves, onCheckedChange = { on -> moves = on; Watchlist.setMoves(ctx, coin.key, on); OrdersKeeper.sync(ctx); onSaved() })
             }
 
-            // The shape of the price, when the coin lives on Solana.
-            mint?.let { PriceChart(it, coin.symbol); ShieldCard(it, coin.symbol) }
+            // The shape of the price. A coin that lives on Solana is drawn from
+            // its busiest pool, with the depth under it; everything else is drawn
+            // from the market, so bitcoin has a chart here too instead of a gap.
+            CoinChart(coin, mint)
+            // Who can do what to the coin. Only a mint has an authority to check.
+            mint?.let { ShieldCard(it, coin.symbol) }
 
             // What if it were as big as something else. Arithmetic, not a forecast.
             WhatIf(coin, qty.toDoubleOrNull() ?: 0.0)

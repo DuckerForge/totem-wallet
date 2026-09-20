@@ -38,6 +38,8 @@ object Market {
         val change24h: Double?,
         /** The Solana mint, when this coin has one. Null means watch only. */
         val mint: String? = null,
+        /** What changed hands in a day, in dollars. The number a chart is read against. */
+        val volume24h: Double? = null,
     ) {
         /** How the watchlist and the manual amounts address it: a mint if it has one. */
         val key: String get() = mint ?: "cg:$id"
@@ -45,7 +47,15 @@ object Market {
 
     @Volatile private var top: List<Coin> = emptyList()
     @Volatile private var topAt = 0L
-    private val mints = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val mints = java.util.concurrent.ConcurrentHashMap<String, String>(
+        // Solana's own coin has no entry in CoinGecko's platform map: nothing
+        // "lives on" the chain it is the gas of, so the lookup comes back empty
+        // and the market screen concluded that Solana cannot be charted or
+        // bought. Wrapped SOL is the mint every pool and every quote on this
+        // chain actually names, which makes it the right answer to "which mint
+        // is this coin", even though nobody minted it.
+        mapOf("solana" to "So11111111111111111111111111111111111111112"),
+    )
 
     /**
      * What is already in memory, and never a network call.
@@ -68,7 +78,8 @@ object Market {
     }
 
     fun toJson(c: Coin): String = org.json.JSONObject().put("id", c.id).put("symbol", c.symbol).put("name", c.name).put("image", c.image)
-        .put("price", c.priceUsd).put("mcap", c.marketCap).put("rank", c.rank).put("ch", c.change24h).put("mint", c.mint).toString()
+        .put("price", c.priceUsd).put("mcap", c.marketCap).put("rank", c.rank).put("ch", c.change24h).put("mint", c.mint)
+        .put("vol", c.volume24h).toString()
 
     fun fromJson(s: String): Coin? = runCatching {
         val o = org.json.JSONObject(s)
@@ -76,6 +87,7 @@ object Market {
             o.getString("id"), o.getString("symbol"), o.getString("name"), o.optString("image").takeIf { it.isNotEmpty() },
             o.optDouble("price").takeIf { !it.isNaN() }, o.optDouble("mcap").takeIf { !it.isNaN() },
             o.optInt("rank").takeIf { it > 0 }, o.optDouble("ch").takeIf { !it.isNaN() }, o.optString("mint").takeIf { it.isNotEmpty() },
+            o.optDouble("vol").takeIf { !it.isNaN() && it > 0 },
         )
     }.getOrNull()
 
@@ -148,6 +160,43 @@ object Market {
         return parse(arr).associateBy { it.id }
     }
 
+    /**
+     * Candles for a coin that has no pool to read: bitcoin, ether, anything that
+     * does not live on this chain.
+     *
+     * GeckoTerminal only knows pools, so it can draw a Solana coin beautifully
+     * and cannot draw bitcoin at all — and "no chart" on the most famous coin in
+     * the list reads as a broken screen, not as a missing pool. CoinGecko's OHLC
+     * is the same data one level up: an exchange-weighted price rather than one
+     * pool's, free, no key, and it covers every coin in the ranking.
+     *
+     * The candle size is chosen by the API from the number of days asked for
+     * (a day gives half-hours, a month gives four-hours, a year gives four-day
+     * candles), which is why the spans here are named after the range they cover
+     * and never after a candle size we do not control. No volume comes back with
+     * it; the screen asks the market data for that instead of inventing bars.
+     */
+    private val ohlcCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Gecko.Candle>>>()
+    private const val OHLC_TTL_MS = 5 * 60_000L
+
+    fun ohlc(id: String, days: Int): List<Gecko.Candle> {
+        val k = "$id|$days"
+        val now = System.currentTimeMillis()
+        ohlcCache[k]?.let { (at, v) -> if (now - at < OHLC_TTL_MS) return v }
+        val arr = getArray("$BASE/coins/" + URLEncoder.encode(id, "UTF-8") + "/ohlc?vs_currency=usd&days=$days") ?: return emptyList()
+        val out = ArrayList<Gecko.Candle>(arr.length())
+        for (i in 0 until arr.length()) {
+            // [timestamp, open, high, low, close] — already oldest first.
+            val row = arr.optJSONArray(i) ?: continue
+            val t = row.optLong(0)
+            val c = row.optDouble(4)
+            if (t <= 0 || c.isNaN() || c <= 0) continue
+            out += Gecko.Candle(t, row.optDouble(1), row.optDouble(2), row.optDouble(3), c, 0.0)
+        }
+        if (out.isNotEmpty()) ohlcCache[k] = now to out
+        return out
+    }
+
     private fun parse(arr: JSONArray): List<Coin> {
         val out = ArrayList<Coin>(arr.length())
         for (i in 0 until arr.length()) {
@@ -163,6 +212,7 @@ object Market {
                 rank = o.optInt("market_cap_rank").takeIf { it > 0 },
                 change24h = o.optDouble("price_change_percentage_24h").takeIf { !it.isNaN() },
                 mint = mints[id]?.takeIf { it.isNotEmpty() },
+                volume24h = o.optDouble("total_volume").takeIf { !it.isNaN() && it > 0 },
             )
         }
         return out

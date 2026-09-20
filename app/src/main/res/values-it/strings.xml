@@ -1314,6 +1314,20 @@
     <string name="span_days">3 mesi</string>
     <string name="chart_none">Questa moneta non ha ancora uno storico prezzi.</string>
     <string name="chart_change">%1$s in %2$s</string>
+    <string name="span_week">7 giorni</string>
+    <string name="span_month">30 giorni</string>
+    <string name="span_year">1 anno</string>
+    <string name="chart_src_pool">pool</string>
+    <string name="chart_src_market">mercato</string>
+    <string name="chart_ohlc">Ap %1$s · Max %2$s · Min %3$s · Ch %4$s</string>
+    <string name="chart_vol_at">vol %1$s</string>
+    <string name="chart_liquidity">Liquidità</string>
+    <string name="chart_volume24">Volume 24h</string>
+    <string name="chart_trades24">Acquisti / vendite 24h</string>
+    <string name="chart_mcap">Capitalizzazione</string>
+    <string name="chart_fdv">Diluita</string>
+    <string name="chart_dex">Exchange</string>
+    <string name="chart_open_on">Apri su %1$s</string>
     <string name="who_clock">aggiornato %1$s fa · prossimo fra %2$s</string>
     <string name="who_clock2">prossimo giro fra %1$s</string>
     <string name="who_clock_late">sto guardando…</string>
@@ -1572,7 +1586,13 @@
     <string name="bridge_dest_hint">Il tuo indirizzo su %1$s</string>
     <string name="bridge_quoting">Chiedo le rotte…</string>
     <string name="bridge_no_route">Nessuna rotta con deposito per questo, adesso. Prova un altro importo o un\'altra catena.</string>
+    <string name="bridge_min">Sotto il minimo di questa rotta. Servono almeno %1$s %2$s.</string>
+    <string name="bridge_floor">Servono almeno %1$s %2$s.</string>
+    <string name="bridge_floor_usd">Minimo %3$s, cioè %1$s %2$s.</string>
+    <string name="bridge_use_min">Metti %1$s %2$s</string>
     <string name="bridge_quote_line">Commissioni e gas circa %1$s $ · circa %2$s min</string>
+    <string name="bridge_route_cost2">Costa %3$s · %1$s %2$s · il %4$s%%</string>
+    <string name="bridge_quote_of_which">di cui %1$s $ di commissioni e gas dichiarati · circa %2$s min</string>
     <string name="bridge_go">Continua: apri l\'ordine</string>
     <string name="bridge_opening">Apro l\'ordine…</string>
     <string name="bridge_open_failed">RocketX non ha aperto l\'ordine. Riprova.</string>
@@ -1790,8 +1810,8 @@
     <string name="bridge_mode_chain">Su un\'altra catena</string>
     <string name="bridge_mode_private">Privato, qui su Solana</string>
     <string name="bridge_private_what">Stessa moneta, stessa catena, un altro indirizzo tuo. I soldi passano da uno scambio, che spezza il filo in catena fra quello che è entrato e quello che è uscito.</string>
-    <string name="bridge_route_cost">costa il %1$s%% di quello che mandi</string>
     <string name="bridge_truth_private">Cosa fa: la catena non mostra più una riga dal tuo indirizzo all\'altro. Cosa non fa: nasconderti allo scambio in mezzo, che vede tutte e due le sponde e non chiede a nessuno chi è. Non è anonimato, è un filo spezzato. L\'ordine dà un indirizzo di deposito; i soldi ci vanno con il Manda normale, scontrino e impronta compresi, e tornano a questo portafoglio se lo scambio non riesce a finire.</string>
     <string name="send_private">Manda privato</string>
-    <string name="send_private_sub">La catena non mostra più una riga fra i due indirizzi. Costa l\'1 o 2% e ci mette qualche minuto.</string>
+    <string name="send_private_sub">La catena non mostra più una riga fra i due indirizzi. Ci mette qualche minuto.</string>
+    <string name="send_private_switch">Passa a SOL.</string>
 </resources>

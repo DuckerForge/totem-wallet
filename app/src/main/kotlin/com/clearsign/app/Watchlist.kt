@@ -49,6 +49,12 @@ object Watchlist {
      * why. Every amount above zero brings its coin back into the list.
      */
     fun reconcile(ctx: Context) {
+        // "SOL" is what the wallet calls the coin that has no token account, and
+        // it is not a mint. Starred from the portfolio it landed in here as a
+        // key nobody could price, chart or buy, sitting next to the Solana the
+        // market already followed by mint. Everything under it moves across.
+        rename(ctx, com.clearsign.core.NATIVE_SOL_MINT, Jupiter.SOL_MINT)
+
         val all = prefs(ctx).all
         val listed = all(ctx)
         all.keys.filter { it.startsWith("qty_") }.forEach { k ->
@@ -56,6 +62,26 @@ object Watchlist {
             val qty = (all[k] as? String)?.toDoubleOrNull() ?: 0.0
             if (qty > 0 && key !in listed) add(ctx, key)
         }
+    }
+
+    /**
+     * The same coin under a better name.
+     *
+     * A coin is followed by one key, and the key it was first saved under is not
+     * always the key it should be kept under. Renaming has to carry the amount,
+     * the bell and the last known price with it, or the coin comes back stripped
+     * of everything the person typed into it. The destination wins when both
+     * exist: it is the one that works.
+     */
+    fun rename(ctx: Context, from: String, to: String) {
+        if (from == to || !has(ctx, from)) return
+        val qty = amount(ctx, from)
+        if (qty > 0 && amount(ctx, to) <= 0) setAmount(ctx, to, qty)
+        if (moves(ctx, from) && !moves(ctx, to)) setMoves(ctx, to, true)
+        recallCoin(ctx, from)?.let { if (recallCoin(ctx, to) == null) rememberCoin(ctx, to, it) }
+        add(ctx, to)
+        remove(ctx, from)
+        prefs(ctx).edit().remove("mv_" + from).remove("mvp_" + from).remove("seen_" + from).apply()
     }
 
     // ---- "tell me when it moves", per coin, like CoinGecko's bell -------------

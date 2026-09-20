@@ -95,7 +95,12 @@ internal fun BridgeSheet(
     // quello, mentre i numeri sullo schermo erano del primo.
     var pending by remember { mutableStateOf<RocketX.Order?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    val fromMint = if (usdc) "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" else null
+    // La cifra sotto la quale nessuno accetta. Viene dal preventivo rifiutato,
+    // non da noi: dipende dal prezzo del momento e cambia da un'ora all'altra.
+    var minAmount by remember { mutableStateOf<Double?>(null) }
+    // Lo stesso numero, saputo prima di provare. Vedi [RocketX.PROBE].
+    var floor by remember { mutableStateOf<Pair<Double, Double?>?>(null) }
+    val fromMint = if (usdc) USDC_MINT else null
     val fromSym = if (usdc) "USDC" else "SOL"
 
     LaunchedEffect(Unit) {
@@ -113,22 +118,57 @@ internal fun BridgeSheet(
         }
     }
 
+    /**
+     * Il minimo chiesto all'apertura, non dopo il rifiuto.
+     *
+     * Solo sull'invio privato. Li' le rotte sono tutte private e condividono la
+     * stessa soglia, quindi sotto quella cifra la pagina si svuota per intero e
+     * non parte niente: e' una regola della schermata, e una regola si scrive
+     * prima. Su un ponte normale invece non c'e' un minimo da scrivere —
+     * misurato: Relay accetta un millesimo di SOL — e annunciarne uno vorrebbe
+     * dire inventare un divieto che non esiste.
+     */
+    LaunchedEffect(private, usdc) {
+        floor = null
+        if (!private) return@LaunchedEffect
+        val probe = withContext(Dispatchers.IO) {
+            // [RocketX.home] la prima volta e' una chiamata, non una lettura:
+            // va chiesta di qua e non sul thread che sta disegnando.
+            val t = RocketX.home() ?: return@withContext null
+            runCatching { RocketX.quote(fromMint, "solana", fromMint, t.id, RocketX.PROBE) }.getOrNull()
+        }
+        floor = probe?.minAmount?.let { it to probe.minUsd }
+    }
+
     val amt = amount.replace(',', '.').toDoubleOrNull()
     LaunchedEffect(target, fromMint, toToken, amt, sameCoin, private) {
-        quotes = emptyList(); error = null; picked = 0; worse = null; pending = null
-        val t = if (private) RocketX.home() else target
-        if (t == null) return@LaunchedEffect
+        quotes = emptyList(); error = null; minAmount = null; picked = 0; worse = null; pending = null
+        if (!private && target == null) return@LaunchedEffect
         if (amt == null || amt <= 0) return@LaunchedEffect
         if (!private && usdc && sameCoin && toToken == null) return@LaunchedEffect
         delay(500)
         quoting = true
-        quotes = withContext(Dispatchers.IO) {
+        val answer = withContext(Dispatchers.IO) {
+            // Anche qui la sponda si risolve dentro l'IO: [RocketX.home] la
+            // prima volta va in rete, e andarci di qua bloccava il disegno.
+            val t = (if (private) RocketX.home() else target) ?: return@withContext null
             // Privato: stessa moneta e stessa catena da tutte e due le parti.
             val to = if (private) fromMint else if (usdc && sameCoin) toToken?.contract else null
-            runCatching { RocketX.quote(fromMint, "solana", to, t.id, amt) }.getOrDefault(emptyList())
-        }.filter { it.walletLess }
+            runCatching { RocketX.quote(fromMint, "solana", to, t.id, amt) }.getOrNull()
+        } ?: RocketX.Quotes(emptyList(), null, null)
+        quotes = answer.list.filter { it.walletLess }
+        minAmount = answer.minAmount?.takeIf { quotes.isEmpty() }
+        // Il minimo appena detto da una risposta fresca vale piu' di quello
+        // chiesto all'apertura: e' lo stesso numero, mezz'ora dopo.
+        minAmount?.let { floor = it to answer.minUsd }
         quoting = false
-        if (quotes.isEmpty()) error = ctx.getString(R.string.bridge_no_route)
+        // "Nessuna rotta, prova un altro importo" mandava a indovinare un numero
+        // che la risposta conteneva gia'. Quando il no e' per la cifra, si dice
+        // qual e' la cifra.
+        if (quotes.isEmpty()) {
+            error = minAmount?.let { ctx.getString(R.string.bridge_min, minText(it), fromSym) }
+                ?: ctx.getString(R.string.bridge_no_route)
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
@@ -218,6 +258,20 @@ internal fun BridgeSheet(
                 colors = pickerField(), shape = rs(12),
             )
 
+            // Quanto ci vuole come minimo, detto prima di scrivere la cifra.
+            // In dollari accanto, perche' quello e' il numero che sta fermo: la
+            // cifra in SOL cambia a ogni movimento del prezzo, e senza i
+            // dollari accanto sembra che l'app non sappia decidersi.
+            floor?.let { (m, usd) ->
+                Text(
+                    if (usd == null) stringResource(R.string.bridge_floor, minText(m), fromSym)
+                    // [fmtPrice] e non [fmtFiat]: il minimo e' un cartello
+                    // pubblico, non un tuo saldo, e non va nascosto in ospite.
+                    else stringResource(R.string.bridge_floor_usd, minText(m), fromSym, fmtPrice(usd, "USD")),
+                    style = HaloType.small, color = Halo.muted,
+                )
+            }
+
             // Il giudizio sull'indirizzo, mentre lo incolli e non dopo.
             // Dove arrivano i soldi: l'altra catena, oppure Solana stessa.
             val landing = if (private) RocketX.home() else target
@@ -230,6 +284,17 @@ internal fun BridgeSheet(
 
             if (quoting) Text(stringResource(R.string.bridge_quoting), style = HaloType.small, color = Halo.muted)
             error?.let { Banner(it, Halo.amber, HIcon.WARNING) }
+            // Il minimo non e' solo una notizia, e' una cifra da mettere nel
+            // campo: ricopiarla a mano da un avviso e' lavoro che il telefono
+            // sa fare da solo, e a mano si sbaglia una cifra e si riprova.
+            minAmount?.let { m ->
+                Row {
+                    SmallChip(stringResource(R.string.bridge_use_min, minText(m), fromSym), HIcon.PEN, tint = Halo.mint) {
+                        amount = minText(m)
+                        Haptics.tick(ctx)
+                    }
+                }
+            }
             // Tre rotte, e quella scelta e' quella che parte.
             //
             // Prima se ne mostravano tre e il bottone prendeva sempre la prima:
@@ -248,23 +313,42 @@ internal fun BridgeSheet(
                         Text(q.exchange + " · " + q.keyword.lowercase().replaceFirstChar { it.uppercase() }, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
                         Text(String.format(Locale.ROOT, "%.6f", q.toAmount).trimEnd('0').trimEnd('.') + " " + (if (private || (usdc && sameCoin)) fromSym else landing?.native ?: ""), fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (best) Halo.mint else Halo.ink)
                     }
-                    // Quanto ti costa la strada, in percentuale e in grande.
+                    // Quanto ti costa la strada, per intero e in soldi.
                     //
-                    // Fra le rotte private ce n'e' una che costa l'uno e tre e
-                    // una che costa l'undici e mezzo: non e' una commissione,
-                    // e' il giro di andata e ritorno su un'altra moneta. Messe
-                    // in fila senza quel numero sembrano scelte fra pari, e non
-                    // lo sono di un ordine di grandezza.
-                    if (private && amt != null && amt > 0 && q.toAmount > 0) {
-                        val cost = (amt - q.toAmount) / amt * 100.0
+                    // La riga sotto diceva solo le commissioni dichiarate, e
+                    // quelle sono meno della meta' del conto: su un SOL valgono
+                    // 0,86 $ mentre fra partenza e arrivo ne mancano 1,10. Il
+                    // resto e' il cambio dentro la rotta, che non sta in nessun
+                    // campo e si vede solo sottraendo. Questa riga e' quella
+                    // sottrazione, ed e' la cifra che paghi davvero.
+                    //
+                    // Si puo' fare solo dove la moneta e' la stessa sulle due
+                    // sponde: l'invio privato e USDC verso USDC. Su un ponte
+                    // vero partono SOL e arriva ETH, e sottrarre due monete
+                    // diverse non vuol dire niente.
+                    val sameUnit = private || (usdc && sameCoin)
+                    val cost = if (sameUnit && amt != null && amt > 0 && q.toAmount > 0) amt - q.toAmount else null
+                    if (cost != null && cost > 0) {
+                        val pctCost = cost / amt!! * 100.0
+                        val costUsd = q.usdPerUnit?.let { cost * it }
                         Text(
-                            stringResource(R.string.bridge_route_cost, String.format(Locale.ROOT, "%.1f", cost)),
+                            stringResource(
+                                R.string.bridge_route_cost2,
+                                coinText(cost), fromSym,
+                                costUsd?.let { fmtPrice(it, "USD") } ?: "—",
+                                String.format(Locale.ROOT, "%.1f", pctCost),
+                            ),
                             fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                            color = if (cost > 5) Halo.red else if (cost > 2) Halo.amber else Halo.mint,
+                            color = if (pctCost > 5) Halo.red else if (pctCost > 2) Halo.amber else Halo.mint,
                         )
                     }
+                    // Le commissioni dichiarate: sotto il totale sono un
+                    // dettaglio, da sole sono tutto quello che si sa.
                     Text(
-                        stringResource(R.string.bridge_quote_line, String.format(Locale.ROOT, "%.2f", q.feeUsd + q.gasUsd), q.minutes?.toString() ?: "?"),
+                        stringResource(
+                            if (cost != null && cost > 0) R.string.bridge_quote_of_which else R.string.bridge_quote_line,
+                            String.format(Locale.ROOT, "%.2f", q.feeUsd + q.gasUsd), q.minutes?.toString() ?: "?",
+                        ),
                         style = HaloType.small, color = Halo.muted,
                     )
                 }
@@ -377,3 +461,22 @@ internal fun BridgeSheet(
         }
     }
 }
+
+/**
+ * Il minimo, scritto per eccesso.
+ *
+ * Arrotondato per difetto rimette la cifra sotto il minimo, e la rotta dice di
+ * no una seconda volta con lo stesso avviso: l'unico arrotondamento che vale
+ * qui e' quello che sta dalla parte giusta della soglia.
+ */
+internal fun minText(v: Double): String {
+    val up = kotlin.math.ceil(v * 10_000.0) / 10_000.0
+    return String.format(Locale.getDefault(), "%.4f", up).trimEnd('0').trimEnd { !it.isDigit() }
+}
+
+/** Una cifra in moneta, senza zeri in coda. */
+internal fun coinText(v: Double): String =
+    String.format(Locale.ROOT, "%.6f", v).trimEnd('0').trimEnd('.')
+
+/** L'unico USDC vero su Solana. Scritto una volta, letto da chi manda e da chi fa il ponte. */
+internal const val USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"

@@ -51,10 +51,31 @@ object Gecko {
      * label over the same data: asking for a day of one-minute candles and
      * drawing every tenth is a lie about the resolution you are seeing.
      */
-    enum class Span(val path: String, val aggregate: Int, val limit: Int, val labelRes: Int) {
-        MINUTES("minute", 5, 60, R.string.span_minutes),   // five hours, five-minute candles
-        HOURS("hour", 1, 48, R.string.span_hours),         // two days, hourly
-        DAYS("day", 1, 90, R.string.span_days),            // three months, daily
+    // [cgDays] is how many days to ask CoinGecko for when the coin has no pool
+    // to read — null where no honest range matches: five hours of five-minute
+    // candles has no equivalent up there, and asking for a day of half-hours
+    // under a label that says five hours would be a lie about what is drawn.
+    enum class Span(val path: String, val aggregate: Int, val limit: Int, val labelRes: Int, val cgDays: Int?) {
+        MINUTES("minute", 5, 60, R.string.span_minutes, null),  // five hours, five-minute candles
+        HOURS("hour", 1, 48, R.string.span_hours, 2),           // two days, hourly
+        WEEK("hour", 1, 168, R.string.span_week, 7),            // a week, hourly
+        MONTH("hour", 4, 180, R.string.span_month, 30),         // a month, four-hourly
+        DAYS("day", 1, 90, R.string.span_days, 90),             // three months, daily
+        YEAR("day", 1, 365, R.string.span_year, 365);           // a year, daily
+
+        companion object {
+            /**
+             * The three that fit under a button.
+             *
+             * A swap sheet and an order sheet have room for a glance, not for a
+             * timeframe picker: the question there is "which way has this been
+             * going", and six chips in a row would be answering a question
+             * nobody asked while pushing the button off the screen. The coin
+             * page, which is where somebody goes *to look at the chart*, gets
+             * the lot.
+             */
+            val small = listOf(MINUTES, HOURS, DAYS)
+        }
     }
 
     /**
@@ -126,19 +147,66 @@ object Gecko {
         return v
     }
 
-    /** The busiest pool for [mint], which is the one a price should come from. */
-    fun topPool(mint: String, bg: Boolean = false): String? {
+    /**
+     * The busiest pool for a coin, and what has been going through it.
+     *
+     * The call that finds the pool already answers with everything a trader
+     * reads before the chart itself: how deep it is, how much changed hands
+     * today, how many of those were people buying rather than selling. It was
+     * being thrown away and the id kept, so the coin page had a picture of a
+     * price with nothing underneath it saying whether that price stands on ten
+     * million dollars of liquidity or on eight hundred.
+     *
+     * The numbers are minutes-fresh and the id is not, so they are cached apart:
+     * the id for a week and on disk, the figures for three minutes and in memory.
+     */
+    data class Pool(
+        val id: String,
+        /** Raydium, Orca, Meteora… whoever holds it. */
+        val dex: String?,
+        val liquidityUsd: Double?,
+        val volume24Usd: Double?,
+        val buys24: Int?,
+        val sells24: Int?,
+        val fdvUsd: Double?,
+    )
+
+    private val statsCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Pool>>()
+    private const val STATS_MS = 3 * 60_000L
+
+    fun pool(mint: String, bg: Boolean = false): Pool? {
+        val now = System.currentTimeMillis()
+        statsCache[mint]?.let { (at, p) -> if (now - at < STATS_MS) return p }
         val data = get("$BASE/tokens/$mint/pools?page=1", bg)?.optJSONArray("data") ?: return null
-        var best: String? = null
-        var bestLiq = -1.0
+        var best: Pool? = null
         for (i in 0 until data.length()) {
             val p = data.optJSONObject(i) ?: continue
-            val liq = p.optJSONObject("attributes")?.optString("reserve_in_usd")?.toDoubleOrNull() ?: 0.0
+            val a = p.optJSONObject("attributes")
+            val liq = a?.optString("reserve_in_usd")?.toDoubleOrNull() ?: 0.0
             val id = p.optString("id").substringAfter('_', "")
-            if (id.isNotEmpty() && liq > bestLiq) { bestLiq = liq; best = id }
+            if (id.isEmpty() || liq <= (best?.liquidityUsd ?: -1.0)) continue
+            val tx = a?.optJSONObject("transactions")?.optJSONObject("h24")
+            best = Pool(
+                id = id,
+                dex = p.optJSONObject("relationships")?.optJSONObject("dex")?.optJSONObject("data")
+                    ?.optString("id")?.takeIf { it.isNotEmpty() },
+                liquidityUsd = liq.takeIf { it > 0 },
+                volume24Usd = a?.optJSONObject("volume_usd")?.optString("h24")?.toDoubleOrNull()?.takeIf { it > 0 },
+                buys24 = tx?.optInt("buys", -1)?.takeIf { it >= 0 },
+                sells24 = tx?.optInt("sells", -1)?.takeIf { it >= 0 },
+                fdvUsd = a?.optString("fdv_usd")?.toDoubleOrNull()?.takeIf { it > 0 },
+            )
+        }
+        best?.let {
+            statsCache[mint] = now to it
+            poolCache[mint] = now to it.id
+            savePools()
         }
         return best
     }
+
+    /** The busiest pool for [mint], which is the one a price should come from. */
+    fun topPool(mint: String, bg: Boolean = false): String? = pool(mint, bg)?.id
 
     /**
      * Closing prices for [pool], oldest first. Empty when the pool is too young or
@@ -155,7 +223,15 @@ object Gecko {
      * line at the moment they did it. The price under that mark is read off the
      * chart, never off a claim about what they paid, which nobody published.
      */
-    data class Candle(val at: Long, val close: Double)
+    data class Candle(
+        val at: Long,
+        val open: Double,
+        val high: Double,
+        val low: Double,
+        val close: Double,
+        /** Dollars through the pool in this candle. Zero when the source has no volume to give. */
+        val volume: Double,
+    )
 
     fun candles(pool: String, span: Span, bg: Boolean = false): List<Candle> {
         val url = "$BASE/pools/$pool/ohlcv/${span.path}?aggregate=${span.aggregate}&limit=${span.limit}"
@@ -167,7 +243,12 @@ object Gecko {
             val row = list.optJSONArray(i) ?: continue
             val c = row.optDouble(4)
             val t = row.optLong(0)
-            if (!c.isNaN() && c > 0 && t > 0) out += Candle(t * 1000L, c)
+            if (c.isNaN() || c <= 0 || t <= 0) continue
+            // The close was all anybody kept, because all anybody drew was a
+            // line. A candle needs the other three, and the bar under it needs
+            // the volume: the same request already carried them.
+            fun at(k: Int, fallback: Double) = row.optDouble(k).takeIf { !it.isNaN() && it > 0 } ?: fallback
+            out += Candle(t * 1000L, at(1, c), at(2, c), at(3, c), c, row.optDouble(5).takeIf { !it.isNaN() && it > 0 } ?: 0.0)
         }
         // The API answers newest first; a chart reads left to right.
         return out.asReversed()

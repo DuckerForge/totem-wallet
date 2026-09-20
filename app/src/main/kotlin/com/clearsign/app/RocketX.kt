@@ -125,8 +125,128 @@ object RocketX {
         val exchange: String, val keyword: String, val type: String, val walletLess: Boolean, val memoRequired: Boolean,
         val fromAmount: Double, val toAmount: Double, val feeUsd: Double, val gasUsd: Double, val minutes: Int?,
         val fromId: Int, val toId: Int, val allowed: Boolean, val priceImpact: Double?,
+        /**
+         * Commissione piu' gas, nella moneta che mandi. Dichiarate da loro.
+         *
+         * Non sono tutto quello che paghi: su un SOL, queste due valgono 0,0079
+         * e quello che arriva e' 0,0102 sotto. La differenza e' il cambio di
+         * andata e ritorno dentro la rotta, che non compare in nessun campo e
+         * si vede solo sottraendo. Per questo lo schermo mostra la sottrazione
+         * e mette queste due sotto, come dettaglio.
+         */
+        val feeCoin: Double?,
+        /** Il prezzo della moneta, implicito nella stessa risposta: la fee in dollari diviso la fee in moneta. */
+        val usdPerUnit: Double?,
     )
     data class Order(val requestId: String, val txId: Long, val depositAddress: String?, val memo: String?, val toAmount: Double, val exchange: String)
+
+    /**
+     * I preventivi, e il motivo di quelli che mancano.
+     *
+     * Una rotta rifiutata torna dentro `quotes` come tutte le altre, ma senza
+     * `toAmount` e senza `isTxnAllowed`, con la ragione scritta in `err`:
+     * "Min. Amount: 0.462745 SOL". Si buttava via insieme alla rotta, e sullo
+     * schermo restava "nessuna rotta, prova un altro importo" — vero e inutile,
+     * perche' la cifra giusta da provare era gia' nella risposta.
+     *
+     * Conta soprattutto sull'invio privato: li' le rotte sono tutte private e
+     * hanno tutte lo stesso minimo, quindi sotto quella cifra la pagina si
+     * svuota per intero. Su un ponte normale il minimo tocca una rotta sola e
+     * le altre rispondono lo stesso, ed e' giusto che non se ne parli.
+     *
+     * [minAmount] e' il piu' basso fra i minimi rifiutati: e' quello che
+     * sblocca la prima rotta, non quello che le sblocca tutte. Vale solo
+     * quando non e' rimasto niente di usabile: se una rotta qualsiasi accetta,
+     * un minimo non c'e', e dirlo sarebbe falso.
+     *
+     * [minUsd] e' lo stesso numero in dollari, ed e' la parte che sta ferma.
+     * Misurato il 20 settembre 2026: le rotte private chiedono 50 $ tondi, in
+     * SOL come in USDC, riconvertiti al prezzo del momento. Per questo la cifra
+     * in SOL balla di continuo (0,462217, poi 0,462745, poi 0,462002) e per
+     * questo non e' scritta da nessuna parte qui dentro: fra un'ora e' un'altra.
+     */
+    data class Quotes(val list: List<Quote>, val minAmount: Double?, val minUsd: Double?)
+
+    /**
+     * Una cifra volutamente ridicola, per farsi dire di no e leggere il minimo.
+     *
+     * E' l'unico modo di sapere il minimo **prima** che qualcuno provi a
+     * mandare: il numero non sta in nessun elenco, lo dice solo un preventivo
+     * rifiutato. Un millesimo di SOL e' sotto la soglia di chiunque.
+     */
+    const val PROBE = 0.001
+
+    /** "Min. Amount: 0.462745 SOL" -> 0.462745. Il simbolo lo sappiamo gia' noi. */
+    private val MIN_NUM = Regex("([0-9]+(?:\\.[0-9]+)?)")
+
+    /**
+     * I numeri della rotta privata, per chi non ha ancora aperto il ponte.
+     *
+     * Il cartellino sul Manda diceva "costa l'1 o 2%", scritto a mano molto
+     * tempo fa, e non diceva che sotto i cinquanta dollari non parte niente.
+     * Due cose inventate al posto di due numeri che l'API regala: quanto costa
+     * davvero questa cifra su questa rotta, e qual e' il minimo adesso.
+     *
+     * Una chiamata sola quando la cifra va bene. Due solo quando viene
+     * rifiutata, perche' allora la seconda serve a sapere di quanto.
+     *
+     * Blocking: chiamare su IO. [fromToken] null e' SOL, altrimenti il mint.
+     */
+    data class Privately(
+        val minAmount: Double?,
+        val minUsd: Double?,
+        val costCoin: Double?,
+        val costUsd: Double?,
+        val costPct: Double?,
+        val minutes: Int?,
+    )
+
+    /**
+     * Il minimo di ieri, per non lasciare la riga vuota mentre arriva quello di oggi.
+     *
+     * Saperlo costa due chiamate in fila, la lista delle catene e il preventivo
+     * rifiutato, e in quei tre secondi il cartellino non diceva niente: uno lo
+     * guarda, non ci trova un numero, e va avanti. Il pavimento in dollari pero'
+     * non si muove — cinquanta, misurati per dieci minuti di fila — quindi
+     * l'ultimo visto e' quasi sempre ancora quello giusto. Si scrive subito e si
+     * corregge da solo un istante dopo.
+     */
+    private fun floorPrefs(ctx: Context) = ctx.getSharedPreferences("apex_rocketx", Context.MODE_PRIVATE)
+
+    fun rememberFloor(ctx: Context, symbol: String, coin: Double, usd: Double?) {
+        floorPrefs(ctx).edit().putString("floor_$symbol", coin.toString())
+            .putString("floorusd_$symbol", usd?.toString() ?: "").apply()
+    }
+
+    fun recallFloor(ctx: Context, symbol: String): Privately? {
+        val p = floorPrefs(ctx)
+        val coin = p.getString("floor_$symbol", null)?.toDoubleOrNull() ?: return null
+        return Privately(coin, p.getString("floorusd_$symbol", null)?.toDoubleOrNull(), null, null, null, null)
+    }
+
+    fun privately(fromToken: String?, amount: Double?): Privately? {
+        // Senza passare da [home].
+        //
+        // Serviva a leggere un id che vale "solana" ed e' gia' scritto a mano
+        // come catena di partenza in ogni chiamata di questo file. In cambio
+        // costava il caricamento delle catene: centosettanta kilobyte e
+        // duecento voci da ricucire sul telefono, prima di poter chiedere la
+        // cosa sola che serve. Il cartellino sul Manda restava muto per tutto
+        // quel tempo, e una riga che arriva dopo che hai smesso di guardarla
+        // non e' arrivata.
+        if (amount != null && amount > 0) {
+            val q = quote(fromToken, "solana", fromToken, "solana", amount)
+            val best = q.list.firstOrNull { it.walletLess }
+            if (best != null && best.toAmount > 0 && best.toAmount < amount) {
+                val cost = amount - best.toAmount
+                return Privately(null, null, cost, best.usdPerUnit?.let { cost * it }, cost / amount * 100.0, best.minutes)
+            }
+            q.minAmount?.let { return Privately(it, q.minUsd, null, null, null, null) }
+        }
+        val probe = quote(fromToken, "solana", fromToken, "solana", PROBE)
+        if (probe.minAmount == null) Log.w(TAG, "privately: preventivo senza minimo (rotte ${probe.list.size})")
+        return Privately(probe.minAmount, probe.minUsd, null, null, null, null)
+    }
 
     /**
      * L'indirizzo ha la forma giusta per quella catena?
@@ -237,11 +357,19 @@ object RocketX {
     }
 
     /** [fromToken]/[toToken] are contract addresses, or null for the chain's native coin. Amount in whole coins. */
-    fun quote(fromToken: String?, fromNetwork: String, toToken: String?, toNetwork: String, amount: Double, slippage: Double = 1.0): List<Quote> {
+    fun quote(fromToken: String?, fromNetwork: String, toToken: String?, toNetwork: String, amount: Double, slippage: Double = 1.0): Quotes {
         val q = "fromToken=${fromToken ?: "null"}&fromNetwork=${enc(fromNetwork)}&toToken=${toToken ?: "null"}&toNetwork=${enc(toNetwork)}&amount=$amount&slippage=$slippage"
-        val o = get(endpoint("/quotation?$q")) ?: return emptyList()
-        val arr = o.optJSONArray("quotes") ?: return emptyList()
-        return (0 until arr.length()).mapNotNull { i ->
+        val o = get(endpoint("/quotation?$q")) ?: return Quotes(emptyList(), null, null)
+        val arr = o.optJSONArray("quotes") ?: return Quotes(emptyList(), null, null)
+        // Il minimo di chi ha detto di no, col prezzo che ha usato per calcolarlo,
+        // prima che le rotte rifiutate spariscano dall'elenco.
+        val refused = (0 until arr.length()).mapNotNull { i ->
+            val x = arr.optJSONObject(i) ?: return@mapNotNull null
+            val why = x.optString("err").takeIf { it.isNotBlank() && it != "null" } ?: return@mapNotNull null
+            val m = MIN_NUM.find(why)?.value?.toDoubleOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
+            m to x.optDouble("fromTokenUsdValue").takeIf { !it.isNaN() && it > 0 }
+        }.minByOrNull { it.first }
+        val list = (0 until arr.length()).mapNotNull { i ->
             val x = arr.optJSONObject(i) ?: return@mapNotNull null
             val e = x.optJSONObject("exchangeInfo") ?: JSONObject()
             Quote(
@@ -253,8 +381,22 @@ object RocketX {
                 fromId = x.optJSONObject("fromTokenInfo")?.optInt("id") ?: 0, toId = x.optJSONObject("toTokenInfo")?.optInt("id") ?: 0,
                 allowed = x.optBoolean("isTxnAllowed", true),
                 priceImpact = x.optJSONObject("additionalInfo")?.optDouble("priceImpact")?.takeIf { !it.isNaN() },
+                feeCoin = listOfNotNull(
+                    x.optDouble("platformFeeInSourceToken").takeIf { !it.isNaN() && it > 0 },
+                    x.optDouble("networkFeeInSourceToken").takeIf { !it.isNaN() && it > 0 },
+                ).takeIf { it.isNotEmpty() }?.sum(),
+                // Un preventivo accettato non porta il prezzo della moneta, ma
+                // porta la stessa commissione scritta due volte, in moneta e in
+                // dollari: il rapporto fra le due e' il prezzo, e arriva senza
+                // chiedere niente a nessuno.
+                usdPerUnit = x.optDouble("platformFeeInSourceToken").takeIf { !it.isNaN() && it > 0 }
+                    ?.let { pf -> x.optDouble("platformFeeUsd").takeIf { !it.isNaN() && it > 0 }?.div(pf) },
             )
         }.filter { it.allowed && it.toAmount > 0 }.sortedByDescending { it.toAmount }
+        // Un minimo si dichiara solo se ha fermato tutto: con una rotta viva
+        // dietro, la cifra e' il capriccio di un exchange e non una soglia.
+        if (list.isNotEmpty() || refused == null) return Quotes(list, null, null)
+        return Quotes(list, refused.first, refused.second?.times(refused.first))
     }
 
     /** Open the order. What comes back for a deposit route is the address to pay. */

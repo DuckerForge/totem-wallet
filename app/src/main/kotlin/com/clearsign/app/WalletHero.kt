@@ -267,12 +267,19 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
     )
 }
 
+/**
+ * One coin you hold.
+ *
+ * There used to be a star at the end of it, to follow the coin from the thing
+ * you already own. It was the wrong place for one. A coin in this list is
+ * already the coin you are watching most closely — you own it — so the star had
+ * nothing to add here, and for native SOL it could not even tell the truth: the
+ * wallet calls it "SOL" and the market calls it by its mint, so the star sat
+ * empty next to a Solana that the Market tab was already following. Following
+ * happens in one place now, where the list it feeds is visible.
+ */
 @Composable
 private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
-    val ctx = LocalContext.current
-    // Follow a coin straight from the thing you already own. The star is the
-    // gesture everyone knows, and it is the same list the Market tab shows.
-    var starred by remember(h.mint) { mutableStateOf(Watchlist.has(ctx, h.mint)) }
     Row(
         Modifier.fillMaxWidth().clip(rs(Radius.row)).clickable(onClick = onClick).padding(vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -307,16 +314,6 @@ private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
                 color = if (h.fiat != null) Halo.ink else Halo.muted,
             )
             h.change24h?.let { c -> Text(pct(c), style = HaloType.label, color = if (c >= 0) Halo.mint else Halo.red) }
-        }
-        Spacer(Modifier.width(2.dp))
-        Box(
-            Modifier.size(30.dp).clip(rs(999)).clickable {
-                starred = Watchlist.toggle(ctx, h.mint)
-                Haptics.tick(ctx)
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            HaloIcon(if (starred) HIcon.STAR_FILLED else HIcon.STAR, if (starred) Halo.amber else Halo.muted.copy(alpha = 0.5f), 15.dp)
         }
     }
 }

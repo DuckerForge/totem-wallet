@@ -33,6 +33,8 @@ object SkrStake {
         val totalStakedRaw: Long,
         /** What one share is worth now. Rewards arrive by this number going up. */
         val sharePrice: Double = 0.0,
+        /** Il conto di stake sulla catena, per il link. Vuoto quando non lo si sa. */
+        val account: String = "",
     ) {
         val ui: Double get() = rawSkr / 1e6
     }

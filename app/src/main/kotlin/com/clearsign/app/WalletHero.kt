@@ -102,6 +102,8 @@ internal fun WalletHero(
     }
     var oreOpen by remember { mutableStateOf(false) }
     if (oreOpen && owner != null) OreSheet(owner, signer) { changed -> oreOpen = false; if (changed) refreshKey++ }
+    var defiOpen by remember { mutableStateOf<DefiPosition?>(null) }
+    defiOpen?.let { d -> DefiSheet(d, currency) { defiOpen = null } }
     var picked by remember { mutableStateOf<Holding?>(null) }
     picked?.let { h ->
         if (owner != null) TokenSheet(
@@ -126,11 +128,20 @@ internal fun WalletHero(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
-            Text(stringResource(R.string.hero_total), style = HaloType.label, color = Halo.muted)
             // A long press covers everything for a guest; a tap on the covered
             // number asks the print to bring it back.
             val guest by Settings.guest
             val ctx = LocalContext.current
+            // Il gesto nascosto si dice, finche' non lo si e' fatto una volta.
+            var hintSeen by remember { mutableStateOf(Settings.hideHintSeen(ctx)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HaloIcon(if (guest) HIcon.LOCK else HIcon.UNLOCK, Halo.muted, 12.dp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    stringResource(R.string.hero_total) + (if (!guest && !hintSeen) " · " + stringResource(R.string.hero_hide_hint) else ""),
+                    style = HaloType.label, color = Halo.muted,
+                )
+            }
             val scope = rememberCoroutineScope()
             Box(
                 Modifier.combinedClickable(
@@ -140,7 +151,7 @@ internal fun WalletHero(
                             if (Presence.confirm(act, ctx.getString(R.string.guest_exit_title), ctx.getString(R.string.guest_exit_sub))) { Settings.guest.value = false; Haptics.success(ctx) }
                         }
                     },
-                    onLongClick = { if (!guest) { Settings.guest.value = true; Haptics.success(ctx) } },
+                    onLongClick = { if (!guest) { Settings.guest.value = true; Haptics.success(ctx); Settings.setHideHintSeen(ctx); hintSeen = true } },
                 ),
             ) {
                 if (guest) Text("••••", style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp), color = Halo.muted)
@@ -172,6 +183,12 @@ internal fun WalletHero(
         pv?.let { view ->
             val main = view.main.filter { it.raw > 0 }
             val others = view.others.filter { it.raw > 0 }
+            // Un portafoglio vuoto lo dice, e dice cosa fare: prima la scheda spariva e basta.
+            if (main.isEmpty() && others.isEmpty() && view.defi.isEmpty()) {
+                GlassCard {
+                    EmptyState(HIcon.WALLET, stringResource(R.string.hero_empty_title), stringResource(R.string.hero_empty_body), stringResource(R.string.receive_btn) to { onAction(HomeAction.RECEIVE) })
+                }
+            }
             if (main.isNotEmpty() || others.isNotEmpty()) {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
@@ -217,7 +234,7 @@ internal fun WalletHero(
                             Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
                             // Tessere in fila, una per posizione: compatte, e scorrono se sono tante.
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                view.defi.forEach { d -> DefiTile(d, currency, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
+                                view.defi.forEach { d -> DefiTile(d, currency) { if (d.kind == DefiPosition.Kind.ORE) oreOpen = true else defiOpen = d } }
                             }
                         }
                         if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
@@ -230,7 +247,13 @@ internal fun WalletHero(
                             if (view.unpriced > 0) Text(stringResource(R.string.hero_some_unpriced), style = HaloType.label, color = Halo.muted)
                             if (others.isNotEmpty()) {
                                 LinkRow(if (showOthers) stringResource(R.string.hero_others_hide) else stringResource(R.string.hero_others, others.size)) { showOthers = !showOthers }
-                                if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
+                                // A pagine di venti: una lista pigra dentro `verticalScroll` non si puo',
+                                // e trentatre' spiccioli composti tutti insieme si sentono nello scorrimento.
+                                var shownOthers by remember(view) { mutableStateOf(20) }
+                                if (showOthers) {
+                                    others.take(shownOthers).forEach { h -> androidx.compose.runtime.key(h.mint) { HoldingRow(h, currency) { picked = h } } }
+                                    if (others.size > shownOthers) LinkRow(stringResource(R.string.hero_others_more, others.size - shownOthers)) { shownOthers += 20 }
+                                }
                             }
                         }
                     }
@@ -288,19 +311,20 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
  */
 @Composable
 private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
+    // How much you hold, and what one of them costs. The second half is
+    // the number you go to another app to look up, and it carries the
+    // day's direction in its colour the way a price always does.
+    val unit = h.fiat?.takeIf { h.ui > 0 }?.let { fmtPrice(it / h.ui, currency) }
+    val move = h.change24h
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().clip(rs(Radius.row)).clickable(onClick = onClick).padding(vertical = Space.sm),
+        Modifier.fillMaxWidth().tappable(src, rs(Radius.row), onClick = onClick).padding(horizontal = Space.sm + 2.dp, vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TokenLogo(h.mint, h.symbol, h.image, 38.dp)
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
             Text(h.name?.takeIf { TokenSymbols.isKnown(h.mint) } ?: h.symbol, style = HaloType.body, color = Halo.ink, maxLines = 1)
-            // How much you hold, and what one of them costs. The second half is
-            // the number you go to another app to look up, and it carries the
-            // day's direction in its colour the way a price always does.
-            val unit = h.fiat?.takeIf { h.ui > 0 }?.let { fmtPrice(it / h.ui, currency) }
-            val move = h.change24h
             Text(
                 buildAnnotatedString {
                     append((if (Settings.guest.value) "••••" else fmtUi(h.ui)) + " " + h.symbol)
@@ -323,6 +347,8 @@ private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
             )
             h.change24h?.let { c -> Text(pct(c), style = HaloType.label, color = if (c >= 0) Halo.mint else Halo.red) }
         }
+        Spacer(Modifier.width(Space.sm))
+        HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 14.dp)
     }
 }
 
@@ -576,7 +602,7 @@ private fun DefiRow(d: DefiPosition, onClick: (() -> Unit)? = null) {
  * una riga; la riga scorre se sono di piu'. La tessera di ORE si tocca.
  */
 @Composable
-private fun DefiTile(d: DefiPosition, currency: String, onClick: (() -> Unit)? = null) {
+private fun DefiTile(d: DefiPosition, currency: String, onClick: () -> Unit) {
     val what = when (d.kind) {
         DefiPosition.Kind.STAKE -> stringResource(R.string.hero_tile_stake)
         DefiPosition.Kind.LEND -> stringResource(R.string.hero_tile_lend)
@@ -586,22 +612,18 @@ private fun DefiTile(d: DefiPosition, currency: String, onClick: (() -> Unit)? =
         DefiPosition.Kind.ORE -> d.sub.substringBefore(" · ")
         else -> d.fiat?.let { fmtFiat(it, currency) } ?: d.sub
     }
-    Column(
-        // 106 dp: tre tessere piu' due spazi stanno nei 339 dp della scheda su un
-        // telefono largo 411. La quarta fa scorrere la fila.
-        Modifier.width(106.dp).clip(rs(14)).background(Halo.cardSoft).border(1.dp, if (onClick != null) Halo.cyan.copy(alpha = 0.35f) else Halo.stroke, rs(14))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    // 106 dp: tre tessere piu' due spazi stanno nei 339 dp della scheda su un
+    // telefono largo 411. La quarta fa scorrere la fila. Ogni tessera apre un
+    // foglio, e lo dice col chevron e con la pressione.
+    HaloTile(106.dp, onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TokenLogo(if (d.kind == DefiPosition.Kind.ORE) com.clearsign.core.Ore.MINT else d.symbol, d.symbol, d.image, 24.dp)
             Spacer(Modifier.width(6.dp))
-            Text(d.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.ink, maxLines = 1)
+            Text(d.symbol, style = HaloType.small.copy(fontFamily = Sora, fontWeight = FontWeight.Bold), color = Halo.ink, maxLines = 1)
         }
-        Text(what, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(what, style = HaloType.label.copy(fontWeight = FontWeight.Medium), color = Halo.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
-            line, fontFamily = Mono, fontSize = 11.sp, style = Tabular, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            line, style = HaloType.mono, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = if (d.state == "active" || d.state == null) Halo.mint else Halo.amber,
         )
     }

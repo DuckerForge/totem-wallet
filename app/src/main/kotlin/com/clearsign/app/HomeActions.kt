@@ -278,22 +278,22 @@ internal fun RecentReceiptsCard(onOpen: () -> Unit) {
         }
     }
     if (entries.isEmpty()) return
+    // Una riga si tocca e apre quello scontrino: aveva la stessa forma delle
+    // righe degli Scontrini e non faceva niente, e il titolo apriva la tab.
+    var selected by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<LedgerEntry?>(null) }
+    selected?.let { e -> ReceiptDetailSheet(e) { selected = null } }
     GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
             CardHeader(stringResource(R.string.tab_receipts), onOpen)
             entries.forEach { e ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(30.dp).clip(rs(Radius.row)).background(Halo.cardSoft),
-                        contentAlignment = Alignment.Center,
-                    ) { HaloIcon(HIcon.RECEIPT, Halo.muted, 15.dp) }
-                    androidx.compose.foundation.layout.Spacer(Modifier.size(Space.md))
-                    Column(Modifier.weight(1f)) {
-                        Text(e.dApp.takeIf { it.isNotBlank() } ?: kindLabel(ctx, e.kind), style = HaloType.small, color = Halo.ink, maxLines = 1)
-                        Text(kindLabel(ctx, e.kind), style = HaloType.label, color = Halo.muted, maxLines = 1)
-                    }
-                    Text(shortWhen(e.at), style = HaloType.label, color = Halo.muted)
-                }
+                HaloRow(
+                    title = e.dApp.takeIf { it.isNotBlank() } ?: kindLabel(ctx, e.kind),
+                    sub = kindLabel(ctx, e.kind),
+                    leading = {
+                        Box(Modifier.size(30.dp).clip(rs(Radius.row)).background(Halo.card), contentAlignment = Alignment.Center) { HaloIcon(HIcon.RECEIPT, Halo.muted, 15.dp) }
+                    },
+                    trailing = { Text(shortWhen(e.at), style = HaloType.label, color = Halo.muted) },
+                ) { selected = e }
             }
         }
     }

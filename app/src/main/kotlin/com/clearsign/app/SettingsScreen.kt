@@ -305,6 +305,23 @@ private fun RpcCard() {
                 shape = rs(12),
             )
             Text(stringResource(R.string.rpc_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+            // Il pool, fornitore per fornitore: nome, stato, chiamate, ultimo
+            // errore. Mai l'indirizzo, che contiene la chiave.
+            val (lines, today) = remember { Rpc.report() }
+            Text(stringResource(R.string.rpc_pool_today, today.first, today.second), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+            lines.forEach { l ->
+                val state = stringResource(
+                    when (l.state) {
+                        RpcPool.State.OK -> R.string.rpc_state_ok
+                        RpcPool.State.COLD -> R.string.rpc_state_cold
+                        RpcPool.State.EXHAUSTED -> R.string.rpc_state_exhausted
+                    },
+                )
+                Text(
+                    "${l.name} · $state · ${l.calls}" + (l.lastError?.let { " · $it" } ?: ""),
+                    fontFamily = Mono, fontSize = 10.5.sp, color = if (l.state == RpcPool.State.OK) Halo.muted else Halo.red, maxLines = 1,
+                )
+            }
         }
     }
 }

@@ -1,0 +1,27 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "context": {
+   "apiVersion": "2.1.0",
+   "slot": 500000100
+  },
+  "value": {
+   "err": {
+    "InstructionError": [
+     0,
+     {
+      "Custom": 1
+     }
+    ]
+   },
+   "logs": [
+    "Program 11111111111111111111111111111111 invoke [1]",
+    "Program 11111111111111111111111111111111 success"
+   ],
+   "accounts": null,
+   "unitsConsumed": 0,
+   "returnData": null
+  }
+ },
+ "id": 1
+}

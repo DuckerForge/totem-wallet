@@ -47,7 +47,10 @@ Android SDK and a JDK 17 to 21.
 ```bash
 cp local.properties.example local.properties
 # sdk.dir, and optionally:
-#   clearsign.heliusRpcUrl   (blank means the public RPC)
+#   clearsign.heliusRpcUrl   (blank means the public RPC; also the DAS lane)
+#   clearsign.alchemyRpcUrl, clearsign.chainstackRpcUrl,
+#   clearsign.rpcfastRpcUrl, clearsign.drpcRpcUrl
+#                            (more free RPC keys for the pool; blank = absent)
 #   clearsign.rocketxKey     (the RocketX partner key, for the bridge)
 #   clearsign.jupReferral    (a Jupiter referral account, for the Ultra fee)
 ```

@@ -20,6 +20,11 @@ android {
     // the scan reads thousands of wallets on a schedule, and if it ever burns through its
     // month the agent must keep trading as if nothing happened. Blank → the feature is off.
     val scanRpcUrl = localProps.getProperty("clearsign.scanRpcUrl", "")
+    // Le altre chiavi del pool RPC. Vuote = fornitore assente. Mai committate.
+    val alchemyRpcUrl = localProps.getProperty("clearsign.alchemyRpcUrl", "")
+    val chainstackRpcUrl = localProps.getProperty("clearsign.chainstackRpcUrl", "")
+    val rpcfastRpcUrl = localProps.getProperty("clearsign.rpcfastRpcUrl", "")
+    val drpcRpcUrl = localProps.getProperty("clearsign.drpcRpcUrl", "")
     // Where the one central scanner publishes what the Seeker crowd is buying.
     // Every phone reads this file; none of them scans. Blank → each phone falls
     // back to scanning for itself, which is fine for one user and absurd for many.
@@ -41,6 +46,10 @@ android {
         versionName = "1.0"
         buildConfigField("String", "HELIUS_RPC_URL", "\"$heliusRpcUrl\"")
         buildConfigField("String", "SCAN_RPC_URL", "\"$scanRpcUrl\"")
+        buildConfigField("String", "ALCHEMY_RPC_URL", "\"$alchemyRpcUrl\"")
+        buildConfigField("String", "CHAINSTACK_RPC_URL", "\"$chainstackRpcUrl\"")
+        buildConfigField("String", "RPCFAST_RPC_URL", "\"$rpcfastRpcUrl\"")
+        buildConfigField("String", "DRPC_RPC_URL", "\"$drpcRpcUrl\"")
         buildConfigField("String", "CROWD_URL", "\"$crowdUrl\"")
         buildConfigField("String", "ARCHIVE_URL", "\"$archiveUrl\"")
         buildConfigField("String", "SKR_TREASURY", "\"$skrTreasury\"")

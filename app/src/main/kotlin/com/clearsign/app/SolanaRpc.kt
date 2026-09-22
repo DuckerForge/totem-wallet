@@ -1,6 +1,5 @@
 package com.clearsign.app
 
-import android.util.Base64
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
@@ -19,9 +18,10 @@ import java.util.concurrent.Future
  *
  * All calls are blocking; never invoke on the main thread.
  *
- * Every read uses `commitment: processed`, the same state the simulation runs
- * against, so pre/post balance diffs never include a phantom delta from a
- * deposit that landed but is not yet finalized.
+ * Every read uses `commitment: processed`, the same level the simulation runs
+ * at. That alone does not line the two up: two nodes are not on the same slot,
+ * and one node moves on between calls. What lines them up is the slot each
+ * answer carries in `result.context`, checked in [simulateEffects].
  */
 object SolanaRpc {
 
@@ -32,10 +32,9 @@ object SolanaRpc {
      *  (never committed); when blank, the public nodes are used. */
     @Volatile var customRpc: String? = BuildConfig.HELIUS_RPC_URL.takeIf { it.isNotBlank() }
 
-    // mainnet-beta supports every method (token + simulate); publicnode is the
-    // rate-limit escape hatch (great for simulate/balance, blocks token calls).
+    // Chi risponde davvero lo decide il pool, in [Rpc]: questo e' solo il
+    // nome con cui i lettori chiedono «la rete principale».
     private const val MAINNET_PRIMARY = "https://api.mainnet-beta.solana.com"
-    private const val MAINNET_FALLBACK = "https://solana-rpc.publicnode.com"
 
     private const val COMMITMENT = "processed"
 
@@ -61,16 +60,11 @@ object SolanaRpc {
         else -> customRpc?.takeIf { it.isNotBlank() } ?: MAINNET_PRIMARY
     }
 
-    private fun candidates(rpcUrl: String): List<String> = when {
-        rpcUrl.contains("devnet") || rpcUrl.contains("testnet") -> listOf(rpcUrl)
-        else -> listOf(rpcUrl, MAINNET_PRIMARY, MAINNET_FALLBACK).distinct()
-    }
-
     data class SimResult(val ok: Boolean, val err: String?, val logs: List<String>, val unitsConsumed: Long?)
 
     /** Simulate a serialized transaction. Returns null on a network/transport failure. */
     fun simulate(rpcUrl: String, txBytes: ByteArray): SimResult? {
-        val b64 = Base64.encodeToString(txBytes, Base64.NO_WRAP)
+        val b64 = B64.encode(txBytes)
         val params = JSONArray()
             .put(b64)
             .put(
@@ -228,6 +222,15 @@ object SolanaRpc {
      *
      * Wire cost: the token-account list (cached), then the simulation and the
      * pre-balance read run concurrently — ~1 round-trip on the hot path.
+     *
+     * La sottrazione si fa solo fra due stati dello stesso slot. Il commento in
+     * cima al file prometteva che `processed` bastasse a tenerli allineati; non
+     * e' vero, due nodi non stanno sullo stesso slot e anche uno solo avanza fra
+     * una chiamata e l'altra. Lo slot vero lo scrivono tutte e due le risposte in
+     * `result.context.slot`, e qui si legge. Quando non coincidono si riprova una
+     * volta, e se nemmeno cosi' si allineano si accetta la lettura solo se uno
+     * stato identico la racchiude da tutte e due le parti: vedi [alignedPre].
+     * Altrimenti `Unavailable`, che a valle vuol dire «riprova», non «va bene».
      */
     fun simulateEffects(
         rpcUrl: String,
@@ -263,31 +266,108 @@ object SolanaRpc {
         // Pre-state (one getMultipleAccounts) and the simulation are independent:
         // run them concurrently. Fallbacks shrink the tracked set if the node
         // rejects the fat request, so the SOL cost still shows instead of a blanket fail.
-        val preOrder = listOf(owner) + tokenAccts.map { it.pubkey } + dests + fresh
+        var tracked = Tracked(owner, tokenAccts, dests, fresh)
+        val preOrder = tracked.order()
         val preF = async { getAccountsMulti(rpcUrl, preOrder) }
 
-        var trackedTokens = tokenAccts
-        var trackedDests = dests
-        var trackedFresh = fresh
-        var value = simulateValue(rpcUrl, txBytes, listOf(owner) + tokenAccts.map { it.pubkey } + dests + fresh)
-        if (value == null && fresh.isNotEmpty()) {
+        var sim = simulateValue(rpcUrl, txBytes, tracked.order())
+        if (sim == null && fresh.isNotEmpty()) {
             Log.i(TAG, "full simulate failed → retry without the new accounts")
-            trackedFresh = emptyList()
-            value = simulateValue(rpcUrl, txBytes, listOf(owner) + tokenAccts.map { it.pubkey } + dests)
+            tracked = tracked.copy(fresh = emptyList())
+            sim = simulateValue(rpcUrl, txBytes, tracked.order())
         }
-        if (value == null && (tokenAccts.isNotEmpty() || dests.isNotEmpty())) {
+        if (sim == null && (tokenAccts.isNotEmpty() || dests.isNotEmpty())) {
             Log.i(TAG, "full simulate failed → retry SOL accounts only")
-            trackedTokens = emptyList(); trackedFresh = emptyList()
-            value = simulateValue(rpcUrl, txBytes, listOf(owner) + dests)
+            tracked = tracked.copy(tokens = emptyList(), fresh = emptyList())
+            sim = simulateValue(rpcUrl, txBytes, tracked.order())
         }
-        if (value == null && dests.isNotEmpty()) {
+        if (sim == null && dests.isNotEmpty()) {
             Log.i(TAG, "retry owner-only")
-            trackedDests = emptyList(); trackedFresh = emptyList()
-            value = simulateValue(rpcUrl, txBytes, listOf(owner))
+            tracked = tracked.copy(dests = emptyList(), fresh = emptyList())
+            sim = simulateValue(rpcUrl, txBytes, tracked.order())
         }
-        val pre = preF.await()
-        if (value == null) { Log.i(TAG, "simulate Unavailable"); return SimOutcome.Unavailable }
-        if (!value.isNull("err")) { Log.i(TAG, "simulate Failed: ${value.get("err")}"); return SimOutcome.Failed(value.get("err").toString()) }
+        var pre = preF.await()
+        if (sim == null) { Log.i(TAG, "simulate Unavailable"); return SimOutcome.Unavailable }
+        if (pre == null) { Log.i(TAG, "pre-state missing → Unavailable"); return SimOutcome.Unavailable }
+        // Un rifiuto e' una risposta a prescindere dallo slot: il nodo l'ha
+        // eseguita ed e' andata male.
+        failureOf(sim)?.let { return it }
+
+        if (pre.slot != sim.slot) {
+            Log.i(TAG, "slots differ: pre=${pre.slot} sim=${sim.slot} → realign")
+            // La lettura era avanti alla simulazione: si rifa' la simulazione, che
+            // adesso, un giro dopo, sta quasi certamente allo stesso slot o oltre.
+            if (pre.slot != null && sim.slot != null && pre.slot > sim.slot) {
+                sim = simulateValue(rpcUrl, txBytes, tracked.order()) ?: return SimOutcome.Unavailable
+                failureOf(sim)?.let { return it }
+            }
+            if (pre.slot != sim.slot) {
+                val again = getAccountsMulti(rpcUrl, preOrder) ?: return SimOutcome.Unavailable
+                pre = alignedPre(pre, again, sim.slot, preOrder)
+                    ?: run { Log.i(TAG, "slots never aligned: pre=${pre.slot}/${again.slot} sim=${sim.slot} → Unavailable"); return SimOutcome.Unavailable }
+            }
+        }
+        return effectsOf(pre, sim, tracked, allTokens, { TokenSymbols.symbol(it) }) { JupiterTokens.cached(it)?.decimals ?: 6 }
+    }
+
+    /** Una simulazione che il nodo ha eseguito e ha visto fallire, gia' nella forma che va a valle. */
+    private fun failureOf(sim: Sim): SimOutcome? =
+        if (sim.value.isNull("err")) null
+        else SimOutcome.Failed(sim.value.get("err").toString()).also { Log.i(TAG, "simulate Failed: ${it.err}") }
+
+    /** I conti che la simulazione riporta, nell'ordine in cui li riporta. */
+    internal data class Tracked(val owner: String, val tokens: List<TokenAccountInfo>, val dests: List<String>, val fresh: List<String>) {
+        fun order(): List<String> = listOf(owner) + tokens.map { it.pubkey } + dests + fresh
+    }
+
+    /** Lo stato di partenza: i conti letti, e lo slot in cui la catena li ha letti. */
+    internal data class PreState(val slot: Long?, val accounts: Map<String, AcctPre>)
+
+    /** Una simulazione riuscita a parlare col nodo: il suo `value`, e lo slot su cui ha girato. */
+    internal data class Sim(val slot: Long?, val value: JSONObject)
+
+    /**
+     * Quale lettura di partenza si puo' sottrarre da una simulazione allo slot
+     * [simSlot], date due letture [first] e [second] fatte una prima e una dopo.
+     *
+     * La risposta pulita e' la seconda, se sta esattamente sullo slot della
+     * simulazione. Se no vale anche la prima, a patto che le due letture
+     * racchiudano la simulazione (prima <= simulazione <= seconda) e che ogni
+     * conto in [keys] sia identico in tutte e due: uno stato che non si e' mosso
+     * da una parte all'altra della simulazione era quello anche nel mezzo. In
+     * tutti gli altri casi null, e chi chiama risponde `Unavailable`.
+     */
+    internal fun alignedPre(first: PreState, second: PreState, simSlot: Long?, keys: List<String>): PreState? {
+        if (simSlot == null) return null
+        if (second.slot == simSlot) return second
+        val a = first.slot ?: return null
+        val c = second.slot ?: return null
+        if (a > simSlot || simSlot > c) return null
+        if (keys.any { first.accounts[it] != second.accounts[it] }) return null
+        return first.copy(slot = simSlot)
+    }
+
+    /**
+     * La parte senza rete: da uno stato di partenza e da una simulazione, le
+     * differenze. Vive da sola perche' e' l'unico modo di provarla da un file
+     * JSON, e con lei il cancello anti prosciugamento che sta a valle.
+     *
+     * Due cose la fanno rispondere `Unavailable` prima ancora di sottrarre: gli
+     * slot che non coincidono, e il proprietario assente dalla lettura. Tutte e
+     * due erano silenzi che diventavano `Ok`.
+     */
+    internal fun effectsOf(
+        pre: PreState,
+        sim: Sim,
+        tracked: Tracked,
+        allTokens: List<TokenAccountInfo>,
+        symbol: (String) -> String,
+        decimals: (String) -> Int,
+    ): SimOutcome {
+        val owner = tracked.owner
+        val value = sim.value
+        if (!value.isNull("err")) return SimOutcome.Failed(value.get("err").toString())
+        if (pre.slot == null || sim.slot == null || pre.slot != sim.slot) { Log.i(TAG, "slot mismatch pre=${pre.slot} sim=${sim.slot} → Unavailable"); return SimOutcome.Unavailable }
         // Senza lo stato di partenza non c'e' niente da cui sottrarre.
         //
         // Questa lettura fallita valeva una mappa vuota e si tirava dritto, e da
@@ -304,37 +384,48 @@ object SolanaRpc {
         // la risposta giusta per una lettura che non e' arrivata, ed e' gia'
         // distinto da `Failed`, che vuol dire «il nodo l'ha eseguita ed e'
         // andata male».
-        if (pre == null || owner !in pre) { Log.i(TAG, "pre-state missing → Unavailable"); return SimOutcome.Unavailable }
+        val accts = pre.accounts
+        if (owner !in accts) { Log.i(TAG, "pre-state missing → Unavailable"); return SimOutcome.Unavailable }
+        // E lo stesso vale per ogni conto che la simulazione riporta: una
+        // differenza calcolata contro un numero che non e' stato letto e' inventata.
+        if (tracked.order().any { it !in accts }) { Log.i(TAG, "pre-state incomplete → Unavailable"); return SimOutcome.Unavailable }
 
         val computeUnits = if (value.isNull("unitsConsumed")) null else value.optLong("unitsConsumed")
         val logCount = value.optJSONArray("logs")?.length() ?: 0
         // Owner's pre-balances by mint: what "you send 95% of your SOL" is measured against.
+        //
+        // Solo dalla lettura di adesso. I conti non letti ripiegavano sull'elenco
+        // in cache, vecchio fino a un minuto, e quel numero finiva nel
+        // denominatore del cancello anti prosciugamento. Meglio omettere la
+        // moneta che darle un numero vecchio: una moneta non tracciata non ha
+        // differenze, quindi il cancello non ha niente da chiederle.
         val preBalances = HashMap<String, Long>()
-        pre[owner]?.lamports?.let { preBalances[com.clearsign.core.NATIVE_SOL_MINT] = it }
-        allTokens.forEach { ta -> preBalances[ta.mint] = (preBalances[ta.mint] ?: 0L) + (pre[ta.pubkey]?.tokenAmount ?: ta.amount) }
+        accts[owner]?.lamports?.let { preBalances[com.clearsign.core.NATIVE_SOL_MINT] = it }
+        allTokens.forEach { ta -> accts[ta.pubkey]?.let { preBalances[ta.mint] = (preBalances[ta.mint] ?: 0L) + (it.tokenAmount ?: 0L) } }
         val accounts = value.optJSONArray("accounts") ?: return SimOutcome.Ok(emptyList(), computeUnits, logCount, preBalances)
         val deltas = ArrayList<com.clearsign.core.BalanceDelta>()
 
         // index 0 = owner SOL
-        pre[owner]?.lamports?.let { ownerPre ->
+        accts[owner]?.lamports?.let { ownerPre ->
             accounts.optJSONObject(0)?.let { acc ->
                 val d = acc.optLong("lamports", ownerPre) - ownerPre
                 if (d != 0L) deltas.add(com.clearsign.core.BalanceDelta(owner, com.clearsign.core.NATIVE_SOL_MINT, "SOL", 9, d))
             }
         }
-        // next: owner's token accounts
-        trackedTokens.forEachIndexed { i, ta ->
-            val preAmt = pre[ta.pubkey]?.tokenAmount ?: ta.amount
+        // next: owner's token accounts. A tracked account the read did not find
+        // (lamports 0) is an account that no longer exists: it holds nothing.
+        tracked.tokens.forEachIndexed { i, ta ->
+            val preAmt = accts[ta.pubkey]?.tokenAmount ?: 0L
             val acc = accounts.optJSONObject(i + 1)
             val post = acc?.let { tokenAmountFromAccountData(it) } ?: preAmt
             val d = post - preAmt
-            if (d != 0L) deltas.add(com.clearsign.core.BalanceDelta(owner, ta.mint, TokenSymbols.symbol(ta.mint), ta.decimals, d))
+            if (d != 0L) deltas.add(com.clearsign.core.BalanceDelta(owner, ta.mint, symbol(ta.mint), ta.decimals, d))
         }
         // finally: destination wallets — their SOL change reveals the split
-        val destBase = 1 + trackedTokens.size
-        val freshBase = destBase + trackedDests.size
-        trackedDests.forEachIndexed { i, addr ->
-            val preLam = pre[addr]?.lamports ?: return@forEachIndexed
+        val destBase = 1 + tracked.tokens.size
+        val freshBase = destBase + tracked.dests.size
+        tracked.dests.forEachIndexed { i, addr ->
+            val preLam = accts[addr]?.lamports ?: return@forEachIndexed
             val acc = accounts.optJSONObject(destBase + i) ?: return@forEachIndexed
             val d = acc.optLong("lamports", preLam) - preLam
             // pre == 0 → the account didn't exist before this tx: its SOL gain is
@@ -345,19 +436,19 @@ object SolanaRpc {
         // count one if the simulated account says, in its own bytes, that we own
         // it: a token account carries its mint at offset 0 and its owner at 32, so
         // this is the account itself claiming us, not us assuming.
-        trackedFresh.forEachIndexed { i, addr ->
+        tracked.fresh.forEachIndexed { i, addr ->
             val acc = accounts.optJSONObject(freshBase + i) ?: return@forEachIndexed
-            val before = pre[addr]?.tokenAmount ?: 0L
-            val t = tokenAccountFrom(acc) ?: return@forEachIndexed
+            val before = accts[addr]?.tokenAmount ?: 0L
+            val t = tokenAccountFrom(acc, decimals) ?: return@forEachIndexed
             if (t.owner != owner) return@forEachIndexed
             val d = t.amount - before
             if (d == 0L) return@forEachIndexed
             // Already counted if we were tracking this mint through an account we
             // owned before the transaction.
-            if (trackedTokens.any { it.mint == t.mint }) return@forEachIndexed
-            deltas.add(com.clearsign.core.BalanceDelta(owner, t.mint, TokenSymbols.symbol(t.mint), t.decimals, d))
+            if (tracked.tokens.any { it.mint == t.mint }) return@forEachIndexed
+            deltas.add(com.clearsign.core.BalanceDelta(owner, t.mint, symbol(t.mint), t.decimals, d))
         }
-        Log.i(TAG, "effects OK: deltas=${deltas.size}, cu=$computeUnits, dests=${trackedDests.size}, new=${trackedFresh.size}")
+        Log.i(TAG, "effects OK: deltas=${deltas.size}, cu=$computeUnits, dests=${tracked.dests.size}, new=${tracked.fresh.size}, slot=${sim.slot}")
         return SimOutcome.Ok(deltas, computeUnits, logCount, preBalances)
     }
 
@@ -390,9 +481,9 @@ object SolanaRpc {
      * mint, so we take the symbol table's answer and fall back to a sane guess
      * rather than another round trip inside the hot path.
      */
-    private fun tokenAccountFrom(acc: JSONObject): TokenAcct? {
+    private fun tokenAccountFrom(acc: JSONObject, decimals: (String) -> Int): TokenAcct? {
         val b64 = acc.optJSONArray("data")?.optString(0) ?: return null
-        val bytes = try { Base64.decode(b64, Base64.DEFAULT) } catch (_: Exception) { return null }
+        val bytes = try { B64.decode(b64) } catch (_: Exception) { return null }
         if (bytes.size < 72) return null
         val ownerProg = acc.optString("owner")
         if (ownerProg != TOKEN_PROGRAM && ownerProg != TOKEN_2022) return null
@@ -400,29 +491,51 @@ object SolanaRpc {
         val who = Base58.encode(bytes.copyOfRange(32, 64))
         var v = 0L
         for (i in 0 until 8) v = v or ((bytes[64 + i].toLong() and 0xFF) shl (8 * i))
-        val decimals = JupiterTokens.cached(mint)?.decimals ?: 6
-        return TokenAcct(mint, who, v, decimals)
+        return TokenAcct(mint, who, v, decimals(mint))
     }
 
     /** What a raw account read tells us: lamports (0 = doesn't exist) and, for SPL token accounts, the amount. */
-    private data class AcctPre(val lamports: Long, val tokenAmount: Long?)
+    internal data class AcctPre(val lamports: Long, val tokenAmount: Long?)
 
-    /** One getMultipleAccounts (base64) for many accounts; missing accounts read as 0 lamports. */
-    private fun getAccountsMulti(rpcUrl: String, pubkeys: List<String>): Map<String, AcctPre> {
-        if (pubkeys.isEmpty()) return emptyMap()
+    /**
+     * One getMultipleAccounts (base64) for many accounts; missing accounts read
+     * as 0 lamports. Tutto o niente: una lettura a meta' era una mappa a meta',
+     * e una mappa a meta' e' la falla numero uno. Il tetto del nodo e' cento
+     * chiavi e qui non se ne chiedono mai piu' di sessantacinque, quindi e' una
+     * chiamata sola e uno slot solo; se mai servissero due pezzi, devono stare
+     * sullo stesso slot o non valgono.
+     */
+    private fun getAccountsMulti(rpcUrl: String, pubkeys: List<String>): PreState? {
+        if (pubkeys.isEmpty()) return PreState(null, emptyMap())
         val out = HashMap<String, AcctPre>()
-        // RPC caps getMultipleAccounts at 100 keys; chunk defensively.
-        pubkeys.chunked(64).forEach { chunk ->
+        var slot: Long? = null
+        for (chunk in pubkeys.chunked(100)) {
             val addrArr = JSONArray(); chunk.forEach { addrArr.put(it) }
             val params = JSONArray().put(addrArr).put(JSONObject().put("encoding", "base64").put("commitment", COMMITMENT))
-            val resp = post(rpcUrl, "getMultipleAccounts", params) ?: return@forEach
-            val arr = resp.optJSONObject("result")?.optJSONArray("value") ?: return@forEach
-            for (i in chunk.indices) {
-                val acc = arr.optJSONObject(i)
-                out[chunk[i]] = AcctPre(acc?.optLong("lamports", 0L) ?: 0L, acc?.let { tokenAmountFromAccountData(it) })
-            }
+            val a = call(rpcUrl, "getMultipleAccounts", params) as? Answer.Answered ?: return null
+            val part = preStateOf(a.json, chunk) ?: return null
+            if (slot != null && part.slot != slot) return null
+            slot = part.slot
+            out.putAll(part.accounts)
         }
-        return out
+        return PreState(slot, out)
+    }
+
+    /** A getMultipleAccounts body for [pubkeys], as a state with its slot. Null when it is not one. */
+    internal fun preStateOf(json: JSONObject, pubkeys: List<String>): PreState? {
+        val arr = json.optJSONObject("result")?.optJSONArray("value") ?: return null
+        val out = HashMap<String, AcctPre>()
+        for (i in pubkeys.indices) {
+            val acc = arr.optJSONObject(i)
+            out[pubkeys[i]] = AcctPre(acc?.optLong("lamports", 0L) ?: 0L, acc?.let { tokenAmountFromAccountData(it) })
+        }
+        return PreState(slotOf(json), out)
+    }
+
+    /** A simulateTransaction body, as the value with its slot. Null when it is not one. */
+    internal fun simOf(json: JSONObject): Sim? {
+        val value = json.optJSONObject("result")?.optJSONObject("value") ?: return null
+        return Sim(slotOf(json), value)
     }
 
     /**
@@ -440,7 +553,7 @@ object SolanaRpc {
         val entries = HashMap<String, List<String>>()
         for (i in tables.indices) {
             val b64 = arr.optJSONObject(i)?.optJSONArray("data")?.optString(0) ?: continue
-            val bytes = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull() ?: continue
+            val bytes = runCatching { B64.decode(b64) }.getOrNull() ?: continue
             // Lookup-table layout: 56-byte meta header, then packed 32-byte addresses.
             if (bytes.size < 56) continue
             val n = (bytes.size - 56) / 32
@@ -455,10 +568,10 @@ object SolanaRpc {
         return writable to readonly
     }
 
-    private fun simulateValue(rpcUrl: String, txBytes: ByteArray, addresses: List<String>): JSONObject? {
+    private fun simulateValue(rpcUrl: String, txBytes: ByteArray, addresses: List<String>): Sim? {
         val addrArr = JSONArray(); addresses.forEach { addrArr.put(it) }
         val params = JSONArray()
-            .put(Base64.encodeToString(txBytes, Base64.NO_WRAP))
+            .put(B64.encode(txBytes))
             .put(
                 JSONObject()
                     .put("encoding", "base64")
@@ -467,8 +580,8 @@ object SolanaRpc {
                     .put("commitment", COMMITMENT)
                     .put("accounts", JSONObject().put("encoding", "base64").put("addresses", addrArr)),
             )
-        val resp = post(rpcUrl, "simulateTransaction", params) ?: return null
-        return resp.optJSONObject("result")?.optJSONObject("value")
+        val a = call(rpcUrl, "simulateTransaction", params) as? Answer.Answered ?: return null
+        return simOf(a.json)
     }
 
     /** Public SOL balance (lamports) for [pubkey], or null on failure. */
@@ -480,7 +593,7 @@ object SolanaRpc {
     fun assetsSummaryMulti(rpcUrl: String, pubkeys: List<String>): Map<String, Pair<Long?, Int>> {
         val lamF = async { getAccountsMulti(rpcUrl, pubkeys) }
         val tokF = pubkeys.map { pk -> pk to async { tokenAccountsOf(rpcUrl, pk).count { it.amount > 0 } } }
-        val lam = lamF.await() ?: emptyMap()
+        val lam = lamF.await()?.accounts.orEmpty()
         return tokF.associate { (pk, f) -> pk to (lam[pk]?.lamports to (f.await() ?: 0)) }
     }
 
@@ -581,7 +694,7 @@ object SolanaRpc {
         for (i in 0 until arr.length()) {
             val dataArr = arr.optJSONObject(i)?.optJSONObject("account")?.optJSONArray("data") ?: continue
             val b64 = dataArr.optString(0)
-            runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()?.let { out.add(it) }
+            runCatching { B64.decode(b64) }.getOrNull()?.let { out.add(it) }
         }
         return out
     }
@@ -656,11 +769,13 @@ object SolanaRpc {
 
     /** Metadata for [mints] via DAS `getAssetBatch` (Helius only; one call per 100 mints, best effort). */
     fun dasAssets(mints: List<String>): Map<String, DasAsset> {
-        val das = customRpc ?: return emptyMap()
+        // Non `customRpc`: chi mette un nodo suo nelle impostazioni non perde i
+        // nomi delle monete, perche' DAS resta sulla corsia di Helius.
+        val das = Rpc.dasUrl() ?: return emptyMap()
         val out = HashMap<String, DasAsset>()
         mints.chunked(100).forEach { chunk ->
             val params = JSONObject().put("ids", JSONArray(chunk))
-            val resp = runCatching { postOnce(das, "getAssetBatch", params) }.getOrNull() as? Http.Ok ?: return@forEach
+            val resp = call(das, "getAssetBatch", params) as? Answer.Answered ?: return@forEach
             val arr = resp.json.optJSONArray("result") ?: return@forEach
             for (i in 0 until arr.length()) {
                 val a = arr.optJSONObject(i) ?: continue
@@ -703,6 +818,10 @@ object SolanaRpc {
      * going rate". Null when the node can't answer.
      */
     fun recentPrioritizationFees(rpcUrl: String, accounts: List<String> = emptyList()): Long? {
+        // Il metro del mondo intero vale solo quando nessuno ha chiesto dei conti
+        // precisi: su un conto affollato la tariffa e' un'altra, e un metro
+        // sbagliato di dieci volte farebbe gridare a una commissione normale.
+        if (accounts.isEmpty()) Archive.chain(15 * 60_000L)?.takeIf { !it.isNull("fee") }?.optLong("fee", -1L)?.takeIf { it >= 0 }?.let { return it }
         val params = JSONArray().apply { if (accounts.isNotEmpty()) put(JSONArray(accounts.take(128))) }
         val resp = post(rpcUrl, "getRecentPrioritizationFees", params) ?: return null
         val arr = resp.optJSONArray("result") ?: return null
@@ -717,14 +836,14 @@ object SolanaRpc {
     fun getAccountInfoRaw(rpcUrl: String, address: String): RawAccount? {
         val v = getAccountInfo(rpcUrl, address) ?: return null
         val b64 = v.optJSONArray("data")?.optString(0) ?: return null
-        val bytes = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull() ?: return null
+        val bytes = runCatching { B64.decode(b64) }.getOrNull() ?: return null
         return RawAccount(bytes, v.optString("owner"), v.optLong("lamports"))
     }
 
     private fun tokenAmountFromAccountData(acc: JSONObject): Long? {
         val dataArr = acc.optJSONArray("data") ?: return null
         val b64 = dataArr.optString(0)
-        val bytes = try { Base64.decode(b64, Base64.DEFAULT) } catch (_: Exception) { return null }
+        val bytes = try { B64.decode(b64) } catch (_: Exception) { return null }
         if (bytes.size < 72) return null // SPL token account layout: amount is u64 LE at offset 64
         val ownerProg = acc.optString("owner")
         if (ownerProg != TOKEN_PROGRAM && ownerProg != TOKEN_2022) return null
@@ -736,19 +855,69 @@ object SolanaRpc {
     /** Result of a send: the signature, or the node's reason for rejecting it. */
     data class SendOutcome(val signature: String?, val error: String?)
 
-    /** Submit a fully-signed transaction. A deterministic rejection (expired
-     *  blockhash, insufficient funds, …) is returned as [SendOutcome.error], not retried. */
+    /**
+     * Submit a fully-signed transaction. A deterministic rejection (expired
+     * blockhash, insufficient funds, …) is returned as [SendOutcome.error], not retried.
+     *
+     * Una transazione spedita non si puo' ritirare, quindi «non inviata» si
+     * dice solo quando e' vero. Un trasporto che cade **dopo** che il nodo ha
+     * gia' propagato i byte lasciava la transazione viva e la risposta diceva
+     * il contrario: `harvestInner` e `sweepTo` la trattavano come mai partita.
+     * Con un nodo era raro, con cinque in fila diventa normale. La firma sta
+     * gia' nei byte, prima ancora di spedirli: prima di riprovare, da qualsiasi
+     * parte, si chiede alla catena se quella firma la conosce. E un nodo che
+     * risponde «gia' processata» sta dicendo che e' atterrata, non che ha
+     * detto no.
+     */
     fun send(rpcUrl: String, signedTx: ByteArray): SendOutcome {
-        val b64 = Base64.encodeToString(signedTx, Base64.NO_WRAP)
-        val params = JSONArray().put(b64).put(JSONObject().put("encoding", "base64").put("preflightCommitment", COMMITMENT))
-        val resp = post(rpcUrl, "sendTransaction", params) ?: return SendOutcome(null, "network unreachable")
-        if (resp.has("result")) return SendOutcome(resp.getString("result"), null)
-        val err = resp.optJSONObject("error")
-        val msg = err?.optJSONObject("data")?.optJSONArray("logs")?.let { logs ->
+        val sig = SolanaTx.firstSignature(signedTx)
+        val method = "sendTransaction"
+        val params = JSONArray().put(B64.encode(signedTx)).put(JSONObject().put("encoding", "base64").put("preflightCommitment", COMMITMENT))
+        for (p in Rpc.lanes(rpcUrl, method)) {
+            var attempt = 0
+            while (attempt < 2) {
+                val t0 = System.currentTimeMillis()
+                val r = Rpc.withLane(p) { postOnce(p.url, method, params) } ?: break
+                val (outcome, err) = outcomeOf(r)
+                Rpc.record(p, method, outcome, System.currentTimeMillis() - t0, err?.optString("message")?.take(80))
+                when (outcome) {
+                    RpcPool.Outcome.OK -> return SendOutcome((r as Http.Ok).json.optString("result").ifEmpty { sig ?: "" }, null)
+                    RpcPool.Outcome.REFUSED -> {
+                        if (sig != null && err != null && isAlreadyProcessed(err)) return SendOutcome(sig, null)
+                        return SendOutcome(null, err?.let { rejectionReason(it) } ?: "rifiutata dal nodo")
+                    }
+                    // Un 5xx o un trasporto caduto possono arrivare dopo che il nodo
+                    // ha gia' propagato i byte: prima di riprovare si chiede alla catena.
+                    RpcPool.Outcome.SERVER, RpcPool.Outcome.TRANSPORT -> {
+                        attempt++; backoff(attempt)
+                        if (sig != null && landed(rpcUrl, sig)) return SendOutcome(sig, null)
+                    }
+                    // Limite, mese finito, metodo che non fa: mai arrivata al runtime.
+                    else -> break
+                }
+            }
+        }
+        return SendOutcome(null, "network unreachable")
+    }
+
+    /** The node's way of saying the signature is already on chain. */
+    internal fun isAlreadyProcessed(error: JSONObject): Boolean {
+        val msg = error.optString("message").lowercase()
+        return msg.contains("already been processed") || msg.contains("alreadyprocessed") ||
+            error.optJSONObject("data")?.opt("err")?.toString()?.contains("AlreadyProcessed") == true
+    }
+
+    /** Why a node refused a send, in the words a person can act on. */
+    internal fun rejectionReason(error: JSONObject): String =
+        error.optJSONObject("data")?.optJSONArray("logs")?.let { logs ->
             // The last program log usually carries the human reason ("insufficient lamports").
             (0 until logs.length()).map { logs.optString(it) }.lastOrNull { it.contains("failed") || it.contains("insufficient") || it.contains("Error") }
-        } ?: err?.optString("message") ?: "rifiutata dal nodo"
-        return SendOutcome(null, msg)
+        } ?: error.optString("message").takeIf { it.isNotEmpty() } ?: "rifiutata dal nodo"
+
+    /** Whether the chain knows [signature] at all, at any commitment. Unknown network → false. */
+    private fun landed(rpcUrl: String, signature: String): Boolean {
+        val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", false)))
+        return resp?.optJSONObject("result")?.optJSONArray("value")?.optJSONObject(0) != null
     }
 
     /**
@@ -828,8 +997,10 @@ object SolanaRpc {
         return v
     }
 
+    /** L'archivio prima della catena: l'epoca e' uguale per tutti e il worker la pubblica ogni dieci minuti. */
     fun epoch(rpcUrl: String): Long? = netConstant("epoch|$rpcUrl") {
-        post(rpcUrl, "getEpochInfo", JSONArray())?.optJSONObject("result")?.optLong("epoch")?.toDouble()
+        Archive.chain(NET_CONST_TTL_MS)?.optLong("epoch", 0L)?.takeIf { it > 0 }?.toDouble()
+            ?: post(rpcUrl, "getEpochInfo", JSONArray())?.optJSONObject("result")?.optLong("epoch")?.toDouble()
     }?.toLong()
 
     fun stakeAccounts(rpcUrl: String, owner: String): List<StakeAccount> {
@@ -866,16 +1037,25 @@ object SolanaRpc {
 
     /** The network's inflation, validator share, as a fraction per year. */
     fun inflationRate(rpcUrl: String): Double? = netConstant("inflation|$rpcUrl") {
-        post(rpcUrl, "getInflationRate", JSONArray())?.optJSONObject("result")?.optDouble("validator")?.takeIf { !it.isNaN() && it > 0 }
+        Archive.chain(NET_CONST_TTL_MS)?.optDouble("inflation", Double.NaN)?.takeIf { !it.isNaN() && it > 0 }
+            ?: post(rpcUrl, "getInflationRate", JSONArray())?.optJSONObject("result")?.optDouble("validator")?.takeIf { !it.isNaN() && it > 0 }
     }
 
     /** Total supply of a mint, raw. */
     /** The raw bytes of one account, or null. */
+    /** Whether [pubkey] exists on chain: true, false, or null when nobody could be asked. */
+    fun accountExists(rpcUrl: String, pubkey: String): Boolean? {
+        val params = JSONArray().put(pubkey).put(JSONObject().put("encoding", "base64").put("dataSlice", JSONObject().put("offset", 0).put("length", 0)))
+        val a = call(rpcUrl, "getAccountInfo", params) as? Answer.Answered ?: return null
+        val result = a.json.optJSONObject("result") ?: return null
+        return !result.isNull("value")
+    }
+
     fun accountBytes(rpcUrl: String, pubkey: String): ByteArray? {
         val v = post(rpcUrl, "getAccountInfo", JSONArray().put(pubkey).put(JSONObject().put("encoding", "base64")))
             ?.optJSONObject("result")?.optJSONObject("value") ?: return null
         val b64 = v.optJSONArray("data")?.optString(0) ?: return null
-        return runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
+        return runCatching { B64.decode(b64) }.getOrNull()
     }
 
     /** The raw bytes of many accounts at once, missing ones left out. Blocking: call on IO. */
@@ -888,7 +1068,7 @@ object SolanaRpc {
             val arr = post(rpcUrl, "getMultipleAccounts", params)?.optJSONObject("result")?.optJSONArray("value") ?: return@forEach
             for (i in chunk.indices) {
                 val b64 = arr.optJSONObject(i)?.optJSONArray("data")?.optString(0) ?: continue
-                runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()?.let { out[chunk[i]] = it }
+                runCatching { B64.decode(b64) }.getOrNull()?.let { out[chunk[i]] = it }
             }
         }
         return out
@@ -909,7 +1089,7 @@ object SolanaRpc {
             val o = arr.optJSONObject(i) ?: continue
             val key = o.optString("pubkey").takeIf { it.isNotEmpty() } ?: continue
             val b64 = o.optJSONObject("account")?.optJSONArray("data")?.optString(0) ?: continue
-            runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()?.let { out[key] = it }
+            runCatching { B64.decode(b64) }.getOrNull()?.let { out[key] = it }
         }
         return out
     }
@@ -925,7 +1105,7 @@ object SolanaRpc {
         )
         val arr = post(rpcUrl, "getProgramAccounts", params)?.optJSONArray("result") ?: return null
         val b64 = arr.optJSONObject(0)?.optJSONObject("account")?.optJSONArray("data")?.optString(0) ?: return null
-        val user = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull() ?: return null
+        val user = runCatching { B64.decode(b64) }.getOrNull() ?: return null
         val config = accountBytes(rpcUrl, SkrStake.CONFIG) ?: return null
         return SkrStake.decode(user, config)?.takeIf { it.rawSkr > 0 }
     }
@@ -939,36 +1119,73 @@ object SolanaRpc {
     }
 
     /**
-     * POST with endpoint fallback. Retries only *transient* failures (transport,
-     * 429, 5xx) with a short backoff; a JSON-RPC error from the node is
-     * deterministic and is returned as-is (the caller reads `error`), except
-     * rate-limit style errors, which move on to the next endpoint. A 4xx moves
-     * to the next endpoint immediately (bad key / unsupported method).
+     * Cosa ha risposto la rete. Tre cose, non due.
+     *
+     * Prima `post()` tornava un corpo o un nulla, e il corpo poteva essere
+     * l'ultimo errore visto: il limite di traffico del primo nodo mentre gli
+     * altri due erano morti sul trasporto. Chi chiamava leggeva «la catena ha
+     * detto no» dove la verita' era «nessuno ha risposto», e quella distinzione
+     * regge il collare: un rifiuto e' una risposta, un silenzio e' un riprova.
      */
-    private fun post(rpcUrl: String, method: String, params: JSONArray): JSONObject? {
-        var last: JSONObject? = null
-        for (url in candidates(rpcUrl)) {
+    sealed interface Answer {
+        /** Un nodo ha risposto con un risultato. [slot] e' quello scritto in `result.context`, quando c'e'. */
+        data class Answered(val json: JSONObject, val slot: Long?) : Answer
+        /** Un nodo l'ha eseguita e ha detto no. Deterministico: un altro nodo direbbe lo stesso. */
+        data class Refused(val body: JSONObject) : Answer {
+            val code: Int get() = body.optJSONObject("error")?.optInt("code") ?: 0
+            val message: String get() = body.optJSONObject("error")?.optString("message").orEmpty()
+        }
+        /** Nessuno ha risposto: trasporto caduto, 5xx, o limite di traffico su ogni nodo. */
+        data object Unreachable : Answer
+    }
+
+    /** Lo slot che un nodo scrive accanto alla risposta, quando lo scrive. */
+    internal fun slotOf(json: JSONObject): Long? =
+        json.optJSONObject("result")?.optJSONObject("context")?.takeIf { it.has("slot") && !it.isNull("slot") }?.optLong("slot")
+
+    /** Un errore JSON-RPC che vale la pena riprovare altrove, perche' parla del nodo e non della chiamata. */
+    internal fun isTransient(error: JSONObject): Boolean = RpcPool.classify(200, error) != RpcPool.Outcome.REFUSED
+
+    /**
+     * POST lungo le corsie del pool. Il nodo proprio per primo se c'e', poi i
+     * fornitori con chiave nell'ordine di questa installazione, in coda le
+     * ultime spiagge. Un trasporto caduto o un 5xx si riprova una volta sul
+     * posto; un limite di traffico, un mese finito o un metodo che quel
+     * fornitore non fa passano al prossimo, e il pool se lo segna. Un errore
+     * deterministico e' una risposta e torna subito come [Answer.Refused]:
+     * un altro nodo direbbe lo stesso. Esaurite le corsie, [Answer.Unreachable].
+     */
+    fun call(rpcUrl: String, method: String, params: Any): Answer {
+        for (p in Rpc.lanes(rpcUrl, method)) {
             var attempt = 0
             while (attempt < 2) {
-                when (val r = postOnce(url, method, params)) {
-                    is Http.Ok -> {
-                        val err = r.json.optJSONObject("error")
-                        if (err == null) return r.json
-                        last = r.json
-                        val code = err.optInt("code"); val msg = err.optString("message").lowercase()
-                        val transient = code == 429 || code == -32429 || msg.contains("rate") || msg.contains("too many") || msg.contains("limit")
-                        if (!transient) return r.json      // deterministic: don't hammer other nodes
-                        break                              // rate-limited here → next endpoint
-                    }
-                    is Http.Status -> {
-                        if (r.code == 429 || r.code >= 500) { attempt++; backoff(attempt); continue }
-                        break                              // 4xx: this endpoint can't serve it
-                    }
-                    Http.Transport -> { attempt++; backoff(attempt) }
+                val t0 = System.currentTimeMillis()
+                val r = Rpc.withLane(p) { postOnce(p.url, method, params) } ?: break
+                val (outcome, err) = outcomeOf(r)
+                Rpc.record(p, method, outcome, System.currentTimeMillis() - t0, err?.optString("message")?.take(80))
+                when (outcome) {
+                    RpcPool.Outcome.OK -> { val j = (r as Http.Ok).json; return Answer.Answered(j, slotOf(j)) }
+                    RpcPool.Outcome.REFUSED -> return Answer.Refused((r as Http.Ok).json)
+                    RpcPool.Outcome.SERVER, RpcPool.Outcome.TRANSPORT -> { attempt++; backoff(attempt) }
+                    else -> break
                 }
             }
         }
-        return last
+        return Answer.Unreachable
+    }
+
+    /** Cosa e' successo, nelle parole del pool, piu' l'errore JSON-RPC se c'era. */
+    private fun outcomeOf(r: Http): Pair<RpcPool.Outcome, JSONObject?> = when (r) {
+        is Http.Ok -> { val err = r.json.optJSONObject("error"); RpcPool.classify(200, err) to err }
+        is Http.Status -> RpcPool.classify(r.code, null) to null
+        Http.Transport -> RpcPool.classify(null, null) to null
+    }
+
+    /** [call] for the readers that only want a body: a refusal is a body with `error`, a silence is null. */
+    private fun post(rpcUrl: String, method: String, params: JSONArray): JSONObject? = when (val a = call(rpcUrl, method, params)) {
+        is Answer.Answered -> a.json
+        is Answer.Refused -> a.body
+        Answer.Unreachable -> null
     }
 
     private fun backoff(attempt: Int) {
@@ -996,4 +1213,14 @@ object SolanaRpc {
     } catch (_: Exception) {
         Http.Transport
     }
+}
+
+/**
+ * Base64 della JVM e non di Android, cosi' la parte pura di questo file gira
+ * anche nei test, dove `android.util.Base64` e' uno stub che risponde nulla.
+ * Il decoder MIME ignora gli a capo, come faceva `Base64.DEFAULT`.
+ */
+private object B64 {
+    fun encode(bytes: ByteArray): String = java.util.Base64.getEncoder().encodeToString(bytes)
+    fun decode(text: String): ByteArray = java.util.Base64.getMimeDecoder().decode(text)
 }

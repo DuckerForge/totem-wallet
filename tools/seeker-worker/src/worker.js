@@ -545,8 +545,40 @@ async function holdingsOf(env, addr, ctx) {
  * il piano gratuito dà cinquanta chiamate in uscita per esecuzione e queste non
  * devono togliere niente al censimento.
  */
+/**
+ * Le costanti della catena, una volta per tutti.
+ *
+ * Epoca, slot, inflazione e la commissione di priorita' mediana: numeri uguali
+ * per chiunque, che ogni telefono chiedeva al suo nodo a ogni portafoglio
+ * aperto e a ogni scontrino. Tre chiamate ogni dieci minuti qui, zero sui
+ * telefoni che leggono `chain` dall'archivio finche' e' fresco. Se questa
+ * scrittura manca, il telefono torna a chiederle alla catena da solo.
+ */
+async function publishChain(env) {
+  const [epoch, infl, fees] = await Promise.all([
+    rpc(env, "getEpochInfo", []),
+    rpc(env, "getInflationRate", []),
+    rpc(env, "getRecentPrioritizationFees", []),
+  ]);
+  if (!epoch || !epoch.epoch) return;
+  const sorted = (Array.isArray(fees) ? fees : [])
+    .map((f) => Number(f.prioritizationFee))
+    .filter((n) => Number.isFinite(n) && n >= 0)
+    .sort((a, b) => a - b);
+  const fee = sorted.length ? sorted[sorted.length >> 1] : null;
+  const out = {
+    at: Date.now(),
+    epoch: epoch.epoch,
+    slot: epoch.absoluteSlot || null,
+    inflation: infl && Number.isFinite(infl.validator) ? infl.validator : null,
+    fee,
+  };
+  await fbPut(env, "chain", JSON.stringify(out));
+}
+
 async function warm(env) {
   if (!fbOn(env)) return;
+  await publishChain(env).catch(() => {});
   const raw = await env.SEEKER.get("crowd");
   if (!raw) return;
   const crowd = JSON.parse(raw);

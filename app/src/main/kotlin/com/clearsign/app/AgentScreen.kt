@@ -177,25 +177,24 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             val inCoins = invested ?: 0L
             val total = (balance ?: 0L) + inCoins
             val diff = if (balance == null) null else total - session.fundedLamports + session.harvestedLamports
-            val openCount = Positions.open(ctx).size
-            Column(
-                Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel)).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
+            val open = remember(refresh) { Positions.open(ctx) }
+            val openCount = open.size
+            // A panel that is read and not touched: no chevron, no press.
+            SoftPanel(padding = 16.dp) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(if (balance == null) "…" else fmtSol(total, 4), style = HaloType.amount, color = Halo.ink)
                     Spacer(Modifier.width(6.dp))
-                    Text("SOL", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.muted, modifier = Modifier.padding(bottom = 6.dp))
+                    Text("SOL", style = HaloType.body, fontWeight = FontWeight.Bold, color = Halo.muted, modifier = Modifier.padding(bottom = 6.dp))
                     Spacer(Modifier.weight(1f))
                     if (diff != null && diff != 0L) {
                         val pct = if (session.fundedLamports > 0) diff * 100.0 / session.fundedLamports else 0.0
-                        Text(
-                            (if (diff > 0) "+" else "−") + fmtSol(kotlin.math.abs(diff), 4) + String.format(" (%+.1f%%)", pct),
-                            fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, style = Tabular,
-                            color = if (diff > 0) Halo.mint else Halo.red, modifier = Modifier.padding(bottom = 6.dp),
+                        DeltaPill(
+                            (if (diff > 0) "+" else "−") + fmtSol(kotlin.math.abs(diff), 4) + String.format(java.util.Locale.getDefault(), " · %+.1f%%", pct),
+                            up = diff > 0, modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
                 }
+                Spacer(Modifier.height(6.dp))
                 // Da dove e' partita a dove sta adesso.
                 //
                 // Il totale grande e la differenza col segno c'erano gia', ma la
@@ -206,19 +205,21 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 if (balance != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.env_put_in), style = HaloType.small, color = Halo.muted, modifier = Modifier.width(96.dp))
-                        Text(fmtSol(session.fundedLamports, 4) + " SOL", fontFamily = Mono, fontSize = 12.sp, color = Halo.ink, style = Tabular)
+                        Text(fmtSol(session.fundedLamports, 4) + " SOL", style = HaloType.mono, color = Halo.ink)
                     }
+                    Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.env_now), style = HaloType.small, color = Halo.muted, modifier = Modifier.width(96.dp))
-                        Text(fmtSol(total, 4) + " SOL", fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if ((diff ?: 0L) >= 0) Halo.mint else Halo.red, style = Tabular)
+                        Text(fmtSol(total, 4) + " SOL", style = HaloType.mono, fontWeight = FontWeight.Bold, color = if ((diff ?: 0L) >= 0) Halo.mint else Halo.red)
                     }
+                    Spacer(Modifier.height(6.dp))
                 }
                 Text(
                     if (openCount > 0) stringResource(R.string.agent_hero_line, fmtSol(balance ?: 0L, 3), openCount, fmtSol(inCoins, 3), fmtSol(history.spentLast24hLamports, 3), fmtSol(policy.dailyLamports, 3))
                     else stringResource(R.string.agent_hero_line_flat, fmtSol(balance ?: 0L, 3), fmtSol(history.spentLast24hLamports, 3), fmtSol(policy.dailyLamports, 3)),
-                    fontFamily = Mono, fontSize = 11.5.sp, color = Halo.muted, style = Tabular,
+                    style = HaloType.mono, color = Halo.muted,
                 )
-                if (session.expired) Banner(stringResource(R.string.env_expired_note), Halo.amber, HIcon.HOURGLASS)
+                if (session.expired) { Spacer(Modifier.height(6.dp)); Banner(stringResource(R.string.env_expired_note), Halo.amber, HIcon.HOURGLASS) }
             }
 
             // The two things you do here. Starting is a choice of lane, so it
@@ -236,7 +237,6 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             // The screen that never sleeps: charts, lines, and the loop's own words.
             GhostButton(stringResource(R.string.eyes_open), Modifier.fillMaxWidth(), HIcon.SEARCH, tint = Halo.cyan) { showEyes = true }
 
-            val open = remember(refresh) { Positions.open(ctx) }
             if (open.isNotEmpty()) {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -260,10 +260,10 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
 
             // Everything else, small. Each opens the same sheet it always did.
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (account != null) SmallChip(stringResource(R.string.env_add), HIcon.DOWNLOAD, tint = Halo.cyan) { showTopUp = true }
+                if (account != null) HaloChip(stringResource(R.string.env_add), HIcon.DOWNLOAD, tint = Halo.cyan) { showTopUp = true }
                 val gain = ((balance ?: 0L) - session.fundedLamports).coerceAtLeast(0L)
                 if (gain > 5_000L && account != null) {
-                    SmallChip(stringResource(R.string.env_harvest_now), HIcon.DOWNLOAD, tint = Halo.mint) {
+                    HaloChip(stringResource(R.string.env_harvest_now), HIcon.DOWNLOAD, tint = Halo.mint) {
                         busy = ctx.getString(R.string.env_harvest_now)
                         scope.launch {
                             val took = SessionActions.harvest(ctx, account, force = true)
@@ -273,9 +273,9 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                         }
                     }
                 }
-                SmallChip(stringResource(R.string.agent_rules), HIcon.SHIELD_LOCK, tint = Halo.cyan) { showRules = true }
+                HaloChip(stringResource(R.string.agent_rules), HIcon.SHIELD_LOCK, tint = Halo.cyan) { showRules = true }
                 if (inCoins > 0) {
-                    SmallChip(stringResource(R.string.env_sell_all), HIcon.SWAP, tint = Halo.amber) {
+                    HaloChip(stringResource(R.string.env_sell_all), HIcon.SWAP, tint = Halo.amber) {
                         busy = ctx.getString(R.string.env_sell_all_busy)
                         scope.launch {
                             val stuck = runCatching { SessionActions.sellAll(ctx) }.getOrDefault(listOf("?"))
@@ -285,7 +285,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                         }
                     }
                 }
-                SmallChip(stringResource(R.string.env_close), HIcon.BLOCK, tint = Halo.red) {
+                HaloChip(stringResource(R.string.env_close), HIcon.BLOCK, tint = Halo.red) {
                     // Look inside before the key disappears: a coin left in a
                     // closed budget is a coin nobody can ever reach again.
                     busy = ctx.getString(R.string.env_closing)
@@ -509,9 +509,7 @@ private fun FollowsSection(refresh: Int) {
                 Text(stringResource(R.string.agent_copy_title).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
                 if (follows.isNotEmpty()) Text(stringResource(R.string.crowd_followed, follows.size), style = HaloType.small, color = Halo.muted)
             }
-            if (follows.isEmpty()) {
-                Text(stringResource(R.string.agent_copy_none), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
-            }
+            if (follows.isEmpty()) EmptyLine(HIcon.STAR, stringResource(R.string.agent_copy_none))
             follows.forEach { w ->
                 val last = events.filter { it.wallet == w }.maxByOrNull { it.at }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -569,9 +567,7 @@ private fun RecentMoves(refresh: Int) {
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Text(stringResource(R.string.agent_recent).uppercase(), style = HaloType.label, color = Halo.muted)
-            if (recent.isEmpty()) {
-                Text(stringResource(R.string.agent_recent_none), style = HaloType.small, color = Halo.muted)
-            }
+            if (recent.isEmpty()) EmptyLine(HIcon.AGENT, stringResource(R.string.agent_recent_none))
             recent.forEach { e ->
                 val refused = e.host == "refused" || e.host == "expired"
                 val tint = if (refused) Halo.red else if (e.host == "asked") Halo.cyan else Halo.mint
@@ -612,12 +608,14 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val blocked = remember { TraderLoop.cannotStart(ctx) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        // With ORE on the sheet grows past a small screen, so it scrolls.
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding()) {
+        SheetHeader(stringResource(R.string.lane_title), stringResource(R.string.lane_sub), HIcon.AGENT, onClose = onDismiss)
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             var cfg by remember { mutableStateOf(TraderLoop.config(ctx)) }
-            Text(stringResource(R.string.lane_title), style = HaloType.title, color = Halo.ink)
             Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
             StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
             StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
@@ -652,13 +650,7 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             }
             // Scavare ORE: una parte della paghetta affidata a un esecutore,
             // tanto al giorno su tante caselle, sotto lo stesso collare.
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.agent_ore_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
-                    Text(stringResource(R.string.agent_ore_sub), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
-                }
-                androidx.compose.material3.Switch(checked = cfg.oreOn, onCheckedChange = { cfg = cfg.copy(oreOn = it) })
-            }
+            SwitchRow(stringResource(R.string.agent_ore_title), stringResource(R.string.agent_ore_sub), cfg.oreOn) { cfg = cfg.copy(oreOn = it) }
             if (cfg.oreOn) {
                 SliderRow(
                     stringResource(R.string.agent_ore_day), fmtSol(cfg.oreLamportsPerDay, 3) + " SOL",
@@ -674,10 +666,10 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                     Text(
                         if (size == null) stringResource(R.string.agent_ore_too_small)
                         else stringResource(R.string.agent_ore_note, fmtSol(size.amountPerSquare, 5), size.squares, fmtSol(size.deposit, 4), size.rounds),
-                        fontFamily = Inter, fontSize = 11.sp, color = if (size == null) Halo.amber else Halo.muted,
+                        style = HaloType.small, color = if (size == null) Halo.amber else Halo.muted,
                     )
                 }
-                Text(stringResource(R.string.ore_wager_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber)
+                Text(stringResource(R.string.ore_wager_note), style = HaloType.small, color = Halo.amber)
             }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.AGENT) {
@@ -687,6 +679,7 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 onStarted()
             }
             GhostButton(stringResource(R.string.cancel), Modifier.fillMaxWidth()) { onDismiss() }
+        }
         }
     }
 }

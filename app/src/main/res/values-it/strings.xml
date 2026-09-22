@@ -1448,7 +1448,7 @@
     <string name="agent_start">Avvia</string>
     <string name="agent_positions">Posizioni</string>
     <string name="agent_recent">Ultime mosse</string>
-    <string name="agent_recent_none">Ancora niente.</string>
+    <string name="agent_recent_none">L\'agente non ha ancora mosso niente. Avvialo qui sopra.</string>
     <string name="agent_truth_link">Cosa garantisce Velum</string>
     <string name="pro_model">Modello e chiave</string>
     <string name="pro_collar">Il collare</string>
@@ -1456,6 +1456,7 @@
     <string name="pro_trace">Traccia in diretta</string>
     <string name="pro_pc">Agente sul computer</string>
     <string name="lane_title">Avvio</string>
+    <string name="lane_sub">Scegli quanto, poi parti.</string>
     <string name="lane_body">Una corsia sola, quella sicura: liquidità dai 50.000 $, autorità di mint e freeze revocate, rivendibile, pochi grandi detentori. Sono le soglie dei bot che vincono. I limiti del collare valgono sempre.</string>
     <string name="lane_start">Avvia</string>
     <string name="chat_group_look">Guarda</string>

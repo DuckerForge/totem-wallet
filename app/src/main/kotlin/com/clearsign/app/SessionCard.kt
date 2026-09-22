@@ -317,13 +317,13 @@ internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: ()
             // exactly like a healthy one.
             val watching = remember(refresh) { TraderLoop.config(ctx).on }
             if (pos.parked) {
-                Text(stringResource(R.string.trader_parked_tag), fontFamily = Mono, fontSize = 10.sp, color = Halo.amber)
+                Text(stringResource(R.string.trader_parked_tag).uppercase(), style = HaloType.label, color = Halo.amber)
                 Spacer(Modifier.width(8.dp))
             } else if (pos.triggerOrder != null) {
-                Text(stringResource(R.string.trader_onchain), fontFamily = Mono, fontSize = 10.sp, color = Halo.mint)
+                Text(stringResource(R.string.trader_onchain).uppercase(), style = HaloType.label, color = Halo.mint)
                 Spacer(Modifier.width(8.dp))
             } else if (!watching) {
-                Text(stringResource(R.string.trader_unwatched_tag), fontFamily = Mono, fontSize = 10.sp, color = Halo.red)
+                Text(stringResource(R.string.trader_unwatched_tag).uppercase(), style = HaloType.label, color = Halo.red)
                 Spacer(Modifier.width(8.dp))
             }
             value?.let { v ->

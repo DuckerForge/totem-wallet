@@ -358,18 +358,11 @@ private fun pct(c: Double): String = (if (c >= 0) "+" else "−") + "%.1f%%".for
 @Composable
 private fun ChangePill(delta: Double, p: Double, currency: String, modifier: Modifier = Modifier) {
     val up = delta >= 0
-    val tint = if (up) Halo.mint else Halo.red
-    Row(
-        modifier.clip(rs(Radius.pill)).background(tint.copy(alpha = 0.12f)).padding(start = 12.dp, end = 8.dp, top = 5.dp, bottom = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            (if (up) "+" else "−") + fmtFiat(kotlin.math.abs(delta), currency) + "  ·  " + pct(p) + "  " + stringResource(R.string.hero_today),
-            style = HaloType.small, color = tint,
-        )
-        // The chevron is the promise that there is something behind the number.
-        HaloIcon(HIcon.CHEVRON_RIGHT, tint, 15.dp)
-    }
+    // The chevron is the promise that there is something behind the number.
+    DeltaPill(
+        (if (up) "+" else "−") + fmtFiat(kotlin.math.abs(delta), currency) + "  ·  " + pct(p) + "  " + stringResource(R.string.hero_today),
+        up, modifier, chevron = true,
+    )
 }
 
 /**

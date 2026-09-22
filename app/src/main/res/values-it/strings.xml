@@ -1539,6 +1539,7 @@
     <string name="notif_sell_now">Vendi ora</string>
     <string name="notif_stop">Ferma l\'agente</string>
     <string name="notif_stopped_by_you">Fermato dalla notifica</string>
+    <string name="comp_stopped_by_you">Fermato dalla bolla</string>
     <string name="agent_copy_title">Copia chi segui</string>
     <string name="agent_copy_none">Nessun portafoglio seguito. In Scout tocca la stella accanto a un portafoglio: quello che compra arriva qui come candidata, con gli stessi cancelli di tutte le altre.</string>
     <string name="agent_copy_how">Quando un portafoglio che segui compra, o due balene comprano la stessa moneta nell\'ora, quella moneta va in cima alla lista. Passa gli stessi controlli delle altre.</string>

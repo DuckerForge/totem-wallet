@@ -512,6 +512,7 @@
     <string name="ore_hold_claim">Tieni premuto per riscuotere</string>
     <string name="ore_sent">Inviata. La griglia si aggiorna fra un momento.</string>
     <string name="ore_stake_link">ORE ha anche uno staking, su ore.com.</string>
+    <string name="ore_round_gone">Questo giro è finito. Torna indietro e scava di nuovo su quello dopo.</string>
     <string name="agent_ore_title">Scava ORE</string>
     <string name="agent_ore_sub">Affida una parte della paghetta a un esecutore che gioca la griglia ogni minuto. Stesso collare.</string>
     <string name="agent_ore_day">SOL al giorno, al massimo</string>

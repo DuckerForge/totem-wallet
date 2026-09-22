@@ -62,7 +62,8 @@ import kotlinx.coroutines.withContext
 private sealed interface OreState {
     object Idle : OreState
     object Analyzing : OreState
-    data class Review(val analyzed: ReceiptEngine.Analyzed, val ixs: List<WalletTx.Instruction>, val label: String, val kind: String) : OreState
+    /** [dig] e' quanto per casella e quali caselle: alla firma il Deploy si ricostruisce sul giro di adesso. */
+    data class Review(val analyzed: ReceiptEngine.Analyzed, val ixs: List<WalletTx.Instruction>, val label: String, val kind: String, val dig: Pair<Long, Set<Int>>? = null) : OreState
     object Signing : OreState
     data class Done(val signature: String) : OreState
     data class Error(val message: String) : OreState
@@ -103,11 +104,11 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
 
     val ownerKey = remember(owner) { Base58.decodePubkey(owner) }
 
-    fun review(kind: String, ixs: List<WalletTx.Instruction>, label: String) {
+    fun review(kind: String, ixs: List<WalletTx.Instruction>, label: String, dig: Pair<Long, Set<Int>>? = null) {
         state = OreState.Analyzing
         scope.launch {
             val analyzed = WalletActions.preview(ctx, owner, ixs)
-            state = if (analyzed == null) OreState.Error(ctx.getString(R.string.wa_no_blockhash)) else OreState.Review(analyzed, ixs, label, kind)
+            state = if (analyzed == null) OreState.Error(ctx.getString(R.string.wa_no_blockhash)) else OreState.Review(analyzed, ixs, label, kind, dig)
         }
     }
 
@@ -213,7 +214,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
                                         if (cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
                                         if (!fresh.open()) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
-                                        review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, fresh.board, cfg)), ctx.getString(R.string.ore_dig))
+                                        review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, fresh.board, cfg)), ctx.getString(R.string.ore_dig), dig = lamports to picked)
                                     }
                                 }
                                 GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { digging = false; picked = emptySet() }
@@ -233,11 +234,27 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
                                 GhostButton(stringResource(R.string.back)) { state = OreState.Idle }
                             } else {
-                                HoldToConfirm(if (s.kind == "ore_dig") stringResource(R.string.ore_hold_dig) else stringResource(R.string.ore_hold_claim)) {
+                                // Lo scontrino resta buono, il giro no: se e' passato, si torna
+                                // indietro invece di firmare un Deploy che il nodo rifiuterebbe.
+                                if (s.dig != null && !v.open(now)) Banner(stringResource(R.string.ore_round_gone), Halo.amber, HIcon.HOURGLASS)
+                                HoldToConfirm(if (s.kind == "ore_dig") stringResource(R.string.ore_hold_dig) else stringResource(R.string.ore_hold_claim), enabled = s.dig == null || v.open(now)) {
                                     state = OreState.Signing
                                     scope.launch {
+                                        // Il Deploy si ricostruisce sul giro di adesso: fra l'anteprima e
+                                        // il dito puo' passare un giro intero, e il conto del giro nella
+                                        // transazione sarebbe quello vecchio. Visto sul telefono: quattro
+                                        // minuti dopo l'anteprima, «Provided seeds do not result in a
+                                        // valid address». Stesse caselle, stessi SOL, giro fresco.
+                                        val ixs = if (s.dig == null) s.ixs else {
+                                            val k = ownerKey
+                                            val rpc = SolanaRpc.urlFor(null)
+                                            val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
+                                            if (k == null || cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
+                                            if (!fresh.open()) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
+                                            listOf(OreMiner.deploy(k, s.dig.first, s.dig.second, fresh.board, cfg))
+                                        }
                                         val log = WalletActions.LogInfo(kind = s.kind, outflows = r.outflows.map { "−" + fmtAmt(it) }, inflows = r.inflows.map { "+" + fmtAmt(it) }, receipt = r, recipientLabel = "ORE")
-                                        state = when (val res = WalletActions.signAndSend(ctx, signer, owner, s.ixs, log)) {
+                                        state = when (val res = WalletActions.signAndSend(ctx, signer, owner, ixs, log)) {
                                             is WalletActions.Result.Sent -> { changed = true; digging = false; picked = emptySet(); refresh++; OreState.Done(res.signature) }
                                             is WalletActions.Result.Failed -> OreState.Error(res.message)
                                         }

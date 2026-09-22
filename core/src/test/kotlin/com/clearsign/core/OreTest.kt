@@ -58,6 +58,14 @@ class OreTest {
         assertEquals(99_300_000L, r.deployed[0] / 100_000 * 100_000, "la prima casella era 0,0993 SOL")
         assertEquals(87L, r.totalMiners)
         assertTrue(r.topMiner.all { it == 0.toByte() })
+        // Giro in corso: il premio non e' ancora scritto, lo slot hash e' vuoto, e la
+        // casella vincente non c'e'. L'atteso conta l'ORE che verra' coniato.
+        assertTrue(r.rewards.all { it == 0L }, "rewards si scrive a giro chiuso")
+        assertEquals(0L, r.rewardOre)
+        assertEquals(Ore.ONE_ORE, r.expectedReward)
+        assertEquals(0L, r.motherlode)
+        assertEquals(null, r.winningSquare)
+        assertEquals(449606368L, r.expiresAt)
     }
 
     @Test fun `il Miner vero, con i numeri visti sulla catena`() {

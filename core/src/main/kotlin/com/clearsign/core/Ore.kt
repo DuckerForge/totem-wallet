@@ -4,8 +4,8 @@ package com.clearsign.core
  * ORE, letto e scritto a mano.
  *
  * ORE oggi e' una griglia di 25 caselle e un giro al minuto: si mette SOL su
- * una o piu' caselle, una vince, chi ci sta sopra si divide un ORE e il SOL
- * delle altre. Il programma non e' Anchor, e' Steel: niente IDL sulla catena,
+ * una o piu' caselle, una vince, chi ci sta sopra si divide un ORE. Il SOL
+ * torna a chi l'ha messo, meno le fee: vedi [OreOdds]. Il programma non e' Anchor, e' Steel: niente IDL sulla catena,
  * quindi lo scontrino non puo' leggerlo da solo e i byte vanno scritti qui.
  *
  * Tutto quello che c'e' in questo file e' stato controllato sulla catena il
@@ -36,6 +36,13 @@ object Ore {
      */
     const val SLOT_MS = 260L
     const val ONE_ORE = 100_000_000_000L
+    /**
+     * L'ORE che un giro paga. Il programma lo conia a giro finito,
+     * `min(MAX_SUPPLY - offerta, 1 ORE)`, e lo scrive in `rewards[0]` del giro
+     * chiuso: sul giro in corso `rewards` e' tutto zero. Con un'offerta di
+     * mezzo milione di ORE contro un tetto di tre milioni (`ore_mint_api::MAX_SUPPLY`), e' un ORE.
+     */
+    const val ROUND_REWARD = ONE_ORE
 
     /** I seed delle PDA, in byte. */
     val SEED_MINER = "miner".toByteArray()
@@ -184,21 +191,48 @@ object Ore {
         return Config(le64(bytes, b + 144), le64(bytes, b + 152), bytes.copyOfRange(b + 160, b + 192), bytes.copyOfRange(b + 192, b + 224))
     }
 
-    data class Round(val id: Long, val deployed: LongArray, val count: LongArray, val totalMiners: Long, val topMiner: ByteArray) {
+    data class Round(
+        val id: Long, val deployed: LongArray, val count: LongArray, val totalMiners: Long, val topMiner: ByteArray,
+        /** L'ORE coniato per questo giro, scritto quando il giro chiude: zero finche' corre. Vedi [ROUND_REWARD]. */
+        val rewards: LongArray = LongArray(SQUARES),
+        /** La pentola, se questo giro l'ha presa: zero quasi sempre. */
+        val motherlode: Long = 0L,
+        /** Scritto a giro finito: da qui esce la casella vincente. Tutti zeri finche' il giro corre. */
+        val slotHash: ByteArray = ByteArray(32),
+        val expiresAt: Long = 0L,
+    ) {
         val totalDeployed: Long get() = deployed.sum()
+        val rewardOre: Long get() = rewards.sum()
+        /** Il premio da aspettarsi: quello scritto se il giro e' chiuso, altrimenti l'ORE che il programma coniera'. */
+        val expectedReward: Long get() = rewardOre.takeIf { it > 0 } ?: ROUND_REWARD
+        /** La casella vincente, se il giro e' chiuso: `(r1 ^ r2 ^ r3 ^ r4) % 25` sui quattro u64 dello slot hash, come `Round::winning_square`. */
+        val winningSquare: Int? get() {
+            if (slotHash.all { it == 0.toByte() } || slotHash.all { it == 0xFF.toByte() }) return null
+            val r = le64(slotHash, 0) xor le64(slotHash, 8) xor le64(slotHash, 16) xor le64(slotHash, 24)
+            return java.lang.Long.remainderUnsigned(r, SQUARES.toLong()).toInt()
+        }
     }
 
     fun round(bytes: ByteArray): Round? {
         if (bytes.size < HEADER + 944 || (bytes[0].toInt() and 0xFF) != ACC_ROUND) return null
         val b = HEADER
+        // id 8, deployed 200, mass 200, count 200, slot_hash 32, expires_at 8, motherlode 8,
+        // rent_payer 32, rewards 200, total_vaulted 8, total_returned_sol 8, total_miners 8, top_miner 32.
         return Round(
             id = le64(bytes, b),
             deployed = LongArray(SQUARES) { le64(bytes, b + 8 + 8 * it) },
             count = LongArray(SQUARES) { le64(bytes, b + 408 + 8 * it) },
             totalMiners = le64(bytes, b + 904),
             topMiner = bytes.copyOfRange(b + 912, b + 944),
+            rewards = LongArray(SQUARES) { le64(bytes, b + 688 + 8 * it) },
+            motherlode = le64(bytes, b + 648),
+            slotHash = bytes.copyOfRange(b + 608, b + 640),
+            expiresAt = le64(bytes, b + 640),
         )
     }
+
+    /** La pentola del Treasury: il primo u64 del corpo. Null se i byte non sono un Treasury. */
+    fun treasuryMotherlode(bytes: ByteArray): Long? = if (bytes.size < HEADER + 8) null else le64(bytes, HEADER)
 
     /** Il conto di chi scava: 744 byte di corpo dopo la testata. */
     data class Miner(

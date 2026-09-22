@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clearsign.core.Ore
+import com.clearsign.core.OreOdds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -94,6 +95,13 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
     var picked by remember { mutableStateOf(setOf<Int>()) }
     /** «Aspetta il prossimo giro», che sparisce da solo quando il giro riparte: non e' un errore, e' un momento. */
     var waiting by remember { mutableStateOf(false) }
+    /** Quanto vale un ORE in SOL, per dire se al prezzo di oggi la puntata conviene. Null finche' non si sa. */
+    var oreSol by remember { mutableStateOf<Double?>(null) }
+    LaunchedEffect(Unit) {
+        val px = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(Ore.MINT, com.clearsign.core.NATIVE_SOL_MINT)) }.getOrNull() }
+        val o = px?.get(Ore.MINT); val s = px?.get(com.clearsign.core.NATIVE_SOL_MINT)
+        if (o != null && s != null && s > 0) oreSol = o / s
+    }
 
     LaunchedEffect(refresh) {
         loading = true
@@ -224,7 +232,35 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         fontFamily = Inter, fontSize = 12.sp, color = Halo.ink,
                                     )
                                 }
-                                Text(stringResource(R.string.ore_wager_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.amber)
+                                // Le caselle piu' vuote adesso: la quota di ORE e' la mia parte
+                                // della casella, e il costo e' lo stesso ovunque.
+                                v.round?.let { r ->
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(stringResource(R.string.ore_best_label), style = HaloType.small, color = Halo.muted)
+                                        listOf(1, 3, 5).forEach { k ->
+                                            SmallChip(k.toString(), null, tint = Halo.cyan) { picked = OreOdds.best(k, r.deployed, r.count).toSet(); Haptics.tick(ctx) }
+                                        }
+                                    }
+                                }
+                                // L'atteso, con le regole del programma: quanto ORE, quanto SOL
+                                // resta sul tavolo, e se al prezzo di oggi torna.
+                                val r = v.round
+                                if (r != null && lamports > 0 && picked.isNotEmpty()) {
+                                    val outlook = OreOdds.outlook(lamports, picked.sorted().map { r.deployed[it] }, r.expectedReward, v.motherlode)
+                                    val pct = String.format(java.util.Locale.ROOT, "%.1f", outlook.costFraction * 100)
+                                    val px = oreSol
+                                    val worth = px?.let { outlook.expectedOre / Ore.ONE_ORE.toDouble() * it }
+                                    Text(
+                                        if (worth != null) stringResource(R.string.ore_outlook, Ore.ore(outlook.expectedOre), Ore.sol((worth * 1e9).toLong()), Ore.sol(outlook.expectedCost), pct)
+                                        else stringResource(R.string.ore_outlook_nopx, Ore.ore(outlook.expectedOre), Ore.sol(outlook.expectedCost), pct),
+                                        style = HaloType.small, color = Halo.ink,
+                                    )
+                                    if (worth != null) {
+                                        val good = worth * 1e9 > outlook.expectedCost
+                                        Text(stringResource(if (good) R.string.ore_outlook_good else R.string.ore_outlook_bad), style = HaloType.label, color = if (good) Halo.mint else Halo.amber)
+                                    }
+                                }
+                                Text(stringResource(R.string.ore_wager_note), style = HaloType.small, color = Halo.muted)
                                 val open = v.open(now, SIGN_MARGIN_S)
                                 if (waiting || !open) Banner(stringResource(R.string.ore_wait_banner), Halo.amber, HIcon.HOURGLASS)
                                 // Il bottone dice cosa manca: le caselle, o il giro.
@@ -320,7 +356,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                     }
 
                     // ---- la griglia: il SOL di tutti su ogni casella, le tue accese, le scelte cerchiate ----
-                    Grid(v, picked, digging && state == OreState.Idle) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
+                    val typed = perSquare.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 1e9).toLong() } ?: 0L
+                    Grid(v, picked, digging && state == OreState.Idle, if (digging) typed else 0L) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
 
                     // ---- i numeri ----------------------------------------------------------------
                     GlassCard {
@@ -360,7 +397,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
  * scegliendo hanno il bordo acceso. Il numero e' il SOL di tutti.
  */
 @Composable
-private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, onPick: (Int) -> Unit) {
+private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare: Long, onPick: (Int) -> Unit) {
     val mine = v.mySquares.toSet()
     val max = (v.round?.deployed?.maxOrNull() ?: 0L).coerceAtLeast(1L)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -397,6 +434,15 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, onPick: (
                             modifier = Modifier.align(Alignment.Center).padding(top = 6.dp),
                         )
                         if (isMine) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).height(6.dp).width(6.dp).clip(rs(3)).background(Halo.mint))
+                        // Mentre scegli: la quota dell'ORE che avresti se vincesse questa, con la cifra scritta.
+                        if (picking && perSquare > 0) {
+                            val share = OreOdds.share(perSquare, sol)
+                            Text(
+                                String.format(java.util.Locale.ROOT, if (share >= 0.1) "%.0f%%" else "%.1f%%", share * 100),
+                                fontFamily = Mono, fontSize = 8.5.sp, color = if (isPicked) Halo.cyan else Halo.muted,
+                                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp),
+                            )
+                        }
                     }
                 }
             }

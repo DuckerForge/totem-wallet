@@ -549,7 +549,12 @@
     <string name="ore_pick_squares">Tap the squares below</string>
     <string name="ore_total">%1$d squares at %2$s SOL make %3$s SOL.</string>
     <string name="ore_first_fee">Plus 10,000 lamports the first time.</string>
-    <string name="ore_wager_note">It is a wager. The SOL can go to the other squares, and with little SOL the fees weigh.</string>
+    <string name="ore_wager_note">You never win other miners\' SOL. A losing square keeps about 11% of yours, the winning one 1%. The prize is the ORE, split among whoever is on the winning square.</string>
+    <string name="ore_best_label">Emptiest squares now:</string>
+    <string name="ore_outlook">Expected: %1$s ORE (≈ %2$s SOL). Expected cost: %3$s SOL, %4$s%% of the stake.</string>
+    <string name="ore_outlook_nopx">Expected: %1$s ORE. Expected cost: %2$s SOL, %3$s%% of the stake.</string>
+    <string name="ore_outlook_good">At today\'s ORE price this pays.</string>
+    <string name="ore_outlook_bad">At today\'s ORE price this does not pay.</string>
     <string name="ore_wait_round">Wait for the next round</string>
     <string name="ore_wait_banner">Between rounds, or too close to the end. The button lights up when the next round starts.</string>
     <string name="ore_hold_dig">Hold to dig</string>
@@ -557,7 +562,7 @@
     <string name="ore_sent">Sent. The grid updates in a moment.</string>
     <string name="ore_stake_link">ORE also has staking, on ore.com.</string>
     <string name="ore_round_gone">This round is over. Go back and dig again on the next one.</string>
-    <string name="ore_hint_idle">Dig puts SOL on squares you choose. Claim collects what a winning square paid.</string>
+    <string name="ore_hint_idle">Dig puts SOL on squares you choose. Claim collects the ORE a winning square paid and the SOL that came back.</string>
     <string name="ore_round_ended_signing">The round ended while you were signing. Nothing was sent. Dig again and hold right after reading the receipt.</string>
     <string name="ore_done_receipt">Saved in Receipts. Come back after the round to claim.</string>
     <string name="ore_done_receipt_claim">Saved in Receipts. The ORE is in your wallet now.</string>

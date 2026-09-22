@@ -27,6 +27,10 @@ object Ore {
     /** L'esecutore aperto: chiunque puo' giocare i giri di chi lo sceglie, per la fee. */
     const val OPEN_EXECUTOR = "executor11111111111111111111111111111111112"
     const val SQUARES = 25
+    /** Il `top_miner` di un giro chiuso il cui premio si divide: `SpLiT111…112`. */
+    const val SPLIT_ADDRESS = "SpLiT11111111111111111111111111111111111112"
+    /** Gli stessi 32 byte, decodificati una volta: in `core` non c'e' Base58. */
+    private val SPLIT_BYTES: ByteArray = byteArrayOf(6, -99, 12, 49, -121, 89, -79, -26, 115, 111, 41, -98, 119, 77, -2, -3, 56, 29, 124, 92, -40, 81, 47, 16, -56, -111, -114, 0, 0, 0, 0, 1)
     const val CHECKPOINT_FEE_LAMPORTS = 10_000L
     /**
      * Uno slot, all'incirca. Serve solo per il conto alla rovescia. Il valore
@@ -205,6 +209,11 @@ object Ore {
         val rewardOre: Long get() = rewards.sum()
         /** Il premio da aspettarsi: quello scritto se il giro e' chiuso, altrimenti l'ORE che il programma coniera'. */
         val expectedReward: Long get() = rewardOre.takeIf { it > 0 } ?: ROUND_REWARD
+        /** Le dieci caselle di questo giro che pagano a uno solo: si sanno prima, dall'id. */
+        val soloMask: Int get() = distributionMask(id)
+        fun isSolo(square: Int): Boolean = soloMask and (1 shl square) != 0
+        /** Il giro e' chiuso e diviso pro quota: `top_miner` e' l'indirizzo SPLIT. */
+        val isSplit: Boolean get() = topMiner.contentEquals(SPLIT_BYTES)
         /** La casella vincente, se il giro e' chiuso: `(r1 ^ r2 ^ r3 ^ r4) % 25` sui quattro u64 dello slot hash, come `Round::winning_square`. */
         val winningSquare: Int? get() {
             if (slotHash.all { it == 0.toByte() } || slotHash.all { it == 0xFF.toByte() }) return null
@@ -229,6 +238,28 @@ object Ore {
             slotHash = bytes.copyOfRange(b + 608, b + 640),
             expiresAt = le64(bytes, b + 640),
         )
+    }
+
+    /**
+     * `Round::distribution_mask`, uguale al programma: un keccak dell'id del
+     * giro mescola le venticinque caselle alla Fisher-Yates, due byte per
+     * passo, ricalcolando il keccak quando i byte finiscono; le prime dieci
+     * della mescolata pagano a uno solo. Provato su trenta giri veri.
+     */
+    fun distributionMask(id: Long): Int {
+        var randomness = Keccak.hash256(ByteArray(8) { ((id ushr (8 * it)) and 0xFF).toByte() })
+        var off = 0
+        val idx = IntArray(SQUARES) { it }
+        for (i in SQUARES - 1 downTo 1) {
+            if (off + 2 > randomness.size) { randomness = Keccak.hash256(randomness); off = 0 }
+            val r = (randomness[off].toInt() and 0xFF) or ((randomness[off + 1].toInt() and 0xFF) shl 8)
+            val j = r % (i + 1)
+            val t = idx[i]; idx[i] = idx[j]; idx[j] = t
+            off += 2
+        }
+        var mask = 0
+        for (k in 0 until 10) mask = mask or (1 shl idx[k])
+        return mask
     }
 
     /** La pentola del Treasury: il primo u64 del corpo. Null se i byte non sono un Treasury. */

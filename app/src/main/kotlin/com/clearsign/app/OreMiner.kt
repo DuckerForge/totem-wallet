@@ -44,6 +44,8 @@ object OreMiner {
         val at: Long,
         /** La pentola nel Treasury, in ORE a undici decimali: pesa un cinquecentesimo nell'atteso. */
         val motherlode: Long = 0L,
+        /** Il giro appena chiuso, con lo slot hash scritto: da qui si vede chi ha vinto. */
+        val lastRound: Ore.Round? = null,
     ) {
         val inPlay: Long get() = miner?.inPlay(board.roundId) ?: 0L
         val claimableSol: Long get() = miner?.rewardsSol ?: 0L
@@ -68,14 +70,18 @@ object OreMiner {
         val automation = first.accounts[autoKey]?.let { Ore.automation(it) }
         // Il giro serve alla griglia, non alla riga del portafoglio: una chiamata in meno a chi non lo guarda.
         var motherlode = 0L
+        var lastRound: Ore.Round? = null
         val round = if (!withRound) null else {
             val roundKey = Base58.encode(roundPda(board.roundId))
-            // Il Treasury viaggia nella stessa chiamata: serve solo alla griglia, per la pentola.
-            val second = multi(rpcUrl, listOf(roundKey, Ore.TREASURY))
+            val prevKey = Base58.encode(roundPda(board.roundId - 1))
+            // Il giro prima e il Treasury viaggiano nella stessa chiamata: il
+            // primo dice chi ha vinto, il secondo la pentola. Solo per la griglia.
+            val second = multi(rpcUrl, listOf(roundKey, prevKey, Ore.TREASURY))
             motherlode = second?.accounts?.get(Ore.TREASURY)?.let { Ore.treasuryMotherlode(it) } ?: 0L
+            lastRound = second?.accounts?.get(prevKey)?.let { Ore.round(it) }
             second?.accounts?.get(roundKey)?.let { Ore.round(it) }
         }
-        return View(miner, board, round, automation, first.slot, System.currentTimeMillis(), motherlode = motherlode)
+        return View(miner, board, round, automation, first.slot, System.currentTimeMillis(), motherlode = motherlode, lastRound = lastRound)
     }
 
     private class Multi(val slot: Long, val accounts: Map<String, ByteArray>)

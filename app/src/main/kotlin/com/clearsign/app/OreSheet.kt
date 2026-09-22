@@ -95,6 +95,30 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
     var picked by remember { mutableStateOf(setOf<Int>()) }
     /** «Aspetta il prossimo giro», che sparisce da solo quando il giro riparte: non e' un errore, e' un momento. */
     var waiting by remember { mutableStateOf(false) }
+    /**
+     * Il dado che rotola. Quando arriva un giro chiuso nuovo la griglia si
+     * accende casella per casella e si ferma su quella vincente; [reveal] e'
+     * la casella accesa in quel momento, [revealed] l'id del giro gia' mostrato.
+     */
+    var reveal by remember { mutableStateOf<Int?>(null) }
+    var revealed by remember { mutableLongStateOf(-1L) }
+    LaunchedEffect(view?.lastRound?.id) {
+        val last = view?.lastRound ?: return@LaunchedEffect
+        val win = last.winningSquare ?: return@LaunchedEffect
+        // La prima lettura non e' un evento: si mostra e basta. Dal secondo giro in poi si vede rotolare.
+        if (revealed < 0) { revealed = last.id; return@LaunchedEffect }
+        if (last.id == revealed) return@LaunchedEffect
+        revealed = last.id
+        var wait = 45L
+        for (i in 0 until 30) { reveal = i % Ore.SQUARES; delay(wait); wait += 6 }
+        reveal = win
+        Haptics.tick(ctx)
+        val v = view
+        val mine = v?.miner?.takeIf { it.roundId == last.id }?.deployed?.getOrNull(win) ?: 0L
+        if (mine > 0L) Haptics.success(ctx)
+        delay(2_500)
+        reveal = null
+    }
     /** Quanto vale un ORE in SOL, per dire se al prezzo di oggi la puntata conviene. Null finche' non si sa. */
     var oreSol by remember { mutableStateOf<Double?>(null) }
     LaunchedEffect(Unit) {
@@ -191,6 +215,9 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                     }
                 }
             }
+
+            // Il giro appena chiuso: la casella uscita, come ha pagato, e se c'eri.
+            v?.lastRound?.let { last -> last.winningSquare?.let { win -> LastRound(v, last, win) } }
 
             when {
                 loading && v == null -> Working(stringResource(R.string.ore_loading))
@@ -357,7 +384,15 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
 
                     // ---- la griglia: il SOL di tutti su ogni casella, le tue accese, le scelte cerchiate ----
                     val typed = perSquare.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 1e9).toLong() } ?: 0L
-                    Grid(v, picked, digging && state == OreState.Idle, if (digging) typed else 0L) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
+                    Grid(v, picked, digging && state == OreState.Idle, if (digging) typed else 0L, reveal, v.lastRound?.takeIf { reveal == null }?.winningSquare) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
+                    // Legenda: il puntino delle caselle che pagano a uno solo.
+                    v.round?.let {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.height(6.dp).width(6.dp).clip(rs(3)).background(Halo.amber))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.ore_solo_legend), style = HaloType.label, color = Halo.muted)
+                        }
+                    }
 
                     // ---- i numeri ----------------------------------------------------------------
                     GlassCard {
@@ -397,9 +432,10 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
  * scegliendo hanno il bordo acceso. Il numero e' il SOL di tutti.
  */
 @Composable
-private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare: Long, onPick: (Int) -> Unit) {
+private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare: Long, reveal: Int?, lastWin: Int?, onPick: (Int) -> Unit) {
     val mine = v.mySquares.toSet()
     val max = (v.round?.deployed?.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val solo = v.round?.soloMask ?: 0
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         for (row in 0 until 5) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -409,12 +445,17 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                     val heat = (sol.toDouble() / max).toFloat().coerceIn(0f, 1f)
                     val isMine = s in mine
                     val isPicked = picking && s in picked
+                    val lit = reveal == s
+                    val won = lastWin == s
                     val fill = when {
+                        lit -> Halo.amber.copy(alpha = 0.55f)
                         isPicked -> Halo.cyan.copy(alpha = 0.32f)
                         isMine -> Halo.mint.copy(alpha = 0.26f)
                         else -> Halo.cyan.copy(alpha = 0.06f + 0.22f * heat)
                     }
                     val edge = when {
+                        lit -> Halo.amber
+                        won -> Halo.amber.copy(alpha = 0.7f)
                         isPicked -> Halo.cyan
                         isMine -> Halo.mint
                         picking -> Halo.cyan.copy(alpha = 0.35f)
@@ -423,7 +464,7 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                     Box(
                         Modifier.weight(1f).aspectRatio(1f).clip(rs(10))
                             .background(Halo.cardSoft).background(fill)
-                            .border(if (isPicked || isMine) 1.5.dp else 1.dp, edge, rs(10))
+                            .border(if (isPicked || isMine || lit || won) 1.5.dp else 1.dp, edge, rs(10))
                             .clickable(enabled = picking) { onPick(s) },
                     ) {
                         Text((s + 1).toString(), fontFamily = Mono, fontSize = 9.sp, color = Halo.muted.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 4.dp))
@@ -434,6 +475,8 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                             modifier = Modifier.align(Alignment.Center).padding(top = 6.dp),
                         )
                         if (isMine) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).height(6.dp).width(6.dp).clip(rs(3)).background(Halo.mint))
+                        // Le caselle che pagano a uno solo, sapute prima del giro.
+                        if (solo and (1 shl s) != 0) Box(Modifier.align(Alignment.BottomEnd).padding(5.dp).height(5.dp).width(5.dp).clip(rs(3)).background(Halo.amber))
                         // Mentre scegli: la quota dell'ORE che avresti se vincesse questa, con la cifra scritta.
                         if (picking && perSquare > 0) {
                             val share = OreOdds.share(perSquare, sol)
@@ -445,6 +488,39 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Il giro appena chiuso, in una riga: quale casella e' uscita, se il premio
+ * si e' diviso o l'ha preso uno solo, e cosa vuol dire per te. Il tuo conto
+ * Miner porta ancora le caselle di quel giro finche' non fai checkpoint, e da
+ * li' si sa se c'eri e quanto ti tocca.
+ */
+@Composable
+private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
+    val onIt = v.miner?.takeIf { it.roundId == last.id }?.deployed?.getOrNull(win) ?: 0L
+    val total = last.deployed.getOrNull(win) ?: 0L
+    val meTop = v.miner != null && last.topMiner.contentEquals(v.miner.authority)
+    val how = if (last.isSplit) stringResource(R.string.ore_last_split, last.count.getOrNull(win)?.toInt() ?: 0) else stringResource(R.string.ore_last_solo)
+    val outcome = when {
+        onIt > 0L && last.isSplit && total > 0 -> stringResource(R.string.ore_last_you_won, Ore.ore(java.math.BigInteger.valueOf(last.rewardOre).multiply(java.math.BigInteger.valueOf(onIt)).divide(java.math.BigInteger.valueOf(total)).toLong()))
+        onIt > 0L && meTop -> stringResource(R.string.ore_last_you_won, Ore.ore(last.rewardOre))
+        onIt > 0L -> stringResource(R.string.ore_last_you_lost_draw)
+        v.miner?.roundId == last.id -> stringResource(R.string.ore_last_you_missed)
+        else -> ""
+    }
+    SoftPanel(padding = 12.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.height(30.dp).width(30.dp).clip(rs(8)).background(Halo.amber.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                Text((win + 1).toString(), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.amber)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.ore_last_title, last.id, win + 1), style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink)
+                Text(how + (if (outcome.isNotEmpty()) " · $outcome" else ""), style = HaloType.label, color = if (onIt > 0L && (last.isSplit || meTop)) Halo.mint else Halo.muted)
             }
         }
     }

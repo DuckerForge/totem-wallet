@@ -29,7 +29,7 @@ data class DefiPosition(
     /** What it pays, per year, as a percentage; null when nobody can say. */
     val aprPct: Double? = null,
 ) {
-    enum class Kind { STAKE, LEND }
+    enum class Kind { STAKE, LEND, ORE }
     /** Coins earned in a day at that rate. */
     val perDayUi: Double? get() = aprPct?.let { ui * it / 100.0 / 365.0 }
     val perDayFiat: Double? get() = if (aprPct != null && fiat != null) fiat * aprPct / 100.0 / 365.0 else null
@@ -230,6 +230,22 @@ object Portfolio {
                 val ui = d.raw / 10.0.pow(d.decimals)
                 val usd = d.priceUsd ?: quotes[d.asset]?.usd ?: if (d.asset in STABLES) 1.0 else null
                 defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo, aprPct = d.aprPct)
+            }
+        }
+        // ORE: una riga solo per chi ha un conto Miner. Una chiamata, senza il giro.
+        runCatching {
+            val v = OreMiner.read(rpc, owner, withRound = false)
+            val m = v?.miner
+            if (v != null && m != null) {
+                val oreUi = v.claimableOre / 1e11
+                val oreUsd = quotes[com.clearsign.core.Ore.MINT]?.usd ?: runCatching { Prices.quotes(listOf(com.clearsign.core.Ore.MINT))[com.clearsign.core.Ore.MINT]?.usd }.getOrNull()
+                val solUsd = quotes[NATIVE_SOL_MINT]?.usd
+                val fiatV = fx?.let { f -> (oreUsd?.let { it * oreUi } ?: 0.0) * f + (solUsd?.let { it * (v.claimableSol + v.inPlay) / 1e9 } ?: 0.0) * f }
+                val sub = (ctx?.getString(R.string.ore_sub, com.clearsign.core.Ore.sol(v.inPlay), com.clearsign.core.Ore.ore(v.claimableOre)) ?: "")
+                defi += DefiPosition(
+                    DefiPosition.Kind.ORE, "ORE", sub, "ORE", oreUi, fiatV,
+                    image = TokenSymbols.image(com.clearsign.core.Ore.MINT), state = null,
+                )
             }
         }
 

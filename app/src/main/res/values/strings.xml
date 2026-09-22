@@ -1039,6 +1039,9 @@
     <string name="market_not_on_solana">This coin does not exist on Solana, so from here you can follow it but not buy it.</string>
     <string name="market_watching">Following</string>
     <string name="market_empty">You are not following any coin yet. Search below and tap one to add it.</string>
+    <string name="market_down_title">The market did not answer</string>
+    <string name="market_down_body">Check the connection and try again.</string>
+    <string name="market_retry">Try again</string>
     <string name="market_no_price">no price</string>
     <string name="tok_search">Name, symbol or mint address</string>
     <string name="tok_yours">Yours</string>

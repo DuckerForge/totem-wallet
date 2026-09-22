@@ -47,6 +47,8 @@ enum class HIcon {
     BRIDGE,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
+    // aggiorna: tre quarti d'arco con la punta. HISTORY e' un orologio e diceva un'altra cosa.
+    REFRESH,
 }
 
 @Composable
@@ -311,6 +313,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 line(14.5f, 13.5f, 20.5f, 13.5f); dot(15.5f, 13.5f, 1.2f)
             }
             HIcon.HISTORY -> { arc(12f, 12f, 8f, -150f, 300f); poly(3f, 5f, 3.8f, 10f, 8.5f, 9f); line(12f, 8f, 12f, 12.5f); line(12f, 12.5f, 15.5f, 14.5f) }
+            HIcon.REFRESH -> { arc(12f, 12f, 8f, -40f, 300f); line(18.1f, 6.9f, 18.6f, 2.6f); line(18.1f, 6.9f, 22.2f, 7.6f) }
             HIcon.CONTACTS -> { circle(9f, 8.5f, 3.5f); path { moveTo(3f, 20f); quadTo(3f, 14f, 9f, 14f); quadTo(15f, 14f, 15f, 20f) }; arc(16f, 8.5f, 3.5f, -80f, 160f); path { moveTo(17f, 14.2f); quadTo(21f, 15f, 21f, 20f) } }
             HIcon.INFO -> { circle(12f, 12f, 8.5f); line(12f, 11f, 12f, 16.5f); dot(12f, 8f, 1.1f) }
             HIcon.FINGERPRINT -> {

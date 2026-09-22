@@ -68,6 +68,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     val ctx = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(true) }
     var ranked by remember { mutableStateOf<List<Market.Coin>>(emptyList()) }
     var found by remember { mutableStateOf<List<Market.Coin>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
@@ -81,7 +82,9 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     val fx = rememberFx()
 
     LaunchedEffect(refresh) {
+        loading = true
         ranked = withContext(Dispatchers.IO) { runCatching { Market.top() }.getOrDefault(emptyList()) }
+        loading = false
     }
 
     // The followed list is priced on its own: it can hold coins that are nowhere
@@ -155,21 +158,14 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item {
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(38.dp).clip(rs(12)).background(Halo.amber.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    HaloIcon(HIcon.STAR_FILLED, Halo.amber, 22.dp)
+            Box(Modifier.padding(top = 14.dp, bottom = 10.dp)) {
+                PageHeader(stringResource(R.string.tab_market), stringResource(R.string.market_sub), HIcon.STAR_FILLED, tint = Halo.amber) {
+                    RoundIconButton(HIcon.REFRESH, spinning = loading) { refresh++ }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.tab_market), style = HaloType.screen, color = Halo.ink)
-                    Text(stringResource(R.string.market_sub), style = HaloType.small, color = Halo.muted)
-                }
-                Box(
-                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { refresh++ },
-                    contentAlignment = Alignment.Center,
-                ) { HaloIcon(HIcon.HISTORY, Halo.muted, 16.dp) }
             }
         }
+        // Chi non segue niente lo legge qui, dove starebbe la lista, con cosa fare.
+        if (keys.isEmpty() && q.length < 2) item { EmptyLine(HIcon.STAR, stringResource(R.string.market_empty)) }
 
         // What is standing on Jupiter in your name, before the watchlist: an order
         // is a decision already made, and it is the first thing worth checking.
@@ -179,24 +175,26 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             item { SectionLabel(stringResource(R.string.market_watching)) }
             items(followed, key = { "w-" + it.key }) { c ->
                 // Following is one tap; unfollowing asks, because it takes the amount with it.
-                CoinRow(c, fx, followed = true, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) { unfollow = c }
+                val amount = remember(refresh, c.key) { Watchlist.amount(ctx, c.key) }
+                CoinRow(c, fx, followed = true, amount = amount, onOpen = { editing = c }) { unfollow = c }
             }
             item {
                 // What the favourites are worth, what the wallet is worth, and the two together.
                 val favUsd = followed.sumOf { c -> Watchlist.amount(ctx, c.key) * (c.priceUsd ?: 0.0) }
                 val wallet = remember(refresh, currency) { Portfolio.cached(owner, currency)?.total }
                 if (favUsd > 0 || (wallet ?: 0.0) > 0) {
-                    GlassCard {
+                    // Un pannello che si legge e basta: niente chevron, niente pressione.
+                    SoftPanel {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row { Text(stringResource(R.string.market_total_followed), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fx.fiat(favUsd), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) }
-                            wallet?.let { w -> Row { Text(stringResource(R.string.market_total_wallet), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fmtFiat(w, currency), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) } }
+                            StatRow(stringResource(R.string.market_total_followed), fx.fiat(favUsd))
+                            wallet?.let { w -> StatRow(stringResource(R.string.market_total_wallet), fmtFiat(w, currency)) }
                             // La somma si fa solo quando le due meta' sono nella stessa unita'.
                             val r = fx.rate.takeIf { fx.cur == currency }
                             if (r != null) {
                                 val all = favUsd * r + (wallet ?: 0.0)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.market_total_all), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, modifier = Modifier.weight(1f))
-                                    Text(fmtFiat(all, currency), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Halo.mint)
+                                    Text(stringResource(R.string.market_total_all), style = HaloType.body, color = Halo.ink, modifier = Modifier.weight(1f))
+                                    Text(fmtFiat(all, currency), style = HaloType.title, color = Halo.mint)
                                 }
                             }
                         }
@@ -210,7 +208,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
-                placeholder = { Text(stringResource(R.string.market_search), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted) },
+                placeholder = { Text(stringResource(R.string.market_search), style = HaloType.small, color = Halo.muted) },
                 leadingIcon = { HaloIcon(HIcon.SEARCH, Halo.muted, 18.dp) },
                 trailingIcon = {
                     if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
@@ -232,15 +230,22 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 ),
             )
         }
-        items(shown, key = { "r-" + it.id }) { c ->
-            // The star says the truth here too: lit when the coin is already followed.
-            val isFollowed = c.key in keys
-            CoinRow(c, fx, followed = isFollowed, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) {
-                if (isFollowed) unfollow = c else { Watchlist.add(ctx, c.key); Haptics.tick(ctx); refresh++ }
+        when (marketState(loading, ranked.isEmpty(), q, searching, shown.isEmpty())) {
+            // Sei righe segnaposto: la pagina ha gia' la sua forma mentre il listino arriva.
+            MarketState.LOADING -> items(6) { PlaceholderRow() }
+            // Il listino non e' arrivato: prima restava un'etichetta sopra il nulla.
+            MarketState.DOWN -> item {
+                EmptyState(HIcon.CHART_DOWN, stringResource(R.string.market_down_title), stringResource(R.string.market_down_body), stringResource(R.string.market_retry) to { refresh++ })
             }
-        }
-        if (shown.isEmpty() && q.length >= 2 && !searching) {
-            item { Text(stringResource(R.string.tok_none), style = HaloType.small, color = Halo.muted, modifier = Modifier.padding(vertical = 10.dp)) }
+            MarketState.NO_RESULTS -> item { EmptyLine(HIcon.SEARCH, stringResource(R.string.tok_none)) }
+            else -> items(shown, key = { "r-" + it.id }) { c ->
+                // The star says the truth here too: lit when the coin is already followed.
+                val isFollowed = c.key in keys
+                val amount = remember(refresh, c.key) { Watchlist.amount(ctx, c.key) }
+                CoinRow(c, fx, followed = isFollowed, amount = amount, onOpen = { editing = c }) {
+                    if (isFollowed) unfollow = c else { Watchlist.add(ctx, c.key); Haptics.tick(ctx); refresh++ }
+                }
+            }
         }
         item { Spacer(Modifier.height(20.dp)) }
     }
@@ -447,10 +452,7 @@ private fun solanaCoin(mint: String): Market.Coin? {
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text.uppercase(), fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 10.sp,
-        color = Halo.muted, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-    )
+    Text(text.uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
 }
 
 /**
@@ -463,17 +465,20 @@ private fun SectionLabel(text: String) {
  */
 @Composable
 private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, onOpen: () -> Unit, onStar: () -> Unit) {
+    // Contenuta e con la pressione, senza chevron: la stella in coda e' il
+    // controllo, e un chevron accanto farebbe a pugni. La riga si tocca lo stesso.
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().clip(rs(12)).clickable(onClick = onOpen).padding(vertical = 8.dp, horizontal = 2.dp),
+        Modifier.fillMaxWidth().tappable(src, rs(Radius.panel), fill = Halo.card, onClick = onOpen).padding(vertical = 8.dp, horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         c.rank?.let {
-            Text(it.toString(), fontFamily = Mono, fontSize = 10.sp, color = Halo.muted, modifier = Modifier.width(26.dp))
+            Text(it.toString(), style = HaloType.mono, color = Halo.muted, modifier = Modifier.width(26.dp))
         } ?: Spacer(Modifier.width(26.dp))
         TokenLogo(c.mint ?: c.id, c.symbol, c.image, 34.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(c.name, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, maxLines = 1)
+            Text(c.name, style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink, maxLines = 1)
             // Quanto ne hai, e quanto vale adesso. La quantita' da sola non e'
             // la risposta alla domanda per cui uno la scrive: chi digita
             // "millecinquecento" vuole sapere quanto fanno, e il prezzo a
@@ -483,19 +488,16 @@ private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, o
                 fmtUi(amt) + " " + c.symbol + (c.priceUsd?.let { " · " + fx.fiat(amt * it) } ?: "")
             }
             val sub = mine ?: (c.symbol + (c.marketCap?.takeIf { it > 0 }?.let { " · " + fx.cap(it) } ?: ""))
-            Text(sub, fontFamily = Inter, fontSize = 11.sp, color = if (mine != null) Halo.mint else Halo.muted, maxLines = 1)
+            Text(sub, style = HaloType.label.copy(fontWeight = FontWeight.Medium), color = if (mine != null) Halo.mint else Halo.muted, maxLines = 1)
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 c.priceUsd?.let { fx.price(it) } ?: stringResource(R.string.market_no_price),
-                fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp,
+                style = HaloType.small.copy(fontFamily = Sora, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
                 color = if (c.priceUsd != null) Halo.ink else Halo.muted,
             )
             c.change24h?.let { ch ->
-                Text(
-                    (if (ch >= 0) "+" else "−") + "%.1f%%".format(kotlin.math.abs(ch)),
-                    fontFamily = Mono, fontSize = 11.sp, color = if (ch >= 0) Halo.mint else Halo.red,
-                )
+                Text((if (ch >= 0) "+" else "−") + "%.1f%%".format(kotlin.math.abs(ch)), style = HaloType.mono, color = if (ch >= 0) Halo.mint else Halo.red)
             }
         }
         Spacer(Modifier.width(4.dp))
@@ -676,5 +678,32 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 else -> Text(stringResource(R.string.market_not_on_solana), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
             }
         }
+    }
+}
+
+/** In che stato e' la lista del mercato. Pura, per il test. */
+internal enum class MarketState { LOADING, DOWN, LIST, SEARCHING, NO_RESULTS }
+
+internal fun marketState(loading: Boolean, rankedEmpty: Boolean, query: String, searching: Boolean, shownEmpty: Boolean): MarketState = when {
+    query.length >= 2 && searching -> MarketState.SEARCHING
+    query.length >= 2 && shownEmpty -> MarketState.NO_RESULTS
+    query.length >= 2 -> MarketState.LIST
+    loading && rankedEmpty -> MarketState.LOADING
+    rankedEmpty -> MarketState.DOWN
+    else -> MarketState.LIST
+}
+
+/** Una riga vuota con la forma di una riga: la pagina ha la sua altezza mentre il listino arriva. */
+@Composable
+private fun PlaceholderRow() {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.width(26.dp))
+        Box(Modifier.size(34.dp).clip(rs(999)).background(Halo.cardSoft))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.fillMaxWidth(0.45f).height(12.dp).clip(rs(6)).background(Halo.cardSoft))
+            Box(Modifier.fillMaxWidth(0.25f).height(9.dp).clip(rs(6)).background(Halo.cardSoft))
+        }
+        Box(Modifier.width(56.dp).height(12.dp).clip(rs(6)).background(Halo.cardSoft))
     }
 }

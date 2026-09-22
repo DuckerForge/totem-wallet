@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -210,7 +213,10 @@ internal fun WalletHero(
                         if (view.defi.isNotEmpty()) {
                             Spacer(Modifier.height(Space.xs))
                             Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
-                            view.defi.forEach { d -> DefiRow(d, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
+                            // Tessere in fila, una per posizione: compatte, e scorrono se sono tante.
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                view.defi.forEach { d -> DefiTile(d, currency, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
+                            }
                         }
                         if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
                         // Tutto il resto, le altre monete, gli spiccioli e gli NFT, sta
@@ -542,6 +548,42 @@ private fun DefiRow(d: DefiPosition, onClick: (() -> Unit)? = null) {
                 fontFamily = Inter, fontSize = 11.sp, color = if (d.state == "active" || d.state == null) Halo.mint else Halo.amber, maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * Una posizione DeFi in una tessera: logo, cosa e', quanto vale. Tre stanno in
+ * una riga; la riga scorre se sono di piu'. La tessera di ORE si tocca.
+ */
+@Composable
+private fun DefiTile(d: DefiPosition, currency: String, onClick: (() -> Unit)? = null) {
+    val what = when (d.kind) {
+        DefiPosition.Kind.STAKE -> stringResource(R.string.hero_tile_stake)
+        DefiPosition.Kind.LEND -> stringResource(R.string.hero_tile_lend)
+        DefiPosition.Kind.ORE -> stringResource(R.string.hero_tile_ore)
+    }
+    val line = when (d.kind) {
+        DefiPosition.Kind.ORE -> d.sub.substringBefore(" · ")
+        else -> d.fiat?.let { fmtFiat(it, currency) } ?: d.sub
+    }
+    Column(
+        // 106 dp: tre tessere piu' due spazi stanno nei 339 dp della scheda su un
+        // telefono largo 411. La quarta fa scorrere la fila.
+        Modifier.width(106.dp).clip(rs(14)).background(Halo.cardSoft).border(1.dp, if (onClick != null) Halo.cyan.copy(alpha = 0.35f) else Halo.stroke, rs(14))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TokenLogo(if (d.kind == DefiPosition.Kind.ORE) com.clearsign.core.Ore.MINT else d.symbol, d.symbol, d.image, 24.dp)
+            Spacer(Modifier.width(6.dp))
+            Text(d.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Halo.ink, maxLines = 1)
+        }
+        Text(what, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            line, fontFamily = Mono, fontSize = 11.sp, style = Tabular, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = if (d.state == "active" || d.state == null) Halo.mint else Halo.amber,
+        )
     }
 }
 

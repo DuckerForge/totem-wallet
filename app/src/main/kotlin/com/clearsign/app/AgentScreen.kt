@@ -118,27 +118,15 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Name, one line of context, and the one switch this page has.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(38.dp).clip(rs(12)).background(Halo.mint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    HaloIcon(HIcon.AGENT, Halo.mint, 22.dp)
-                }
-                SweepHalo(Halo.mint, Modifier.size(38.dp), key = FirstRun.at)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.tab_agent), style = HaloType.screen, color = Halo.ink)
-                Text(
-                    when (val l = link) {
-                        is AgentLink.State.On -> stringResource(R.string.agent_link_to, l.name)
-                        else -> stringResource(R.string.agent_tab_sub)
-                    },
-                    style = HaloType.small, color = Halo.muted, maxLines = 2,
-                )
-            }
-            ProSwitch(pro) { Settings.setAgentPro(ctx, it); Haptics.tick(ctx) }
-        }
+        // The same header as the other pages, and the one switch this page has.
+        PageHeader(
+            stringResource(R.string.tab_agent),
+            when (val l = link) {
+                is AgentLink.State.On -> stringResource(R.string.agent_link_to, l.name)
+                else -> stringResource(R.string.agent_tab_sub)
+            },
+            HIcon.AGENT, tint = Halo.mint, sweep = true,
+        ) { ProSwitch(pro) { Settings.setAgentPro(ctx, it); Haptics.tick(ctx) } }
 
         NightCard(refresh)
 
@@ -150,7 +138,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                     Text(stringResource(R.string.agent_nobudget_title), style = HaloType.title, color = Halo.ink)
                     Text(stringResource(R.string.env_none), style = HaloType.small, color = Halo.muted)
                     PrimaryButton(stringResource(R.string.env_create), danger = false, enabled = owner != null, icon = HIcon.HOURGLASS) { showNew = true }
-                    GhostButton(stringResource(R.string.chat_open), Modifier.fillMaxWidth(), HIcon.AGENT, tint = Halo.cyan) { onChat() }
+                    // One button, one link: the chat is the quiet way in.
+                    LinkRow(stringResource(R.string.chat_open)) { onChat() }
                     if (owner == null) Text(stringResource(R.string.agent_tab_none), style = HaloType.small, color = Halo.amber)
                 }
             }
@@ -224,18 +213,20 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
 
             // The two things you do here. Starting is a choice of lane, so it
             // opens a small sheet rather than flipping a switch.
+            // Starting is the one full button on this page; stopping is quieter,
+            // the chat is the other way in, and the Eyes are a link.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (cfg.on) {
                     GhostButton(stringResource(R.string.trader_stop_action), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber, height = 54.dp) {
                         TraderLoop.stop(ctx, ctx.getString(R.string.trader_stopped_by_you)); TraderKeeper.sync(ctx); refresh++
                     }
                 } else {
-                    GhostButton(stringResource(R.string.agent_start), Modifier.weight(1f), HIcon.AGENT, tint = Halo.mint, height = 54.dp) { showLane = true }
+                    Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.agent_start), danger = false, icon = HIcon.AGENT) { showLane = true } }
                 }
-                Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.chat_open), danger = false, icon = HIcon.AGENT) { onChat() } }
+                GhostButton(stringResource(R.string.chat_open), Modifier.weight(1f), HIcon.AGENT, tint = Halo.cyan, height = 54.dp) { onChat() }
             }
             // The screen that never sleeps: charts, lines, and the loop's own words.
-            GhostButton(stringResource(R.string.eyes_open), Modifier.fillMaxWidth(), HIcon.SEARCH, tint = Halo.cyan) { showEyes = true }
+            LinkRow(stringResource(R.string.eyes_open)) { showEyes = true }
 
             if (open.isNotEmpty()) {
                 GlassCard {
@@ -313,7 +304,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
 
         if (pro) {
             Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.agent_pro).uppercase(), style = HaloType.label, color = Halo.amber)
+            Text(stringResource(R.string.agent_pro).uppercase(), style = HaloType.label, color = Halo.muted)
 
             ProSection(stringResource(R.string.pro_model), HIcon.KEY, openAtFirst = !Brain.configured(ctx)) { BrainFields() }
 
@@ -418,32 +409,16 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
 /* The one switch: Simple or Pro, as a small pill that reads as a toggle. */
 @Composable
 private fun ProSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
-    val tint = if (on) Halo.amber else Halo.muted
-    Row(
-        Modifier.clip(rs(Radius.pill)).background(tint.copy(alpha = if (on) 0.16f else 0.08f)).border(1.dp, tint.copy(alpha = 0.6f), rs(Radius.pill))
-            .clickable { onChange(!on) }.padding(horizontal = 11.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(7.dp).clip(rs(Radius.pill)).background(tint))
-        Spacer(Modifier.width(6.dp))
-        Text(stringResource(R.string.agent_pro), fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = tint)
-    }
+    HaloChip(stringResource(R.string.agent_pro), tint = if (on) Halo.cyan else Halo.muted, selected = on) { onChange(!on) }
 }
 
 /* A Pro section: a title you tap, and its content when open. Closed by default, so the page stays a page. */
 @Composable
 private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false, content: @Composable () -> Unit) {
     var open by remember(title) { mutableStateOf(openAtFirst) }
-    GlassCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
-                HaloIcon(icon, Halo.amber, 15.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(title, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Halo.ink, modifier = Modifier.weight(1f))
-                HaloIcon(HIcon.CHEVRON_DOWN, Halo.muted, 14.dp, Modifier.rotate(if (open) 180f else 0f))
-            }
-            if (open) content()
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        DisclosureRow(title, null, icon, open) { open = !open }
+        if (open) GlassCard { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { content() } }
     }
 }
 
@@ -457,26 +432,24 @@ private fun LastBudget(refresh: Int) {
     val ctx = LocalContext.current
     val c = remember(refresh) { SessionWallet.lastClose(ctx) } ?: return
     val up = c.resultLamports >= 0
-    GlassCard {
+    val mins = ((c.closedAt - c.createdAt) / 60_000L).coerceAtLeast(0L)
+    val dur = if (mins >= 60) String.format(java.util.Locale.ROOT, "%dh %02dm", mins / 60, mins % 60) else "$mins min"
+    // A panel that is read: the two ends, the result in a pill, and the
+    // share as a small round button, not a third bordered box on the page.
+    SoftPanel {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.env_last_title).uppercase(), style = HaloType.label, color = Halo.muted)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.env_last_in, fmtSol(c.fundedLamports, 4)), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink)
-                    Text(stringResource(R.string.env_last_out, fmtSol(c.backLamports + c.harvestedLamports, 4)), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        (if (up) "+" else "−") + fmtSol(kotlin.math.abs(c.resultLamports), 4) + " SOL",
-                        fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (up) Halo.mint else Halo.red, style = Tabular,
-                    )
-                    Text(String.format(java.util.Locale.ROOT, "%+.1f%%", c.resultPct), fontFamily = Mono, fontSize = 11.5.sp, color = if (up) Halo.mint else Halo.red, style = Tabular)
-                }
+                Text(stringResource(R.string.env_last_title).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
+                DeltaPill(
+                    (if (up) "+" else "−") + fmtSol(kotlin.math.abs(c.resultLamports), 4) + " SOL" + String.format(java.util.Locale.ROOT, " · %+.1f%%", c.resultPct),
+                    up,
+                )
             }
-            val mins = ((c.closedAt - c.createdAt) / 60_000L).coerceAtLeast(0L)
-            val dur = if (mins >= 60) String.format(java.util.Locale.ROOT, "%dh %02dm", mins / 60, mins % 60) else "$mins min"
-            Text(stringResource(R.string.env_last_moves, c.buys, c.sells, dur), style = HaloType.small, color = Halo.muted)
-            GhostButton(stringResource(R.string.pnl_card_share), Modifier.fillMaxWidth(), HIcon.SHARE, tint = Halo.cyan) {
+            StatRow(stringResource(R.string.env_put_in), fmtSol(c.fundedLamports, 4) + " SOL")
+            StatRow(stringResource(R.string.env_last_back), fmtSol(c.backLamports + c.harvestedLamports, 4) + " SOL")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.env_last_moves, c.buys, c.sells, dur), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f))
+                RoundIconButton(HIcon.SHARE, tint = Halo.cyan) {
                 PnlCard.share(
                     ctx, PnlCard.Face(
                         ctx.getString(R.string.env_last_title), ctx.getString(R.string.env_last_moves, c.buys, c.sells, dur), c.resultPct,
@@ -484,6 +457,7 @@ private fun LastBudget(refresh: Int) {
                     ),
                     "budget-" + c.closedAt + ".png",
                 )
+            }
             }
         }
     }

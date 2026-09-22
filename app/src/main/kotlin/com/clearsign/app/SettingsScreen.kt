@@ -35,8 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -108,19 +106,8 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
 private fun SettingsGroup(title: String, sub: String, icon: HIcon, content: @Composable ColumnScope.() -> Unit) {
     var open by rememberSaveable(title) { mutableStateOf(false) }
     val ctx = LocalContext.current
-    // The chevron turns instead of swapping: the row is the same row, open or
-    // closed. The angle is read in graphicsLayer, so turning it redraws nothing.
-    val turn = animateFloatAsState(if (open) 90f else 0f, label = "group")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        HaloRow(
-            title, sub, onGround = true, chevron = false,
-            leading = {
-                Box(Modifier.size(34.dp).clip(rs(10)).background(if (open) Halo.mint.copy(alpha = 0.14f) else Halo.cyanSoft), contentAlignment = Alignment.Center) {
-                    HaloIcon(icon, if (open) Halo.mint else Halo.cyan, 18.dp)
-                }
-            },
-            trailing = { HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 16.dp, Modifier.graphicsLayer { rotationZ = turn.value }) },
-        ) { open = !open; Haptics.tick(ctx) }
+        DisclosureRow(title, sub, icon, open) { open = !open; Haptics.tick(ctx) }
         if (open) content()
     }
 }

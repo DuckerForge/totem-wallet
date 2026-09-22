@@ -555,6 +555,13 @@
     <string name="ore_outlook_nopx">Expected: %1$s ORE. Expected cost: %2$s SOL, %3$s%% of the stake.</string>
     <string name="ore_outlook_good">At today\'s ORE price this pays.</string>
     <string name="ore_outlook_bad">At today\'s ORE price this does not pay.</string>
+    <string name="ore_solo_legend">squares with a dot pay one miner only, drawn by stake</string>
+    <string name="ore_last_title">Round %1$d: square %2$d came out</string>
+    <string name="ore_last_split">the ORE was split among %1$d miners</string>
+    <string name="ore_last_solo">one miner took all the ORE</string>
+    <string name="ore_last_you_won">you get %1$s ORE</string>
+    <string name="ore_last_you_lost_draw">you were on it, the draw went to someone else</string>
+    <string name="ore_last_you_missed">you were on other squares</string>
     <string name="ore_wait_round">Wait for the next round</string>
     <string name="ore_wait_banner">Between rounds, or too close to the end. The button lights up when the next round starts.</string>
     <string name="ore_hold_dig">Hold to dig</string>

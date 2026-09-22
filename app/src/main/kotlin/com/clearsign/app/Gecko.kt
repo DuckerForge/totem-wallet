@@ -107,7 +107,11 @@ object Gecko {
     fun warmPools(ctx: android.content.Context) {
         if (poolsLoaded) return
         poolsLoaded = true
-        poolFile = java.io.File(ctx.filesDir, "gecko_pools.json")
+        // Il nome ha un numero perche' la regola di scelta e' cambiata: il file
+        // vecchio contiene pool scelte per profondita', alcune morte, e sarebbero
+        // rimaste buone per una settimana. Si butta e si ricomincia.
+        runCatching { java.io.File(ctx.filesDir, "gecko_pools.json").delete() }
+        poolFile = java.io.File(ctx.filesDir, "gecko_pools2.json")
         runCatching {
             val f = poolFile ?: return
             if (!f.exists()) return
@@ -140,7 +144,7 @@ object Gecko {
         val pool = poolCache[mint]?.takeIf { now - it.first < POOL_MS }?.second
             ?: topPool(mint, bg)?.also { poolCache[mint] = now to it; savePools() }
             ?: return emptyList()
-        val v = candles(pool, span, bg)
+        val v = candles(pool, span, bg, token = mint)
         // An empty answer is not cached: the pool may simply be a minute too young,
         // and a coin bought right now is exactly the one somebody wants to see.
         if (v.isNotEmpty()) seriesCache[key] = now to v
@@ -174,35 +178,73 @@ object Gecko {
     private val statsCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Pool>>()
     private const val STATS_MS = 3 * 60_000L
 
-    fun pool(mint: String, bg: Boolean = false): Pool? {
+    /**
+     * Una domanda sola per moneta, anche quando a chiederlo sono in due.
+     *
+     * Aprire una scheda fa partire insieme due cose che vogliono la stessa
+     * risposta: le cifre sotto il grafico e il grafico stesso, che per sapere
+     * da quale pool leggere chiama di nuovo qui. La cache si riempie alla fine,
+     * quindi la seconda partiva prima che la prima tornasse: due richieste
+     * identiche allo stesso indirizzo, spaziate di un secondo dal cancello,
+     * dove ne bastava una. Chi arriva secondo adesso aspetta sulla porta e
+     * trova la risposta gia' scritta.
+     */
+    private val asking = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    fun pool(mint: String, bg: Boolean = false): Pool? = synchronized(asking.computeIfAbsent(mint) { Any() }) {
         val now = System.currentTimeMillis()
         statsCache[mint]?.let { (at, p) -> if (now - at < STATS_MS) return p }
         val data = get("$BASE/tokens/$mint/pools?page=1", bg)?.optJSONArray("data") ?: return null
-        var best: Pool? = null
+        val pools = ArrayList<Pool>(data.length())
         for (i in 0 until data.length()) {
             val p = data.optJSONObject(i) ?: continue
             val a = p.optJSONObject("attributes")
-            val liq = a?.optString("reserve_in_usd")?.toDoubleOrNull() ?: 0.0
             val id = p.optString("id").substringAfter('_', "")
-            if (id.isEmpty() || liq <= (best?.liquidityUsd ?: -1.0)) continue
+            if (id.isEmpty()) continue
             val tx = a?.optJSONObject("transactions")?.optJSONObject("h24")
-            best = Pool(
+            pools += Pool(
                 id = id,
                 dex = p.optJSONObject("relationships")?.optJSONObject("dex")?.optJSONObject("data")
                     ?.optString("id")?.takeIf { it.isNotEmpty() },
-                liquidityUsd = liq.takeIf { it > 0 },
+                liquidityUsd = a?.optString("reserve_in_usd")?.toDoubleOrNull()?.takeIf { it > 0 },
                 volume24Usd = a?.optJSONObject("volume_usd")?.optString("h24")?.toDoubleOrNull()?.takeIf { it > 0 },
                 buys24 = tx?.optInt("buys", -1)?.takeIf { it >= 0 },
                 sells24 = tx?.optInt("sells", -1)?.takeIf { it >= 0 },
                 fdvUsd = a?.optString("fdv_usd")?.toDoubleOrNull()?.takeIf { it > 0 },
             )
         }
+        val best = busiest(pools)
         best?.let {
             statsCache[mint] = now to it
             poolCache[mint] = now to it.id
             savePools()
         }
         return best
+    }
+
+    /**
+     * Fra tutte le pool di una moneta, quella dove si scambia davvero.
+     *
+     * Prima si prendeva la piu' profonda, e la profondita' non dice se qualcuno
+     * compra. Misurato su EDEL il 20 settembre 2026: la pool piu' profonda ha
+     * centosettantanovemila dollari fermi, zero scambi in un giorno, e l'ultima
+     * candela e' di maggio a 0,0062 $. Quella dove si scambia ne ha
+     * centoventisette di profondita', quattordicimila di volume, e la moneta
+     * sta a 0,0230 $. Il grafico mostrava quattro mesi vecchi a un terzo del
+     * prezzo, le cifre sotto dicevano volume zero, e il link apriva la pagina
+     * di una pool morta: da fuori sembra un'altra moneta.
+     *
+     * Quindi si sceglie per volume. Con un pavimento: una pool con due dollari
+     * dentro e molto volume non e' un mercato, e' un palleggio fra due
+     * portafogli, quindi per entrare in gara deve avere almeno un cinquantesimo
+     * della profondita' della piu' profonda. Se non si scambia da nessuna parte
+     * resta la piu' profonda, che e' il meglio che si puo' dire di una moneta
+     * ferma.
+     */
+    internal fun busiest(pools: List<Pool>): Pool? {
+        val deepest = pools.maxOfOrNull { it.liquidityUsd ?: 0.0 } ?: return null
+        val traded = pools.filter { (it.volume24Usd ?: 0.0) > 0 && (it.liquidityUsd ?: 0.0) >= deepest / 50 }
+        return traded.maxByOrNull { it.volume24Usd ?: 0.0 } ?: pools.maxByOrNull { it.liquidityUsd ?: 0.0 }
     }
 
     /** The busiest pool for [mint], which is the one a price should come from. */
@@ -213,7 +255,7 @@ object Gecko {
      * the API is unreachable — and an empty chart is drawn as nothing at all,
      * never as a flat line, which would read as a price that did not move.
      */
-    fun closes(pool: String, span: Span): List<Double> = candles(pool, span).map { it.close }
+    fun closes(pool: String, span: Span, token: String? = null): List<Double> = candles(pool, span, token = token).map { it.close }
 
     /**
      * One candle, with the hour it belongs to.
@@ -233,8 +275,20 @@ object Gecko {
         val volume: Double,
     )
 
-    fun candles(pool: String, span: Span, bg: Boolean = false): List<Candle> {
-        val url = "$BASE/pools/$pool/ohlcv/${span.path}?aggregate=${span.aggregate}&limit=${span.limit}"
+    /**
+     * [token] e' il mint di cui si vuole il prezzo. Va sempre passato quando lo
+     * si conosce.
+     *
+     * Una pool ha due monete, e questa chiamata senza dirle quale risponde con
+     * la prima delle due. Misurato il 20 settembre 2026 su SOL: la pool piu'
+     * profonda che lo contiene si chiama "WOTF / SOL", e il grafico di Solana
+     * era il grafico di WOTF. Non un errore visibile - una linea c'e', sale e
+     * scende - solo la moneta sbagliata. Col mint scritto nell'indirizzo la
+     * stessa pool risponde centoundici dollari, che e' quanto costa un SOL.
+     */
+    fun candles(pool: String, span: Span, bg: Boolean = false, token: String? = null): List<Candle> {
+        val url = "$BASE/pools/$pool/ohlcv/${span.path}?aggregate=${span.aggregate}&limit=${span.limit}" +
+            (token?.let { "&token=$it" } ?: "")
         val list = get(url, bg)?.optJSONObject("data")?.optJSONObject("attributes")
             ?.optJSONArray("ohlcv_list") ?: return emptyList()
         val out = ArrayList<Candle>(list.length())
@@ -285,14 +339,23 @@ object Gecko {
      * front asked, which is exactly the window in which a person is waiting.
      */
     private fun pace(bg: Boolean) {
+        // Il posto si prenota dentro il lucchetto, si aspetta fuori.
+        //
+        // Prima si dormiva tenendolo chiuso, e la curva di fondo lo teneva
+        // chiuso per tre secondi e sei: chi apriva una moneta in quel momento
+        // non aspettava il suo secondo scarso, aspettava di sapere quando
+        // avrebbe potuto cominciare ad aspettare. Lo scarto fra le chiamate e'
+        // identico, il tempo di attesa di chi guarda no.
+        val wait: Long
         synchronized(gate) {
             val now = System.currentTimeMillis()
-            var wait = (if (bg) GAP_BACK else GAP_FRONT) - (now - lastCall)
-            if (bg) wait = maxOf(wait, 3000L - (now - lastFront))
-            if (wait > 0) runCatching { Thread.sleep(wait) }
-            lastCall = System.currentTimeMillis()
+            var w = (if (bg) GAP_BACK else GAP_FRONT) - (now - lastCall)
+            if (bg) w = maxOf(w, 3000L - (now - lastFront))
+            wait = maxOf(w, 0L)
+            lastCall = now + wait
             if (!bg) lastFront = lastCall
         }
+        if (wait > 0) runCatching { Thread.sleep(wait) }
     }
 
     private fun get(url: String, bg: Boolean = false): JSONObject? {

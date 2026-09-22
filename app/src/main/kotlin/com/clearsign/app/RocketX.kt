@@ -502,6 +502,13 @@ object RocketX {
         (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { bridge(it) } }
     }.getOrDefault(emptyList()).sortedByDescending { it.at }
 
+    /** An order opened and never paid: out of the history, because nothing ever left. */
+    fun forget(ctx: Context, requestId: String) {
+        val arr = JSONArray()
+        bridges(ctx).filterNot { it.requestId == requestId }.forEach { arr.put(json(it)) }
+        ctx.getSharedPreferences("apex_bridges", Context.MODE_PRIVATE).edit().putString("all", arr.toString()).apply()
+    }
+
     /** The deposit went out: keep its chain signature with the order, for `/status` later. */
     fun attachSignature(ctx: Context, deposit: String, signature: String) {
         val all = bridges(ctx)

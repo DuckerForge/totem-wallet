@@ -68,6 +68,9 @@ internal fun BridgeSheet(
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var networks by remember { mutableStateOf<List<RocketX.Network>>(emptyList()) }
+    // Solana as a landing: read once on IO. [RocketX.home] the first time is a
+    // network call, and it used to be made in composition, on the main thread.
+    var home by remember { mutableStateOf<RocketX.Network?>(null) }
     var usdc by remember { mutableStateOf(false) }
     var target by remember { mutableStateOf<RocketX.Network?>(null) }
     /**
@@ -105,6 +108,7 @@ internal fun BridgeSheet(
 
     LaunchedEffect(Unit) {
         networks = withContext(Dispatchers.IO) { runCatching { RocketX.networks() }.getOrDefault(emptyList()) }
+        home = withContext(Dispatchers.IO) { runCatching { RocketX.home() }.getOrNull() }
         // Si parte da Ethereum, non dalla prima che manda RocketX, che e'
         // Bitcoin: su un ponte da Solana la prima e' quella che si usa di piu'.
         target = RocketX.popular(networks).firstOrNull() ?: networks.firstOrNull()
@@ -135,6 +139,7 @@ internal fun BridgeSheet(
             // [RocketX.home] la prima volta e' una chiamata, non una lettura:
             // va chiesta di qua e non sul thread che sta disegnando.
             val t = RocketX.home() ?: return@withContext null
+            home = t
             runCatching { RocketX.quote(fromMint, "solana", fromMint, t.id, RocketX.PROBE) }.getOrNull()
         }
         floor = probe?.minAmount?.let { it to probe.minUsd }
@@ -274,7 +279,7 @@ internal fun BridgeSheet(
 
             // Il giudizio sull'indirizzo, mentre lo incolli e non dopo.
             // Dove arrivano i soldi: l'altra catena, oppure Solana stessa.
-            val landing = if (private) RocketX.home() else target
+            val landing = if (private) home else target
             val fits = landing?.let { t -> dest.takeIf { it.isNotBlank() }?.let { RocketX.addressFits(t, it) } }
             if (fits == false) {
                 Banner(stringResource(R.string.bridge_dest_wrong, landing?.name ?: ""), Halo.red, HIcon.BLOCK)
@@ -370,7 +375,7 @@ internal fun BridgeSheet(
             val ready = quotes.isNotEmpty() && dest.length >= 20 && amt != null && amt > 0 && busy == null && fits != false
             PrimaryButton(stringResource(R.string.bridge_go), danger = false, enabled = ready, icon = HIcon.SWAP) {
                 val q = quotes.getOrNull(picked) ?: quotes.first()
-                val t = (if (private) RocketX.home() else target) ?: return@PrimaryButton
+                val t = (if (private) home else target) ?: return@PrimaryButton
                 busy = ctx.getString(R.string.bridge_opening)
                 scope.launch {
                     // Se un ordine e' gia' aperto e in attesa del tuo si', e' quello

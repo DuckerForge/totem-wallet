@@ -339,6 +339,7 @@
     <string name="demo_offline_note">Offline demo: no network, no real transaction. With the Seed Vault connected the signature is real.</string>
     <string name="settings_hdr">SETTINGS</string>
     <string name="settings_sub">Language</string>
+    <string name="settings_page_sub">Wallet, agent, phone, look.</string>
     <string name="lang_label">LANGUAGE</string>
     <string name="lang_system">System</string>
     <string name="lang_note">Receipts also read in Spanish; the interface is English or Italian.</string>
@@ -1123,6 +1124,7 @@
     <string name="home_act_link">Link</string>
     <string name="home_act_agent">Agent</string>
     <string name="home_act_more">More</string>
+    <string name="home_act_more_sub">Everything that is not on the front page.</string>
     <string name="home_agent_hdr">THE AGENT</string>
     <string name="home_agent_off">No agent yet. It can only ask; every move still needs your fingerprint.</string>
     <string name="env_limits_note">It signs on its own up to %1$s SOL a move and %2$s SOL a day. Above that it asks you, and you sign with your fingerprint.</string>

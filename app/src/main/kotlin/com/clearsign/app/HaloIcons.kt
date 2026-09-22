@@ -28,7 +28,7 @@ enum class HIcon {
     DRAIN, FLAG, HOURGLASS, GIFT, SEEDLING, UNLOCK,
     // states / actions
     BLOCK, SHIELD_LOCK, CHECK, WARNING, PEN, SEND, SIGN, LOGIN, COPY, EXTERNAL,
-    CHEVRON_RIGHT, CHEVRON_DOWN, CHEVRON_LEFT, CLOSE, SEARCH, NFC, MORE, HOLD, GEM, WALLET, HISTORY, CONTACTS, INFO, FINGERPRINT,
+    CHEVRON_RIGHT, CHEVRON_DOWN, CHEVRON_LEFT, CLOSE, SEARCH, NFC, MORE, HOLD, GEM, WALLET, HISTORY, CONTACTS, PEOPLE, INFO, FINGERPRINT,
     // wallet actions / themes
     LOCK, COINS, QR, PALETTE, RECEIVE, PASTE, SCAN, SHARE,
     // brand: a shield sealed with a signature check
@@ -314,6 +314,8 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             }
             HIcon.HISTORY -> { arc(12f, 12f, 8f, -150f, 300f); poly(3f, 5f, 3.8f, 10f, 8.5f, 9f); line(12f, 8f, 12f, 12.5f); line(12f, 12.5f, 15.5f, 14.5f) }
             HIcon.REFRESH -> { arc(12f, 12f, 8f, -40f, 300f); line(18.1f, 6.9f, 18.6f, 2.6f); line(18.1f, 6.9f, 22.2f, 7.6f) }
+            // Two whole people, one in front: the list of them, not the exchange.
+            HIcon.PEOPLE -> { circle(8.5f, 8.5f, 3.2f); path { moveTo(2.5f, 20f); quadTo(2.5f, 14.2f, 8.5f, 14.2f); quadTo(14.5f, 14.2f, 14.5f, 20f) }; circle(16.6f, 7.4f, 2.6f); path { moveTo(15.2f, 12.4f); quadTo(21.6f, 12.6f, 21.6f, 19f) } }
             HIcon.CONTACTS -> { circle(9f, 8.5f, 3.5f); path { moveTo(3f, 20f); quadTo(3f, 14f, 9f, 14f); quadTo(15f, 14f, 15f, 20f) }; arc(16f, 8.5f, 3.5f, -80f, 160f); path { moveTo(17f, 14.2f); quadTo(21f, 15f, 21f, 20f) } }
             HIcon.INFO -> { circle(12f, 12f, 8.5f); line(12f, 11f, 12f, 16.5f); dot(12f, 8f, 1.1f) }
             HIcon.FINGERPRINT -> {

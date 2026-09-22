@@ -339,6 +339,7 @@
     <string name="demo_offline_note">Demo offline: nessuna rete, nessuna transazione reale. Col Seed Vault collegato la firma è vera.</string>
     <string name="settings_hdr">IMPOSTAZIONI</string>
     <string name="settings_sub">Lingua</string>
+    <string name="settings_page_sub">Portafoglio, agente, telefono, aspetto.</string>
     <string name="lang_label">LINGUA</string>
     <string name="lang_system">Sistema</string>
     <string name="lang_note">Le ricevute si leggono anche in spagnolo; l\'interfaccia è in inglese o italiano.</string>
@@ -1123,6 +1124,7 @@
     <string name="home_act_link">Link</string>
     <string name="home_act_agent">Agente</string>
     <string name="home_act_more">Altro</string>
+    <string name="home_act_more_sub">Tutto quello che non sta in prima pagina.</string>
     <string name="home_agent_hdr">L\'AGENTE</string>
     <string name="home_agent_off">Nessun agente. Può solo chiedere: ogni mossa passa comunque dalla tua impronta.</string>
     <string name="env_limits_note">Firma da solo fino a %1$s SOL per operazione e %2$s SOL al giorno. Sopra, chiede a te e firmi con l\'impronta.</string>

@@ -356,12 +356,13 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+        SheetHeader(stringResource(R.string.home_act_more), stringResource(R.string.home_act_more_sub), HIcon.MORE, onClose = onDismiss)
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = Space.xl, vertical = Space.lg)
-                .navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(horizontal = Space.xl).padding(bottom = Space.lg),
             verticalArrangement = Arrangement.spacedBy(Space.md),
         ) {
-            Text(stringResource(R.string.home_act_more), style = HaloType.title, color = Halo.ink)
+            // Every row its own icon, so the list can be read by shape alone.
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
             // Mandare soldi con un link non stava qui dentro, perche' stava
@@ -373,26 +374,18 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             MoreRow(HIcon.SPARK, stringResource(R.string.blink_open), onLink)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.health_title), onHealth)
-            MoreRow(HIcon.CONTACTS, stringResource(R.string.home_contacts_hdr), onContacts)
-            MoreRow(HIcon.SPARK, stringResource(R.string.comp_page_title), onCompanion)
+            MoreRow(HIcon.PEOPLE, stringResource(R.string.home_contacts_hdr), onContacts)
+            MoreRow(HIcon.PIGEON, stringResource(R.string.comp_page_title), onCompanion)
             MoreRow(HIcon.SETTINGS, stringResource(R.string.tab_settings), onSettings)
             androidx.compose.foundation.layout.Spacer(Modifier.size(Space.sm))
+        }
         }
     }
 }
 
 @Composable
 private fun MoreRow(icon: HIcon, label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel))
-            .clickable(onClick = onClick).padding(Space.lg),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HaloIcon(icon, Halo.ink, 20.dp)
-        androidx.compose.foundation.layout.Spacer(Modifier.size(Space.md))
-        Text(label, style = HaloType.body, color = Halo.ink, modifier = Modifier.weight(1f))
-        HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 16.dp)
-    }
+    HaloRow(label, onGround = true, leading = { HaloIcon(icon, Halo.ink, 20.dp) }, onClick = onClick)
 }
 
 /** Realized P&L, behind the balance's own change. The card already existed. */

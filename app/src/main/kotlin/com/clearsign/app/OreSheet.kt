@@ -271,7 +271,11 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text(stringResource(R.string.ore_best_label), style = HaloType.small, color = Halo.muted)
                                         listOf(1, 3, 5).forEach { k ->
-                                            SmallChip(k.toString(), null, tint = Halo.cyan) { picked = OreOdds.best(k, r.deployed, r.count).toSet(); Haptics.tick(ctx) }
+                                            // Una casella dove sei gia' sopra il programma la salta: non si ripropone.
+                                            SmallChip(k.toString(), null, tint = Halo.cyan) {
+                                                val mine = v.mySquares.toSet()
+                                                picked = OreOdds.best(Ore.SQUARES, r.deployed, r.count).filter { it !in mine }.take(k).toSet(); Haptics.tick(ctx)
+                                            }
                                         }
                                     }
                                 }
@@ -486,7 +490,8 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                         Modifier.weight(1f).aspectRatio(1f).clip(rs(10))
                             .background(Halo.cardSoft).background(fill)
                             .border(if (isPicked || isMine || lit || won) 1.5.dp else 1.dp, edge, rs(10))
-                            .clickable(enabled = picking) { onPick(s) },
+                            // Dove sei gia' sopra non si rimette: il programma salterebbe la casella.
+                            .clickable(enabled = picking && !isMine) { onPick(s) },
                     ) {
                         Text((s + 1).toString(), fontFamily = Mono, fontSize = 9.sp, color = Halo.muted.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 4.dp))
                         Text(

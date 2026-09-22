@@ -1105,9 +1105,10 @@ object SolanaRpc {
         )
         val arr = post(rpcUrl, "getProgramAccounts", params)?.optJSONArray("result") ?: return null
         val b64 = arr.optJSONObject(0)?.optJSONObject("account")?.optJSONArray("data")?.optString(0) ?: return null
+        val account = arr.optJSONObject(0)?.optString("pubkey").orEmpty()
         val user = runCatching { B64.decode(b64) }.getOrNull() ?: return null
         val config = accountBytes(rpcUrl, SkrStake.CONFIG) ?: return null
-        return SkrStake.decode(user, config)?.takeIf { it.rawSkr > 0 }
+        return SkrStake.decode(user, config)?.takeIf { it.rawSkr > 0 }?.copy(account = account)
     }
 
     // ---- transport -----------------------------------------------------------

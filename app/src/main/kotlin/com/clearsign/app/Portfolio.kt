@@ -28,8 +28,17 @@ data class DefiPosition(
     val image: String? = null, val state: String? = null,
     /** What it pays, per year, as a percentage; null when nobody can say. */
     val aprPct: Double? = null,
+    /** Quello che il foglio di dettaglio dice in piu' della tessera. Null nelle cache vecchie. */
+    val detail: Detail? = null,
 ) {
     enum class Kind { STAKE, LEND, ORE }
+
+    /** Il dettaglio di una posizione, letto insieme al portafoglio e salvato con lui. */
+    sealed interface Detail {
+        data class Stake(val account: String, val voter: String?, val activationEpoch: Long, val deactivationEpoch: Long, val epoch: Long) : Detail
+        data class Guardians(val account: String, val guardian: String, val shares: String, val sharePrice: Double, val poolUi: Double) : Detail
+        data class Lend(val asset: String) : Detail
+    }
     /** Coins earned in a day at that rate. */
     val perDayUi: Double? get() = aprPct?.let { ui * it / 100.0 / 365.0 }
     val perDayFiat: Double? get() = if (aprPct != null && fiat != null) fiat * aprPct / 100.0 / 365.0 else null
@@ -80,6 +89,16 @@ object Portfolio {
     private val VALIDATORS = mapOf(
         "SKRuTecmFDZHjs2DxRTJNEK7m7hunKGTWJiaZ3tMVVA" to "Seeker",
     )
+    /**
+     * Da quanto uno stake e' attivo: epoche passate e giorni stimati. Un'epoca
+     * e' 432.000 slot, e uno slot dura quello che si e' misurato in `Ore.SLOT_MS`.
+     */
+    fun stakeSince(epoch: Long, activationEpoch: Long): Pair<Long, Double> {
+        val epochs = (epoch - activationEpoch).coerceAtLeast(0L)
+        val days = epochs * 432_000.0 * com.clearsign.core.Ore.SLOT_MS / 1000.0 / 86_400.0
+        return epochs to days
+    }
+
     fun validatorName(voter: String?): String = when {
         voter == null -> "…"
         VALIDATORS[voter] != null -> VALIDATORS[voter]!!
@@ -134,16 +153,7 @@ object Portfolio {
         }
         o.put("h", hs)
         val ds = org.json.JSONArray()
-        v.defi.forEach { d ->
-            ds.put(
-                org.json.JSONObject()
-                    .put("k", d.kind.name).put("l", d.label).put("sub", d.sub).put("s", d.symbol)
-                    .put("ui", d.ui).put("f", d.fiat ?: org.json.JSONObject.NULL)
-                    .put("i", d.image ?: org.json.JSONObject.NULL)
-                    .put("st", d.state ?: org.json.JSONObject.NULL)
-                    .put("apr", d.aprPct ?: org.json.JSONObject.NULL),
-            )
-        }
+        v.defi.forEach { d -> ds.put(PortfolioJson.encodePosition(d)) }
         o.put("d", ds)
         file(ctx).writeText(o.toString())
     }
@@ -161,11 +171,7 @@ object Portfolio {
             Holding(j.optString("m"), j.optString("s"), j.optInt("d"), j.optLong("r"), d(j, "f"), t(j, "n"), t(j, "i"), j.optBoolean("nft"), d(j, "c"))
         }
         val ds = o.optJSONArray("d") ?: org.json.JSONArray()
-        val defi = (0 until ds.length()).mapNotNull { i ->
-            val j = ds.optJSONObject(i) ?: return@mapNotNull null
-            val kind = runCatching { DefiPosition.Kind.valueOf(j.optString("k")) }.getOrNull() ?: return@mapNotNull null
-            DefiPosition(kind, j.optString("l"), j.optString("sub"), j.optString("s"), j.optDouble("ui"), d(j, "f"), t(j, "i"), t(j, "st"), d(j, "apr"))
-        }
+        val defi = (0 until ds.length()).mapNotNull { i -> ds.optJSONObject(i)?.let { PortfolioJson.decodePosition(it) } }
         return PortfolioView(o.optString("cur"), o.optDouble("total"), holdings, o.optInt("priced"), o.optInt("unpriced"), defi)
     }
 
@@ -211,6 +217,7 @@ object Portfolio {
                     defi += DefiPosition(
                         DefiPosition.Kind.STAKE, "SOL", validatorName(st.voter), "SOL", ui, price(NATIVE_SOL_MINT)?.let { it * ui },
                         image = TokenSymbols.image(NATIVE_SOL_MINT), state = st.state(epoch), aprPct = if (live) apr else null,
+                        detail = DefiPosition.Detail.Stake(st.pubkey, st.voter, st.activationEpoch, st.deactivationEpoch, epoch),
                     )
                 }
             }
@@ -222,6 +229,7 @@ object Portfolio {
                     DefiPosition.Kind.STAKE, "SKR", ctx?.getString(R.string.defi_guardians) ?: "Seeker Guardians", "SKR", st.ui,
                     skrUsd?.let { p -> fx?.let { p * it * st.ui } }, image = TokenSymbols.image(SkrStake.SKR_MINT), state = "active",
                     aprPct = ctx?.let { c -> runCatching { SkrStake.observedAprPct(c, st.sharePrice) }.getOrNull() },
+                    detail = DefiPosition.Detail.Guardians(st.account, st.guardian, st.shares.toString(), st.sharePrice, st.totalStakedRaw / 1e6),
                 )
             }
         }
@@ -229,7 +237,7 @@ object Portfolio {
             for (d in JupiterLend.deposits(owner)) {
                 val ui = d.raw / 10.0.pow(d.decimals)
                 val usd = d.priceUsd ?: quotes[d.asset]?.usd ?: if (d.asset in STABLES) 1.0 else null
-                defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo, aprPct = d.aprPct)
+                defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo, aprPct = d.aprPct, detail = DefiPosition.Detail.Lend(d.asset))
             }
         }
         // ORE: una riga solo per chi ha un conto Miner. Una chiamata, senza il giro.
@@ -260,5 +268,42 @@ object Portfolio {
         val total = holdings.sumOf { it.fiat ?: 0.0 } + defi.sumOf { it.fiat ?: 0.0 }
         PortfolioView(currency, total, holdings, holdings.count { it.fiat != null }, holdings.count { it.fiat == null && it.isMain }, defi)
             .also { v -> last = "$owner|$currency" to v; ctx?.let { runCatching { save(it, "$owner|$currency", v) } } }
+    }
+}
+
+/** Il JSON della cache del portafoglio, la parte che cambia: le posizioni DeFi con il loro dettaglio. Puro, per il test. */
+internal object PortfolioJson {
+    private fun d(j: org.json.JSONObject, n: String): Double? = if (j.isNull(n)) null else j.optDouble(n).takeIf { !it.isNaN() }
+    private fun t(j: org.json.JSONObject, n: String): String? = if (j.isNull(n)) null else j.optString(n).ifEmpty { null }
+
+    fun encodePosition(p: DefiPosition): org.json.JSONObject = org.json.JSONObject()
+        .put("k", p.kind.name).put("l", p.label).put("sub", p.sub).put("s", p.symbol)
+        .put("ui", p.ui).put("f", p.fiat ?: org.json.JSONObject.NULL)
+        .put("i", p.image ?: org.json.JSONObject.NULL)
+        .put("st", p.state ?: org.json.JSONObject.NULL)
+        .put("apr", p.aprPct ?: org.json.JSONObject.NULL)
+        .put("dt", encodeDetail(p.detail) ?: org.json.JSONObject.NULL)
+
+    fun decodePosition(j: org.json.JSONObject): DefiPosition? {
+        val kind = runCatching { DefiPosition.Kind.valueOf(j.optString("k")) }.getOrNull() ?: return null
+        return DefiPosition(kind, j.optString("l"), j.optString("sub"), j.optString("s"), j.optDouble("ui"), d(j, "f"), t(j, "i"), t(j, "st"), d(j, "apr"), decodeDetail(j.optJSONObject("dt")))
+    }
+
+    fun encodeDetail(x: DefiPosition.Detail?): org.json.JSONObject? = when (x) {
+        null -> null
+        is DefiPosition.Detail.Stake -> org.json.JSONObject().put("t", "stake").put("a", x.account).put("v", x.voter ?: org.json.JSONObject.NULL)
+            .put("ae", x.activationEpoch).put("de", x.deactivationEpoch).put("e", x.epoch)
+        is DefiPosition.Detail.Guardians -> org.json.JSONObject().put("t", "guardians").put("a", x.account).put("g", x.guardian).put("sh", x.shares).put("sp", x.sharePrice).put("pool", x.poolUi)
+        is DefiPosition.Detail.Lend -> org.json.JSONObject().put("t", "lend").put("as", x.asset)
+    }
+
+    fun decodeDetail(j: org.json.JSONObject?): DefiPosition.Detail? {
+        j ?: return null
+        return when (j.optString("t")) {
+            "stake" -> DefiPosition.Detail.Stake(j.optString("a"), t(j, "v"), j.optLong("ae", Long.MAX_VALUE), j.optLong("de", Long.MAX_VALUE), j.optLong("e", 0L))
+            "guardians" -> DefiPosition.Detail.Guardians(j.optString("a"), j.optString("g"), j.optString("sh"), j.optDouble("sp"), j.optDouble("pool"))
+            "lend" -> DefiPosition.Detail.Lend(j.optString("as"))
+            else -> null
+        }
     }
 }

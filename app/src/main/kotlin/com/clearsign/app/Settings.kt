@@ -154,6 +154,10 @@ object Settings {
         textScale.value = c
     }
 
+    /** «Tieni premuto per nascondere» si dice finche' non lo si e' fatto una volta. */
+    fun hideHintSeen(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("hide_hint_seen", false)
+    fun setHideHintSeen(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("hide_hint_seen", true).apply()
+
     fun setOnboarded(ctx: Context) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ONBOARDED, true).apply()
         onboarded.value = true

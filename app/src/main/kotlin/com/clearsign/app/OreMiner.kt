@@ -42,6 +42,8 @@ object OreMiner {
         /** Lo slot della risposta: il conto alla rovescia parte da qui. */
         val slot: Long,
         val at: Long,
+        /** La pentola nel Treasury, in ORE a undici decimali: pesa un cinquecentesimo nell'atteso. */
+        val motherlode: Long = 0L,
     ) {
         val inPlay: Long get() = miner?.inPlay(board.roundId) ?: 0L
         val claimableSol: Long get() = miner?.rewardsSol ?: 0L
@@ -65,11 +67,15 @@ object OreMiner {
         val miner = first.accounts[minerKey]?.let { Ore.miner(it) }
         val automation = first.accounts[autoKey]?.let { Ore.automation(it) }
         // Il giro serve alla griglia, non alla riga del portafoglio: una chiamata in meno a chi non lo guarda.
+        var motherlode = 0L
         val round = if (!withRound) null else {
             val roundKey = Base58.encode(roundPda(board.roundId))
-            multi(rpcUrl, listOf(roundKey))?.accounts?.get(roundKey)?.let { Ore.round(it) }
+            // Il Treasury viaggia nella stessa chiamata: serve solo alla griglia, per la pentola.
+            val second = multi(rpcUrl, listOf(roundKey, Ore.TREASURY))
+            motherlode = second?.accounts?.get(Ore.TREASURY)?.let { Ore.treasuryMotherlode(it) } ?: 0L
+            second?.accounts?.get(roundKey)?.let { Ore.round(it) }
         }
-        return View(miner, board, round, automation, first.slot, System.currentTimeMillis())
+        return View(miner, board, round, automation, first.slot, System.currentTimeMillis(), motherlode = motherlode)
     }
 
     private class Multi(val slot: Long, val accounts: Map<String, ByteArray>)

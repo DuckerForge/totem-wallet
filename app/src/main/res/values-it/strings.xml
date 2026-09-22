@@ -549,7 +549,12 @@
     <string name="ore_pick_squares">Tocca le caselle qui sotto</string>
     <string name="ore_total">%1$d caselle a %2$s SOL fanno %3$s SOL.</string>
     <string name="ore_first_fee">Più 10.000 lamport la prima volta.</string>
-    <string name="ore_wager_note">È una scommessa. Il SOL può andare alle altre caselle, e con poco SOL le fee pesano.</string>
+    <string name="ore_wager_note">Non vinci mai il SOL degli altri. Una casella perdente trattiene circa l\'11% del tuo, quella vincente l\'1%. Il premio è l\'ORE, diviso fra chi sta sulla casella vincente.</string>
+    <string name="ore_best_label">Le caselle più libere adesso:</string>
+    <string name="ore_outlook">Atteso: %1$s ORE (≈ %2$s SOL). Costo atteso: %3$s SOL, il %4$s%% della puntata.</string>
+    <string name="ore_outlook_nopx">Atteso: %1$s ORE. Costo atteso: %2$s SOL, il %3$s%% della puntata.</string>
+    <string name="ore_outlook_good">Al prezzo ORE di oggi conviene.</string>
+    <string name="ore_outlook_bad">Al prezzo ORE di oggi non conviene.</string>
     <string name="ore_wait_round">Aspetta il prossimo giro</string>
     <string name="ore_wait_banner">Fra un giro e l\'altro, o troppo vicino alla fine. Il bottone si accende quando parte il giro nuovo.</string>
     <string name="ore_hold_dig">Tieni premuto per scavare</string>
@@ -557,7 +562,7 @@
     <string name="ore_sent">Inviata. La griglia si aggiorna fra un momento.</string>
     <string name="ore_stake_link">ORE ha anche uno staking, su ore.com.</string>
     <string name="ore_round_gone">Questo giro è finito. Torna indietro e scava di nuovo su quello dopo.</string>
-    <string name="ore_hint_idle">Scava mette SOL sulle caselle che scegli. Riscuoti prende quello che una casella vincente ha pagato.</string>
+    <string name="ore_hint_idle">Scava mette SOL sulle caselle che scegli. Riscuoti prende l\'ORE che una casella vincente ha pagato e il SOL tornato indietro.</string>
     <string name="ore_round_ended_signing">Il giro è finito mentre firmavi. Non è partito niente. Scava di nuovo e tieni premuto subito dopo aver letto lo scontrino.</string>
     <string name="ore_done_receipt">Salvata negli Scontrini. Torna dopo il giro per riscuotere.</string>
     <string name="ore_done_receipt_claim">Salvata negli Scontrini. L\'ORE adesso è nel portafoglio.</string>

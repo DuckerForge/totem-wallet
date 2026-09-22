@@ -664,6 +664,8 @@ class CompanionService : Service() {
         val ctx = this
         val p = Halo.palette
         paintFace()
+        // The notification line follows the bubble: same numbers, no second truth.
+        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification()) }
 
         val pos = last.pos
         val move = last.posPct
@@ -729,12 +731,24 @@ class CompanionService : Service() {
 
     // ---- foreground notification ------------------------------------------
 
+    /**
+     * The notification a foreground service must have, made as small as Android
+     * allows: a channel at the lowest importance, so no sound, no icon in the
+     * status bar and a collapsed line at the bottom of the shade; secret on the
+     * lock screen; deferred, so it appears only once the bubble has been up a
+     * while; and its one line carries the numbers the bubble shows, so it reads
+     * as a status and not as a nag. On Android 14 and later it can be swiped
+     * away too, and the bubble stays.
+     */
     private fun notification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
+        // The old channel may exist at a louder importance from an earlier
+        // version, and importance cannot be lowered on a channel that exists.
+        runCatching { nm.deleteNotificationChannel(OLD_CHANNEL) }
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL, getString(R.string.companion_title), NotificationManager.IMPORTANCE_MIN)
-                    .apply { setShowBadge(false) },
+                    .apply { setShowBadge(false); enableLights(false); enableVibration(false); setSound(null, null); lockscreenVisibility = Notification.VISIBILITY_SECRET },
             )
         }
         fun pi(action: String, code: Int) = PendingIntent.getService(
@@ -743,9 +757,13 @@ class CompanionService : Service() {
         )
         val b = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(getString(R.string.companion_title))
-            .setContentText(getString(if (hidden) R.string.comp_hidden else R.string.companion_running))
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(if (hidden) getString(R.string.comp_hidden) else statusLine())
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+        if (android.os.Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
         // Nascosta si torna da qui, che e' dove sta gia' il dito.
         if (hidden) {
             b.addAction(Notification.Action.Builder(null, getString(R.string.comp_show), pi(ACTION_SHOW, 2)).build())
@@ -756,8 +774,17 @@ class CompanionService : Service() {
         return b.build()
     }
 
+    /** What the bubble knows, in one line: the health and the loop. */
+    private fun statusLine(): String {
+        val parts = ArrayList<String>()
+        last.health?.let { parts += getString(R.string.companion_health_line, it.score) }
+        parts += if (last.trading) getString(R.string.trader_idle) else getString(R.string.companion_agent_off)
+        return parts.joinToString(" · ")
+    }
+
     companion object {
-        private const val CHANNEL = "companion"
+        private const val OLD_CHANNEL = "companion"
+        private const val CHANNEL = "companion_quiet"
         private const val NOTIF_ID = 4711
         private const val PANEL_DP = 300f
         const val ACTION_STOP = "com.clearsign.app.COMPANION_STOP"

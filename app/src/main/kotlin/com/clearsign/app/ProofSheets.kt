@@ -50,7 +50,7 @@ internal fun ProofSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                 )
                 GhostButton(stringResource(R.string.share), Modifier.fillMaxWidth(), HIcon.SHARE, tint = Halo.cyan) {
                     val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, line)
-                    runCatching { ctx.startActivity(android.content.Intent.createChooser(i, null)) }
+                    Door.hold(); runCatching { ctx.startActivity(android.content.Intent.createChooser(i, null)) }
                 }
             }
             Text(stringResource(R.string.proof_truth), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)

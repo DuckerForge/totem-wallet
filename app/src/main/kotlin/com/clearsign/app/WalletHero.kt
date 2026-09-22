@@ -284,6 +284,11 @@ internal fun tokenColor(mint: String): androidx.compose.ui.graphics.Color {
 /** Logo from the token metadata, or coloured initials while it loads / when there is none. */
 @Composable
 internal fun TokenLogo(mint: String, symbol: String, image: String?, size: androidx.compose.ui.unit.Dp) {
+    // ORE non e' una moneta come le altre qui dentro: e' la griglia. Il suo
+    // logo ufficiale e' una scritta in bianco e nero che fra i tondi colorati
+    // sparisce. Una gemma in ambra, la tinta che il tema usa per l'oro, si
+    // trova a colpo d'occhio senza urlare.
+    if (mint == com.clearsign.core.Ore.MINT) { OreMark(size); return }
     val tint = tokenColor(mint)
     val initials: @Composable () -> Unit = {
         Box(Modifier.size(size).clip(rs(999)).background(tint.copy(alpha = 0.22f)).border(1.dp, tint.copy(alpha = 0.5f), rs(999)), contentAlignment = Alignment.Center) {
@@ -299,6 +304,17 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
             modifier = Modifier.matchParentSize().clip(rs(999)),
         )
     }
+}
+
+/** Il marchio di ORE: un tondo ambra con la gemma dentro, alla misura del logo che sostituisce. */
+@Composable
+internal fun OreMark(size: androidx.compose.ui.unit.Dp) {
+    Box(
+        Modifier.size(size).clip(rs(999))
+            .background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Halo.amber.copy(alpha = 0.34f), Halo.amber.copy(alpha = 0.12f))))
+            .border(1.dp, Halo.amber.copy(alpha = 0.6f), rs(999)),
+        contentAlignment = Alignment.Center,
+    ) { HaloIcon(HIcon.GEM, Halo.amber, size * 0.52f) }
 }
 
 /**

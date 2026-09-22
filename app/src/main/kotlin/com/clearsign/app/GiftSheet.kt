@@ -93,7 +93,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                     GhostButton(stringResource(R.string.copy), Modifier.weight(1f), HIcon.COPY, tint = Halo.cyan) { copyText(ctx, link!!) }
                     GhostButton(stringResource(R.string.share), Modifier.weight(1f), HIcon.SHARE, tint = Halo.mint) {
                         val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link)
-                        runCatching { ctx.startActivity(Intent.createChooser(i, null)) }
+                        Door.hold(); runCatching { ctx.startActivity(Intent.createChooser(i, null)) }
                     }
                 }
                 Banner(stringResource(R.string.gift_warn), Halo.amber, HIcon.WARNING)

@@ -345,7 +345,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
         androidx.compose.runtime.DisposableEffect(lifecycle) {
             val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
-                if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP) accounts = emptyList()
+                // Lo scan e la condivisione sono nostri: non si esce, non si richiude.
+                if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP && !Door.consumeHold()) accounts = emptyList()
             }
             lifecycle.addObserver(obs)
             onDispose { lifecycle.removeObserver(obs) }
@@ -549,7 +550,22 @@ fun HomeScreen(signer: SeedVaultSigner) {
         }
 
         if (showMore) {
+            val tick by Settings.homeActionsTick
+            val onHome = remember(tick) { Settings.homeActions(ctx).toSet() }
             MoreSheet(
+                hidden = CHOOSABLE_ACTIONS.filter { it.name !in onHome && it !in setOf(HomeAction.TAP, HomeAction.LINK, HomeAction.BRIDGE) },
+                onAction = { a ->
+                    showMore = false
+                    when (a) {
+                        HomeAction.SEND -> showSend = true
+                        HomeAction.RECEIVE -> showReceive = true
+                        HomeAction.SWAP -> showSwap = true
+                        HomeAction.SCAN -> scanHome()
+                        HomeAction.CROWD -> showCrowd = true
+                        HomeAction.AGENT -> tab = Tab.AGENT
+                        else -> {}
+                    }
+                },
                 onTap = { showMore = false; showTap = true },
                 onHealth = { showMore = false; showHealth = true },
                 onContacts = { showMore = false; tab = Tab.SETTINGS },

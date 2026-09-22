@@ -208,7 +208,8 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 path { moveTo(12f, 3f); arcTo(12f, 12f, 9f, 270f, 300f); quadTo(12.5f, 15f, 14.5f, 15.5f); quadTo(17f, 16f, 16.5f, 18.5f); quadTo(16f, 21f, 12f, 21f) }
                 dot(8f, 9.5f, 1.4f); dot(12f, 7f, 1.4f); dot(16f, 9.5f, 1.4f); dot(7.5f, 14.5f, 1.4f)
             }
-            HIcon.RECEIVE -> { line(12f, 4f, 12f, 16f); poly(7f, 11f, 12f, 16f, 17f, 11f); line(5f, 20f, 19f, 20f) }
+            // Freccia giu' e vassoio, 15 punti come il resto della fila.
+            HIcon.RECEIVE -> { line(12f, 4.5f, 12f, 15.5f); poly(7.5f, 11f, 12f, 15.5f, 16.5f, 11f); line(4.5f, 19.5f, 19.5f, 19.5f) }
             HIcon.PASTE -> {
                 path { moveTo(9f, 5f); lineTo(6.5f, 5f); quadTo(5f, 5f, 5f, 6.5f); lineTo(5f, 19.5f); quadTo(5f, 21f, 6.5f, 21f); lineTo(17.5f, 21f); quadTo(19f, 21f, 19f, 19.5f); lineTo(19f, 6.5f); quadTo(19f, 5f, 17.5f, 5f); lineTo(15f, 5f) }
                 poly(9f, 3.5f, 15f, 3.5f, 15f, 6.5f, 9f, 6.5f, close = true)
@@ -235,7 +236,9 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.CHECK -> poly(5f, 12.5f, 10f, 17.5f, 19.5f, 7f)
             HIcon.WARNING -> { path { moveTo(12f, 3.5f); lineTo(21.5f, 20f); lineTo(2.5f, 20f); close() }; line(12f, 9.5f, 12f, 14f); dot(12f, 17f, 1.1f) }
             HIcon.PEN -> { path { moveTo(4f, 20f); lineTo(8f, 20f); lineTo(19.5f, 8.5f); lineTo(15.5f, 4.5f); lineTo(4f, 16f); close() }; line(13f, 7f, 17f, 11f) }
-            HIcon.SEND -> { path { moveTo(3f, 11f); lineTo(21f, 3f); lineTo(15f, 21f); lineTo(11.5f, 13f); close() }; line(11.5f, 13f, 21f, 3f) }
+            // L'aeroplanino stava in 18 punti e accanto a Ricevi, che ne prende 15,
+            // sembrava un'altra misura. Ora sta nella stessa scatola degli altri.
+            HIcon.SEND -> { path { moveTo(4.5f, 11.5f); lineTo(19.5f, 4.5f); lineTo(14.5f, 19.5f); lineTo(11.6f, 13f); close() }; line(11.6f, 13f, 19.5f, 4.5f) }
             HIcon.SIGN -> {
                 path { moveTo(14f, 3f); lineTo(7f, 3f); quadTo(5.5f, 3f, 5.5f, 4.5f); lineTo(5.5f, 19.5f); quadTo(5.5f, 21f, 7f, 21f); lineTo(17f, 21f); quadTo(18.5f, 21f, 18.5f, 19.5f); lineTo(18.5f, 7.5f); close() }
                 poly(14f, 3f, 14f, 7.5f, 18.5f, 7.5f); poly(8.5f, 14.5f, 11f, 17f, 15.5f, 11.5f)

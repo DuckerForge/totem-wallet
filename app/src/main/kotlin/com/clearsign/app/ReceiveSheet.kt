@@ -164,7 +164,7 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
                         }
                         GhostButton(stringResource(R.string.share), Modifier.weight(1f), HIcon.SHARE, tint = Halo.cyan) {
                             val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, payload)
-                            runCatching { ctx.startActivity(Intent.createChooser(i, null)) }
+                            Door.hold(); runCatching { ctx.startActivity(Intent.createChooser(i, null)) }
                         }
                     }
                 } else {

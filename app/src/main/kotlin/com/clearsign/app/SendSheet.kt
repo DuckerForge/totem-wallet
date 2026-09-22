@@ -315,7 +315,7 @@ internal fun SendSheet(
                                 } else to = text
                             }
                             SmallChip(stringResource(R.string.send_scan), HIcon.SCAN, tint = Halo.cyan) {
-                                scanLauncher.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(true).setCaptureActivity(ScanPortraitActivity::class.java).setPrompt(""))
+                                Door.hold(); scanLauncher.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(true).setCaptureActivity(ScanPortraitActivity::class.java).setPrompt(""))
                             }
                             // The radio is already listening while the app is in front. The
                             // button does not switch it on: it gives the person a moment

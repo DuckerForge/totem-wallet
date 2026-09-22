@@ -539,6 +539,9 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
         v.miner?.roundId == last.id -> stringResource(R.string.ore_last_you_missed)
         else -> ""
     }
+    val won = onIt > 0L && (last.isSplit || meTop)
+    val ctx = LocalContext.current
+    val title = stringResource(R.string.ore_last_title, last.id, win + 1)
     SoftPanel(padding = 12.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.height(30.dp).width(30.dp).clip(rs(8)).background(Halo.amber.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
@@ -546,8 +549,15 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.ore_last_title, last.id, win + 1), style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink)
-                Text(how + (if (outcome.isNotEmpty()) " · $outcome" else ""), style = HaloType.label, color = if (onIt > 0L && (last.isSplit || meTop)) Halo.mint else Halo.muted)
+                Text(title, style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink)
+                Text(how + (if (outcome.isNotEmpty()) " · $outcome" else ""), style = HaloType.label, color = if (won) Halo.mint else Halo.muted)
+            }
+            // Un giro vinto e' una carta da mostrare, come la paghetta chiusa.
+            if (won) {
+                Spacer(Modifier.width(8.dp))
+                RoundIconButton(HIcon.SHARE, tint = Halo.mint) {
+                    PnlCard.share(ctx, PnlCard.Face("ORE · " + title, how, null, outcome, ctx.getString(R.string.pnl_card_foot)), "ore-" + last.id + ".png")
+                }
             }
         }
     }

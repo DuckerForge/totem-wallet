@@ -197,6 +197,16 @@ object SolanaTx {
                 else -> DecodedInstruction(InstructionKind.UNKNOWN, program)
             }
             COMPUTE_BUDGET_PROGRAM -> null // fee/limit hints; nothing for the receipt
+            // ORE: un Deploy o un Automate mettono SOL in gioco. Chi paga le caselle
+            // e' il conto 1, e se non e' chi firma lo dice il motore dei rischi.
+            com.clearsign.core.Ore.PROGRAM -> when (val call = com.clearsign.core.Ore.decode(ix.data, ix.accounts.map { i -> d.staticAccountKeys.getOrNull(i) ?: "" })) {
+                is com.clearsign.core.Ore.Call.Deploy -> DecodedInstruction(InstructionKind.WAGER, program, amountRaw = call.total, subject = call.authority?.takeIf { it.isNotEmpty() })
+                is com.clearsign.core.Ore.Call.Automate -> DecodedInstruction(
+                    InstructionKind.WAGER, program, amountRaw = call.deposit,
+                    destination = call.executor?.takeIf { it.isNotEmpty() && it != com.clearsign.core.Ore.OPEN_EXECUTOR },
+                )
+                else -> DecodedInstruction(InstructionKind.UNKNOWN, program)
+            }
             else -> DecodedInstruction(InstructionKind.UNKNOWN, program)
         }
     }

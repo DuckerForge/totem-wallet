@@ -73,6 +73,8 @@ object Localization {
         RiskFlag.BRAND_NEW_RECIPIENT to "The recipient has no on-chain history at all (brand-new wallet).",
         RiskFlag.FEE_EXCESSIVE to "Pays %s× the network's current priority fee (%s SOL extra) — the dApp set a far higher price than needed.",
         RiskFlag.EXTRA_SIGNERS to "Needs %s more signature(s) besides yours (e.g. %s): it only goes through once someone else also signs.",
+        RiskFlag.WAGER to "Puts %s SOL on the ORE grid. It is a wager: the SOL can go to the other squares.",
+        RiskFlag.WAGER_FOR_OTHER to "Pays %s SOL of ORE squares for another wallet, %s, not for you.",
     )
     private val riskIt = mapOf(
         RiskFlag.SIMULATION_FAILED to "Impossibile simulare la transazione: non firmo alla cieca.",
@@ -96,6 +98,8 @@ object Localization {
         RiskFlag.BRAND_NEW_RECIPIENT to "Il destinatario non ha alcuno storico on-chain (wallet nuovo di zecca).",
         RiskFlag.FEE_EXCESSIVE to "Paga %s× la commissione di priorità attuale della rete (%s SOL in più): la dApp ha impostato un prezzo molto più alto del necessario.",
         RiskFlag.EXTRA_SIGNERS to "Richiede %s firma/e oltre alla tua (es. %s): si completa solo se firma anche qualcun altro.",
+        RiskFlag.WAGER to "Mette %s SOL sulla griglia di ORE. È una scommessa: il SOL può andare alle altre caselle.",
+        RiskFlag.WAGER_FOR_OTHER to "Paga %s SOL di caselle ORE per un altro portafoglio, %s, non per te.",
     )
 
     /** Localized explanation for a risk; unknown locales read English. */

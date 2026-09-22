@@ -124,8 +124,14 @@ object ReceiptEngine {
             withTimeoutOrNull(4_000) {
                 d.instructions.mapNotNull { ix ->
                     val pid = d.staticAccountKeys.getOrNull(ix.programIdIndex) ?: return@mapNotNull null
-                    if (pid in NATIVE_PROGRAMS) null else pid to ix.data
-                }.take(6).map { (pid, data) -> async { runCatching { AnchorIdl.decode(ctx, rpc, pid, data) }.getOrNull() } }.mapNotNull { it.await() }
+                    if (pid in NATIVE_PROGRAMS) null else Triple(pid, ix.data, ix.accounts.map { i -> d.staticAccountKeys.getOrNull(i) ?: "" })
+                }.take(6).map { (pid, data, accounts) ->
+                    async {
+                        // ORE non ha un IDL sulla catena: lo si legge a mano, in :core.
+                        if (pid == com.clearsign.core.Ore.PROGRAM) com.clearsign.core.Ore.decode(data, accounts)?.let { com.clearsign.core.Ore.render(it, deviceLocaleTag()) }
+                        else runCatching { AnchorIdl.decode(ctx, rpc, pid, data) }.getOrNull()
+                    }
+                }.mapNotNull { it.await() }
             } ?: emptyList()
         }
 

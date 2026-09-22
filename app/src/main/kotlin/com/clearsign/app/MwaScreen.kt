@@ -1358,6 +1358,7 @@ internal fun riskIcon(f: RiskFlag): HIcon = when (f) {
     RiskFlag.DURABLE_NONCE -> HIcon.HOURGLASS; RiskFlag.FOREIGN_FEE_PAYER -> HIcon.GIFT; RiskFlag.BRAND_NEW_RECIPIENT -> HIcon.SEEDLING; RiskFlag.LIMITED_APPROVAL -> HIcon.UNLOCK
     RiskFlag.FEE_EXCESSIVE -> HIcon.COINS
     RiskFlag.EXTRA_SIGNERS -> HIcon.PEN
+    RiskFlag.WAGER -> HIcon.COINS; RiskFlag.WAGER_FOR_OTHER -> HIcon.MASK
 }
 
 internal fun riskTitle(f: RiskFlag): Int = when (f) {
@@ -1372,6 +1373,7 @@ internal fun riskTitle(f: RiskFlag): Int = when (f) {
     RiskFlag.BRAND_NEW_RECIPIENT -> R.string.rt_brand_new; RiskFlag.LIMITED_APPROVAL -> R.string.rt_limited
     RiskFlag.FEE_EXCESSIVE -> R.string.rt_fee_excessive
     RiskFlag.EXTRA_SIGNERS -> R.string.rt_extra_signers
+    RiskFlag.WAGER -> R.string.rt_wager; RiskFlag.WAGER_FOR_OTHER -> R.string.rt_wager_other
 }
 
 /** Chip row to browse each transaction in the bundle; red chip = that tx is DANGER. */

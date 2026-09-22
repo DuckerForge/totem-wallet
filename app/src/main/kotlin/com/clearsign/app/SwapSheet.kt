@@ -259,7 +259,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                 // A full-height sheet has to say how to leave it: swiping it down is
                 // not something a person should have to discover.
                 Box(
-                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999))
+                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999))
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
                 ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
@@ -269,7 +269,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                 when (val s = state) {
                     SwapState.Form, SwapState.Building -> {
                         // FROM
-                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(14.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).haloBorder(rs(18)).padding(14.dp)) {
                             Text(stringResource(R.string.swap_you_pay), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 OutlinedTextField(
@@ -318,7 +318,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                         // the two coins in the wrong order.
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Box(
-                                Modifier.size(38.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999))
+                                Modifier.size(38.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999))
                                     .clickable {
                                         val q = quote
                                         val next = if (q != null) fmtUnits(q.outAmount, to.decimals) else ""
@@ -332,7 +332,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             ) { HaloIcon(HIcon.SWAP, Halo.mint, 18.dp) }
                         }
                         // TO
-                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(14.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).haloBorder(rs(18)).padding(14.dp)) {
                             Text(stringResource(R.string.swap_you_get), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -348,13 +348,13 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                         // feels like a coin toss, and a line fixes it for nothing.
                         Box(
                             Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f))
-                                .border(cardBorder(), rs(16)).padding(14.dp),
+                                .haloBorder(rs(16)).padding(14.dp),
                         ) { PriceChart(to.mint, to.symbol) }
                         safety?.let { SafetyCard(it, to.symbol) }
                         ShieldCard(to.mint, to.symbol)
                         // Quote details
                         quote?.let { q ->
-                            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f)).border(cardBorder(), rs(16)).padding(14.dp)) {
+                            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f)).haloBorder(rs(16)).padding(14.dp)) {
                                 StatRow(stringResource(R.string.swap_rate), "1 ${from.symbol} ≈ " + rate(q, from.decimals, to.decimals) + " ${to.symbol}")
                                 StatRow(stringResource(R.string.swap_route), if (q.routeLabels.isEmpty()) "Jupiter" else "Jupiter · " + q.routeLabels.joinToString(", "))
                                 StatRow(stringResource(R.string.swap_impact), "%.2f%%".format(q.priceImpactPct * 100))
@@ -498,7 +498,7 @@ private fun CustomPercentSheet(current: Int, onSave: (Int) -> Unit, onDismiss: (
 /** What the swap does, in trade terms: logos, rate, route, our fee, price impact. */
 @Composable
 private fun SwapSummary(from: PickToken, to: PickToken, q: Jupiter.Quote) {
-    Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).border(cardBorder(), rs(18)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).haloBorder(rs(18)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TokenLogo(from.mint, from.symbol, from.icon, 34.dp)
             Column(Modifier.weight(1f)) {
@@ -523,7 +523,7 @@ private fun SwapSummary(from: PickToken, to: PickToken, q: Jupiter.Quote) {
 @Composable
 private fun TokenChip(t: PickToken, onClick: () -> Unit) {
     Row(
-        Modifier.clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onClick() }.padding(start = 6.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+        Modifier.clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onClick() }.padding(start = 6.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TokenLogo(t.mint, t.symbol, t.icon, 24.dp)

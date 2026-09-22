@@ -42,6 +42,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -58,7 +59,7 @@ internal fun WalletHero(
     owner: String?,
     signer: SeedVaultSigner,
     /** 0 = the balance is at full size, 1 = it has gone up into the header. */
-    collapse: Float,
+    collapse: androidx.compose.runtime.State<Float>,
     onAction: (HomeAction) -> Unit,
     onPnl: () -> Unit,
     /** The header takes the balance over once the big one has scrolled away. */
@@ -116,10 +117,11 @@ internal fun WalletHero(
         // a box around the number would make it one panel among the others.
         Column(
             Modifier.fillMaxWidth().graphicsLayer {
-                alpha = 1f - collapse
-                scaleX = 1f - collapse * 0.35f
-                scaleY = 1f - collapse * 0.35f
-                translationY = -collapse * 40.dp.toPx()
+                val c = collapse.value
+                alpha = 1f - c
+                scaleX = 1f - c * 0.35f
+                scaleY = 1f - c * 0.35f
+                translationY = -c * 40.dp.toPx()
             },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Space.xs),
@@ -382,7 +384,7 @@ private fun TokenSheet(
                     Text(h.symbol + (if (h.isNft) "  ·  NFT" else ""), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 }
             }
-            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(14.dp)) {
+            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16)).padding(14.dp)) {
                 StatRow(stringResource(R.string.token_amount), fmtUi(h.ui) + " " + h.symbol)
                 StatRow(stringResource(R.string.token_value), h.fiat?.let { fmtFiat(it, currency) } ?: stringResource(R.string.burn_value_none), accent = h.fiat != null)
                 if (!isSol) {
@@ -490,24 +492,42 @@ private fun BigTotal(total: Double, currency: String) {
             sweepAnim.animateTo(2f, androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing))
         }
     }
-    val sweep = sweepAnim.value
     val ink = Halo.ink
     val lit = Halo.mint
+    // Lo sfocato si crea una volta: dentro `graphicsLayer` si rifaceva a ogni
+    // invalidazione del livello.
+    val blur = androidx.compose.runtime.remember {
+        android.graphics.RenderEffect.createBlurEffect(18f, 18f, android.graphics.Shader.TileMode.DECAL).asComposeRenderEffect()
+    }
     androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
         // The glow behind: the accent, very faint, so the number sits in light.
         Text(
             fmtFiat(shown.toDouble(), currency),
             style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = lit.copy(alpha = 0.18f)),
-            modifier = Modifier.graphicsLayer { renderEffect = android.graphics.RenderEffect.createBlurEffect(18f, 18f, android.graphics.Shader.TileMode.DECAL).asComposeRenderEffect() },
+            modifier = Modifier.graphicsLayer { renderEffect = blur },
         )
+        // Il riflesso e' un disegno sopra il testo, non un pennello dentro lo
+        // stile: `sweepAnim.value` si leggeva in composizione e rifaceva il
+        // layout del testo a sessanta fotogrammi al secondo per dieci secondi.
+        // Letto qui, dentro il draw, muove solo i pixel.
         Text(
             fmtFiat(shown.toDouble(), currency),
-            style = HaloType.amount.copy(
-                fontSize = 44.sp, lineHeight = 50.sp,
-                brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                    0f to ink, (sweep - 0.25f).coerceIn(0f, 1f) to ink, sweep.coerceIn(0f, 1f) to lit, (sweep + 0.25f).coerceIn(0f, 1f) to ink, 1f to ink,
-                ),
-            ),
+            style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = ink),
+            modifier = Modifier
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val s = sweepAnim.value
+                    if (s > -0.99f && s < 1.99f) {
+                        drawRect(
+                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(androidx.compose.ui.graphics.Color.Transparent, lit, androidx.compose.ui.graphics.Color.Transparent),
+                                startX = (s - 0.25f) * size.width, endX = (s + 0.25f) * size.width,
+                            ),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.SrcAtop,
+                        )
+                    }
+                }
         )
     }
 }
@@ -632,8 +652,8 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
     LaunchedEffect(values) {
         growth.animateTo(1f, androidx.compose.animation.core.tween(5200, easing = androidx.compose.animation.core.LinearEasing))
     }
-    val p = growth.value
-    val grow = (p / LINE_END).coerceAtMost(1f)
+    // `growth` si legge dentro il disegno, non qui: letto in composizione la
+    // scintilla ricomponeva a ogni fotogramma per cinque secondi.
     // Loaded out here: an image is a composable's business, not a canvas's.
     //
     // Keyed on the mint, and that is not a nicety. Remembered state in a loop is
@@ -642,9 +662,11 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
     // the icons vanished from a picture that had just drawn them. Keyed, a coin
     // keeps its own slot for as long as it is in the list.
     val marks = coins.map { m -> androidx.compose.runtime.key(m) { rememberCoinBitmap(m) } }
+    val lo = androidx.compose.runtime.remember(values) { values.min() }
+    val hi = androidx.compose.runtime.remember(values) { values.max() }
     androidx.compose.foundation.Canvas(modifier) {
-        val lo = values.min()
-        val hi = values.max()
+        val p = growth.value
+        val grow = (p / LINE_END).coerceAtMost(1f)
         val span = (hi - lo).takeIf { it > 0.0 } ?: 1.0
         // Kept off the floor and the ceiling: a line that touches either edge
         // reads as clipped, as if the real shape carried on outside the box.

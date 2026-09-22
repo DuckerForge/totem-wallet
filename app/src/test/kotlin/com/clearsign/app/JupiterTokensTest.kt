@@ -79,4 +79,14 @@ class JupiterTokensTest {
     fun `an unknown mint is simply not there`() {
         assertNull(JupiterTokens.cached("NeverSeenThisMintBefore11111111111111111111"))
     }
+
+    @Test fun `il disco tiene le monete usate piu' di recente`() {
+        fun tok(m: String) = JupiterTokens.Tok(mint = m, symbol = m, name = m, icon = null, decimals = 6)
+        val all = listOf(tok("a"), tok("b"), tok("c"), tok("d"))
+        val touched = mapOf("a" to 10L, "b" to 40L, "c" to 30L)
+        assertEquals(listOf("b", "c"), JupiterTokens.keepNewest(all, touched, 2).map { it.mint })
+        assertEquals(4, JupiterTokens.keepNewest(all, touched, 10).size)
+        // Mai toccata vale zero: e' la prima a uscire.
+        assertEquals("d", JupiterTokens.keepNewest(all, touched, 4).last().mint)
+    }
 }

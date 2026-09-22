@@ -83,7 +83,7 @@ internal fun LedgerScreen() {
             // ---- period totals ----------------------------------------------
             if (shown.isNotEmpty()) {
                 val totals = remember(shown, currency) { Totals.of(shown, currency) }
-                Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.ledger_totals), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
                         Spacer(Modifier.weight(1f))
@@ -184,7 +184,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
 @Composable
 internal fun AnalyticsCard(a: Analytics) {
     var open by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).border(cardBorder(), rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
             HaloIcon(HIcon.COINS, Halo.cyan, 14.dp); Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.pnl_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)

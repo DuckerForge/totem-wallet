@@ -80,7 +80,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 )
                 // A way out that does not depend on knowing you can swipe a sheet down.
                 Box(
-                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onDismiss() },
+                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
                 ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
             }
@@ -147,7 +147,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                     Text(stringResource(R.string.gift_open), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
                     open.forEach { g ->
                         Row(
-                            Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).padding(12.dp),
+                            Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12)).padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {

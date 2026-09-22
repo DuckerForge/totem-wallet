@@ -165,7 +165,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                     Text(stringResource(R.string.market_sub), style = HaloType.small, color = Halo.muted)
                 }
                 Box(
-                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { refresh++ },
+                    Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { refresh++ },
                     contentAlignment = Alignment.Center,
                 ) { HaloIcon(HIcon.HISTORY, Halo.muted, 16.dp) }
             }

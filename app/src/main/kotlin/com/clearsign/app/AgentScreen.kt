@@ -179,7 +179,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             val diff = if (balance == null) null else total - session.fundedLamports + session.harvestedLamports
             val openCount = Positions.open(ctx).size
             Column(
-                Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.panel)).padding(16.dp),
+                Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel)).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {

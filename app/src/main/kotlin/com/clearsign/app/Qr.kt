@@ -51,7 +51,7 @@ internal fun QrTile(text: String, size: Dp = 232.dp, modifier: Modifier = Modifi
     if (matrix == null) return
     val ground = Halo.ground
     Box(
-        modifier.size(size).clip(rs(20)).background(Color(0xFFF7F8FB)).border(cardBorder(), rs(20)).padding(16.dp),
+        modifier.size(size).clip(rs(20)).background(Color(0xFFF7F8FB)).haloBorder(rs(20)).padding(16.dp),
     ) {
         Canvas(Modifier.fillMaxWidth().size(size - 32.dp)) {
             val n = matrix.width

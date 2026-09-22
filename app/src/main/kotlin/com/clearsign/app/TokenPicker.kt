@@ -113,7 +113,7 @@ internal fun TokenPicker(
 
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).clip(rs(999)).background(Halo.card).border(cardBorder(), rs(999)).clickable { onClose() }, contentAlignment = Alignment.Center) {
+            Box(Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onClose() }, contentAlignment = Alignment.Center) {
                 HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp)
             }
             Spacer(Modifier.width(12.dp))

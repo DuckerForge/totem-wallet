@@ -513,6 +513,7 @@
     <string name="ore_first_fee">Plus 10,000 lamports the first time.</string>
     <string name="ore_wager_note">It is a wager. The SOL can go to the other squares, and with little SOL the fees weigh.</string>
     <string name="ore_wait_round">Wait for the next round</string>
+    <string name="ore_wait_banner">Between rounds, or too close to the end. The button lights up when the next round starts.</string>
     <string name="ore_hold_dig">Hold to dig</string>
     <string name="ore_hold_claim">Hold to claim</string>
     <string name="ore_sent">Sent. The grid updates in a moment.</string>

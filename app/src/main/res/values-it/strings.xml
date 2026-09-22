@@ -513,6 +513,7 @@
     <string name="ore_first_fee">Più 10.000 lamport la prima volta.</string>
     <string name="ore_wager_note">È una scommessa. Il SOL può andare alle altre caselle, e con poco SOL le fee pesano.</string>
     <string name="ore_wait_round">Aspetta il prossimo giro</string>
+    <string name="ore_wait_banner">Fra un giro e l\'altro, o troppo vicino alla fine. Il bottone si accende quando parte il giro nuovo.</string>
     <string name="ore_hold_dig">Tieni premuto per scavare</string>
     <string name="ore_hold_claim">Tieni premuto per riscuotere</string>
     <string name="ore_sent">Inviata. La griglia si aggiorna fra un momento.</string>

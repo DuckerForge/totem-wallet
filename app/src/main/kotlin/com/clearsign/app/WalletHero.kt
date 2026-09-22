@@ -267,7 +267,7 @@ internal fun WalletHero(
 private const val MAX_COLLAPSED = 3
 
 @Composable
-private fun LinkRow(label: String, onClick: () -> Unit) {
+internal fun LinkRow(label: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clip(rs(10)).clickable(onClick = onClick).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Halo.cyan)
         Spacer(Modifier.width(4.dp))

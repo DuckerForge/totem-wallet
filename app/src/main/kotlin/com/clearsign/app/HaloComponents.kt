@@ -398,3 +398,24 @@ fun DeltaPill(text: String, up: Boolean, modifier: Modifier = Modifier, chevron:
         if (chevron) HaloIcon(HIcon.CHEVRON_RIGHT, tint, 15.dp)
     }
 }
+
+/**
+ * A row that opens a group under itself: the icon tile lights up and the
+ * chevron turns instead of swapping, in graphicsLayer, so opening redraws
+ * and never recomposes the row. The same row for Settings and for the
+ * agent's Pro sections.
+ */
+@Composable
+fun DisclosureRow(title: String, sub: String?, icon: HIcon, open: Boolean, tint: Color = Halo.cyan, onToggle: () -> Unit) {
+    val turn = animateFloatAsState(if (open) 90f else 0f, label = "disclosure")
+    HaloRow(
+        title, sub, onGround = true, chevron = false,
+        leading = {
+            Box(Modifier.size(34.dp).clip(rs(10)).background(if (open) Halo.mint.copy(alpha = 0.14f) else tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                HaloIcon(icon, if (open) Halo.mint else tint, 18.dp)
+            }
+        },
+        trailing = { HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 16.dp, Modifier.graphicsLayer { rotationZ = turn.value }) },
+        onClick = onToggle,
+    )
+}

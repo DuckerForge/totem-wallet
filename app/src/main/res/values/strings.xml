@@ -1571,6 +1571,7 @@
         <string name="env_balance_unknown">Could not read the budget balance, so nothing was sent back and the budget stays open. Try again when the network answers.</string>
 <string name="env_close_summary">Put in %1$s SOL, got back %2$s SOL: %3$s SOL (%4$s).</string>
     <string name="env_last_title">The last budget</string>
+    <string name="env_last_back">Got back</string>
     <string name="env_last_in">Put in: %1$s SOL</string>
     <string name="env_last_out">Got back: %1$s SOL</string>
     <string name="env_last_moves">%1$d buys, %2$d sales, %3$s</string>

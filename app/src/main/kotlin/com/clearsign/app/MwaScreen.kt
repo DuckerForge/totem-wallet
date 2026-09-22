@@ -539,7 +539,9 @@ internal fun GhostButton(
     val shape = rs(16)
     val src = remember { MutableInteractionSource() }
     Row(
-        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(height).clip(shape).haloBorder(shape).clickable(interactionSource = src, indication = null) { onClick() },
+        // Outlined in its own colour, a little faded: a second-rank action,
+        // not a second card. The living stroke belongs to the cards.
+        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(height).clip(shape).haloBorder(shape, color = tint.copy(alpha = 0.42f)).clickable(interactionSource = src, indication = null) { onClick() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { HaloIcon(icon, tint, 17.dp); Spacer(Modifier.width(8.dp)) }

@@ -308,8 +308,15 @@ class CompanionService : Service() {
         startSpinner()
     }
 
-    /** Ogni quanto si disturba la catena per il saldo. Il battito e' un minuto. */
-    private val chainEvery = 5 * 60_000L
+    /**
+     * Ogni quanto si disturba la catena per il saldo. Il battito e' un minuto.
+     *
+     * Era cinque minuti, cioe' 288 letture al giorno per bolla, e a diecimila
+     * bolle sono tre milioni al giorno su chiavi che ne danno otto al mese in
+     * tutto. Il numero cambia solo quando l'agente compra o vende, e chi lo
+     * muove ridisegna lo schermo da se': mezz'ora non perde niente.
+     */
+    private val chainEvery = 30 * 60_000L
     private var freeAt = 0L
     private var freeCached: Long? = null
 

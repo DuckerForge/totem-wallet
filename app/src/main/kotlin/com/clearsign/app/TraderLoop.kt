@@ -50,7 +50,15 @@ object TraderLoop {
 
     /** How much of a tick we skip when nothing needs doing. */
     const val EXIT_EVERY_MS = 90_000L
-    const val HUNT_EVERY_MS = 360_000L
+    /**
+     * Ogni quanto si va a caccia: sei minuti col nodo proprio, dodici sulle
+     * chiavi condivise. Le uscite restano a novanta secondi in tutti e due i
+     * casi, perche' lo stop loss non aspetta nessuno. Le due corsie: chi porta
+     * il suo nodo respira piu' in fretta, chi usa quello di tutti ne usa meta'.
+     */
+    private const val HUNT_OWN_MS = 360_000L
+    private const val HUNT_SHARED_MS = 720_000L
+    val HUNT_EVERY_MS: Long get() = if (Rpc.ownNode != null) HUNT_OWN_MS else HUNT_SHARED_MS
 
     /**
      * Quanto aspettare prima del prossimo giro.
@@ -194,6 +202,7 @@ object TraderLoop {
      * di tutti gli altri, quindi non puo' accavallarsi con uno in corso.
      */
     fun start(ctx: Context, cfg: Config) {
+        forgetRoom()
         setConfig(ctx, cfg.copy(on = true))
         prefs(ctx).edit().remove("note").apply()
         val app = ctx.applicationContext
@@ -245,8 +254,34 @@ object TraderLoop {
         }
         lookedAt.longValue = now
         if (mayHunt) huntedAt.longValue = now
-        AgentTrace.working { tickInner(ctx, mayHunt) }
+        AgentTrace.working { tickInner(ctx, mayHunt) }.also { if (it.acted) forgetRoom() }
     }
+
+    /**
+     * Il SOL libero della paghetta, letto al massimo ogni mezz'ora.
+     *
+     * Serve a una domanda sola, «c'e' posto per un'altra fetta», e la risposta
+     * cambia solo quando l'agente agisce o quando qualcuno ricarica. La prima
+     * la sappiamo e si dimentica il numero; la seconda aspetta al massimo una
+     * mezz'ora. Erano duecentoquaranta letture al giorno per un numero che non
+     * si muoveva.
+     */
+    private const val ROOM_TTL_MS = 30 * 60_000L
+    @Volatile private var roomKey: String? = null
+    @Volatile private var roomAt = 0L
+    @Volatile private var roomLamports = 0L
+
+    private suspend fun roomFor(pubkey: String): Long {
+        val now = System.currentTimeMillis()
+        if (roomKey == pubkey && now - roomAt < ROOM_TTL_MS) return roomLamports
+        val read = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pubkey) }.getOrNull() } ?: return 0L
+        roomKey = pubkey; roomAt = now; roomLamports = read
+        return read
+    }
+
+    fun forgetRoom() { roomAt = 0L }
+
+    @Volatile private var budgetSaidDay = -1L
 
     /**
      * One more slice of a coin already in play, asked by a person looking at
@@ -407,8 +442,20 @@ object TraderLoop {
             return finish(Tick(said, acted = false))
         }
 
-        val rpc = SolanaRpc.urlFor(null)
-        val balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(rpc, s.pubkey) }.getOrNull() } ?: 0L
+        // Il tetto del giorno sulle chiavi condivise: la caccia si ferma, le
+        // uscite sopra sono gia' passate e non si fermano. Detto una volta al giorno.
+        if (Rpc.overBudget()) {
+            val day = System.currentTimeMillis() / RpcPool.DAY_MS
+            if (budgetSaidDay != day) {
+                budgetSaidDay = day
+                val said = ctx.getString(R.string.trader_budget)
+                AgentTrace.say(said, AgentTrace.Kind.WARN)
+                note(ctx, said)
+            }
+            return finish(Tick("budget", acted = false))
+        }
+
+        val balance = roomFor(s.pubkey)
         if (balance < slice + FEE * 4) return finish(Tick("no room", acted = false))
 
         return finish(hunt(ctx, cfg, slice, open.map { it.mint }.toSet(), p))

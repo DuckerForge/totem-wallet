@@ -1677,6 +1677,11 @@
     <string name="rpc_title">Il tuo nodo Solana</string>
     <string name="rpc_sub">Da dove questo telefono legge la catena</string>
     <string name="rpc_hint">https://…  (vuoto = quello di serie)</string>
+    <string name="rpc_pool_today">Chiavi condivise oggi: %1$d chiamate su %2$d. Il tuo nodo non ha tetto.</string>
+    <string name="rpc_state_ok">bene</string>
+    <string name="rpc_state_cold">a riposo</string>
+    <string name="rpc_state_exhausted">finito per il mese</string>
+    <string name="trader_budget">Questo telefono ha usato la sua parte dei nodi condivisi per oggi. Continuo a guardare quello che tengo e torno a caccia domani. Il tuo nodo nelle Impostazioni toglie il tetto.</string>
     <string name="rpc_note">L\'app ne porta dentro uno, condiviso da tutti. Con l\'agente acceso un telefono fa qualche migliaio di chiamate al giorno, quindi chi macina sta meglio col suo: Helius, QuickNode e Alchemy danno una chiave gratis. Non cambia nient\'altro, e la chiave non esce da questo telefono.</string>
     <string name="speed_title">Velocità di quello che invii</string>
     <string name="speed_sub">Una commissione di priorità sugli invii, gli ordini e le chiusure che costruiamo noi.</string>

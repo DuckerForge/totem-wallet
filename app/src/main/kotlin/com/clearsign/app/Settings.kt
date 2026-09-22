@@ -79,6 +79,7 @@ object Settings {
 
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        Rpc.init(ctx)
         rpcUrl.value = p.getString(KEY_RPC, null).orEmpty()
         applyRpc()
         currency.value = p.getString(KEY_CURRENCY, null) ?: defaultCurrency()
@@ -103,10 +104,14 @@ object Settings {
         applyRpc()
     }
 
-    /** Il proprio se c'e', quello compilato se no. */
+    /**
+     * Il proprio se c'e', quello compilato se no. Il pool sa qual e' il
+     * proprio: lo mette per primo e resta dietro come ripiego.
+     */
     private fun applyRpc() {
-        SolanaRpc.customRpc = rpcUrl.value.takeIf { it.isNotBlank() }
-            ?: BuildConfig.HELIUS_RPC_URL.takeIf { it.isNotBlank() }
+        val own = rpcUrl.value.takeIf { it.isNotBlank() }
+        Rpc.ownNode = own
+        SolanaRpc.customRpc = own ?: BuildConfig.HELIUS_RPC_URL.takeIf { it.isNotBlank() }
     }
 
     fun setWalletOpen(ctx: Context, on: Boolean) {

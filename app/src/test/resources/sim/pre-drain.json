@@ -1,0 +1,45 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "context": {
+   "apiVersion": "2.1.0",
+   "slot": 600000200
+  },
+  "value": [
+   {
+    "lamports": 2000000000,
+    "owner": "11111111111111111111111111111111",
+    "executable": false,
+    "rentEpoch": 0,
+    "space": 0,
+    "data": [
+     "",
+     "base64"
+    ]
+   },
+   {
+    "lamports": 2039280,
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "executable": false,
+    "rentEpoch": 0,
+    "space": 165,
+    "data": [
+     "xvp6877brTo9ZfNqq8l0MbG75MLS9uDkfKYCA0UvXWFIwBtQWQBUVdncsMa87Ny0+1suq8GpqCtXOSuqpA8E5kBCDwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+     "base64"
+    ]
+   },
+   {
+    "lamports": 1000000,
+    "owner": "11111111111111111111111111111111",
+    "executable": false,
+    "rentEpoch": 0,
+    "space": 0,
+    "data": [
+     "",
+     "base64"
+    ]
+   }
+  ]
+ },
+ "id": 1
+}

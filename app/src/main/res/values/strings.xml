@@ -1677,6 +1677,11 @@
     <string name="rpc_title">Your own Solana node</string>
     <string name="rpc_sub">Where this phone reads the chain</string>
     <string name="rpc_hint">https://…  (empty = the one that ships with the app)</string>
+    <string name="rpc_pool_today">Shared keys today: %1$d calls of %2$d. Your own node has no cap.</string>
+    <string name="rpc_state_ok">fine</string>
+    <string name="rpc_state_cold">resting</string>
+    <string name="rpc_state_exhausted">out for the month</string>
+    <string name="trader_budget">This phone has used its share of the shared nodes for today. I keep watching what I hold and I hunt again tomorrow. Your own node in Settings lifts the cap.</string>
     <string name="rpc_note">The app ships with a shared node. With the agent running, one phone makes a few thousand calls a day, so a busy wallet is better off with its own: Helius, QuickNode and Alchemy all give a free key. Nothing else changes, and the key never leaves this phone.</string>
     <string name="speed_title">Speed of what you send</string>
     <string name="speed_sub">A priority fee on transfers, orders and closes we build ourselves.</string>

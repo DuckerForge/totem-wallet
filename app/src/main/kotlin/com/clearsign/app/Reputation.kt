@@ -42,8 +42,30 @@ object Reputation {
 
     enum class Verdict { TRUSTED, MIXED, FLAGGED, NONE }
 
+    /**
+     * Se il programma c'e'. Misurato il 22 settembre 2026: su devnet l'account
+     * del programma non esiste, zero conti, e ogni scontrino pagava lo stesso
+     * un `getProgramAccounts` che non poteva rispondere niente. Devnet si
+     * azzera ogni tanto, quindi questa e' una domanda che va rifatta, ma non a
+     * ogni scontrino: una volta ogni sei ore, e la risposta «non c'e'» si
+     * tiene. Quando il programma torna, la reputazione torna da sola.
+     */
+    @Volatile private var deployed: Triple<Long, String, Boolean>? = null
+    private const val DEPLOYED_TTL_MS = 6 * 60 * 60_000L
+
+    private fun isDeployed(): Boolean {
+        val now = System.currentTimeMillis()
+        deployed?.let { (at, on, ok) -> if (on == rpc && now - at < DEPLOYED_TTL_MS) return ok }
+        // Senza risposta si prova lo stesso, come prima: un silenzio non dice che non c'e'.
+        val ok = SolanaRpc.accountExists(rpc, PROGRAM_ID) ?: return true
+        deployed = Triple(now, rpc, ok)
+        if (!ok) Log.i("ClearSign-Rep", "program not on $rpc, skipping lookups for a while")
+        return ok
+    }
+
     /** Fetch a target's reputation, or null when nobody has voted / on error. */
     fun fetch(target: String): Rep? {
+        if (!isDeployed()) return null
         val datas = try {
             SolanaRpc.programAccountsMemcmp(rpc, PROGRAM_ID, offset = 8, valueBase58 = target)
         } catch (e: Exception) {

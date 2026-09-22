@@ -845,7 +845,7 @@
     <string name="env_expired_note">The budget has expired. Close it and take back what is left.</string>
     <string name="env_key">Show the key</string>
     <string name="env_close">Close it and take everything back</string>
-    <string name="env_closing">Sweeping it back…</string>
+    <string name="env_closing">Bringing it back…</string>
     <string name="env_truth">What holds even if the agent\'s machine is hacked: it can never move more than what is in the budget, and closing it ends its power at once. The rules are applied here on the phone, and they protect you from the agent, not from a hacked phone. Nothing is enforced on chain.</string>
     <string name="env_new_title">A new budget</string>
     <string name="env_new_body">Money set apart from your wallet. The agent spends only this. Above its limits it asks for your fingerprint.</string>
@@ -1451,8 +1451,8 @@
     <string name="chart_dex">Exchange</string>
     <string name="chart_open_on">Open on %1$s</string>
     <string name="who_clock">updated %1$s ago · next in %2$s</string>
-    <string name="who_clock2">next sweep in %1$s</string>
-    <string name="who_clock_late">sweeping…</string>
+    <string name="who_clock2">next look in %1$s</string>
+    <string name="who_clock_late">looking now…</string>
     <string name="hold_legend_free">%1$d dark ones: airdrops that came with the phone, worth nothing</string>
     <string name="whale_holds">Holds</string>
     <string name="whale_share">%1$s%% of the total</string>

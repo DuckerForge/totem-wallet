@@ -129,21 +129,22 @@ object CompanionPrefs {
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.35f, cy - r * 0.42f, r * 1.75f,
-                intArrayOf(lift(body0, 0.34f), body0, sink(body0, 0.55f)),
+                intArrayOf(lift(body0, 0.22f), body0, sink(body0, 0.55f)),
                 floatArrayOf(0f, 0.50f, 1f), Shader.TileMode.CLAMP,
             )
         }
         c.drawCircle(cx, cy, r, body)
 
-        // La specchiatura: dove la luce batte per prima.
+        // La specchiatura: dove la luce batte per prima. Era il doppio di
+        // cosi' e cadeva proprio sul braccio sinistro della V, che sbiancava.
         val spec = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx - r * 0.34f, cy - r * 0.48f, r * 0.62f,
-                intArrayOf(AColor.argb(84, 255, 255, 255), AColor.argb(0, 255, 255, 255)),
+                cx - r * 0.38f, cy - r * 0.54f, r * 0.50f,
+                intArrayOf(AColor.argb(40, 255, 255, 255), AColor.argb(0, 255, 255, 255)),
                 null, Shader.TileMode.CLAMP,
             )
         }
-        c.drawCircle(cx - r * 0.34f, cy - r * 0.48f, r * 0.62f, spec)
+        c.drawCircle(cx - r * 0.38f, cy - r * 0.54f, r * 0.50f, spec)
 
         // Il bordo: chiaro in alto dove la luce lo prende, scuro in basso.
         val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -200,15 +201,26 @@ object CompanionPrefs {
             }
         }
 
-        /** Il segno dell'app: una V dal viola al ciano, per quando non c'e' un numero da dire. */
+        /**
+         * Il segno dell'app: una V dal viola al ciano, per quando non c'e' un
+         * numero da dire. Piena sempre, non a meta' quando e' ferma: era il
+         * segno a sparire sotto la luce, non la luce a essere troppa. Sotto
+         * ha un'ombra scura, cosi' si stacca anche dai temi chiari.
+         */
         fun mark(alpha: Int) {
-            val v = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * 0.14f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
-                shader = LinearGradient(cx - r * 0.3f, cy + r * 0.3f, cx + r * 0.3f, cy - r * 0.3f, intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt()), null, Shader.TileMode.CLAMP)
-                this.alpha = alpha
-            }
             val path = android.graphics.Path().apply {
-                moveTo(cx - r * 0.34f, cy - r * 0.26f); lineTo(cx, cy + r * 0.30f); lineTo(cx + r * 0.34f, cy - r * 0.26f)
+                moveTo(cx - r * 0.36f, cy - r * 0.28f); lineTo(cx, cy + r * 0.32f); lineTo(cx + r * 0.36f, cy - r * 0.28f)
+            }
+            val under = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = r * 0.26f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                color = AColor.argb(if (alpha < 255) 90 else 120, 0, 0, 0)
+                maskFilter = android.graphics.BlurMaskFilter(r * 0.10f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
+            c.drawPath(path, under)
+            val v = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = r * 0.15f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                shader = LinearGradient(cx - r * 0.3f, cy + r * 0.3f, cx + r * 0.3f, cy - r * 0.3f, intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt()), null, Shader.TileMode.CLAMP)
+                this.alpha = 255
             }
             c.drawPath(path, v)
         }

@@ -70,8 +70,8 @@ object Ore {
             val amountPerSquare: Long, val deposit: Long, val fee: Long, val mask: Long,
             val strategy: Int, val reload: Boolean, val executor: String?,
         ) : Call {
-            /** Con la strategia a caso la maschera e' un numero di caselle, non quali. */
-            val squares: Int get() = if (strategy == STRATEGY_RANDOM) mask.toInt().coerceIn(0, SQUARES) else squaresOf(mask.toInt()).size
+            /** Le caselle nella maschera. Sulla catena anche le automazioni a caso portano una maschera di caselle. */
+            val squares: Int get() = squaresOf(mask.toInt()).size
         }
         object Close : Call
         data class Other(val discriminator: Int) : Call
@@ -129,7 +129,7 @@ object Ore {
                 (if (it) "fee a giro" else "fee per round") to sol(call.fee) + " SOL",
                 (if (it) "rigioca le vincite" else "replays winnings") to (if (call.reload) (if (it) "sì" else "yes") else "no"),
             ) + (if (call.executor != null && call.executor != OPEN_EXECUTOR) listOf((if (it) "esecutore" else "executor") to short(call.executor)) else emptyList())
-            Call.Close -> (if (it) "Chiudi l'automazione" else "Close the automation") to emptyList()
+            Call.Close -> (if (it) "Chiudi un giro finito" else "Close a finished round") to emptyList()
             is Call.Other -> (if (it) "Chiamata a ORE" else "Call to ORE") to listOf((if (it) "istruzione" else "instruction") to call.discriminator.toString())
         }
         return ProgramCall(PROGRAM, "ORE", method, args)
@@ -214,6 +214,37 @@ object Ore {
         fun needsCheckpoint(boardRoundId: Long): Boolean = roundId < boardRoundId && checkpointId < roundId
         val claimableOre: Long get() = rewardsOre + refinedOre
         val squaresNow: List<Int> get() = deployed.indices.filter { deployed[it] > 0 }
+    }
+
+    /** Il conto di un'automazione: 152 byte di corpo. Letto sulla catena il 22 settembre 2026. */
+    data class Automation(
+        val amountPerSquare: Long,
+        val authority: ByteArray,
+        val balance: Long,
+        val executor: ByteArray,
+        val fee: Long,
+        val strategy: Long,
+        val mask: Long,
+        val reload: Boolean,
+        val totalSolSpent: Long,
+        val totalOreEarned: Long,
+        val maxProductionCost: Long,
+    ) {
+        val squares: Int get() = squaresOf(mask.toInt()).size
+        /** Quanto costa un giro: le caselle piu' la fee a chi esegue. */
+        val perRound: Long get() = amountPerSquare * squares + fee
+        val roundsLeft: Int get() = if (perRound <= 0) 0 else (balance / perRound).toInt()
+    }
+
+    fun automation(bytes: ByteArray): Automation? {
+        if (bytes.size < HEADER + 152 || (bytes[0].toInt() and 0xFF) != ACC_AUTOMATION) return null
+        val b = HEADER
+        return Automation(
+            amountPerSquare = le64(bytes, b), authority = bytes.copyOfRange(b + 8, b + 40), balance = le64(bytes, b + 40),
+            executor = bytes.copyOfRange(b + 48, b + 80), fee = le64(bytes, b + 80), strategy = le64(bytes, b + 88), mask = le64(bytes, b + 96),
+            reload = le64(bytes, b + 104) != 0L, totalSolSpent = le64(bytes, b + 112), totalOreEarned = le64(bytes, b + 120),
+            maxProductionCost = le64(bytes, b + 128),
+        )
     }
 
     fun miner(bytes: ByteArray): Miner? {

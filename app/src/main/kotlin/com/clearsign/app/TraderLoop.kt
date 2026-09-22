@@ -107,6 +107,12 @@ object TraderLoop {
          * il costo gli sta bene. Tutto il resto dello scudo continua a fermare.
          */
         val maxFeePct: Int = 0,
+        /** L'agente scava ORE: affida una parte della paghetta a un esecutore, sotto il collare. */
+        val oreOn: Boolean = false,
+        /** Quanto SOL al giorno, al massimo, fra caselle e fee. */
+        val oreLamportsPerDay: Long = 50_000_000L,
+        /** Su quante caselle a giro. */
+        val oreSquares: Int = 3,
     ) {
         // One lane. There used to be two and the agent asked which; on Solana
         // the honest answer is that the wild one is where the money goes to die,
@@ -126,6 +132,9 @@ object TraderLoop {
             stopLossPct = p.getInt("sl", 15),
             slicePercent = p.getInt("slice", 80),
             maxFeePct = p.getInt("fee", 0),
+            oreOn = p.getBoolean("oreOn", false),
+            oreLamportsPerDay = p.getLong("oreDay", 50_000_000L),
+            oreSquares = p.getInt("oreSquares", 3),
         )
     }
 
@@ -134,6 +143,7 @@ object TraderLoop {
             .putBoolean("on", c.on).putBoolean("bold", c.bold)
             .putInt("max", c.maxPositions).putInt("tp", c.takeProfitPct)
             .putInt("sl", c.stopLossPct).putInt("slice", c.slicePercent).putInt("fee", c.maxFeePct)
+            .putBoolean("oreOn", c.oreOn).putLong("oreDay", c.oreLamportsPerDay).putInt("oreSquares", c.oreSquares)
             .apply()
     }
 
@@ -204,6 +214,20 @@ object TraderLoop {
     fun start(ctx: Context, cfg: Config) {
         forgetRoom()
         setConfig(ctx, cfg.copy(on = true))
+        // Scavare vuol dire pagare il programma di ORE e i suoi conti di questa
+        // paghetta: il collare li deve conoscere per nome, o rifiuta ogni mossa.
+        OreAgent.reset(ctx)
+        if (cfg.oreOn) {
+            val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
+            val key = s?.let { Base58.decodePubkey(it.pubkey) }
+            if (p != null && key != null) SessionWallet.setPolicy(
+                ctx,
+                p.copy(
+                    allowedPrograms = p.allowedPrograms + com.clearsign.core.Ore.PROGRAM,
+                    allowedDestinations = p.allowedDestinations + Base58.encode(OreMiner.automationPda(key)) + Base58.encode(OreMiner.minerPda(key)),
+                ),
+            )
+        }
         prefs(ctx).edit().remove("note").apply()
         val app = ctx.applicationContext
         AppScope.launch { runCatching { tick(app, mayHunt = true) } }
@@ -415,6 +439,12 @@ object TraderLoop {
                 note(ctx, m)
                 return Tick(m, acted = true)
             }
+        }
+
+        // ORE, quando e' acceso: riscuote, racconta, o affida. Una mossa per giro,
+        // come tutto il resto, e prima della caccia perche' e' piu' economica.
+        if (cfg.oreOn && mayHunt) {
+            runCatching { OreAgent.step(ctx, cfg, s, ceiling) }.getOrNull()?.let { t -> note(ctx, t.summary); return finish(t) }
         }
 
         if (!mayHunt) return finish(Tick("watching", acted = false))
@@ -1092,7 +1122,7 @@ object TraderLoop {
      * posts no notification when the collar wants a person, so a background
      * move would wait ninety seconds against a screen that never appeared.
      */
-    private suspend fun handle(
+    internal suspend fun handle(
         ctx: Context, tx: ByteArray, intent: JSONObject, source: AgentBroker.Job.Source = AgentBroker.Job.Source.LINK, ultraRequestId: String? = null,
     ): AgentBroker.Verdict =
         AgentBroker.handle(

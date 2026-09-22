@@ -4,6 +4,11 @@ import android.content.Context
 import com.clearsign.core.Receipt
 import com.clearsign.core.RiskFlag
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Turns a receipt (what the user saw) into a ledger entry (what is kept). */
 object LedgerRecorder {
@@ -28,9 +33,52 @@ object LedgerRecorder {
         attestation = attestation, attestationSig = attestationSig,
     )
 
-    /** Append, then price it in the background. */
+    /** Append, price it in the background, and ask the chain whether it went through. */
     fun record(ctx: Context, e: LedgerEntry) {
         Ledger.append(ctx, e)
         if (e.hasValue) FiatRates.fillAsync(ctx.applicationContext, e.id, e.ym, e.outflows + e.inflows)
+        watch(ctx, e)
     }
+
+    /** The tag a row gets when the chain refused the transaction after the node had taken it. */
+    const val FAILED = "failed"
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val WATCH_STEPS_MS = longArrayOf(4_000, 10_000, 25_000, 60_000)
+
+    /**
+     * A row is written when the node accepts the bytes, and the node can
+     * accept bytes the chain then refuses: a swap past its slippage, a send
+     * that lost the race for a blockhash. That row used to say "sent" for
+     * ever, with its legs, and the P&L counted it. Now the chain is asked
+     * four times over a hundred seconds; a refusal tags the row, the
+     * receipts say it, and the analytics skip it. A silence changes nothing:
+     * not knowing is not the same as failed.
+     */
+    fun watch(ctx: Context, e: LedgerEntry) {
+        val sig = e.signature ?: return
+        if (!e.sent || e.tags.contains(FAILED)) return
+        val app = ctx.applicationContext
+        scope.launch {
+            for (wait in WATCH_STEPS_MS) {
+                delay(wait)
+                when (runCatching { SolanaRpc.verdictOf(SolanaRpc.urlFor(e.cluster), sig) }.getOrNull()) {
+                    true -> return@launch
+                    false -> { Ledger.update(app, e.id, e.ym) { it.copy(tags = it.tags + FAILED) }; return@launch }
+                    null -> {}
+                }
+            }
+        }
+    }
+
+    /** A move the app made without a receipt to analyse: what came in or went out, and from which wallet. */
+    fun plainMove(
+        ctx: Context, kind: String, wallet: String, signature: String?, inflows: List<Leg>, outflows: List<Leg>,
+        label: String?, feeLamports: Long = 0L, feePaidByMe: Boolean = true,
+    ): LedgerEntry = LedgerEntry(
+        id = newId(), groupId = newId(), at = System.currentTimeMillis(), kind = kind, dApp = ctx.getString(R.string.app_name), host = null,
+        pkg = ctx.packageName, cluster = null, wallet = wallet, signature = signature, sent = signature != null, txIndex = 0, txCount = 1,
+        outflows = outflows, inflows = inflows, feeLamports = feeLamports, feePaidByMe = feePaidByMe, counterparties = emptyList(),
+        primaryRecipient = null, recipientLabel = label, risks = emptyList(),
+    )
 }

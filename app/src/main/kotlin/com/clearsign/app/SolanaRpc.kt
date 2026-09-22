@@ -914,6 +914,26 @@ object SolanaRpc {
             (0 until logs.length()).map { logs.optString(it) }.lastOrNull { it.contains("failed") || it.contains("insufficient") || it.contains("Error") }
         } ?: error.optString("message").takeIf { it.isNotEmpty() } ?: "rifiutata dal nodo"
 
+    /**
+     * What the chain says of [signature], once: true landed, false failed on
+     * chain, null when it does not know yet or could not be asked. The
+     * receipts use it after a send, because "the node took it" and "it went
+     * through" are two different sentences.
+     */
+    fun verdictOf(rpcUrl: String, signature: String): Boolean? {
+        val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", true)))
+        val value = resp?.optJSONObject("result")?.optJSONArray("value") ?: return null
+        return chainVerdict(value.optJSONObject(0))
+    }
+
+    /** Pure: one status object from getSignatureStatuses, read as a verdict. */
+    internal fun chainVerdict(st: JSONObject?): Boolean? {
+        if (st == null) return null
+        if (!st.isNull("err")) return false
+        val c = st.optString("confirmationStatus")
+        return if (c == "confirmed" || c == "finalized") true else null
+    }
+
     /** Whether the chain knows [signature] at all, at any commitment. Unknown network → false. */
     private fun landed(rpcUrl: String, signature: String): Boolean {
         val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", false)))

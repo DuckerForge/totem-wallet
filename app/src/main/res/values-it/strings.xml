@@ -446,6 +446,13 @@
     <string name="ledger_empty">Ogni transazione che firmi o invii compare qui come scontrino: importi, controparti, rischi, prova — e puoi esportarla per le tasse.</string>
     <string name="kind_tx">firmata per una dApp</string>
     <string name="kind_send">inviata</string>
+    <string name="kind_swap">scambio</string>
+    <string name="kind_blink">Blink</string>
+    <string name="kind_setup">impostazione</string>
+    <string name="kind_ore_dig">scavo ORE</string>
+    <string name="kind_ore_claim">incasso ORE</string>
+    <string name="ledger_failed">non passata</string>
+    <string name="ledger_failed_body">La catena ha rifiutato questa transazione dopo che il nodo l\'aveva presa. Non si è mosso niente. È stata pagata solo la commissione di rete.</string>
     <string name="kind_theme">tema</string>
     <string name="kind_revoke">revoca</string>
     <string name="kind_close">account chiuso</string>
@@ -830,6 +837,7 @@
     <string name="env_key_missing">La chiave della paghetta non è disponibile.</string>
     <string name="env_log_fund">Paghetta caricata</string>
     <string name="env_log_sweep">Paghetta chiusa</string>
+    <string name="env_log_moved">%1$s portata a casa</string>
     <string name="env_log_rent">Rent della paghetta recuperato</string>
     <plurals name="env_rent_back">
         <item quantity="one">%1$d account vuoto chiuso. Il rent è tornato nel tuo wallet.</item>
@@ -967,6 +975,8 @@
     <string name="claim_truth">Un link regalo si porta dietro la sua chiave: chi lo apre per primo può prenderlo. Non c\'è altro che lo protegga.</string>
     <string name="gift_title">Manda soldi con un link</string>
     <string name="gift_log">Link regalo</string>
+    <string name="gift_log_taken">Regalo ricevuto</string>
+    <string name="gift_log_back">Regalo ripreso</string>
     <string name="gift_body">Velum crea un portafoglino usa e getta, ci mette la cifra e ti dà un link. Mandalo a chi vuoi: chi lo apre porta i soldi nel suo wallet.</string>
     <string name="gift_warn">Chi ha il link ha i soldi. Va bene per una mancia, non per uno stipendio. Finché nessuno lo ritira, puoi riprendertelo.</string>
     <string name="gift_amount">Importo</string>

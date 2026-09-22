@@ -32,6 +32,8 @@ object AnalyticsEngine {
         val disposals = HashMap<String, Int>()
 
         for (e in ordered) {
+            // The chain refused it: nothing moved, so nothing was bought or sold.
+            if (e.tags.contains(LedgerRecorder.FAILED)) continue
             val snap = e.fiat[currency] ?: continue
             // acquisitions
             for (leg in e.inflows) {

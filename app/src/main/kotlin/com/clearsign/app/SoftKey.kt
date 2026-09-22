@@ -34,18 +34,21 @@ object SoftKey {
      * Move everything this key holds to [to], minus the fee. Returns the
      * signature, or null with a reason. Used to claim a gift and to reclaim one.
      */
-    suspend fun sweepAll(from: ByteArray, to: String, cluster: String? = null): Pair<String?, String?> {
+    /** What a sweep did: the signature, or the reason it did not, and the lamports that moved. */
+    data class Sweep(val signature: String?, val error: String?, val lamports: Long)
+
+    suspend fun sweepAll(from: ByteArray, to: String, cluster: String? = null): Sweep {
         val pub = pubkeyOf(from)
         val rpc = SolanaRpc.urlFor(cluster)
         val balance = runCatching { SolanaRpc.getBalance(rpc, pub) }.getOrNull() ?: 0L
         val fee = 5_000L
-        if (balance <= fee) return null to "empty"
-        val fromKey = Base58.decodePubkey(pub) ?: return null to "bad key"
-        val toKey = Base58.decodePubkey(to) ?: return null to "bad address"
-        val bh = SolanaRpc.latestBlockhash(rpc) ?: return null to "no blockhash"
+        if (balance <= fee) return Sweep(null, "empty", 0L)
+        val fromKey = Base58.decodePubkey(pub) ?: return Sweep(null, "bad key", 0L)
+        val toKey = Base58.decodePubkey(to) ?: return Sweep(null, "bad address", 0L)
+        val bh = SolanaRpc.latestBlockhash(rpc) ?: return Sweep(null, "no blockhash", 0L)
         val tx = WalletTx.build(fromKey, Base58.decode(bh.hash), listOf(WalletTx.systemTransfer(fromKey, toKey, balance - fee)))
         val signed = SolanaTx.attachSignature(tx, 0, sign(from, SolanaTx.messageBytes(tx)))
         val out = SolanaRpc.send(rpc, signed)
-        return out.signature to out.error
+        return Sweep(out.signature, out.error, balance - fee)
     }
 }

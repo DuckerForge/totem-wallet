@@ -359,8 +359,24 @@ object SessionActions {
             val tx = WalletTx.build(fromKey, Base58.decode(bh.hash), ix)
             val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(tx))
             if (sig == null) { stuck += sym; continue }
-            val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(null), SolanaTx.attachSignature(tx, 0, sig)) }
-            if (out.signature == null) stuck += sym
+            val signed = SolanaTx.attachSignature(tx, 0, sig)
+            val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(null), signed) }
+            if (out.signature == null) { stuck += sym; continue }
+            // A coin that came home is a line in the book. These moves used to
+            // be the only transactions of the budget without one: the coin
+            // appeared in the wallet and the receipts had nothing to say.
+            val receipt = withContext(Dispatchers.IO) {
+                runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), signed, owner, null, requireSim = false).receipt }.getOrNull()
+            }
+            LedgerRecorder.record(
+                ctx,
+                LedgerRecorder.fromReceipt(
+                    at = System.currentTimeMillis(), kind = "envelope", dApp = ctx.getString(R.string.env_title), host = null, pkg = ctx.packageName,
+                    cluster = null, wallet = owner, r = receipt, signature = out.signature, sent = true,
+                    txIndex = 0, txCount = 1, groupId = LedgerRecorder.newId(), attestation = null, attestationSig = null,
+                    recipientLabelFallback = ctx.getString(R.string.env_log_moved, sym),
+                ),
+            )
         }
         return stuck
     }

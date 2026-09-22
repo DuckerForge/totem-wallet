@@ -553,9 +553,10 @@
     <string name="ore_best_label">Le caselle più libere adesso:</string>
     <string name="ore_outlook">Atteso: %1$s ORE (≈ %2$s SOL). Costo atteso: %3$s SOL, il %4$s%% della puntata.</string>
     <string name="ore_outlook_nopx">Atteso: %1$s ORE. Costo atteso: %2$s SOL, il %3$s%% della puntata.</string>
-    <string name="ore_outlook_good">Al prezzo ORE di oggi conviene.</string>
-    <string name="ore_outlook_bad">Al prezzo ORE di oggi non conviene.</string>
-    <string name="ore_solo_legend">le caselle col puntino pagano a un solo minatore, estratto in base alla puntata</string>
+    <string name="ore_outlook_good">In media, al prezzo ORE di oggi, tornano %1$s SOL per ogni SOL messo. Mai sicuro: vince una casella su 25, le tue sono %2$d.</string>
+    <string name="ore_outlook_bad">In media, al prezzo ORE di oggi, tornano %1$s SOL per ogni SOL messo: si perde. Vince una casella su 25, le tue sono %2$d.</string>
+    <string name="ore_outlook_crowd">La quota è contata su quanto la rete mette di solito a fine giro, circa %1$s SOL per casella, non sul vuoto di adesso.</string>
+    <string name="ore_solo_legend">col puntino: paga a uno solo, estratto in base alla puntata</string>
     <string name="ore_last_title">Giro %1$d: è uscita la casella %2$d</string>
     <string name="ore_last_split">l\'ORE si è diviso fra %1$d minatori</string>
     <string name="ore_last_solo">un minatore solo ha preso tutto l\'ORE</string>

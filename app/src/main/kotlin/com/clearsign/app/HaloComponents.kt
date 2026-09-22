@@ -301,6 +301,8 @@ fun PageHeader(
     tint: Color = Halo.cyan,
     leading: (@Composable () -> Unit)? = null,
     sweep: Boolean = false,
+    /** Per la riga sotto il titolo: la home la fa comparire quando il numero grande scorre via. */
+    subModifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -316,7 +318,7 @@ fun PageHeader(
         }
         Column(Modifier.weight(1f)) {
             Text(title, style = HaloType.screen, color = Halo.ink, maxLines = 1)
-            if (sub != null) Text(sub, style = HaloType.small, color = Halo.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub != null) Text(sub, style = HaloType.small, color = Halo.muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = subModifier)
         }
         trailing()
     }

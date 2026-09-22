@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -716,7 +717,11 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
 private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>, onSelect: (Tab) -> Unit) {
     val ctx = LocalContext.current
     Row(
-        Modifier.fillMaxWidth().background(Halo.card).border(androidx.compose.foundation.BorderStroke(1.dp, Halo.stroke)).padding(horizontal = 12.dp, vertical = 8.dp),
+        // Solo la riga in alto: un bordo su quattro lati faceva della barra una
+        // scheda, e una barra non e' una scheda.
+        Modifier.fillMaxWidth().background(Halo.card)
+            .drawBehind { drawLine(Halo.stroke, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         // The market icon says how the market is: a line going up in the accent
@@ -757,13 +762,17 @@ private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>,
                     stringResource(label), style = HaloType.label,
                     color = if (active) Halo.mint else Halo.muted,
                     modifier = Modifier
+                        // Si chiude solo sul Wallet, che e' l'unica tab che scorre la
+                        // barra: sulle altre le etichette restano, e tornando al
+                        // Wallet il suo scorrimento e' quello di prima.
                         .layout { measurable, constraints ->
                             val p = measurable.measure(constraints)
-                            val h = (p.height * (1f - collapse.value)).toInt().coerceAtLeast(0)
+                            val c = if (tab == Tab.WALLET) collapse.value else 0f
+                            val h = (p.height * (1f - c)).toInt().coerceAtLeast(0)
                             layout(p.width, h) { p.placeRelative(0, 0) }
                         }
                         .graphicsLayer {
-                            val c = collapse.value
+                            val c = if (tab == Tab.WALLET) collapse.value else 0f
                             alpha = 1f - c
                             scaleY = 1f - c
                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
@@ -780,42 +789,33 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
     var scanError by remember { mutableStateOf<String?>(null) }
     val ownScan = rememberAgentScan { scanError = it }
     val scan = onScan ?: ownScan
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        // Il segno vero, non un glifo su un gradiente.
-        //
-        // Stava a una volta e mezza e ritagliato, e aveva senso: quell'immagine
-        // era l'icona del lanciatore a tutto quadro, e per mostrarne il centro
-        // visibile bisognava ingrandirla. Adesso `brand_bird` e' composta apposta
-        // per stare dentro un riquadro, quindi lo zoom la gonfiava e le tagliava
-        // gli angoli. Sta dentro e basta.
-        Box(Modifier.size(36.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
-            androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(R.mipmap.brand_bird),
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.app_name), style = HaloType.title, color = Halo.ink)
-            // Once the big number has scrolled away the header takes it over, so
-            // the figure that matters is never off screen.
-            if (headline != null) {
-                Text(
-                    headline, style = HaloType.small, color = Halo.ink,
-                    modifier = Modifier.graphicsLayer { alpha = collapse?.value ?: 0f },
+    // La stessa intestazione delle altre tab. Il segno vero al posto della
+    // tessera con l'icona, e quando il numero grande e' scorso via la riga
+    // sotto il titolo lo riprende, cosi' la cifra che conta non esce mai.
+    PageHeader(
+        title = stringResource(R.string.app_name),
+        sub = headline,
+        subModifier = Modifier.graphicsLayer { alpha = collapse?.value ?: 0f },
+        leading = {
+            Box(Modifier.size(38.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(R.mipmap.brand_bird),
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
+        },
+    ) {
         if (account != null) {
+            val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Row(
-                Modifier.clip(rs(999)).background(Halo.cardSoft).haloBorder(rs(999)).clickable(onClick = onChip).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                Modifier.tappable(src, rs(999), onClick = onChip).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(account.pubkeyBase58, 20.dp)
                 Spacer(Modifier.width(6.dp))
-                Text(account.label ?: shorten(account.pubkeyBase58), fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 11.5.sp, color = Halo.ink, maxLines = 1)
+                Text(account.label ?: shorten(account.pubkeyBase58), style = HaloType.label.copy(fontWeight = FontWeight.Medium), color = Halo.ink, maxLines = 1)
             }
         }
     }

@@ -124,12 +124,15 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                     }
                 }
 
+                if (e.tags.contains(LedgerRecorder.FAILED)) Banner(stringResource(R.string.ledger_failed_body), Halo.red, HIcon.WARNING)
                 // ---- note + tags ----------------------------------------------
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(stringResource(R.string.detail_note_hdr), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
-                        ChipRow(listOf("gift", "income", "expense", "trade").map { it to tagLabel(ctx, it) }, e.tags.firstOrNull()) { t ->
-                            update { it.copy(tags = if (t == null || it.tags.firstOrNull() == t) emptyList() else listOf(t)) }; Haptics.tick(ctx)
+                        val userTag = e.tags.firstOrNull { it != LedgerRecorder.FAILED }
+                        ChipRow(listOf("gift", "income", "expense", "trade").map { it to tagLabel(ctx, it) }, userTag) { t ->
+                            // The chain's own marker stays whatever the person picks.
+                            update { val keep = it.tags.filter { f -> f == LedgerRecorder.FAILED }; it.copy(tags = if (t == null || userTag == t) keep else keep + t) }; Haptics.tick(ctx)
                         }
                         OutlinedTextField(
                             value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth(), minLines = 2,

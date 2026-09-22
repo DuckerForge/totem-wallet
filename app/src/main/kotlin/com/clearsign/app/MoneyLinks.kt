@@ -133,9 +133,11 @@ object MoneyLinks {
     /** Take a gift back. Only works while nobody has claimed it. */
     suspend fun reclaim(ctx: Context, gift: Gift, owner: String): String? = withContext(Dispatchers.IO) {
         val seed = seedOf(ctx, gift.pubkey) ?: return@withContext ctx.getString(R.string.gift_key_gone)
-        val (sig, err) = SoftKey.sweepAll(seed, owner)
-        if (sig == null) return@withContext if (err == "empty") ctx.getString(R.string.gift_already_taken) else err
+        val sw = SoftKey.sweepAll(seed, owner)
+        val sig = sw.signature ?: return@withContext if (sw.error == "empty") ctx.getString(R.string.gift_already_taken) else sw.error
         markClaimed(ctx, gift.pubkey)
+        // Money that came back is a line in the book, like the money that left.
+        LedgerRecorder.record(ctx, LedgerRecorder.plainMove(ctx, "gift", owner, sig, inflows = solLeg(sw.lamports), outflows = emptyList(), label = ctx.getString(R.string.gift_log_back)))
         null
     }
 
@@ -145,10 +147,17 @@ object MoneyLinks {
     }
 
     suspend fun claim(ctx: Context, seed: ByteArray, to: String): Pair<String?, String?> = withContext(Dispatchers.IO) {
-        val (sig, err) = SoftKey.sweepAll(seed, to)
-        if (sig != null) markClaimed(ctx, SoftKey.pubkeyOf(seed))
-        sig to err
+        val sw = SoftKey.sweepAll(seed, to)
+        if (sw.signature != null) {
+            markClaimed(ctx, SoftKey.pubkeyOf(seed))
+            // A gift taken used to arrive with no receipt: SOL in the wallet and
+            // not a line to say where from.
+            LedgerRecorder.record(ctx, LedgerRecorder.plainMove(ctx, "gift", to, sw.signature, inflows = solLeg(sw.lamports), outflows = emptyList(), label = ctx.getString(R.string.gift_log_taken)))
+        }
+        sw.signature to sw.error
     }
+
+    private fun solLeg(lamports: Long) = listOf(Leg(com.clearsign.core.NATIVE_SOL_MINT, "SOL", 9, lamports))
 
     // ---- the list of gifts you made ------------------------------------------
 

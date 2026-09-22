@@ -446,6 +446,13 @@
     <string name="ledger_empty">Every transaction you sign or send shows up here as a receipt: amounts, counterparties, risks, proof — and you can export it for your taxes.</string>
     <string name="kind_tx">signed for a dApp</string>
     <string name="kind_send">sent</string>
+    <string name="kind_swap">swap</string>
+    <string name="kind_blink">Blink</string>
+    <string name="kind_setup">setup</string>
+    <string name="kind_ore_dig">ORE dig</string>
+    <string name="kind_ore_claim">ORE claim</string>
+    <string name="ledger_failed">did not go through</string>
+    <string name="ledger_failed_body">The chain refused this transaction after the node had taken it. Nothing moved. Only the network fee was paid.</string>
     <string name="kind_theme">theme</string>
     <string name="kind_revoke">revoke</string>
     <string name="kind_close">account closed</string>
@@ -830,6 +837,7 @@
     <string name="env_key_missing">The key is not available.</string>
     <string name="env_log_fund">Agent budget funded</string>
     <string name="env_log_sweep">Agent budget closed</string>
+    <string name="env_log_moved">%1$s brought home</string>
     <string name="env_log_rent">Budget rent reclaimed</string>
     <plurals name="env_rent_back">
         <item quantity="one">%1$d empty account closed. Its rent is back in your wallet.</item>
@@ -967,6 +975,8 @@
     <string name="claim_truth">A gift link carries its own key: whoever opens it first can take it. Nothing else protects it.</string>
     <string name="gift_title">Send money with a link</string>
     <string name="gift_log">Gift link</string>
+    <string name="gift_log_taken">Gift taken</string>
+    <string name="gift_log_back">Gift taken back</string>
     <string name="gift_body">Velum makes a small throwaway wallet, puts the amount in it, and hands you a link. Send it to anyone; whoever opens it takes the money into their own wallet.</string>
     <string name="gift_warn">Whoever has the link has the money. Good for a tip, wrong for a salary. Until someone takes it, you can take it back.</string>
     <string name="gift_amount">Amount</string>

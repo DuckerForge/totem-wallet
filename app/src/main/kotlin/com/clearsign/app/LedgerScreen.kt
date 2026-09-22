@@ -76,7 +76,7 @@ internal fun LedgerScreen() {
             FilterLabel(stringResource(R.string.ledger_kind))
             ChipRow(
                 listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all_kinds)) +
-                    listOf("tx", "send", "agent", "order", "gift", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
+                    listOf("tx", "send", "swap", "agent", "order", "gift", "ore_dig", "ore_claim", "blink", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
                 kind,
             ) { kind = it }
 
@@ -151,7 +151,7 @@ internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>
 @Composable
 private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
-    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
+    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "swap" -> HIcon.SWAP; "blink" -> HIcon.SPARK; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
     // La riga apre lo scontrino e lo dice: contenuta, con la pressione, col chevron.
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -166,7 +166,8 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (if (e.kind == "agent") agentHow(ctx, e.host) else "") + (if (e.kind == "order" && e.note.isNotBlank()) " · " + e.note else "") + (e.recipientLabel?.let { " · $it" } ?: ""), style = HaloType.label.copy(fontWeight = FontWeight.Medium), color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (e.attestationSig != null) { Spacer(Modifier.width(5.dp)); HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 11.dp) }
-                if (e.tags.isNotEmpty()) { Spacer(Modifier.width(5.dp)); Text(e.tags.first(), style = HaloType.label, color = Halo.cyan) }
+                if (e.tags.contains(LedgerRecorder.FAILED)) { Spacer(Modifier.width(5.dp)); Text(stringResource(R.string.ledger_failed), style = HaloType.label, color = Halo.red) }
+                e.tags.firstOrNull { it != LedgerRecorder.FAILED }?.let { Spacer(Modifier.width(5.dp)); Text(it, style = HaloType.label, color = Halo.cyan) }
             }
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -244,6 +245,10 @@ internal fun kindLabel(ctx: android.content.Context, k: String): String = when (
     "signin" -> ctx.getString(R.string.kind_signin); "message" -> ctx.getString(R.string.kind_message); "theme" -> ctx.getString(R.string.kind_theme)
     "revoke" -> ctx.getString(R.string.kind_revoke); "close" -> ctx.getString(R.string.kind_close); "burn" -> ctx.getString(R.string.kind_burn); "envelope" -> ctx.getString(R.string.kind_envelope); "send" -> ctx.getString(R.string.kind_send)
     "agent" -> ctx.getString(R.string.kind_agent); "gift" -> ctx.getString(R.string.kind_gift); "order" -> ctx.getString(R.string.kind_order)
+    // A swap, a Blink and a setup used to fall through to "signed for a dApp",
+    // which is the one thing they are not.
+    "swap" -> ctx.getString(R.string.kind_swap); "blink" -> ctx.getString(R.string.kind_blink); "setup" -> ctx.getString(R.string.kind_setup)
+    "ore_dig" -> ctx.getString(R.string.kind_ore_dig); "ore_claim" -> ctx.getString(R.string.kind_ore_claim)
     else -> ctx.getString(R.string.kind_tx)
 }
 

@@ -485,6 +485,9 @@
     <string name="fee_tag">fee</string>
     <string name="rt_extra_signers">Extra signatures required</string>
     <string name="hero_defi_ore">%1$s on the grid</string>
+    <string name="hero_tile_stake">staked</string>
+    <string name="hero_tile_lend">Jupiter Lend</string>
+    <string name="hero_tile_ore">on the grid</string>
     <string name="hero_ore_dig">Dig ORE</string>
     <string name="ore_title">ORE</string>
     <string name="ore_subtitle">The grid, one round a minute</string>

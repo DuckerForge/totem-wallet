@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  */
 class TypeScaleRatchetTest {
     /** Il tetto di oggi. Abbassarlo quando si toglie, mai alzarlo. */
-    private val ceiling = 697
+    private val ceiling = 660
 
     @Test fun `le dimensioni scritte a mano non crescono`() {
         // I test girano con la cartella di lavoro sul modulo `app`: si cerca

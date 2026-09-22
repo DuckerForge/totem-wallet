@@ -1448,7 +1448,7 @@
     <string name="agent_start">Start</string>
     <string name="agent_positions">Positions</string>
     <string name="agent_recent">Last moves</string>
-    <string name="agent_recent_none">Nothing yet.</string>
+    <string name="agent_recent_none">The agent has not moved anything yet. Start it above.</string>
     <string name="agent_truth_link">What Velum guarantees</string>
     <string name="pro_model">Model and key</string>
     <string name="pro_collar">The collar</string>
@@ -1456,6 +1456,7 @@
     <string name="pro_trace">Live trace</string>
     <string name="pro_pc">Agent on a computer</string>
     <string name="lane_title">Start</string>
+    <string name="lane_sub">Choose how much, then go.</string>
     <string name="lane_body">One lane, the safe one: liquidity from $50,000, mint and freeze authority revoked, sellable, few large holders. The floors the winning bots use. The collar\'s limits always hold.</string>
     <string name="lane_start">Start</string>
     <string name="chat_group_look">Look</string>

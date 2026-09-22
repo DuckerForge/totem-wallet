@@ -372,3 +372,22 @@ fun SwitchRow(title: String, sub: String?, checked: Boolean, onChange: (Boolean)
         )
     }
 }
+
+/**
+ * The change with its sign: green up, red down, in a soft pill of its own
+ * colour. Shared by the wallet's "today" and the agent's "since you funded
+ * it", so a gain looks the same wherever it is. `chevron` only when the
+ * pill opens something.
+ */
+@Composable
+fun DeltaPill(text: String, up: Boolean, modifier: Modifier = Modifier, chevron: Boolean = false) {
+    val tint = if (up) Halo.mint else Halo.red
+    Row(
+        modifier.clip(rs(Radius.pill)).background(tint.copy(alpha = 0.12f))
+            .padding(start = 12.dp, end = if (chevron) 8.dp else 12.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = HaloType.small, color = tint)
+        if (chevron) HaloIcon(HIcon.CHEVRON_RIGHT, tint, 15.dp)
+    }
+}

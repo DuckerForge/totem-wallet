@@ -562,6 +562,13 @@
     <string name="ore_last_you_won">you get %1$s ORE</string>
     <string name="ore_last_you_lost_draw">you were on it, the draw went to someone else</string>
     <string name="ore_last_you_missed">you were on other squares</string>
+    <string name="ore_view_now">now</string>
+    <string name="ore_view_history">last %1$d rounds</string>
+    <string name="ore_history_wins">Came out: %1$s</string>
+    <string name="ore_history_hot">Square %1$d came out %2$d times</string>
+    <string name="ore_history_best">The network leaves %1$s emptiest</string>
+    <string name="ore_why_renew">moving the ORE squares to the least crowded ones</string>
+    <string name="trace_ore_renew">ORE: squares moved to %1$s, the least crowded over the last %2$d rounds</string>
     <string name="ore_wait_round">Wait for the next round</string>
     <string name="ore_wait_banner">Between rounds, or too close to the end. The button lights up when the next round starts.</string>
     <string name="ore_hold_dig">Hold to dig</string>

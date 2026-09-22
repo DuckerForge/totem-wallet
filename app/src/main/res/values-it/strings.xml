@@ -562,6 +562,13 @@
     <string name="ore_last_you_won">ti toccano %1$s ORE</string>
     <string name="ore_last_you_lost_draw">c\'eri, il sorteggio è andato a un altro</string>
     <string name="ore_last_you_missed">eri su altre caselle</string>
+    <string name="ore_view_now">adesso</string>
+    <string name="ore_view_history">ultimi %1$d giri</string>
+    <string name="ore_history_wins">Uscite: %1$s</string>
+    <string name="ore_history_hot">La casella %1$d è uscita %2$d volte</string>
+    <string name="ore_history_best">La rete lascia più vuote le caselle %1$s</string>
+    <string name="ore_why_renew">sposto le caselle di ORE sulle meno affollate</string>
+    <string name="trace_ore_renew">ORE: caselle spostate su %1$s, le meno affollate degli ultimi %2$d giri</string>
     <string name="ore_wait_round">Aspetta il prossimo giro</string>
     <string name="ore_wait_banner">Fra un giro e l\'altro, o troppo vicino alla fine. Il bottone si accende quando parte il giro nuovo.</string>
     <string name="ore_hold_dig">Tieni premuto per scavare</string>

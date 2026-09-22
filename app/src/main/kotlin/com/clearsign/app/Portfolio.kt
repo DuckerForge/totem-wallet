@@ -237,6 +237,7 @@ object Portfolio {
             val v = OreMiner.read(rpc, owner, withRound = false)
             val m = v?.miner
             if (v != null && m != null) {
+                runCatching { TokenSymbols.resolve(listOf(com.clearsign.core.Ore.MINT)) }
                 val oreUi = v.claimableOre / 1e11
                 val oreUsd = quotes[com.clearsign.core.Ore.MINT]?.usd ?: runCatching { Prices.quotes(listOf(com.clearsign.core.Ore.MINT))[com.clearsign.core.Ore.MINT]?.usd }.getOrNull()
                 val solUsd = quotes[NATIVE_SOL_MINT]?.usd

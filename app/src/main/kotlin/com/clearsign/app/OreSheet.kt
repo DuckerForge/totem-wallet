@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -92,6 +93,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
     var digging by remember { mutableStateOf(false) }
     var perSquare by remember { mutableStateOf("0.001") }
     var picked by remember { mutableStateOf(setOf<Int>()) }
+    /** «Aspetta il prossimo giro», che sparisce da solo quando il giro riparte: non e' un errore, e' un momento. */
+    var waiting by remember { mutableStateOf(false) }
 
     LaunchedEffect(refresh) {
         loading = true
@@ -106,6 +109,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         while (true) {
             delay(1_000)
             now = System.currentTimeMillis()
+            if (waiting && v.open(now, SIGN_MARGIN_S)) waiting = false
             if (v.secondsLeft(now) <= 0.0 && now - v.at > 12_000L) { refresh++; break }
         }
     }
@@ -130,7 +134,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Il foglio prende tutto lo schermo: l'intestazione sta sotto la barra di stato, non sotto l'orologio.
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val v = view
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TokenLogo(Ore.MINT, "ORE", TokenSymbols.image(Ore.MINT), 40.dp)
@@ -213,6 +218,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 }
                                 Text(stringResource(R.string.ore_wager_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.amber)
                                 val open = v.open(now, SIGN_MARGIN_S)
+                                if (waiting || !open) Banner(stringResource(R.string.ore_wait_banner), Halo.amber, HIcon.HOURGLASS)
                                 // Il bottone dice cosa manca: le caselle, o il giro.
                                 PrimaryButton(
                                     when {
@@ -228,7 +234,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         val rpc = SolanaRpc.urlFor(null)
                                         val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
                                         if (cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
-                                        if (!fresh.open(margin = SIGN_MARGIN_S)) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
+                                        if (!fresh.open(margin = SIGN_MARGIN_S)) { view = fresh; waiting = true; state = OreState.Idle; return@launch }
                                         review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, fresh.board, cfg)), dig = lamports to picked)
                                     }
                                 }
@@ -265,7 +271,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                             val rpc = SolanaRpc.urlFor(null)
                                             val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
                                             if (k == null || cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
-                                            if (!fresh.open(margin = SIGN_MARGIN_S)) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
+                                            if (!fresh.open(margin = SIGN_MARGIN_S)) { view = fresh; waiting = true; state = OreState.Idle; return@launch }
                                             listOf(OreMiner.deploy(k, s.dig.first, s.dig.second, fresh.board, cfg))
                                         }
                                         val log = WalletActions.LogInfo(kind = s.kind, outflows = r.outflows.map { "−" + fmtAmt(it) }, inflows = r.inflows.map { "+" + fmtAmt(it) }, receipt = r, recipientLabel = "ORE")

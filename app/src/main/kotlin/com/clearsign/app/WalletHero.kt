@@ -204,17 +204,20 @@ internal fun WalletHero(
                         }
                         if (!open) return@Column
                         (if (showAll || main.size <= MAX_COLLAPSED) main else main.take(MAX_COLLAPSED)).forEach { h -> HoldingRow(h, currency) { picked = h } }
+                        // Le posizioni DeFi stanno sempre in vista, subito sotto le monete
+                        // principali: sono poche e sono soldi, non spiccioli e NFT. Chi
+                        // cerca ORE non deve scavare per trovare Scava.
+                        if (view.defi.isNotEmpty()) {
+                            Spacer(Modifier.height(Space.xs))
+                            Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
+                            view.defi.forEach { d -> DefiRow(d, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
+                        }
+                        if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
+                        // Tutto il resto, le altre monete, gli spiccioli e gli NFT, sta
+                        // dietro «mostra tutto», in fondo alla scheda.
                         if (main.size > MAX_COLLAPSED) {
                             LinkRow(if (showAll) stringResource(R.string.hero_show_less) else stringResource(R.string.hero_show_all, main.size)) { showAll = !showAll }
                         }
-                        // Everything past the first few coins lives behind "show all".
-                        //
-                        // The odds and ends and the DeFi used to sit below the fold
-                        // whatever you did, so the card was tall even when it was
-                        // "collapsed" and the interesting part, the coins, was the
-                        // smallest thing in it. One link now decides the whole
-                        // depth of the card: the coins you actually watch, or all
-                        // of it.
                         if (showAll || main.size <= MAX_COLLAPSED) {
                             if (view.unpriced > 0) Text(stringResource(R.string.hero_some_unpriced), style = HaloType.label, color = Halo.muted)
                             if (others.isNotEmpty()) {
@@ -222,15 +225,6 @@ internal fun WalletHero(
                                 if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
                             }
                         }
-                        // Le posizioni DeFi stanno sempre in vista, fuori da «mostra tutto»:
-                        // sono poche e sono soldi, non spiccioli e NFT. Chi cerca ORE non
-                        // deve scavare per trovare Scava.
-                        if (view.defi.isNotEmpty()) {
-                            Spacer(Modifier.height(Space.xs))
-                            Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
-                            view.defi.forEach { d -> DefiRow(d, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
-                        }
-                        if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
                     }
                 }
             }

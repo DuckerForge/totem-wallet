@@ -65,6 +65,15 @@ class RiskEngine(private val locale: String = "en") {
                     // assigning some other fresh account is how PDAs/ATAs get created.
                     if (myWallet != null && ix.subject == myWallet) risks += risk(RiskFlag.WALLET_OWNER_CHANGE, Severity.DANGER)
                 InstructionKind.DURABLE_NONCE -> risks += risk(RiskFlag.DURABLE_NONCE, Severity.WARN)
+                // Una scommessa e' un uso voluto, non un attacco: si dice, non si
+                // blocca. Pagare le caselle di un altro invece e' un altro che
+                // gioca coi tuoi soldi, e quello si blocca.
+                InstructionKind.WAGER -> {
+                    val sol = Ore.sol(ix.amountRaw ?: 0L)
+                    val payee = ix.subject
+                    risks += if (payee != null && myWallet != null && payee != myWallet) risk(RiskFlag.WAGER_FOR_OTHER, Severity.DANGER, sol, payee.take(4) + "…" + payee.takeLast(4))
+                    else risk(RiskFlag.WAGER, Severity.WARN, sol)
+                }
                 else -> {}
             }
 

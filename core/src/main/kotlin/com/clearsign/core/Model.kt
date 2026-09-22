@@ -34,6 +34,7 @@ enum class InstructionKind {
     ASSIGN_OWNER,    // System Assign: hands an account (maybe *your wallet*) to a program
     DURABLE_NONCE,   // AdvanceNonceAccount: the signature never expires (classic drainer setup)
     SWAP,
+    WAGER,           // SOL put on a bet the chain settles: an ORE deploy, or SOL handed to an ORE executor
     UNKNOWN,
 }
 
@@ -74,6 +75,8 @@ enum class RiskFlag {
     EXTRA_SIGNERS,         // the transaction needs signatures from keys other than yours
     AGENT_INTENT_MISMATCH, // an AI agent declared one thing; the simulated effect is another (Agent Gate)
     AGENT_INTENT_OK,       // the agent's declared intent matches the simulated effect (informational)
+    WAGER,                 // puts SOL on the ORE grid: it can go to the other squares
+    WAGER_FOR_OTHER,       // pays ORE squares whose miner belongs to another wallet
 }
 
 /**

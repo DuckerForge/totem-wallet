@@ -484,6 +484,8 @@
     <string name="split_hdr">Dove vanno i fondi</string>
     <string name="fee_tag">commissione</string>
     <string name="rt_extra_signers">Servono altre firme</string>
+    <string name="rt_wager">Una scommessa su ORE</string>
+    <string name="rt_wager_other">Paghi le caselle di un altro</string>
     <string name="onb1_t">Vedi ciò che firmi</string>
     <string name="onb1_b">Ogni transazione diventa una ricevuta chiara — importo, destinatario e rischio veri — prima che il Seed Vault chieda la tua impronta.</string>
     <string name="onb2_t">Una prova firmata da tenere</string>

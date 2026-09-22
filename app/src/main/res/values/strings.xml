@@ -484,6 +484,8 @@
     <string name="split_hdr">Where the funds go</string>
     <string name="fee_tag">fee</string>
     <string name="rt_extra_signers">Extra signatures required</string>
+    <string name="rt_wager">A wager on ORE</string>
+    <string name="rt_wager_other">Paying someone else\'s squares</string>
     <string name="onb1_t">See what you sign</string>
     <string name="onb1_b">Every transaction becomes a plain receipt — real amount, real recipient, real risk — before the Seed Vault ever asks for your fingerprint.</string>
     <string name="onb2_t">Signed proof you can keep</string>

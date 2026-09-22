@@ -406,7 +406,7 @@ private fun TokenSheet(
                     Text(h.symbol + (if (h.isNft) "  ·  NFT" else ""), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 }
             }
-            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16)).padding(14.dp)) {
+            Column(Modifier.fillMaxWidth().clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16), living = false).padding(14.dp)) {
                 StatRow(stringResource(R.string.token_amount), fmtUi(h.ui) + " " + h.symbol)
                 StatRow(stringResource(R.string.token_value), h.fiat?.let { fmtFiat(it, currency) } ?: stringResource(R.string.burn_value_none), accent = h.fiat != null)
                 if (!isSol) {

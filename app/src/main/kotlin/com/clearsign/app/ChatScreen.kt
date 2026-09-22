@@ -318,7 +318,7 @@ internal fun AgentConsole() {
 
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(rs(12)).background(Halo.ground2).haloBorder(rs(12))
+            .clip(rs(12)).background(Halo.ground2).haloBorder(rs(12), living = false)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -415,7 +415,7 @@ private val SIGNED_VERDICTS = setOf("signed_silently", "confirmed_by_user", "ref
 
 @Composable
 private fun AssistantBubble(text: String, live: Boolean) {
-    Box(Modifier.fillMaxWidth(0.92f).clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16)).padding(12.dp)) {
+    Box(Modifier.fillMaxWidth(0.92f).clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16), living = false).padding(12.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(lite(text), style = HaloType.small, color = Halo.ink, modifier = Modifier.weight(1f, fill = false))
             if (live) { Spacer(Modifier.width(3.dp)); BlinkCaret(Halo.mint, 13.dp, 7.dp) }

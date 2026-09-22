@@ -57,7 +57,9 @@ internal fun ThemesCard(signer: SeedVaultSigner, owner: String?, onNeedPro: () -
 
     var showEditor by remember { mutableStateOf(false) }
     // Built-ins first, then a "Custom" tile that opens the editor.
-    val tiles = Palettes.all + CustomTheme.palette(ctx)
+    // Built once, and again when the editor closes: reading the saved custom
+    // palette is a preferences read, and it must not happen on every recomposition.
+    val tiles = remember(showEditor) { Palettes.all + CustomTheme.palette(ctx) }
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SectionTitle(stringResource(R.string.home_themes_hdr), stringResource(R.string.home_themes_sub), HIcon.PALETTE)

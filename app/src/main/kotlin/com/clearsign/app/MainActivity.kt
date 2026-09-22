@@ -259,6 +259,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         // A widget quick action asks for a specific sheet.
         val requested = remember { (ctx as? android.app.Activity)?.intent?.getStringExtra("open") }
         var showSend by remember { mutableStateOf(requested == "send") }
+        // A contact tapped in Settings: the send sheet opens already addressed.
+        var sendTo by remember { mutableStateOf<String?>(null) }
         var showReceive by remember { mutableStateOf(requested == "receive") }
         var showSwap by remember { mutableStateOf(requested == "swap") }
         // A coin chosen in the market tab: the swap opens already pointing at it.
@@ -496,7 +498,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                         Tab.MARKET -> MarketScreen(owner = owner, signer = signer, onBuy = { mint -> swapMint = mint; tab = Tab.WALLET })
                         Tab.AGENT -> AgentScreen(owner, signer, onChat = { showChat = true })
                         Tab.RECEIPTS -> LedgerScreen()
-                        Tab.SETTINGS -> SettingsScreen(signer, owner) { SecurityTools(signer, owner, contacts) }
+                        Tab.SETTINGS -> SettingsScreen(signer, owner) { SecurityTools(signer, owner, contacts) { addr -> sendTo = addr; showSend = true } }
                     } }
                     }
                 }
@@ -518,13 +520,13 @@ fun HomeScreen(signer: SeedVaultSigner) {
         if (showSend && first != null) {
             SendSheet(
                 signer, first.pubkeyBase58,
-                prefillTo = request?.recipient, prefillAmount = request?.amount?.let { fmtUi(it) },
+                prefillTo = request?.recipient ?: sendTo, prefillAmount = request?.amount?.let { fmtUi(it) },
                 prefillMint = request?.let { it.mint ?: com.clearsign.core.NATIVE_SOL_MINT } ?: sendMint,
                 prefillMemo = bridgeMemo,
                 deal = bridgeDeal,
                 onGift = { showSend = false; showGift = true },
                 onPrivate = { to, amt -> showSend = false; privateSend = to to amt; showBridge = true },
-            ) { showSend = false; sendMint = null; bridgeMemo = null; bridgeDeal = null; (ctx as? MainActivity)?.incoming = null }
+            ) { showSend = false; sendTo = null; sendMint = null; bridgeMemo = null; bridgeDeal = null; (ctx as? MainActivity)?.incoming = null }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
         // A page, not a sheet: it sits over everything, tab bar included, because
@@ -590,7 +592,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
  * home stays a wallet (balance, actions, holdings) and not a dashboard.
  */
 @Composable
-private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map<String, String>) {
+private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map<String, String>, onSend: (String) -> Unit) {
     var showDemo by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 // ---- Wallet health (the score) --------------------------------
@@ -604,21 +606,17 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SectionTitle(stringResource(R.string.home_contacts_hdr), if (contacts.isEmpty()) stringResource(R.string.none) else "${contacts.size}", HIcon.CONTACTS)
-                        if (contacts.isEmpty()) {
-                            Text(stringResource(R.string.contacts_empty_note), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted)
-                        }
+                        if (contacts.isEmpty()) EmptyLine(HIcon.PEOPLE, stringResource(R.string.contacts_empty_note))
                         val vctx = LocalContext.current
                         val verified = remember(contacts) { Contacts.verified(vctx) }
+                        // A contact is somewhere money goes: the row opens the
+                        // send sheet with the address already in it.
                         contacts.entries.take(20).forEach { (addr, label) ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Avatar(addr, 30.dp)
-                                Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Halo.ink)
-                                    Text(shorten(addr, 6) + (if (addr in verified) " · " + stringResource(R.string.ctap_verified) else ""), fontFamily = FontFamily.Monospace, fontSize = 11.5.sp, color = if (addr in verified) Halo.mint else Halo.muted)
-                                }
-                                TrustChip(TrustLevel.TRUSTED)
-                            }
+                            HaloRow(
+                                label, shorten(addr, 6) + (if (addr in verified) " · " + stringResource(R.string.ctap_verified) else ""),
+                                leading = { Avatar(addr, 30.dp) },
+                                trailing = { TrustChip(TrustLevel.TRUSTED) },
+                            ) { onSend(addr) }
                         }
                         if (owner != null) {
                             var showTapX by remember { mutableStateOf(false) }

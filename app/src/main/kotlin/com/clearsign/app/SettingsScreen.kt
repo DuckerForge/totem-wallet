@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +55,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(R.string.tab_settings), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Halo.ink)
+        PageHeader(stringResource(R.string.tab_settings), stringResource(R.string.settings_page_sub), HIcon.SETTINGS)
 
         // What people touch most, first. Everything is included: there is no
         // plan to buy and no card to say so.
@@ -106,22 +108,19 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
 private fun SettingsGroup(title: String, sub: String, icon: HIcon, content: @Composable ColumnScope.() -> Unit) {
     var open by rememberSaveable(title) { mutableStateOf(false) }
     val ctx = LocalContext.current
+    // The chevron turns instead of swapping: the row is the same row, open or
+    // closed. The angle is read in graphicsLayer, so turning it redraws nothing.
+    val turn = animateFloatAsState(if (open) 90f else 0f, label = "group")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(
-            Modifier.fillMaxWidth().clip(rs(18)).background(Halo.card).border(1.dp, if (open) Halo.mint.copy(alpha = 0.35f) else Halo.stroke, rs(18))
-                .clickable { open = !open; Haptics.tick(ctx) }.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(34.dp).clip(rs(10)).background(if (open) Halo.mint.copy(alpha = 0.14f) else Halo.cyanSoft), contentAlignment = Alignment.Center) {
-                HaloIcon(icon, if (open) Halo.mint else Halo.cyan, 18.dp)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
-                Text(sub, fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
-            }
-            HaloIcon(if (open) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
-        }
+        HaloRow(
+            title, sub, onGround = true, chevron = false,
+            leading = {
+                Box(Modifier.size(34.dp).clip(rs(10)).background(if (open) Halo.mint.copy(alpha = 0.14f) else Halo.cyanSoft), contentAlignment = Alignment.Center) {
+                    HaloIcon(icon, if (open) Halo.mint else Halo.cyan, 18.dp)
+                }
+            },
+            trailing = { HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 16.dp, Modifier.graphicsLayer { rotationZ = turn.value }) },
+        ) { open = !open; Haptics.tick(ctx) }
         if (open) content()
     }
 }
@@ -308,19 +307,21 @@ private fun RpcCard() {
             // Il pool, fornitore per fornitore: nome, stato, chiamate, ultimo
             // errore. Mai l'indirizzo, che contiene la chiave.
             val (lines, today) = remember { Rpc.report() }
-            Text(stringResource(R.string.rpc_pool_today, today.first, today.second), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
-            lines.forEach { l ->
-                val state = stringResource(
-                    when (l.state) {
-                        RpcPool.State.OK -> R.string.rpc_state_ok
-                        RpcPool.State.COLD -> R.string.rpc_state_cold
-                        RpcPool.State.EXHAUSTED -> R.string.rpc_state_exhausted
-                    },
-                )
-                Text(
-                    "${l.name} · $state · ${l.calls}" + (l.lastError?.let { " · $it" } ?: ""),
-                    fontFamily = Mono, fontSize = 10.5.sp, color = if (l.state == RpcPool.State.OK) Halo.muted else Halo.red, maxLines = 1,
-                )
+            SoftPanel {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(stringResource(R.string.rpc_pool_today, today.first, today.second), style = HaloType.small, color = Halo.muted)
+                    lines.forEach { l ->
+                        val state = stringResource(
+                            when (l.state) {
+                                RpcPool.State.OK -> R.string.rpc_state_ok
+                                RpcPool.State.COLD -> R.string.rpc_state_cold
+                                RpcPool.State.EXHAUSTED -> R.string.rpc_state_exhausted
+                            },
+                        )
+                        StatRow(l.name, "$state · ${l.calls}", accent = l.state == RpcPool.State.OK)
+                        l.lastError?.let { Text(it, style = HaloType.label, color = Halo.red, maxLines = 1) }
+                    }
+                }
             }
         }
     }

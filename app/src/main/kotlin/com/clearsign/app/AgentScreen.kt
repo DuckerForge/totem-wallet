@@ -650,6 +650,35 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
                 if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)
             }
+            // Scavare ORE: una parte della paghetta affidata a un esecutore,
+            // tanto al giorno su tante caselle, sotto lo stesso collare.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.agent_ore_title), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                    Text(stringResource(R.string.agent_ore_sub), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+                }
+                androidx.compose.material3.Switch(checked = cfg.oreOn, onCheckedChange = { cfg = cfg.copy(oreOn = it) })
+            }
+            if (cfg.oreOn) {
+                SliderRow(
+                    stringResource(R.string.agent_ore_day), fmtSol(cfg.oreLamportsPerDay, 3) + " SOL",
+                    (cfg.oreLamportsPerDay / 1_000_000L).toFloat(), 10f..200f, Halo.cyan, steps = 18,
+                ) { cfg = cfg.copy(oreLamportsPerDay = (it.toLong() * 1_000_000L).coerceIn(10_000_000L, 200_000_000L)) }
+                SliderRow(stringResource(R.string.agent_ore_squares), cfg.oreSquares.toString(), cfg.oreSquares.toFloat(), 1f..10f, Halo.mint, steps = 8) {
+                    cfg = cfg.copy(oreSquares = it.toInt().coerceIn(1, 10))
+                }
+                run {
+                    val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
+                    val ceiling = if (p != null) minOf(p.perTxLamports, p.askAboveLamports.takeIf { it > 0 } ?: p.perTxLamports) else 0L
+                    val size = OreAgent.sizing(cfg.oreLamportsPerDay, cfg.oreSquares, ceiling, s?.capLamports ?: 0L)
+                    Text(
+                        if (size == null) stringResource(R.string.agent_ore_too_small)
+                        else stringResource(R.string.agent_ore_note, fmtSol(size.amountPerSquare, 5), size.squares, fmtSol(size.deposit, 4), size.rounds),
+                        fontFamily = Inter, fontSize = 11.sp, color = if (size == null) Halo.amber else Halo.muted,
+                    )
+                }
+                Text(stringResource(R.string.ore_wager_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.amber)
+            }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.AGENT) {
                 TraderLoop.start(ctx, cfg)

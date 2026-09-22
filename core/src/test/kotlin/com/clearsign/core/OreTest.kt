@@ -81,6 +81,22 @@ class OreTest {
         assertEquals("0.086903", Ore.sol(m.rewardsSol))
     }
 
+    @Test fun `l'Automation vera, quella di una balena che gioca tutte le caselle`() {
+        val a = assertNotNull(Ore.automation(fixture("automation")))
+        assertEquals(20_000_000L, a.amountPerSquare)
+        assertEquals(191_162_004_000L, a.balance)
+        assertEquals(7_000L, a.fee)
+        assertEquals(0L, a.strategy)
+        assertEquals(25, a.squares)
+        assertTrue(a.reload)
+        assertEquals(632_000_000_000L, a.totalSolSpent)
+        assertEquals(13_890_795_059_028L, a.totalOreEarned)
+        assertEquals(-1L, a.maxProductionCost)
+        assertEquals(25 * 20_000_000L + 7_000L, a.perRound)
+        assertEquals(382, a.roundsLeft)
+        assertNull(Ore.automation(fixture("miner")))
+    }
+
     @Test fun `un conto sbagliato non si legge`() {
         assertNull(Ore.miner(fixture("board")))
         assertNull(Ore.board(fixture("miner")))
@@ -108,7 +124,7 @@ class OreTest {
     }
 
     @Test fun `Automate, 66 byte, e la maschera a caso e' un numero di caselle`() {
-        val data = Ore.automateData(5_000_000L, 300_000_000L, 20_000L, 3L, Ore.STRATEGY_RANDOM, reload = true, maxProductionCost = 500_000_000L)
+        val data = Ore.automateData(5_000_000L, 300_000_000L, 20_000L, Ore.maskOf(listOf(2, 9, 17)).toLong(), Ore.STRATEGY_PREFERRED, reload = true, maxProductionCost = 500_000_000L)
         assertEquals(66, data.size)
         val c = assertNotNull(Ore.decode(data, listOf(me, "auto", Ore.OPEN_EXECUTOR, "miner"))) as Ore.Call.Automate
         assertEquals(300_000_000L, c.deposit)
@@ -142,7 +158,7 @@ class OreTest {
         assertEquals("ORE", Ore.render(deploy).programName)
         val one = Ore.decode(Ore.deployData(1_000_000L, 1), listOf(me, me))!!
         assertEquals("Put 0.001 SOL on 1 square", Ore.render(one, "en").method)
-        val auto = Ore.decode(Ore.automateData(5_000_000L, 300_000_000L, 20_000L, 3L, 0, true), listOf(me, "a", other, "m"))!!
+        val auto = Ore.decode(Ore.automateData(5_000_000L, 300_000_000L, 20_000L, 7L, 1, true), listOf(me, "a", other, "m"))!!
         val r = Ore.render(auto, "it")
         assertEquals("Affida 0.3 SOL a un esecutore", r.method)
         assertTrue(r.args.any { it.first == "esecutore" && it.second.startsWith("39Fe") })

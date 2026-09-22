@@ -46,14 +46,14 @@ class OreMinerTest {
     }
 
     @Test fun `Riscuoti mette solo quello che serve`() {
-        val none = OreMiner.View(miner(413544L, 413543L, 0L, 0L), board, null, 0L, 0L)
+        val none = OreMiner.View(miner(413544L, 413543L, 0L, 0L), board, null, slot = 0L, at = 0L)
         assertTrue(OreMiner.claimInstructions(owner, none).isEmpty())
-        assertTrue(OreMiner.claimInstructions(owner, OreMiner.View(null, board, null, 0L, 0L)).isEmpty())
+        assertTrue(OreMiner.claimInstructions(owner, OreMiner.View(null, board, null, slot = 0L, at = 0L)).isEmpty())
 
-        val solOnly = OreMiner.View(miner(413544L, 413543L, 5_000L, 0L), board, null, 0L, 0L)
+        val solOnly = OreMiner.View(miner(413544L, 413543L, 5_000L, 0L), board, null, slot = 0L, at = 0L)
         assertEquals(listOf(Ore.IX_CLAIM_SOL), OreMiner.claimInstructions(owner, solOnly).map { it.data[0].toInt() })
 
-        val oreOnly = OreMiner.View(miner(413544L, 413543L, 0L, 7L), board, null, 0L, 0L)
+        val oreOnly = OreMiner.View(miner(413544L, 413543L, 0L, 7L), board, null, slot = 0L, at = 0L)
         val ixs = OreMiner.claimInstructions(owner, oreOnly)
         assertEquals(2, ixs.size)
         assertEquals(Base58.encode(WalletTx.ATA_PROGRAM), Base58.encode(ixs[0].programId))
@@ -61,18 +61,21 @@ class OreMinerTest {
         assertEquals(11, ixs[1].keys.size)
 
         // Un giro vecchio non chiuso: prima si chiude, poi si riscuote tutto.
-        val stale = OreMiner.View(miner(413540L, 413539L, 0L, 0L), board, null, 0L, 0L)
+        val stale = OreMiner.View(miner(413540L, 413539L, 0L, 0L), board, null, slot = 0L, at = 0L)
         val all = OreMiner.claimInstructions(owner, stale)
         assertEquals(listOf(Ore.IX_CHECKPOINT, Ore.IX_CLAIM_SOL, 1, Ore.IX_CLAIM_ORE), all.map { it.data[0].toInt() })
         assertEquals(Base58.encode(OreMiner.roundPda(413540L)), Base58.encode(all[0].keys[5].pubkey))
     }
 
     @Test fun `Automate affida all'esecutore aperto`() {
-        val ix = OreMiner.automate(owner, 1_000_000L, 3, 300_000_000L, 20_000L, reload = true, maxProductionCost = 500_000_000L)
+        val ix = OreMiner.automate(owner, 1_000_000L, listOf(1, 5, 9), 300_000_000L, 20_000L, reload = true, maxProductionCost = 500_000_000L)
         assertEquals(5, ix.keys.size)
         assertEquals(Ore.OPEN_EXECUTOR, Base58.encode(ix.keys[2].pubkey))
         assertEquals(66, ix.data.size)
         assertEquals(300_000_000L, ix.lamportsMoved)
+        val stop = OreMiner.stopAutomation(owner)
+        assertEquals("11111111111111111111111111111111", Base58.encode(stop.keys[2].pubkey))
+        assertEquals(66, stop.data.size)
     }
 
     @Test fun `il conto alla rovescia scende senza chiedere niente`() {

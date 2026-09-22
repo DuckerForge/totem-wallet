@@ -37,6 +37,8 @@ object OreMiner {
         val miner: Ore.Miner?,
         val board: Ore.Board,
         val round: Ore.Round?,
+        /** L'automazione di questo portafoglio, se ne ha una viva. */
+        val automation: Ore.Automation? = null,
         /** Lo slot della risposta: il conto alla rovescia parte da qui. */
         val slot: Long,
         val at: Long,
@@ -57,15 +59,17 @@ object OreMiner {
     fun read(rpcUrl: String, owner: String, withRound: Boolean = true): View? {
         val ownerKey = Base58.decodePubkey(owner) ?: return null
         val minerKey = Base58.encode(minerPda(ownerKey))
-        val first = multi(rpcUrl, listOf(minerKey, Ore.BOARD)) ?: return null
+        val autoKey = Base58.encode(automationPda(ownerKey))
+        val first = multi(rpcUrl, listOf(minerKey, Ore.BOARD, autoKey)) ?: return null
         val board = first.accounts[Ore.BOARD]?.let { Ore.board(it) } ?: return null
         val miner = first.accounts[minerKey]?.let { Ore.miner(it) }
+        val automation = first.accounts[autoKey]?.let { Ore.automation(it) }
         // Il giro serve alla griglia, non alla riga del portafoglio: una chiamata in meno a chi non lo guarda.
         val round = if (!withRound) null else {
             val roundKey = Base58.encode(roundPda(board.roundId))
             multi(rpcUrl, listOf(roundKey))?.accounts?.get(roundKey)?.let { Ore.round(it) }
         }
-        return View(miner, board, round, first.slot, System.currentTimeMillis())
+        return View(miner, board, round, automation, first.slot, System.currentTimeMillis())
     }
 
     private class Multi(val slot: Long, val accounts: Map<String, ByteArray>)
@@ -135,16 +139,28 @@ object OreMiner {
     )
 
     /**
-     * Affida a un esecutore: [amountPerSquare] su [squares] caselle a caso a
+     * Affida a un esecutore: [amountPerSquare] su ognuna delle [squares] a
      * ogni giro, finche' il [deposit] dura, [fee] all'esecutore per giro.
      */
-    fun automate(owner: ByteArray, amountPerSquare: Long, squares: Int, deposit: Long, fee: Long, reload: Boolean, maxProductionCost: Long, executor: ByteArray = OPEN_EXECUTOR): WalletTx.Instruction =
+    fun automate(owner: ByteArray, amountPerSquare: Long, squares: Collection<Int>, deposit: Long, fee: Long, reload: Boolean, maxProductionCost: Long, executor: ByteArray = OPEN_EXECUTOR): WalletTx.Instruction =
         WalletTx.Instruction(
             PROGRAM,
             listOf(signer(owner), w(automationPda(owner)), w(executor), w(minerPda(owner)), r(WalletTx.SYSTEM_PROGRAM)),
-            Ore.automateData(amountPerSquare, deposit, fee, squares.toLong(), Ore.STRATEGY_RANDOM, reload, maxProductionCost),
+            // Caselle fisse, scelte da noi: cosi' un giro costa sempre lo stesso e il deposito dura quanto detto.
+            Ore.automateData(amountPerSquare, deposit, fee, Ore.maskOf(squares).toLong(), Ore.STRATEGY_PREFERRED, reload, maxProductionCost),
             lamportsMoved = deposit,
         )
+
+    /**
+     * Ferma l'automazione e riprendi quello che resta: e' `Automate` con
+     * l'esecutore vuoto, che nel programma vuol dire chiudere il conto e
+     * restituire il saldo a chi firma.
+     */
+    fun stopAutomation(owner: ByteArray): WalletTx.Instruction = WalletTx.Instruction(
+        PROGRAM,
+        listOf(signer(owner), w(automationPda(owner)), w(ByteArray(32)), w(minerPda(owner)), r(WalletTx.SYSTEM_PROGRAM)),
+        Ore.automateData(0L, 0L, 0L, 0L, Ore.STRATEGY_RANDOM, reload = false),
+    )
 
     /**
      * Riscuoti: una transazione sola con quello che serve e niente di piu'.

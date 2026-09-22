@@ -481,6 +481,11 @@ object SessionActions {
     internal suspend fun closeBudgetInner(ctx: Context, owner: String): Pair<Boolean, String> {
         val s = SessionWallet.current(ctx) ?: return false to ctx.getString(R.string.trader_stop_nobudget)
         runCatching { AgentLinkService.revoke(ctx) }
+        // ORE prima di tutto: l'automazione si ferma e il suo resto torna nella
+        // paghetta, l'ORE scavato va al proprietario. Un errore qui ferma la
+        // chiusura come ogni altro passo, perche' chiudere con soldi fermi su
+        // un conto di un altro programma e' dimenticare la chiave con i soldi fuori.
+        runCatching { OreAgent.bringHome(ctx, owner) }.getOrDefault(null)?.let { return false to it }
         val stuck = runCatching { sellAllInner(ctx) }.getOrDefault(listOf("?"))
         if (stuck.isNotEmpty()) return false to ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
         val rent = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)

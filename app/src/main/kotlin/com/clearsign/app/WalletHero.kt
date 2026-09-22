@@ -96,6 +96,8 @@ internal fun WalletHero(
         curve = if (o == null || v == null) emptyList()
         else runCatching { BalanceCurve.of(ctx, o, v) }.getOrDefault(emptyList())
     }
+    var oreOpen by remember { mutableStateOf(false) }
+    if (oreOpen && owner != null) OreSheet(owner, signer) { changed -> oreOpen = false; if (changed) refreshKey++ }
     var picked by remember { mutableStateOf<Holding?>(null) }
     picked?.let { h ->
         if (owner != null) TokenSheet(
@@ -222,8 +224,10 @@ internal fun WalletHero(
                             if (view.defi.isNotEmpty()) {
                                 Spacer(Modifier.height(Space.xs))
                                 Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
-                                view.defi.forEach { d -> DefiRow(d) }
+                                view.defi.forEach { d -> DefiRow(d, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
                             }
+                            // Chi non scava ancora trova la porta qui, sotto le altre posizioni.
+                            if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
                         }
                     }
                 }
@@ -518,13 +522,19 @@ private fun BigTotal(total: Double, currency: String) {
  * it is over there, and it is working.
  */
 @Composable
-private fun DefiRow(d: DefiPosition) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        TokenLogo(d.symbol, d.symbol, d.image, 34.dp)
+private fun DefiRow(d: DefiPosition, onClick: (() -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().clip(rs(10)).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TokenLogo(if (d.kind == DefiPosition.Kind.ORE) com.clearsign.core.Ore.MINT else d.symbol, d.symbol, d.image, 34.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                stringResource(if (d.kind == DefiPosition.Kind.STAKE) R.string.hero_defi_stake else R.string.hero_defi_lend, d.symbol),
+                stringResource(
+                    when (d.kind) { DefiPosition.Kind.STAKE -> R.string.hero_defi_stake; DefiPosition.Kind.LEND -> R.string.hero_defi_lend; DefiPosition.Kind.ORE -> R.string.hero_defi_ore },
+                    d.symbol,
+                ),
                 fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, maxLines = 1,
             )
             Text(

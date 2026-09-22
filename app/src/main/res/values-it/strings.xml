@@ -522,6 +522,7 @@
     <string name="ore_hint_idle">Scava mette SOL sulle caselle che scegli. Riscuoti prende quello che una casella vincente ha pagato.</string>
     <string name="ore_round_ended_signing">Il giro è finito mentre firmavi. Non è partito niente. Scava di nuovo e tieni premuto subito dopo aver letto lo scontrino.</string>
     <string name="ore_done_receipt">Salvata negli Scontrini. Torna dopo il giro per riscuotere.</string>
+    <string name="ore_done_receipt_claim">Salvata negli Scontrini. L\'ORE adesso è nel portafoglio.</string>
     <string name="agent_ore_title">Scava ORE</string>
     <string name="agent_ore_sub">Affida una parte della paghetta a un esecutore che gioca la griglia ogni minuto. Stesso collare.</string>
     <string name="agent_ore_day">SOL al giorno, al massimo</string>

@@ -522,6 +522,7 @@
     <string name="ore_hint_idle">Dig puts SOL on squares you choose. Claim collects what a winning square paid.</string>
     <string name="ore_round_ended_signing">The round ended while you were signing. Nothing was sent. Dig again and hold right after reading the receipt.</string>
     <string name="ore_done_receipt">Saved in Receipts. Come back after the round to claim.</string>
+    <string name="ore_done_receipt_claim">Saved in Receipts. The ORE is in your wallet now.</string>
     <string name="agent_ore_title">Dig ORE</string>
     <string name="agent_ore_sub">Hands part of the budget to an executor that plays the grid every minute. Same collar.</string>
     <string name="agent_ore_day">SOL per day, at most</string>

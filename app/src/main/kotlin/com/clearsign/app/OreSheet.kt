@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -72,7 +71,7 @@ private sealed interface OreState {
     /** [dig] e' quanto per casella e quali caselle: alla firma il Deploy si ricostruisce sul giro di adesso. */
     data class Review(val analyzed: ReceiptEngine.Analyzed, val ixs: List<WalletTx.Instruction>, val kind: String, val dig: Pair<Long, Set<Int>>? = null) : OreState
     object Signing : OreState
-    data class Done(val signature: String, val what: String) : OreState
+    data class Done(val signature: String, val what: String, val dig: Boolean) : OreState
     data class Error(val message: String) : OreState
 }
 
@@ -134,8 +133,14 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
-        // Il foglio prende tutto lo schermo: l'intestazione sta sotto la barra di stato, non sotto l'orologio.
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Il foglio prende tutto lo schermo ed e' una finestra a parte, che si
+        // mangia i margini di sistema: `statusBarsPadding` qui vale zero. La
+        // barra di stato si misura dalle risorse, che non mentono.
+        val statusBar = with(androidx.compose.ui.platform.LocalDensity.current) {
+            val id = ctx.resources.getIdentifier("status_bar_height", "dimen", "android")
+            (if (id > 0) ctx.resources.getDimensionPixelSize(id) else 0).toDp()
+        }
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = statusBar).imePadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val v = view
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TokenLogo(Ore.MINT, "ORE", TokenSymbols.image(Ore.MINT), 40.dp)
@@ -278,7 +283,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         state = when (val res = WalletActions.signAndSend(ctx, signer, owner, ixs, log)) {
                                             is WalletActions.Result.Sent -> {
                                                 changed = true; digging = false; picked = emptySet(); refresh++
-                                                OreState.Done(res.signature, r.calls.joinToString(" · ") { it.method })
+                                                OreState.Done(res.signature, r.calls.joinToString(" · ") { it.method }, dig = s.dig != null)
                                             }
                                             is WalletActions.Result.Failed -> OreState.Error(explain(res.message))
                                         }
@@ -295,7 +300,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(s.what, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
                                     Text(s.signature, fontFamily = Mono, fontSize = 10.5.sp, color = Halo.muted, maxLines = 2)
-                                    Text(stringResource(R.string.ore_done_receipt), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
+                                    Text(stringResource(if (s.dig) R.string.ore_done_receipt else R.string.ore_done_receipt_claim), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

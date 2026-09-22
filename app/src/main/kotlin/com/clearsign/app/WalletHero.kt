@@ -221,14 +221,16 @@ internal fun WalletHero(
                                 LinkRow(if (showOthers) stringResource(R.string.hero_others_hide) else stringResource(R.string.hero_others, others.size)) { showOthers = !showOthers }
                                 if (showOthers) others.forEach { h -> HoldingRow(h, currency) { picked = h } }
                             }
-                            if (view.defi.isNotEmpty()) {
-                                Spacer(Modifier.height(Space.xs))
-                                Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
-                                view.defi.forEach { d -> DefiRow(d, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
-                            }
-                            // Chi non scava ancora trova la porta qui, sotto le altre posizioni.
-                            if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
                         }
+                        // Le posizioni DeFi stanno sempre in vista, fuori da «mostra tutto»:
+                        // sono poche e sono soldi, non spiccioli e NFT. Chi cerca ORE non
+                        // deve scavare per trovare Scava.
+                        if (view.defi.isNotEmpty()) {
+                            Spacer(Modifier.height(Space.xs))
+                            Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
+                            view.defi.forEach { d -> DefiRow(d, onClick = if (d.kind == DefiPosition.Kind.ORE) ({ oreOpen = true }) else null) }
+                        }
+                        if (view.defi.none { it.kind == DefiPosition.Kind.ORE }) LinkRow(stringResource(R.string.hero_ore_dig)) { oreOpen = true }
                     }
                 }
             }

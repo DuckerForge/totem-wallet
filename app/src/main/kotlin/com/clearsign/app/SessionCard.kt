@@ -237,11 +237,15 @@ internal fun AgentPulse(refresh: Int) {
     var beat by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(3_000); beat++ } }
 
-    val cfg = remember(refresh, beat) { TraderLoop.config(ctx) }
-    val mode = remember(refresh, beat) { SessionWallet.policy(ctx)?.mode }
-    val note = remember(refresh, beat) { TraderLoop.lastNote(ctx) }
-    val at = remember(refresh, beat) { TraderLoop.lastTickAt(ctx) }
-    val open = remember(refresh, beat) { Positions.open(ctx).size }
+    // Five reads, on IO, into one value. They used to run in composition on
+    // every beat: cheap each, but on the main thread and three times a minute.
+    var snap by remember { mutableStateOf(PulseSnap.read(ctx)) }
+    LaunchedEffect(refresh, beat) { snap = withContext(Dispatchers.IO) { PulseSnap.read(ctx) } }
+    val cfg = snap.cfg
+    val mode = snap.mode
+    val note = snap.note
+    val at = snap.at
+    val open = snap.open
 
     val paused = mode == AgentMode.OFF || mode == AgentMode.READ_ONLY
     // A note written by the loop as it stopped is the one thing worth shouting.
@@ -840,5 +844,12 @@ internal fun SliderRow(label: String, value: String, v: Float, range: ClosedFloa
             value = v, onValueChange = onChange, valueRange = range, steps = steps,
             colors = SliderDefaults.colors(thumbColor = tint, activeTrackColor = tint.copy(alpha = 0.7f), inactiveTrackColor = Halo.stroke),
         )
+    }
+}
+
+/** What the pulse row reads on each beat, all at once and off the main thread. */
+private data class PulseSnap(val cfg: TraderLoop.Config, val mode: AgentMode?, val note: String?, val at: Long, val open: Int) {
+    companion object {
+        fun read(ctx: android.content.Context) = PulseSnap(TraderLoop.config(ctx), SessionWallet.policy(ctx)?.mode, TraderLoop.lastNote(ctx), TraderLoop.lastTickAt(ctx), Positions.open(ctx).size)
     }
 }

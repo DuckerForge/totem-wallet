@@ -290,12 +290,28 @@ private fun Candles(
     onCursor: (Int?) -> Unit,
 ) {
     val tm = rememberTextMeasurer()
-    val axis = TextStyle(fontFamily = Mono, fontSize = 9.sp, color = Halo.muted)
-    val pill = TextStyle(fontFamily = Mono, fontSize = 9.sp, color = Halo.ground, fontWeight = FontWeight.Bold)
     val up = Halo.mint
     val down = Halo.red
-    val grid = Halo.muted.copy(alpha = 0.16f)
+    val mutedCol = Halo.muted
+    val groundCol = Halo.ground
+    val grid = mutedCol.copy(alpha = 0.16f)
     val ground = Halo.ground2
+    val axis = remember(mutedCol) { TextStyle(fontFamily = Mono, fontSize = 9.sp, color = mutedCol) }
+    val pill = remember(groundCol) { TextStyle(fontFamily = Mono, fontSize = 9.sp, color = groundCol, fontWeight = FontWeight.Bold) }
+    // The scale and the four axis labels change with the candles, not with
+    // the finger: computed once per list, not once per draw.
+    val scale = remember(candles) {
+        val lo = candles.minOf { it.low }
+        val hi = candles.maxOf { it.high }
+        val pad = ((hi - lo) * 0.06).takeIf { it > 0 } ?: (hi * 0.02).coerceAtLeast(1e-12)
+        val top = hi + pad
+        val bottom = (lo - pad).coerceAtLeast(0.0)
+        Triple(bottom, (top - bottom).takeIf { it > 0 } ?: 1.0, candles.maxOf { it.volume }.takeIf { it > 0 } ?: 1.0)
+    }
+    val axisLabels = remember(scale, fx, axis, tm) { (0..3).map { k -> tm.measure(fx.num(scale.first + scale.second * k / 3.0), axis) } }
+    val lastLabel = remember(candles, fx, pill, tm) { tm.measure(fx.num(candles.last().close), pill) }
+    val densityNow = androidx.compose.ui.platform.LocalDensity.current.density
+    val dash = remember(densityNow) { PathEffect.dashPathEffect(floatArrayOf(5f * densityNow, 4f * densityNow)) }
 
     Canvas(
         Modifier.fillMaxWidth().height(196.dp)
@@ -333,12 +349,8 @@ private fun Candles(
         val volH = if (hasVol) bodyH * 0.18f else 0f
         val priceH = bodyH - volH - (if (hasVol) 6.dp.toPx() else 0f)
 
-        val lo = candles.minOf { it.low }
-        val hi = candles.maxOf { it.high }
-        val pad = ((hi - lo) * 0.06).takeIf { it > 0 } ?: (hi * 0.02).coerceAtLeast(1e-12)
-        val top = hi + pad
-        val bottom = (lo - pad).coerceAtLeast(0.0)
-        val range = (top - bottom).takeIf { it > 0 } ?: 1.0
+        val bottom = scale.first
+        val range = scale.second
         fun y(v: Double) = (priceH - ((v - bottom) / range * priceH)).toFloat().coerceIn(0f, priceH)
         fun x(i: Int) = plotW * (i + 0.5f) / n
 
@@ -348,7 +360,7 @@ private fun Candles(
             val v = bottom + range * k / 3.0
             val gy = y(v)
             drawLine(grid, Offset(0f, gy), Offset(plotW, gy), strokeWidth = 1f)
-            val lay = tm.measure(fx.num(v), axis)
+            val lay = axisLabels[k]
             drawText(lay, topLeft = Offset(plotW + 5.dp.toPx(), (gy - lay.size.height / 2f).coerceIn(0f, priceH - lay.size.height)))
         }
 
@@ -375,7 +387,7 @@ private fun Candles(
         }
 
         if (hasVol) {
-            val maxV = candles.maxOf { it.volume }.takeIf { it > 0 } ?: 1.0
+            val maxV = scale.third
             val w = (slot * 0.66f).coerceAtMost(9.dp.toPx()).coerceAtLeast(1f)
             candles.forEachIndexed { i, c ->
                 val h = (c.volume / maxV * volH).toFloat()
@@ -388,10 +400,9 @@ private fun Candles(
         // Where it is now, written on the scale, so the last candle has a number
         // and not only a height.
         val lastY = y(candles.last().close)
-        val dash = PathEffect.dashPathEffect(floatArrayOf(5f * density, 4f * density))
         drawLine(tint.copy(alpha = 0.5f), Offset(0f, lastY), Offset(plotW, lastY), strokeWidth = 1f * density, pathEffect = dash)
         run {
-            val lay = tm.measure(fx.num(candles.last().close), pill)
+            val lay = lastLabel
             val px = plotW + 3.dp.toPx()
             val py = (lastY - lay.size.height / 2f - 2f * density).coerceIn(0f, priceH - lay.size.height)
             drawRoundRect(tint, Offset(px, py), Size(lay.size.width + 6f * density, lay.size.height + 4f * density), CornerRadius(3f * density))

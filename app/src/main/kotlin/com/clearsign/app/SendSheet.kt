@@ -236,11 +236,15 @@ internal fun SendSheet(
     // Address poisoning: the same ends as somebody you know, a different middle.
     // Known is what this wallet has a reason to trust: contacts, its own
     // accounts, the budget, and everyone it has already paid.
-    val known = remember(contacts) {
-        buildSet {
-            addAll(contacts.keys); add(owner)
-            SessionWallet.current(ctx)?.pubkey?.let { add(it) }
-            runCatching { Ledger.all(ctx) }.getOrDefault(emptyList()).filter { it.sent }.mapNotNull { it.primaryRecipient }.forEach { add(it) }
+    // The contacts at once; the budget and the ledger a moment later, on IO.
+    // The lookalike check runs again when they land.
+    val known by androidx.compose.runtime.produceState(contacts.keys + owner, contacts) {
+        value = withContext(Dispatchers.IO) {
+            buildSet {
+                addAll(contacts.keys); add(owner)
+                SessionWallet.current(ctx)?.pubkey?.let { add(it) }
+                runCatching { Ledger.all(ctx) }.getOrDefault(emptyList()).filter { it.sent }.mapNotNull { it.primaryRecipient }.forEach { add(it) }
+            }
         }
     }
     val lookalike = remember(to, known) { com.clearsign.core.AddressPoison.lookalike(to, known) }
@@ -520,7 +524,9 @@ internal fun SendSheet(
                         LaunchedEffect(s.signature) { prefillTo?.let { RocketX.attachSignature(ctx, it, s.signature) } }
                         // The proof: the receipt this phone just signed, as a QR for the person paid.
                         var showProof by remember { mutableStateOf(false) }
-                        val entry = remember(s.signature) { runCatching { Ledger.all(ctx).firstOrNull { it.signature == s.signature } }.getOrNull() }
+                        val entry = androidx.compose.runtime.produceState<LedgerEntry?>(null, s.signature) {
+                            value = withContext(Dispatchers.IO) { runCatching { Ledger.bySignature(ctx, s.signature) }.getOrNull() }
+                        }.value
                         if (entry?.attestationSig != null) {
                             GhostButton(stringResource(R.string.proof_show), Modifier.fillMaxWidth(), HIcon.SHIELD_LOCK, tint = Halo.mint) { showProof = true }
                             if (showProof) ProofSheet(entry) { showProof = false }

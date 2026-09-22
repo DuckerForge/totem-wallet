@@ -225,6 +225,14 @@ class MainActivity : ComponentActivity() {
         // Ma si legge **dopo il primo fotogramma** e su IO: erano due file JSON
         // letti sul thread principale prima di `setContent`, e lo splash restava
         // nero per tutto il tempo che ci mettevano, sempre di piu' col passare dei mesi.
+        // One image loader for every logo in the app, with a memory cache so a
+        // coin seen on one page is not fetched again on the next.
+        coil.Coil.setImageLoader {
+            coil.ImageLoader.Builder(this)
+                .memoryCache { coil.memory.MemoryCache.Builder(this).maxSizePercent(0.08).build() }
+                .crossfade(false)
+                .build()
+        }
         window.decorView.post {
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching { JupiterTokens.warmDisk(this@MainActivity) }

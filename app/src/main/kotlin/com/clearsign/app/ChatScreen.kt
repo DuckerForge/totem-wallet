@@ -172,7 +172,9 @@ internal fun ChatScreen(onClose: () -> Unit) {
                     }
                 }
             }
-            itemsIndexed(turns) { _, t -> TurnRow(t) }
+            // Turns only append, so the index is a stable key: a new answer
+            // does not remeasure the ones above it.
+            itemsIndexed(turns, key = { i, _ -> i }) { _, t -> TurnRow(t) }
             // The answer, as it arrives. The dots only while nothing has arrived yet.
             live?.let { l -> item { AssistantBubble(l, live = true) } }
             if (thinking && live == null) item { TypingDots() }
@@ -255,11 +257,14 @@ internal fun ChatScreen(onClose: () -> Unit) {
 private fun StatusStrip(open: Boolean, onToggle: () -> Unit) {
     val ctx = LocalContext.current
     var beat by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(3_000); beat++ } }
-    val cfg = remember(beat) { TraderLoop.config(ctx) }
-    val session = remember(beat) { SessionWallet.current(ctx) }
-    val mode = remember(beat) { SessionWallet.policy(ctx)?.mode }
-    val openCount = remember(beat) { Positions.open(ctx).size }
+    // Four reads of preferences and files every three seconds, on IO and into
+    // one value: the strip recomposes when something changed, not on the tick.
+    var snap by remember { mutableStateOf(StripSnap.read(ctx)) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(3_000); beat++; snap = withContext(Dispatchers.IO) { StripSnap.read(ctx) } } }
+    val cfg = snap.cfg
+    val session = snap.session
+    val mode = snap.mode
+    val openCount = snap.open
     var free by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(session?.pubkey, beat / 10) {
         val pub = session?.pubkey ?: return@LaunchedEffect
@@ -540,5 +545,12 @@ private fun TypingDots() {
             )
             Box(Modifier.size(7.dp).clip(rs(Radius.pill)).background(Halo.mint.copy(alpha = a)))
         }
+    }
+}
+
+/** What the status strip reads every three seconds, all at once and off the main thread. */
+private data class StripSnap(val cfg: TraderLoop.Config, val session: SessionWallet.Session?, val mode: AgentMode?, val open: Int) {
+    companion object {
+        fun read(ctx: android.content.Context) = StripSnap(TraderLoop.config(ctx), SessionWallet.current(ctx), SessionWallet.policy(ctx)?.mode, Positions.open(ctx).size)
     }
 }

@@ -27,6 +27,7 @@ object Market {
     private const val PAGE = 100
     private const val TTL_MS = 120_000L
 
+    @androidx.compose.runtime.Immutable
     data class Coin(
         val id: String,
         val symbol: String,

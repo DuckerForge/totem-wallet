@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.pow
 
 /** One holding, priced in the display currency when a price is known. */
+@androidx.compose.runtime.Immutable
 data class Holding(
     val mint: String, val symbol: String, val decimals: Int, val raw: Long, val fiat: Double?,
     val name: String? = null, val image: String? = null, val isNft: Boolean = false,
@@ -23,6 +24,7 @@ data class Holding(
  * account, a deposit in Jupiter Lend. Jupiter's wallet lists these under
  * DeFi; the token list alone would say you have less than you do.
  */
+@androidx.compose.runtime.Immutable
 data class DefiPosition(
     val kind: Kind, val label: String, val sub: String, val symbol: String, val ui: Double, val fiat: Double?,
     val image: String? = null, val state: String? = null,
@@ -45,6 +47,7 @@ data class DefiPosition(
 }
 
 /** The wallet's portfolio: total value in [currency] and the holdings behind it. */
+@androidx.compose.runtime.Immutable
 data class PortfolioView(
     val currency: String, val total: Double, val holdings: List<Holding>, val priced: Int, val unpriced: Int,
     val defi: List<DefiPosition> = emptyList(),

@@ -136,9 +136,12 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         // Il foglio prende tutto lo schermo ed e' una finestra a parte, che si
         // mangia i margini di sistema: `statusBarsPadding` qui vale zero. La
         // barra di stato si misura dalle risorse, che non mentono.
-        val statusBar = with(androidx.compose.ui.platform.LocalDensity.current) {
-            val id = ctx.resources.getIdentifier("status_bar_height", "dimen", "android")
-            (if (id > 0) ctx.resources.getDimensionPixelSize(id) else 0).toDp()
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val statusBar = remember(density) {
+            with(density) {
+                val id = ctx.resources.getIdentifier("status_bar_height", "dimen", "android")
+                (if (id > 0) ctx.resources.getDimensionPixelSize(id) else 0).toDp()
+            }
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = statusBar).imePadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val v = view

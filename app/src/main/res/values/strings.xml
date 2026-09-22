@@ -487,6 +487,11 @@
     <string name="hero_defi_ore">%1$s on the grid</string>
     <string name="hero_ore_dig">Dig ORE</string>
     <string name="ore_title">ORE</string>
+    <string name="ore_subtitle">The grid, one round a minute</string>
+    <string name="ore_round_n">Round %1$d</string>
+    <string name="ore_seconds">%1$d s</string>
+    <string name="ore_round_waiting_short">starts with the first deploy</string>
+    <string name="ore_round_between_short">between rounds</string>
     <string name="ore_sub">%1$s SOL in play · %2$s ORE to claim</string>
     <string name="ore_loading">reading the grid…</string>
     <string name="ore_unreachable">The chain did not answer. Try again in a moment.</string>
@@ -503,7 +508,7 @@
     <string name="ore_dig">Dig</string>
     <string name="ore_none">Nothing to claim yet.</string>
     <string name="ore_per_square">SOL per square</string>
-    <string name="ore_pick_squares">Tap the squares you want.</string>
+    <string name="ore_pick_squares">Tap the squares below</string>
     <string name="ore_total">%1$d squares at %2$s SOL make %3$s SOL.</string>
     <string name="ore_first_fee">Plus 10,000 lamports the first time.</string>
     <string name="ore_wager_note">It is a wager. The SOL can go to the other squares, and with little SOL the fees weigh.</string>
@@ -513,6 +518,9 @@
     <string name="ore_sent">Sent. The grid updates in a moment.</string>
     <string name="ore_stake_link">ORE also has staking, on ore.com.</string>
     <string name="ore_round_gone">This round is over. Go back and dig again on the next one.</string>
+    <string name="ore_hint_idle">Dig puts SOL on squares you choose. Claim collects what a winning square paid.</string>
+    <string name="ore_round_ended_signing">The round ended while you were signing. Nothing was sent. Dig again and hold right after reading the receipt.</string>
+    <string name="ore_done_receipt">Saved in Receipts. Come back after the round to claim.</string>
     <string name="agent_ore_title">Dig ORE</string>
     <string name="agent_ore_sub">Hands part of the budget to an executor that plays the grid every minute. Same collar.</string>
     <string name="agent_ore_day">SOL per day, at most</string>

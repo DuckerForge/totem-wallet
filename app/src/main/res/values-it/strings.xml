@@ -487,6 +487,11 @@
     <string name="hero_defi_ore">%1$s sulla griglia</string>
     <string name="hero_ore_dig">Scava ORE</string>
     <string name="ore_title">ORE</string>
+    <string name="ore_subtitle">La griglia, un giro al minuto</string>
+    <string name="ore_round_n">Giro %1$d</string>
+    <string name="ore_seconds">%1$d s</string>
+    <string name="ore_round_waiting_short">parte col primo che mette</string>
+    <string name="ore_round_between_short">fra un giro e l\'altro</string>
     <string name="ore_sub">%1$s SOL in gioco · %2$s ORE da riscuotere</string>
     <string name="ore_loading">leggo la griglia…</string>
     <string name="ore_unreachable">La catena non ha risposto. Riprova fra un momento.</string>
@@ -503,7 +508,7 @@
     <string name="ore_dig">Scava</string>
     <string name="ore_none">Niente da riscuotere ancora.</string>
     <string name="ore_per_square">SOL per casella</string>
-    <string name="ore_pick_squares">Tocca le caselle che vuoi.</string>
+    <string name="ore_pick_squares">Tocca le caselle qui sotto</string>
     <string name="ore_total">%1$d caselle a %2$s SOL fanno %3$s SOL.</string>
     <string name="ore_first_fee">Più 10.000 lamport la prima volta.</string>
     <string name="ore_wager_note">È una scommessa. Il SOL può andare alle altre caselle, e con poco SOL le fee pesano.</string>
@@ -513,6 +518,9 @@
     <string name="ore_sent">Inviata. La griglia si aggiorna fra un momento.</string>
     <string name="ore_stake_link">ORE ha anche uno staking, su ore.com.</string>
     <string name="ore_round_gone">Questo giro è finito. Torna indietro e scava di nuovo su quello dopo.</string>
+    <string name="ore_hint_idle">Scava mette SOL sulle caselle che scegli. Riscuoti prende quello che una casella vincente ha pagato.</string>
+    <string name="ore_round_ended_signing">Il giro è finito mentre firmavi. Non è partito niente. Scava di nuovo e tieni premuto subito dopo aver letto lo scontrino.</string>
+    <string name="ore_done_receipt">Salvata negli Scontrini. Torna dopo il giro per riscuotere.</string>
     <string name="agent_ore_title">Scava ORE</string>
     <string name="agent_ore_sub">Affida una parte della paghetta a un esecutore che gioca la griglia ogni minuto. Stesso collare.</string>
     <string name="agent_ore_day">SOL al giorno, al massimo</string>

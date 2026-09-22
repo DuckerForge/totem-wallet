@@ -51,8 +51,8 @@ object OreMiner {
         val mySquares: List<Int> get() = if (miner != null && miner.roundId == board.roundId) miner.squaresNow else emptyList()
         /** Quanto manca alla fine del giro, adesso, senza chiedere altro alla catena. */
         fun secondsLeft(now: Long = System.currentTimeMillis()): Double = (board.secondsLeft(slot) - (now - at) / 1000.0).coerceAtLeast(0.0)
-        /** Fra un giro e l'altro non si puo' mettere niente: il Deploy fallirebbe sul nodo. */
-        fun open(now: Long = System.currentTimeMillis()): Boolean = board.waiting || secondsLeft(now) > 5.0
+        /** Fra un giro e l'altro non si puo' mettere niente: il Deploy fallirebbe sul nodo. [margin] e' quanto deve restare. */
+        fun open(now: Long = System.currentTimeMillis(), margin: Double = 5.0): Boolean = board.waiting || secondsLeft(now) > margin
     }
 
     /** Bloccante: chiamare su IO. Null quando la catena non ha risposto. */

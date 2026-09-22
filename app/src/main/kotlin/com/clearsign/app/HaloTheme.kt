@@ -423,6 +423,9 @@ object HaloType {
 
     /** Addresses, signatures, anything meant to be compared character by character. */
     val code: TextStyle get() = TextStyle(fontFamily = Mono, fontSize = 13.sp, lineHeight = 19.sp)
+
+    /** Un importo o un indirizzo dentro una riga: piu' piccolo di `code`, tabulare. */
+    val mono: TextStyle get() = TextStyle(fontFamily = Mono, fontSize = 12.sp, lineHeight = 16.sp, fontFeatureSettings = "tnum")
 }
 
 /**

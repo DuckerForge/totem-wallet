@@ -427,8 +427,6 @@ internal fun PnlSheet(onDismiss: () -> Unit) {
     }
 }
 
-/** The navigation bar inset, spelled once instead of in every sheet. */
-private fun Modifier.navigationBarsPadding(): Modifier = this.then(Modifier)
 
 /** Wallet health, reachable from the home without turning the home into a dashboard. */
 @Composable

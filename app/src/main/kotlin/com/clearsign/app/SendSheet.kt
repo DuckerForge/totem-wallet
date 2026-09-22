@@ -686,45 +686,9 @@ internal fun SmallChip(
     icon: HIcon?,
     tint: Color = Halo.cyan,
     onLongClick: (() -> Unit)? = null,
-    /**
-     * Blink three times on arrival, in blue.
-     *
-     * For the one chip whose second gesture is invisible: you can hold it to
-     * change it, and nothing on a flat rectangle says so. Three pulses and then
-     * still, because an affordance that keeps flashing is an advert.
-     */
     pulse: Boolean = false,
     onClick: () -> Unit,
-) {
-    val beat = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(pulse) {
-        if (!pulse) return@LaunchedEffect
-        kotlinx.coroutines.delay(400)
-        beat.animateTo(
-            1f,
-            androidx.compose.animation.core.repeatable(
-                6, androidx.compose.animation.core.tween(320),
-                androidx.compose.animation.core.RepeatMode.Reverse,
-            ),
-        )
-        beat.snapTo(0f)
-    }
-    val lit = Halo.cyan.copy(alpha = 0.55f * beat.value)
-    Row(
-        Modifier.clip(rs(10))
-            .background(tint.copy(alpha = 0.10f + 0.18f * beat.value))
-            .border(1.dp, if (beat.value > 0.01f) lit else tint.copy(alpha = 0.45f), rs(10))
-            .then(
-                if (onLongClick == null) Modifier.clickable { onClick() }
-                else Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            )
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) { HaloIcon(icon, tint, 14.dp); Spacer(Modifier.width(6.dp)) }
-        Text(label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = tint)
-    }
-}
+) = HaloChip(label, icon, tint, pulse = pulse, onLongClick = onLongClick, onClick = onClick)
 
 @Composable
 private fun fieldColors(border: Color) = OutlinedTextFieldDefaults.colors(

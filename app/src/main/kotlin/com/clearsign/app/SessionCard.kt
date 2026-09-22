@@ -66,22 +66,8 @@ import kotlinx.coroutines.withContext
  * all back. Everything the collar decides shows up here and in the ledger.
  */
 @Composable
-internal fun ModeChip(label: String, on: Boolean, tint: Color, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier.clip(rs(12)).background(if (on) tint.copy(alpha = 0.16f) else Halo.cardSoft).border(1.dp, if (on) tint else Halo.stroke, rs(12))
-            .clickable { onClick() }.padding(vertical = 9.dp, horizontal = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Centred and told not to wrap. Left to itself a label wider than its
-        // chip is clipped on the right, and a word missing its last character
-        // does not read as clipped: it reads as crooked.
-        Text(
-            label, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp,
-            color = if (on) tint else Halo.muted, maxLines = 1, softWrap = false,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-    }
-}
+internal fun ModeChip(label: String, on: Boolean, tint: Color, modifier: Modifier, onClick: () -> Unit) =
+    HaloChip(label, tint = if (on) tint else Halo.muted, selected = on, modifier = modifier, fillWidth = true, onClick = onClick)
 
 private fun symbolOf(mint: String): String = when (mint) {
     NATIVE_SOL_MINT, AgentPolicy.WSOL -> "SOL"

@@ -1125,6 +1125,8 @@
     <string name="home_act_agent">Agent</string>
     <string name="home_act_more">More</string>
     <string name="home_act_more_sub">Everything that is not on the front page.</string>
+    <string name="more_health">Wallet health</string>
+    <string name="more_contacts">Trusted contacts</string>
     <string name="home_agent_hdr">THE AGENT</string>
     <string name="home_agent_off">No agent yet. It can only ask; every move still needs your fingerprint.</string>
     <string name="env_limits_note">It signs on its own up to %1$s SOL a move and %2$s SOL a day. Above that it asks you, and you sign with your fingerprint.</string>

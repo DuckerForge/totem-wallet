@@ -68,7 +68,8 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
         withContext(Dispatchers.IO) {
             val p = pool ?: runCatching { Gecko.topPool(mint) }.getOrNull()
             pool = p
-            series = if (p == null) emptyList() else runCatching { Gecko.closes(p, span) }.getOrElse { emptyList() }
+            // Col mint, non senza: in una pool ci sono due monete e questa e' quella chiesta.
+            series = if (p == null) emptyList() else runCatching { Gecko.closes(p, span, mint) }.getOrElse { emptyList() }
         }
         loading = false
     }

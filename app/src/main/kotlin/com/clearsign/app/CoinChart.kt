@@ -75,6 +75,11 @@ import kotlin.math.max
 @Composable
 internal fun CoinChart(coin: Market.Coin, mint: String?) {
     val ctx = LocalContext.current
+    // Il grafico e' in dollari perche' la fonte risponde in dollari. Qui si
+    // converte quello che si scrive, scala compresa: una moneta letta in euro
+    // non puo' avere l'asse in dollari, o la riga sotto il dito dice un numero
+    // che non sta da nessuna parte.
+    val fx = rememberFx()
     var span by remember(coin.key) { mutableStateOf(Gecko.Span.HOURS) }
     var candles by remember(coin.key) { mutableStateOf<List<Gecko.Candle>>(emptyList()) }
     var loading by remember(coin.key) { mutableStateOf(true) }
@@ -136,7 +141,14 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                (last ?: coin.priceUsd)?.let { fmtPrice(it, "USD") } ?: stringResource(R.string.market_no_price),
+                                // Il prezzo di mercato prima della candela: la
+                                // candela e' di una pool sola e puo' essere
+                                // vecchia di un'ora, il prezzo in cima e' lo
+                                // stesso che la riga dietro questa scheda ha
+                                // appena mostrato. Due numeri diversi per la
+                                // stessa moneta sullo stesso schermo sono un
+                                // errore, anche quando tutti e due sono veri.
+                                (coin.priceUsd ?: last)?.let { fx.price(it) } ?: stringResource(R.string.market_no_price),
                                 fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 21.sp, color = Halo.ink, maxLines = 1,
                             )
                             if (pct != null) {
@@ -160,13 +172,13 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
                         Text(
                             stringResource(
                                 R.string.chart_ohlc,
-                                axisNum(at.open), axisNum(at.high), axisNum(at.low), axisNum(at.close),
+                                fx.num(at.open), fx.num(at.high), fx.num(at.low), fx.num(at.close),
                             ),
                             fontFamily = Mono, fontSize = 10.5.sp, color = Halo.muted, style = Tabular, maxLines = 1,
                         )
                         if (at.volume > 0) {
                             Text(
-                                stringResource(R.string.chart_vol_at, fmtCap(at.volume)),
+                                stringResource(R.string.chart_vol_at, fx.cap(at.volume)),
                                 fontFamily = Mono, fontSize = 10.5.sp, color = Halo.cyan, style = Tabular, maxLines = 1,
                             )
                         }
@@ -175,7 +187,7 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
             }
 
             when {
-                candles.size >= 2 -> Candles(candles, tint, cursor, span) { cursor = it }
+                candles.size >= 2 -> Candles(candles, tint, cursor, span, fx) { cursor = it }
                 loading -> Box(Modifier.fillMaxWidth().height(196.dp))
                 else -> Text(stringResource(R.string.chart_none), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
             }
@@ -204,18 +216,18 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
             val p = pool
             val stats = buildList {
                 if (p != null) {
-                    p.liquidityUsd?.let { add(Triple(stringResource(R.string.chart_liquidity), fmtCap(it), Halo.ink)) }
-                    p.volume24Usd?.let { add(Triple(stringResource(R.string.chart_volume24), fmtCap(it), Halo.ink)) }
+                    p.liquidityUsd?.let { add(Triple(stringResource(R.string.chart_liquidity), fx.cap(it), Halo.ink)) }
+                    p.volume24Usd?.let { add(Triple(stringResource(R.string.chart_volume24), fx.cap(it), Halo.ink)) }
                     if (p.buys24 != null && p.sells24 != null) {
                         add(Triple(stringResource(R.string.chart_trades24), "${p.buys24} / ${p.sells24}", Halo.ink))
                     }
                     (coin.marketCap ?: p.fdvUsd)?.let {
-                        add(Triple(stringResource(if (coin.marketCap != null) R.string.chart_mcap else R.string.chart_fdv), fmtCap(it), Halo.ink))
+                        add(Triple(stringResource(if (coin.marketCap != null) R.string.chart_mcap else R.string.chart_fdv), fx.cap(it), Halo.ink))
                     }
                     p.dex?.let { add(Triple(stringResource(R.string.chart_dex), it.replaceFirstChar { c -> c.uppercase() }, Halo.muted)) }
                 } else {
-                    coin.marketCap?.let { add(Triple(stringResource(R.string.chart_mcap), fmtCap(it), Halo.ink)) }
-                    coin.volume24h?.let { add(Triple(stringResource(R.string.chart_volume24), fmtCap(it), Halo.ink)) }
+                    coin.marketCap?.let { add(Triple(stringResource(R.string.chart_mcap), fx.cap(it), Halo.ink)) }
+                    coin.volume24h?.let { add(Triple(stringResource(R.string.chart_volume24), fx.cap(it), Halo.ink)) }
                 }
             }
             if (stats.isNotEmpty()) {
@@ -237,12 +249,19 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
             // The whole thing, at the place that does nothing else. We draw what
             // fits in a wallet; depth, holders and every pool are a website's
             // job, and pretending otherwise would mean shipping a browser.
-            val url = p?.let { "https://www.dextools.io/app/en/solana/pair-explorer/${it.id}" }
+            //
+            // Il sito e' quello da cui arriva il numero, non quello piu' famoso.
+            // L'identificativo della pool ce lo da' GeckoTerminal; infilarlo
+            // nell'indirizzo di DexTools voleva dire chiedere a un altro sito di
+            // riconoscere un codice di casa d'altri, e quando non lo riconosce
+            // non risponde "non lo trovo", apre qualcosa. Cosi' il link apre
+            // esattamente la pool disegnata qui sopra.
+            val url = p?.let { "https://www.geckoterminal.com/solana/pools/${it.id}" }
                 ?: coin.id.takeIf { it != mint && it != coin.mint }?.let { "https://www.coingecko.com/en/coins/$it" }
             if (url != null) {
                 Row {
                     SmallChip(
-                        stringResource(R.string.chart_open_on, if (p != null) "DexTools" else "CoinGecko"),
+                        stringResource(R.string.chart_open_on, if (p != null) "GeckoTerminal" else "CoinGecko"),
                         HIcon.EXTERNAL, tint = Halo.cyan,
                     ) {
                         runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
@@ -267,6 +286,7 @@ private fun Candles(
     tint: Color,
     cursor: Int?,
     span: Gecko.Span,
+    fx: Fx,
     onCursor: (Int?) -> Unit,
 ) {
     val tm = rememberTextMeasurer()
@@ -328,7 +348,7 @@ private fun Candles(
             val v = bottom + range * k / 3.0
             val gy = y(v)
             drawLine(grid, Offset(0f, gy), Offset(plotW, gy), strokeWidth = 1f)
-            val lay = tm.measure(axisNum(v), axis)
+            val lay = tm.measure(fx.num(v), axis)
             drawText(lay, topLeft = Offset(plotW + 5.dp.toPx(), (gy - lay.size.height / 2f).coerceIn(0f, priceH - lay.size.height)))
         }
 
@@ -371,7 +391,7 @@ private fun Candles(
         val dash = PathEffect.dashPathEffect(floatArrayOf(5f * density, 4f * density))
         drawLine(tint.copy(alpha = 0.5f), Offset(0f, lastY), Offset(plotW, lastY), strokeWidth = 1f * density, pathEffect = dash)
         run {
-            val lay = tm.measure(axisNum(candles.last().close), pill)
+            val lay = tm.measure(fx.num(candles.last().close), pill)
             val px = plotW + 3.dp.toPx()
             val py = (lastY - lay.size.height / 2f - 2f * density).coerceIn(0f, priceH - lay.size.height)
             drawRoundRect(tint, Offset(px, py), Size(lay.size.width + 6f * density, lay.size.height + 4f * density), CornerRadius(3f * density))
@@ -400,7 +420,7 @@ private fun Candles(
             drawLine(Halo.ink.copy(alpha = 0.45f), Offset(0f, cy), Offset(plotW, cy), strokeWidth = 1f * density, pathEffect = dash)
             drawCircle(Halo.ink, 3f * density, Offset(cx, cy))
 
-            val lay = tm.measure(axisNum(c.close), pill)
+            val lay = tm.measure(fx.num(c.close), pill)
             val py = (cy - lay.size.height / 2f - 2f * density).coerceIn(0f, priceH - lay.size.height)
             drawRoundRect(Halo.ink, Offset(plotW + 3.dp.toPx(), py), Size(lay.size.width + 6f * density, lay.size.height + 4f * density), CornerRadius(3f * density))
             drawText(lay, topLeft = Offset(plotW + 3.dp.toPx() + 3f * density, py + 2f * density))
@@ -423,7 +443,7 @@ private fun Candles(
 private val AXIS_W = 58.dp
 
 /** A number for the scale: as many decimals as the price needs, and no currency on it. */
-private fun axisNum(v: Double): String {
+internal fun axisNum(v: Double): String {
     val decimals = when {
         v >= 1000 -> 0
         v >= 1 -> 2

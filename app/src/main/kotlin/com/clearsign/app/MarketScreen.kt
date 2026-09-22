@@ -77,13 +77,8 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     val keys = remember(refresh) { Watchlist.reconcile(ctx); Watchlist.all(ctx) }
     var unfollow by remember { mutableStateOf<Market.Coin?>(null) }
     val currency by Settings.currency
-    // USD to the person's currency, for one total across favourites and wallet.
-    var rate by remember { mutableStateOf<Double?>(null) }
-    LaunchedEffect(currency) {
-        rate = if (currency == "USD") 1.0 else withContext(Dispatchers.IO) {
-            runCatching { FiatRates.spot(listOf("USD", currency)) }.getOrNull()?.let { m -> m[currency]?.div(m["USD"] ?: return@let null) }
-        }
-    }
+    // Il mercato risponde in dollari; qui si legge nella valuta scelta.
+    val fx = rememberFx()
 
     LaunchedEffect(refresh) {
         ranked = withContext(Dispatchers.IO) { runCatching { Market.top() }.getOrDefault(emptyList()) }
@@ -184,7 +179,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             item { SectionLabel(stringResource(R.string.market_watching)) }
             items(followed, key = { "w-" + it.key }) { c ->
                 // Following is one tap; unfollowing asks, because it takes the amount with it.
-                CoinRow(c, followed = true, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) { unfollow = c }
+                CoinRow(c, fx, followed = true, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) { unfollow = c }
             }
             item {
                 // What the favourites are worth, what the wallet is worth, and the two together.
@@ -193,9 +188,10 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 if (favUsd > 0 || (wallet ?: 0.0) > 0) {
                     GlassCard {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row { Text(stringResource(R.string.market_total_followed), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fmtFiat(favUsd, "USD"), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) }
+                            Row { Text(stringResource(R.string.market_total_followed), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fx.fiat(favUsd), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) }
                             wallet?.let { w -> Row { Text(stringResource(R.string.market_total_wallet), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f)); Text(fmtFiat(w, currency), fontFamily = Mono, fontSize = 13.sp, color = Halo.ink, style = Tabular) } }
-                            val r = rate
+                            // La somma si fa solo quando le due meta' sono nella stessa unita'.
+                            val r = fx.rate.takeIf { fx.cur == currency }
                             if (r != null) {
                                 val all = favUsd * r + (wallet ?: 0.0)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -239,7 +235,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         items(shown, key = { "r-" + it.id }) { c ->
             // The star says the truth here too: lit when the coin is already followed.
             val isFollowed = c.key in keys
-            CoinRow(c, followed = isFollowed, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) {
+            CoinRow(c, fx, followed = isFollowed, amount = Watchlist.amount(ctx, c.key), onOpen = { editing = c }) {
                 if (isFollowed) unfollow = c else { Watchlist.add(ctx, c.key); Haptics.tick(ctx); refresh++ }
             }
         }
@@ -286,7 +282,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
  * grows a hundredfold, and this is not a forecast.
  */
 @Composable
-private fun WhatIf(coin: Market.Coin, amount: Double) {
+private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
     val mine = coin.marketCap ?: return
     if (mine <= 0) return
     val price = coin.priceUsd ?: return
@@ -328,7 +324,7 @@ private fun WhatIf(coin: Market.Coin, amount: Double) {
         Text(stringResource(R.string.whatif_title), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
         SmallChip(stringResource(R.string.whatif_pick), HIcon.SEARCH, tint = Halo.cyan) { picking = !picking }
     }
-    Text(stringResource(R.string.whatif_mine, fmtCap(mine)), style = HaloType.small, color = Halo.muted)
+    Text(stringResource(R.string.whatif_mine, fx.cap(mine)), style = HaloType.small, color = Halo.muted)
 
     if (picking) {
         OutlinedTextField(
@@ -382,12 +378,12 @@ private fun WhatIf(coin: Market.Coin, amount: Double) {
             Column(Modifier.weight(1f)) {
                 label?.let { Text(it, fontFamily = Mono, fontSize = 10.sp, color = Halo.cyan) }
                 Text(
-                    if (open) stringResource(R.string.whatif_row_open, t.symbol, fmtCap(cap))
-                    else stringResource(R.string.whatif_row_mc, t.symbol, fmtCap(cap), fmtPrice(price * mult, "USD")),
+                    if (open) stringResource(R.string.whatif_row_open, t.symbol, fx.cap(cap))
+                    else stringResource(R.string.whatif_row_mc, t.symbol, fx.cap(cap), fx.price(price * mult)),
                     fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, maxLines = 2,
                 )
                 if (amount > 0 && !open) {
-                    Text(stringResource(R.string.whatif_yours, fmtFiat(amount * price * mult, "USD")), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint)
+                    Text(stringResource(R.string.whatif_yours, fx.fiat(amount * price * mult)), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint)
                 }
             }
             Text(multText, fontFamily = Mono, fontSize = 13.sp, color = if (mult >= 1) Halo.cyan else Halo.red)
@@ -401,16 +397,16 @@ private fun WhatIf(coin: Market.Coin, amount: Double) {
         if (open) {
             Spacer(Modifier.height(6.dp))
             Text(
-                fmtPrice(price * mult, "USD"),
+                fx.price(price * mult),
                 fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 30.sp, color = Halo.ink,
             )
             Text(
-                stringResource(R.string.whatif_open_sub, fmtPrice(price, "USD"), multText),
+                stringResource(R.string.whatif_open_sub, fx.price(price), multText),
                 fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted,
             )
             if (amount > 0) {
                 Text(
-                    stringResource(R.string.whatif_yours, fmtFiat(amount * price * mult, "USD")),
+                    stringResource(R.string.whatif_yours, fx.fiat(amount * price * mult)),
                     fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Halo.mint,
                 )
             }
@@ -425,12 +421,19 @@ private fun WhatIf(coin: Market.Coin, amount: Double) {
 }
 
 /** A market cap in three characters and a unit: 1,2 Mld$, 340 M$, 52 k$. */
-internal fun fmtCap(v: Double): String = when {
-    v >= 1e12 -> String.format(java.util.Locale.getDefault(), "%.2f T$", v / 1e12)
-    v >= 1e9 -> String.format(java.util.Locale.getDefault(), "%.1f Mld$", v / 1e9)
-    v >= 1e6 -> String.format(java.util.Locale.getDefault(), "%.0f M$", v / 1e6)
-    v >= 1e3 -> String.format(java.util.Locale.getDefault(), "%.0f k$", v / 1e3)
-    else -> String.format(java.util.Locale.getDefault(), "%.0f $", v)
+internal fun fmtCap(v: Double, cur: String = "USD"): String {
+    // Il simbolo sta attaccato alla scala quando e' un segno ("128 k$", "128 k€")
+    // e staccato quando e' una parola, perche' "128 kSOL" non si legge.
+    val sym = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)
+    fun s(scale: String) = if (sym.length > 1) "$scale $sym" else "$scale$sym"
+    val l = java.util.Locale.getDefault()
+    return when {
+        v >= 1e12 -> String.format(l, "%.2f " + s("T"), v / 1e12)
+        v >= 1e9 -> String.format(l, "%.1f " + s("Mld"), v / 1e9)
+        v >= 1e6 -> String.format(l, "%.0f " + s("M"), v / 1e6)
+        v >= 1e3 -> String.format(l, "%.0f " + s("k"), v / 1e3)
+        else -> String.format(l, "%.0f " + sym, v)
+    }
 }
 
 /** A coin we follow by mint but that the ranked page does not carry. */
@@ -459,7 +462,7 @@ private fun SectionLabel(text: String) {
  * for.
  */
 @Composable
-private fun CoinRow(c: Market.Coin, followed: Boolean, amount: Double, onOpen: () -> Unit, onStar: () -> Unit) {
+private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, onOpen: () -> Unit, onStar: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(rs(12)).clickable(onClick = onOpen).padding(vertical = 8.dp, horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -471,13 +474,20 @@ private fun CoinRow(c: Market.Coin, followed: Boolean, amount: Double, onOpen: (
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(c.name, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, maxLines = 1)
-            val mine = amount.takeIf { it > 0 }?.let { fmtUi(it) + " " + c.symbol }
-            val sub = mine ?: (c.symbol + (c.marketCap?.takeIf { it > 0 }?.let { " · " + fmtCap(it) } ?: ""))
+            // Quanto ne hai, e quanto vale adesso. La quantita' da sola non e'
+            // la risposta alla domanda per cui uno la scrive: chi digita
+            // "millecinquecento" vuole sapere quanto fanno, e il prezzo a
+            // destra e' il prezzo di una moneta, non della sua parte. La
+            // moltiplicazione e' qui, sulla riga, non solo nel totale in fondo.
+            val mine = amount.takeIf { it > 0 }?.let { amt ->
+                fmtUi(amt) + " " + c.symbol + (c.priceUsd?.let { " · " + fx.fiat(amt * it) } ?: "")
+            }
+            val sub = mine ?: (c.symbol + (c.marketCap?.takeIf { it > 0 }?.let { " · " + fx.cap(it) } ?: ""))
             Text(sub, fontFamily = Inter, fontSize = 11.sp, color = if (mine != null) Halo.mint else Halo.muted, maxLines = 1)
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                c.priceUsd?.let { fmtPrice(it, "USD") } ?: stringResource(R.string.market_no_price),
+                c.priceUsd?.let { fx.price(it) } ?: stringResource(R.string.market_no_price),
                 fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.5.sp,
                 color = if (c.priceUsd != null) Halo.ink else Halo.muted,
             )
@@ -503,6 +513,7 @@ private fun CoinRow(c: Market.Coin, followed: Boolean, amount: Double, onOpen: (
 private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String?, onBuy: (String) -> Unit, onSaved: () -> Unit, onDismiss: () -> Unit) {
 
     val ctx = LocalContext.current
+    val fx = rememberFx()
     var qty by remember(coin.key) { mutableStateOf(Watchlist.amount(ctx, coin.key).takeIf { it > 0 }?.let { fmtUi(it) } ?: "") }
     var mint by remember(coin.key) { mutableStateOf(coin.mint) }
     var looking by remember(coin.key) { mutableStateOf(coin.mint == null) }
@@ -513,6 +524,28 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
         mint = withContext(Dispatchers.IO) { runCatching { Market.mintOf(coin.id) }.getOrNull() }
         looking = false
     }
+
+    // Il prezzo, quando la lista non ce l'aveva.
+    //
+    // La riga arriva senza prezzo ogni volta che il listino e Jupiter tacciono
+    // insieme, e da li' in poi la scheda non poteva piu' fare la moltiplicazione:
+    // scrivevi quanto ne hai e sotto non compariva niente, che e' l'unica cosa
+    // per cui uno quel numero lo scrive. Aperta la scheda, una domanda sola alla
+    // fonte giusta - il listino per una moneta di un'altra catena, Jupiter per un
+    // mint - e la cifra torna.
+    var price by remember(coin.key) { mutableStateOf(coin.priceUsd) }
+    LaunchedEffect(coin.key, mint) {
+        if (price != null) return@LaunchedEffect
+        val m = mint
+        price = withContext(Dispatchers.IO) {
+            runCatching {
+                if (m != null) JupiterTokens.byMints(listOf(m))[m]?.usd else Market.byId(coin.id)?.priceUsd
+            }.getOrNull()
+        }
+    }
+
+    // La stessa moneta col prezzo ritrovato, per tutto quello che sotto ci fa i conti.
+    val priced = if (price != null && coin.priceUsd == null) coin.copy(priceUsd = price) else coin
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -533,8 +566,8 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                         style = HaloType.small, color = Halo.muted,
                     )
                 }
-                coin.priceUsd?.let {
-                    Text(fmtPrice(it, "USD"), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink)
+                price?.let {
+                    Text(fx.price(it), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink)
                 }
                 Spacer(Modifier.width(10.dp))
                 // The star was missing here, so opening a coin you already follow
@@ -564,9 +597,9 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 colors = pickerField(), shape = rs(12),
             )
-            val worth = (qty.toDoubleOrNull() ?: 0.0) * (coin.priceUsd ?: 0.0)
+            val worth = (qty.toDoubleOrNull() ?: 0.0) * (price ?: 0.0)
             if (worth > 0) {
-                Text(stringResource(R.string.market_qty_worth, fmtFiat(worth, "USD")), style = HaloType.body, color = Halo.mint)
+                Text(stringResource(R.string.market_qty_worth, fx.fiat(worth)), style = HaloType.body, color = Halo.mint)
             }
 
             PrimaryButton(stringResource(R.string.market_qty_save), danger = false) {
@@ -596,23 +629,23 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
             // The shape of the price. A coin that lives on Solana is drawn from
             // its busiest pool, with the depth under it; everything else is drawn
             // from the market, so bitcoin has a chart here too instead of a gap.
-            CoinChart(coin, mint)
+            CoinChart(priced, mint)
             // Who can do what to the coin. Only a mint has an authority to check.
             mint?.let { ShieldCard(it, coin.symbol) }
 
             // What if it were as big as something else. Arithmetic, not a forecast.
-            WhatIf(coin, qty.toDoubleOrNull() ?: 0.0)
+            WhatIf(priced, qty.toDoubleOrNull() ?: 0.0, fx)
 
             // Buy it cheaper, buy it a slice at a time, or be told: all three need
             // the mint and a price, and the first two need the Seed Vault.
             val m = mint
-            if (m != null && coin.priceUsd != null) {
+            if (m != null && price != null) {
                 var limit by remember { mutableStateOf(false) }
                 var dca by remember { mutableStateOf(false) }
                 var alert by remember { mutableStateOf(false) }
                 var decimals by remember(m) { mutableStateOf<Int?>(null) }
                 LaunchedEffect(m) { decimals = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(m))[m]?.decimals }.getOrNull() } }
-                val oc = OrderCoin(m, coin.symbol, decimals ?: 6, coin.image, coin.priceUsd)
+                val oc = OrderCoin(m, coin.symbol, decimals ?: 6, coin.image, price)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (signer != null && owner != null) {
                         SmallChip(stringResource(R.string.order_limit), HIcon.HOURGLASS, tint = Halo.cyan) { limit = true }

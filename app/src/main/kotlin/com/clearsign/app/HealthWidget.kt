@@ -91,13 +91,15 @@ class HealthWidget : GlanceAppWidget() {
         }
         val open = androidx.glance.appwidget.action.actionStartActivity(Intent(ctx, MainActivity::class.java))
 
+        // On the card colour, not the page's: a launcher is dark too, and the
+        // widget used to melt into it. The ring carries the brand gradient.
         Column(
-            GlanceModifier.fillMaxSize().background(p.ground).cornerRadius(22.dp)
+            GlanceModifier.fillMaxSize().background(p.ground2).cornerRadius(22.dp)
                 .padding(if (roomy) 12.dp else 8.dp).clickable(open),
         ) {
             Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
                 Image(
-                    provider = ImageProvider(ring(d?.score, tint, p.stroke, p.ink)),
+                    provider = ImageProvider(ring(d?.score, tint, p.stroke, p.ink, brand = d != null && d.score >= 80)),
                     contentDescription = ctx.getString(R.string.widget_health),
                     modifier = GlanceModifier.size(if (roomy) 58.dp else 42.dp),
                 )
@@ -105,8 +107,10 @@ class HealthWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.width(10.dp))
                     Column(GlanceModifier.defaultWeight()) {
                         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            // The eyebrow names the app and the score in one breath:
+                            // the number is already in the ring, the word was not.
                             Text(
-                                ctx.getString(R.string.widget_health),
+                                (ctx.getString(R.string.app_name) + "  ·  " + ctx.getString(R.string.widget_health)).uppercase(),
                                 style = TextStyle(color = ColorProvider(p.muted), fontSize = 9.sp, fontWeight = FontWeight.Bold),
                                 modifier = GlanceModifier.defaultWeight(), maxLines = 1,
                             )
@@ -126,7 +130,7 @@ class HealthWidget : GlanceAppWidget() {
                             val headline = if (wide && d.totalFiat != null) fmtFiat(d.totalFiat, d.currency) else fmtSol(d.lamports, 4) + " SOL"
                             Text(
                                 headline,
-                                style = TextStyle(color = ColorProvider(p.ink), fontSize = if (roomy) 18.sp else 15.sp, fontWeight = FontWeight.Bold),
+                                style = TextStyle(color = ColorProvider(p.ink), fontSize = if (roomy) 21.sp else 16.sp, fontWeight = FontWeight.Bold),
                                 maxLines = 1,
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -136,11 +140,18 @@ class HealthWidget : GlanceAppWidget() {
                                     Spacer(GlanceModifier.width(6.dp))
                                 }
                                 d.change24h?.let { c ->
-                                    Text(
-                                        (if (c >= 0) "+" else "\u2212") + "%.1f%%".format(kotlin.math.abs(c)),
-                                        style = TextStyle(color = ColorProvider(if (c >= 0) p.accent else p.red), fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                        maxLines = 1,
-                                    )
+                                    // The day's move in its own soft pill, as on the wallet page.
+                                    val tone = if (c >= 0) p.accent else p.red
+                                    Box(
+                                        GlanceModifier.cornerRadius(9.dp).background(ColorProvider(tone.copy(alpha = 0.14f))).padding(horizontal = 6.dp, vertical = 1.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            (if (c >= 0) "+" else "\u2212") + "%.1f%%".format(kotlin.math.abs(c)),
+                                            style = TextStyle(color = ColorProvider(tone), fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                            maxLines = 1,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -149,9 +160,10 @@ class HealthWidget : GlanceAppWidget() {
             }
 
             if (d != null && roomy) {
+                val alert = d.alert?.takeIf { it.isNotBlank() }
                 Text(
-                    d.alert ?: ctx.getString(R.string.widget_clean),
-                    style = TextStyle(color = ColorProvider(if (d.alert == null) p.accent else p.amber), fontSize = 10.sp),
+                    alert ?: ctx.getString(R.string.widget_clean),
+                    style = TextStyle(color = ColorProvider(if (alert == null) p.accent else p.amber), fontSize = 10.sp),
                     maxLines = if (tall) 2 else 1,
                 )
                 if (wide && d.reclaimable > 0L) {
@@ -185,7 +197,7 @@ class HealthWidget : GlanceAppWidget() {
         val intent = Intent(ctx, MainActivity::class.java).putExtra("open", target)
             .setAction("com.clearsign.app.OPEN_" + target.uppercase())
         Box(
-            modifier.height(30.dp).cornerRadius(10.dp).background(ColorProvider(tint.copy(alpha = 0.16f)))
+            modifier.height(34.dp).cornerRadius(12.dp).background(ColorProvider(tint.copy(alpha = 0.14f)))
                 .clickable(androidx.glance.appwidget.action.actionStartActivity(intent)),
             contentAlignment = Alignment.Center,
         ) {
@@ -197,25 +209,38 @@ class HealthWidget : GlanceAppWidget() {
     }
 
     /** The score ring, drawn as a bitmap — RemoteViews cannot draw arcs. */
-    private fun ring(score: Int?, tint: Color, track: Color, ink: Color): Bitmap {
+    private fun ring(score: Int?, tint: Color, track: Color, ink: Color, brand: Boolean): Bitmap {
         val px = 216
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-        val w = px * 0.105f
-        val rect = RectF(w, w, px - w, px - w)
+        val cx = px / 2f
+        val w = px * 0.085f
+        val inset = w * 1.1f
+        val rect = RectF(inset, inset, px - inset, px - inset)
+        // A soft disc behind the ring, so the number sits on something.
+        val disc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = track.copy(alpha = 0.16f).toArgb() }
+        c.drawCircle(cx, cx, cx - inset, disc)
         val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE; strokeWidth = w; strokeCap = Paint.Cap.ROUND
         }
-        arc.color = track.copy(alpha = 0.55f).toArgb()
+        arc.color = track.copy(alpha = 0.45f).toArgb()
         c.drawArc(rect, 0f, 360f, false, arc)
         if (score != null) {
-            arc.color = tint.toArgb()
+            // The brand gradient when the score is good, the warning colour when
+            // it is not: the same rule as the bubble.
+            if (brand) {
+                arc.shader = android.graphics.SweepGradient(
+                    cx, cx,
+                    intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt(), 0xFF4DFFD0.toInt(), 0xFF9524F3.toInt()),
+                    floatArrayOf(0f, 0.34f, 0.67f, 1f),
+                ).apply { setLocalMatrix(android.graphics.Matrix().apply { postRotate(-90f, cx, cx) }) }
+            } else arc.color = tint.toArgb()
             c.drawArc(rect, -90f, 360f * score.coerceIn(0, 100) / 100f, false, arc)
         }
         val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ink.toArgb(); textAlign = Paint.Align.CENTER; textSize = px * 0.30f; isFakeBoldText = true
+            color = ink.toArgb(); textAlign = Paint.Align.CENTER; textSize = px * 0.32f; isFakeBoldText = true
         }
-        c.drawText(score?.toString() ?: "–", px / 2f, px / 2f + label.textSize * 0.35f, label)
+        c.drawText(score?.toString() ?: "–", cx, cx + label.textSize * 0.35f, label)
         return bmp
     }
 

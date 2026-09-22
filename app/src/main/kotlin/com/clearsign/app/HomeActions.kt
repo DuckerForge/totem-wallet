@@ -157,7 +157,7 @@ internal fun WalletChipSheet(address: String, onSettings: () -> Unit, onDismiss:
             MoreRow(HIcon.COPY, stringResource(R.string.copy_address)) { copyText(ctx, address); Haptics.tick(ctx); onDismiss() }
             MoreRow(HIcon.SHARE, stringResource(R.string.share)) {
                 val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, address)
-                runCatching { ctx.startActivity(android.content.Intent.createChooser(i, null)) }; onDismiss()
+                Door.hold(); runCatching { ctx.startActivity(android.content.Intent.createChooser(i, null)) }; onDismiss()
             }
             MoreRow(HIcon.EXTERNAL, "Solscan") { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://solscan.io/account/$address"))) } }
             MoreRow(HIcon.SETTINGS, stringResource(R.string.tab_settings)) { onSettings(); onDismiss() }
@@ -350,7 +350,7 @@ private fun shortWhen(at: Long): String {
  * tap away, instead of competing with the money on the front page.
  */
 @Composable
-internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onGift: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onLink: () -> Unit = {}, onGift: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, hidden: List<HomeAction> = emptyList(), onAction: (HomeAction) -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -363,8 +363,11 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             verticalArrangement = Arrangement.spacedBy(Space.md),
         ) {
             // Every row its own icon, so the list can be read by shape alone.
+            // Prima le azioni che uno ha tolto dalla prima pagina: Scambia, Scan,
+            // Agente, la folla. Tolte da li' devono restare a un tocco da qui.
+            for (a in hidden) MoreRow(homeActionIcon(a), stringResource(homeActionLabel(a))) { onAction(a) }
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
-            if (RocketX.enabled) MoreRow(HIcon.SWAP, stringResource(R.string.bridge_title), onBridge)
+            if (RocketX.enabled) MoreRow(HIcon.BRIDGE, stringResource(R.string.bridge_title), onBridge)
             // Mandare soldi con un link non stava qui dentro, perche' stava
             // sempre sulla prima pagina. Quando il ponte ha preso il suo posto e'
             // rimasto raggiungibile solo dal Manda e da Personalizza, cioe' per

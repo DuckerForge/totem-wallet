@@ -30,7 +30,7 @@ object Exports {
         val i = if (uris.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
         else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
         i.type = mime; i.putExtra(Intent.EXTRA_SUBJECT, subject); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        runCatching { ctx.startActivity(Intent.createChooser(i, null)) }
+        Door.hold(); runCatching { ctx.startActivity(Intent.createChooser(i, null)) }
     }
 }
 

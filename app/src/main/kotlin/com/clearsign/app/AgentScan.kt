@@ -52,5 +52,5 @@ internal fun rememberAgentScan(onError: (String) -> Unit = {}): () -> Unit {
     val options = remember {
         ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(true).setCaptureActivity(ScanPortraitActivity::class.java).setPrompt("")
     }
-    return { launcher.launch(options) }
+    return { Door.hold(); launcher.launch(options) }
 }

@@ -1125,6 +1125,8 @@
     <string name="home_act_agent">Agente</string>
     <string name="home_act_more">Altro</string>
     <string name="home_act_more_sub">Tutto quello che non sta in prima pagina.</string>
+    <string name="more_health">Salute del portafoglio</string>
+    <string name="more_contacts">Contatti fidati</string>
     <string name="home_agent_hdr">L\'AGENTE</string>
     <string name="home_agent_off">Nessun agente. Può solo chiedere: ogni mossa passa comunque dalla tua impronta.</string>
     <string name="env_limits_note">Firma da solo fino a %1$s SOL per operazione e %2$s SOL al giorno. Sopra, chiede a te e firmi con l\'impronta.</string>

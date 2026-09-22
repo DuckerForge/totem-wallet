@@ -51,23 +51,32 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * ORE, dal portafoglio. Il giro in corso con il conto alla rovescia, la
- * griglia con il SOL per casella, i tre numeri, Riscuoti e Scava.
+ * ORE, dal portafoglio. In alto quello che si puo' fare, sotto la griglia,
+ * in fondo i numeri: i bottoni e lo scontrino si vedono senza scorrere, e
+ * la griglia sta subito sotto il dito quando tocca scegliere le caselle.
  *
  * Il conto alla rovescia si ridisegna ogni secondo dallo slot letto una
  * volta e non chiede niente alla catena: si rilegge quando il giro e' finito
- * e la pausa e' passata, non prima. Riscuoti e Scava passano da anteprima,
- * scontrino e impronta come ogni cosa che questo portafoglio spedisce.
+ * e la pausa e' passata. Riscuoti e Scava passano da anteprima, scontrino e
+ * impronta come ogni cosa che questo portafoglio spedisce.
+ *
+ * Un giro dura una cinquantina di secondi e l'impronta ne porta via
+ * qualcuno: il Deploy si ricostruisce sul giro del momento quando si tiene
+ * premuto, e solo se restano almeno [SIGN_MARGIN_S] secondi. Visto sul
+ * telefono il 22 settembre: firmato a giro finito, il nodo rifiuta.
  */
 private sealed interface OreState {
     object Idle : OreState
     object Analyzing : OreState
     /** [dig] e' quanto per casella e quali caselle: alla firma il Deploy si ricostruisce sul giro di adesso. */
-    data class Review(val analyzed: ReceiptEngine.Analyzed, val ixs: List<WalletTx.Instruction>, val label: String, val kind: String, val dig: Pair<Long, Set<Int>>? = null) : OreState
+    data class Review(val analyzed: ReceiptEngine.Analyzed, val ixs: List<WalletTx.Instruction>, val kind: String, val dig: Pair<Long, Set<Int>>? = null) : OreState
     object Signing : OreState
-    data class Done(val signature: String) : OreState
+    data class Done(val signature: String, val what: String) : OreState
     data class Error(val message: String) : OreState
 }
+
+/** Quanto deve restare del giro per firmare un Deploy: l'anteprima, il dito, l'impronta e l'invio. */
+private const val SIGN_MARGIN_S = 15.0
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -91,8 +100,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
     }
     // Un secondo alla volta. A giro finito si aspetta la pausa, quaranta slot,
     // e si rilegge; se il giro nuovo non e' ancora partito si riprova ogni
-    // dodici secondi, che e' una chiamata ogni dodici secondi solo con il
-    // foglio aperto nella pausa.
+    // dodici secondi, solo con il foglio aperto nella pausa.
     LaunchedEffect(view) {
         val v = view ?: return@LaunchedEffect
         while (true) {
@@ -104,13 +112,18 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
 
     val ownerKey = remember(owner) { Base58.decodePubkey(owner) }
 
-    fun review(kind: String, ixs: List<WalletTx.Instruction>, label: String, dig: Pair<Long, Set<Int>>? = null) {
+    fun review(kind: String, ixs: List<WalletTx.Instruction>, dig: Pair<Long, Set<Int>>? = null) {
         state = OreState.Analyzing
         scope.launch {
             val analyzed = WalletActions.preview(ctx, owner, ixs)
-            state = if (analyzed == null) OreState.Error(ctx.getString(R.string.wa_no_blockhash)) else OreState.Review(analyzed, ixs, label, kind, dig)
+            state = if (analyzed == null) OreState.Error(ctx.getString(R.string.wa_no_blockhash)) else OreState.Review(analyzed, ixs, kind, dig)
         }
     }
+
+    /** Un rifiuto del nodo che parla del giro finito, detto in parole. */
+    fun explain(message: String): String =
+        if (message.contains("invalid account data", true) || message.contains("InvalidAccountData") || message.contains("invalid seeds", true)) ctx.getString(R.string.ore_round_ended_signing)
+        else message
 
     ModalBottomSheet(
         onDismissRequest = { onDismiss(changed) },
@@ -118,53 +131,51 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val v = view
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TokenLogo(Ore.MINT, "ORE", TokenSymbols.image(Ore.MINT), 36.dp)
-                Spacer(Modifier.width(10.dp))
+                TokenLogo(Ore.MINT, "ORE", TokenSymbols.image(Ore.MINT), 40.dp)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.ore_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
-                    val v = view
-                    Text(
-                        when {
-                            v == null -> stringResource(R.string.ore_loading)
-                            v.board.waiting -> stringResource(R.string.ore_round_waiting, v.board.roundId)
-                            v.secondsLeft(now) <= 0.0 -> stringResource(R.string.ore_round_between, v.board.roundId)
-                            else -> stringResource(R.string.ore_round_left, v.board.roundId, v.secondsLeft(now).toInt())
-                        },
-                        fontFamily = Mono, fontSize = 11.5.sp, color = Halo.muted, style = Tabular,
-                    )
+                    Text(stringResource(R.string.ore_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Halo.ink)
+                    Text(stringResource(R.string.ore_subtitle), style = HaloType.small, color = Halo.muted)
                 }
                 SmallChip("ore.com", HIcon.EXTERNAL, tint = Halo.cyan) {
                     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ore.com"))) }
                 }
             }
+            // Il giro: una barra che si svuota col tempo, nei colori del marchio,
+            // e il numero del giro accanto. Nella pausa la barra e' vuota e ambra.
+            if (v != null) {
+                val left = v.secondsLeft(now)
+                val roundS = 200 * Ore.SLOT_MS / 1000.0
+                val frac = if (v.board.waiting) 0f else (left / roundS).toFloat().coerceIn(0f, 1f)
+                val paused = v.board.waiting || left <= 0.0
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.ore_round_n, v.board.roundId).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
+                        Text(
+                            when {
+                                v.board.waiting -> stringResource(R.string.ore_round_waiting_short)
+                                paused -> stringResource(R.string.ore_round_between_short)
+                                else -> stringResource(R.string.ore_seconds, left.toInt())
+                            },
+                            fontFamily = Mono, fontSize = 12.sp, color = if (paused) Halo.amber else Halo.mint, style = Tabular,
+                        )
+                    }
+                    Box(Modifier.fillMaxWidth().height(5.dp).clip(rs(3)).background(Halo.cardSoft)) {
+                        Box(
+                            Modifier.fillMaxWidth(frac).height(5.dp).clip(rs(3))
+                                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Halo.mint, Halo.cyan))),
+                        )
+                    }
+                }
+            }
 
-            val v = view
             when {
                 loading && v == null -> Working(stringResource(R.string.ore_loading))
                 v == null -> Banner(stringResource(R.string.ore_unreachable), Halo.amber, HIcon.WARNING)
                 else -> {
-                    // La griglia: il SOL di tutti su ogni casella, le tue accese, quelle scelte cerchiate.
-                    Grid(v, picked, digging) { s -> picked = if (s in picked) picked - s else picked + s }
-
-                    GlassCard {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            StatRow(stringResource(R.string.ore_in_play), Ore.sol(v.inPlay) + " SOL", accent = v.inPlay > 0)
-                            StatRow(
-                                stringResource(R.string.ore_claimable),
-                                Ore.ore(v.claimableOre) + " ORE · " + Ore.sol(v.claimableSol) + " SOL" +
-                                    (if (v.needsCheckpoint) " · " + stringResource(R.string.ore_checkpoint_pending) else ""),
-                                accent = v.hasClaim,
-                            )
-                            v.miner?.let { m ->
-                                StatRow(stringResource(R.string.ore_lifetime), Ore.ore(m.lifetimeRewardsOre) + " ORE · " + Ore.sol(m.lifetimeRewardsSol) + " SOL · −" + Ore.sol(m.lifetimeDeployed) + " SOL")
-                            }
-                            v.round?.let { r ->
-                                StatRow(stringResource(R.string.ore_round_pot), Ore.sol(r.totalDeployed) + " SOL · " + stringResource(R.string.ore_miners, r.totalMiners.toInt()))
-                            }
-                        }
-                    }
-
+                    // ---- quello che si puo' fare, sopra la griglia ------------------------
                     when (val s = state) {
                         OreState.Idle -> {
                             if (!digging) {
@@ -173,10 +184,11 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         val k = ownerKey ?: return@GhostButton
                                         val ixs = OreMiner.claimInstructions(k, v)
                                         if (ixs.isEmpty()) state = OreState.Error(ctx.getString(R.string.ore_none))
-                                        else review("ore_claim", ixs, ctx.getString(R.string.ore_claim))
+                                        else review("ore_claim", ixs)
                                     }
-                                    GhostButton(stringResource(R.string.ore_dig), Modifier.weight(1f), HIcon.SPARK, tint = Halo.cyan) { digging = true }
+                                    Chunky(stringResource(R.string.ore_dig), HIcon.SPARK, Modifier.weight(1f)) { digging = true }
                                 }
+                                Text(stringResource(R.string.ore_hint_idle), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
                             } else {
                                 OutlinedTextField(
                                     value = perSquare, onValueChange = { perSquare = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
@@ -192,29 +204,32 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 )
                                 val lamports = perSquare.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 1e9).toLong() } ?: 0L
                                 val total = lamports * picked.size
-                                Text(
-                                    if (picked.isEmpty()) stringResource(R.string.ore_pick_squares)
-                                    else stringResource(R.string.ore_total, picked.size, Ore.sol(lamports), Ore.sol(total)) +
-                                        (if (v.miner == null) " " + stringResource(R.string.ore_first_fee) else ""),
-                                    fontFamily = Inter, fontSize = 12.sp, color = Halo.ink,
-                                )
+                                if (picked.isNotEmpty()) {
+                                    Text(
+                                        stringResource(R.string.ore_total, picked.size, Ore.sol(lamports), Ore.sol(total)) +
+                                            (if (v.miner == null) " " + stringResource(R.string.ore_first_fee) else ""),
+                                        fontFamily = Inter, fontSize = 12.sp, color = Halo.ink,
+                                    )
+                                }
                                 Text(stringResource(R.string.ore_wager_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.amber)
-                                val open = v.open(now)
+                                val open = v.open(now, SIGN_MARGIN_S)
+                                // Il bottone dice cosa manca: le caselle, o il giro.
                                 PrimaryButton(
-                                    if (open) stringResource(R.string.ore_dig) else stringResource(R.string.ore_wait_round),
+                                    when {
+                                        picked.isEmpty() -> stringResource(R.string.ore_pick_squares)
+                                        !open -> stringResource(R.string.ore_wait_round)
+                                        else -> stringResource(R.string.ore_dig)
+                                    },
                                     danger = false, enabled = open && lamports > 0 && picked.isNotEmpty(),
                                 ) {
                                     val k = ownerKey ?: return@PrimaryButton
                                     state = OreState.Analyzing
                                     scope.launch {
-                                        // La Board si rilegge adesso, non quella di quando si e' aperto
-                                        // il foglio: il giro cambia ogni minuto e il programma rifiuta
-                                        // un Deploy sul giro sbagliato. Visto sul telefono il 22 settembre.
                                         val rpc = SolanaRpc.urlFor(null)
                                         val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
                                         if (cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
-                                        if (!fresh.open()) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
-                                        review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, fresh.board, cfg)), ctx.getString(R.string.ore_dig), dig = lamports to picked)
+                                        if (!fresh.open(margin = SIGN_MARGIN_S)) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
+                                        review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, fresh.board, cfg)), dig = lamports to picked)
                                     }
                                 }
                                 GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { digging = false; picked = emptySet() }
@@ -223,50 +238,61 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                         OreState.Analyzing -> Working(stringResource(R.string.send_analyzing))
                         is OreState.Review -> {
                             val r = s.analyzed.receipt
-                            r.calls.forEach { c ->
-                                Text(c.method, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
-                                c.args.forEach { (n, value) -> Text("$n · $value", fontFamily = Mono, fontSize = 11.sp, color = Halo.muted) }
+                            GlassCard {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    r.calls.forEach { c ->
+                                        Text(c.method, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                                        c.args.forEach { (n, value) -> Text("$n · $value", fontFamily = Mono, fontSize = 11.sp, color = Halo.muted) }
+                                    }
+                                    r.outflows.forEach { d -> Text("−" + fmtAmt(d), fontFamily = Mono, fontSize = 12.sp, color = Halo.red, style = Tabular) }
+                                    r.inflows.forEach { d -> Text("+" + fmtAmt(d), fontFamily = Mono, fontSize = 12.sp, color = Halo.mint, style = Tabular) }
+                                }
                             }
-                            r.outflows.forEach { d -> Text("−" + fmtAmt(d), fontFamily = Mono, fontSize = 12.sp, color = Halo.red, style = Tabular) }
-                            r.inflows.forEach { d -> Text("+" + fmtAmt(d), fontFamily = Mono, fontSize = 12.sp, color = Halo.mint, style = Tabular) }
                             r.risks.forEach { RiskRow(it) }
                             if (r.blocksApproval) {
                                 Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
-                                GhostButton(stringResource(R.string.back)) { state = OreState.Idle }
+                                GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { state = OreState.Idle }
                             } else {
-                                // Lo scontrino resta buono, il giro no: se e' passato, si torna
-                                // indietro invece di firmare un Deploy che il nodo rifiuterebbe.
-                                if (s.dig != null && !v.open(now)) Banner(stringResource(R.string.ore_round_gone), Halo.amber, HIcon.HOURGLASS)
-                                HoldToConfirm(if (s.kind == "ore_dig") stringResource(R.string.ore_hold_dig) else stringResource(R.string.ore_hold_claim), enabled = s.dig == null || v.open(now)) {
+                                val stillOpen = s.dig == null || v.open(now, SIGN_MARGIN_S)
+                                if (!stillOpen) Banner(stringResource(R.string.ore_round_gone), Halo.amber, HIcon.HOURGLASS)
+                                HoldToConfirm(if (s.kind == "ore_dig") stringResource(R.string.ore_hold_dig) else stringResource(R.string.ore_hold_claim), enabled = stillOpen) {
                                     state = OreState.Signing
                                     scope.launch {
-                                        // Il Deploy si ricostruisce sul giro di adesso: fra l'anteprima e
-                                        // il dito puo' passare un giro intero, e il conto del giro nella
-                                        // transazione sarebbe quello vecchio. Visto sul telefono: quattro
-                                        // minuti dopo l'anteprima, «Provided seeds do not result in a
-                                        // valid address». Stesse caselle, stessi SOL, giro fresco.
+                                        // Il Deploy si ricostruisce sul giro di adesso: fra l'anteprima e il
+                                        // dito puo' passare un giro intero. Stesse caselle, stessi SOL.
                                         val ixs = if (s.dig == null) s.ixs else {
                                             val k = ownerKey
                                             val rpc = SolanaRpc.urlFor(null)
                                             val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
                                             if (k == null || cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
-                                            if (!fresh.open()) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
+                                            if (!fresh.open(margin = SIGN_MARGIN_S)) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
                                             listOf(OreMiner.deploy(k, s.dig.first, s.dig.second, fresh.board, cfg))
                                         }
                                         val log = WalletActions.LogInfo(kind = s.kind, outflows = r.outflows.map { "−" + fmtAmt(it) }, inflows = r.inflows.map { "+" + fmtAmt(it) }, receipt = r, recipientLabel = "ORE")
                                         state = when (val res = WalletActions.signAndSend(ctx, signer, owner, ixs, log)) {
-                                            is WalletActions.Result.Sent -> { changed = true; digging = false; picked = emptySet(); refresh++; OreState.Done(res.signature) }
-                                            is WalletActions.Result.Failed -> OreState.Error(res.message)
+                                            is WalletActions.Result.Sent -> {
+                                                changed = true; digging = false; picked = emptySet(); refresh++
+                                                OreState.Done(res.signature, r.calls.joinToString(" · ") { it.method })
+                                            }
+                                            is WalletActions.Result.Failed -> OreState.Error(explain(res.message))
                                         }
                                     }
                                 }
-                                GhostButton(stringResource(R.string.back)) { state = OreState.Idle }
+                                GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { state = OreState.Idle }
                             }
                         }
                         OreState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
                         is OreState.Done -> {
+                            // Lo scontrino resta qui dopo la firma, e sta anche fra gli Scontrini.
                             Banner(stringResource(R.string.ore_sent), Halo.mint, HIcon.CHECK)
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            GlassCard {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(s.what, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                                    Text(s.signature, fontFamily = Mono, fontSize = 10.5.sp, color = Halo.muted, maxLines = 2)
+                                    Text(stringResource(R.string.ore_done_receipt), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 GhostButton("Solscan", Modifier.weight(1f), HIcon.EXTERNAL, tint = Halo.cyan) {
                                     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(solscanTxUrl(s.signature, null)))) }
                                 }
@@ -275,7 +301,35 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                         }
                         is OreState.Error -> {
                             Banner(s.message, Halo.red, HIcon.WARNING)
-                            GhostButton(stringResource(R.string.back)) { state = OreState.Idle }
+                            GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { state = OreState.Idle }
+                        }
+                    }
+
+                    // ---- la griglia: il SOL di tutti su ogni casella, le tue accese, le scelte cerchiate ----
+                    Grid(v, picked, digging && state == OreState.Idle) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
+
+                    // ---- i numeri ----------------------------------------------------------------
+                    GlassCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.fillMaxWidth()) {
+                                Stat(stringResource(R.string.ore_in_play), Ore.sol(v.inPlay) + " SOL", if (v.inPlay > 0) Halo.mint else Halo.ink, Modifier.weight(1f))
+                                Stat(
+                                    stringResource(R.string.ore_claimable), Ore.ore(v.claimableOre) + " ORE", if (v.hasClaim) Halo.mint else Halo.ink, Modifier.weight(1f),
+                                    sub = Ore.sol(v.claimableSol) + " SOL" + (if (v.needsCheckpoint) " · " + stringResource(R.string.ore_checkpoint_pending) else ""),
+                                )
+                            }
+                            Row(Modifier.fillMaxWidth()) {
+                                val m = v.miner
+                                Stat(
+                                    stringResource(R.string.ore_lifetime), if (m == null) "—" else Ore.ore(m.lifetimeRewardsOre) + " ORE", Halo.ink, Modifier.weight(1f),
+                                    sub = if (m == null) null else "+" + Ore.sol(m.lifetimeRewardsSol) + " · −" + Ore.sol(m.lifetimeDeployed) + " SOL",
+                                )
+                                val r = v.round
+                                Stat(
+                                    stringResource(R.string.ore_round_pot), if (r == null) "—" else Ore.sol(r.totalDeployed) + " SOL", Halo.ink, Modifier.weight(1f),
+                                    sub = r?.let { stringResource(R.string.ore_miners, it.totalMiners.toInt()) },
+                                )
+                            }
                         }
                     }
                 }
@@ -286,32 +340,77 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
     }
 }
 
-/** Cinque per cinque. Il numero e' il SOL di tutti sulla casella; il bordo dice le tue e quelle che stai scegliendo. */
+/**
+ * Cinque per cinque. Ogni casella si scalda col SOL che ha sopra, nel colore
+ * secondario del tema; le tue sono nel colore primario, quelle che stai
+ * scegliendo hanno il bordo acceso. Il numero e' il SOL di tutti.
+ */
 @Composable
 private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, onPick: (Int) -> Unit) {
     val mine = v.mySquares.toSet()
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val max = (v.round?.deployed?.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         for (row in 0 until 5) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 for (col in 0 until 5) {
                     val s = row * 5 + col
                     val sol = v.round?.deployed?.getOrNull(s) ?: 0L
+                    val heat = (sol.toDouble() / max).toFloat().coerceIn(0f, 1f)
                     val isMine = s in mine
                     val isPicked = picking && s in picked
+                    val fill = when {
+                        isPicked -> Halo.cyan.copy(alpha = 0.32f)
+                        isMine -> Halo.mint.copy(alpha = 0.26f)
+                        else -> Halo.cyan.copy(alpha = 0.06f + 0.22f * heat)
+                    }
+                    val edge = when {
+                        isPicked -> Halo.cyan
+                        isMine -> Halo.mint
+                        picking -> Halo.cyan.copy(alpha = 0.35f)
+                        else -> Halo.stroke
+                    }
                     Box(
-                        Modifier.weight(1f).aspectRatio(1f).clip(rs(8))
-                            .background(if (isPicked) Halo.cyan.copy(alpha = 0.22f) else if (isMine) Halo.mint.copy(alpha = 0.18f) else Halo.cardSoft)
-                            .border(1.dp, if (isPicked) Halo.cyan else if (isMine) Halo.mint else Halo.stroke, rs(8))
+                        Modifier.weight(1f).aspectRatio(1f).clip(rs(10))
+                            .background(Halo.cardSoft).background(fill)
+                            .border(if (isPicked || isMine) 1.5.dp else 1.dp, edge, rs(10))
                             .clickable(enabled = picking) { onPick(s) },
-                        contentAlignment = Alignment.Center,
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text((s + 1).toString(), fontFamily = Mono, fontSize = 9.sp, color = Halo.muted)
-                            Text(if (sol > 0) fmtSol(sol, 3) else "·", fontFamily = Mono, fontSize = 10.sp, color = if (isMine || isPicked) Halo.ink else Halo.muted, style = Tabular)
-                        }
+                        Text((s + 1).toString(), fontFamily = Mono, fontSize = 9.sp, color = Halo.muted.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 4.dp))
+                        Text(
+                            if (sol > 0) fmtSol(sol, 3) else "·",
+                            fontFamily = Mono, fontWeight = if (isMine || isPicked) FontWeight.Bold else FontWeight.Normal, fontSize = 10.5.sp,
+                            color = if (isMine || isPicked) Halo.ink else Halo.ink.copy(alpha = 0.6f + 0.4f * heat), style = Tabular,
+                            modifier = Modifier.align(Alignment.Center).padding(top = 6.dp),
+                        )
+                        if (isMine) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).height(6.dp).width(6.dp).clip(rs(3)).background(Halo.mint))
                     }
                 }
             }
         }
+    }
+}
+
+/** Un numero con la sua etichetta sopra, come nelle schede del portafoglio. */
+@Composable
+private fun Stat(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier, sub: String? = null) {
+    Column(modifier) {
+        Text(label.uppercase(), style = HaloType.label, color = Halo.muted)
+        Text(value, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = color, style = Tabular, maxLines = 1)
+        if (sub != null) Text(sub, fontFamily = Mono, fontSize = 10.5.sp, color = Halo.muted, style = Tabular, maxLines = 1)
+    }
+}
+
+/** Il bottone pieno, nei colori del marchio, che sta in una riga accanto a un altro. */
+@Composable
+private fun Chunky(label: String, icon: HIcon, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(
+        modifier.height(48.dp).clip(rs(16))
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Halo.mint, Halo.cyan)))
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HaloIcon(icon, Halo.ground, 18.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ground)
     }
 }

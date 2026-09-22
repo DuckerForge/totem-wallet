@@ -587,6 +587,11 @@
     <string name="agent_ore_squares">Squares per round</string>
     <string name="agent_ore_note">%1$s SOL on each of %2$d squares per round. Hands over %3$s SOL, enough for %4$d rounds.</string>
     <string name="agent_ore_too_small">Not enough for a round: raise the SOL per day or lower the squares.</string>
+    <string name="agent_ore_bury_title">Put the gains in ORE</string>
+    <string name="agent_ore_bury_sub">On close the gain, not the stake, is swapped into ORE and comes home that way. Under 0.005 SOL it stays SOL.</string>
+    <string name="trader_why_bury">The budget\'s gain put into ORE, on close</string>
+    <string name="trader_buried">Gain of %1$s SOL put into ORE</string>
+    <string name="trader_bury_skipped">The gain stays in SOL: %1$s</string>
     <string name="trace_ore_start">Handed %1$s SOL to ORE: %2$s SOL on %3$d squares per round, %4$d rounds.</string>
     <string name="trace_ore_progress">ORE so far: spent %1$s SOL, mined %2$s ORE, %3$d rounds left.</string>
     <string name="trace_ore_claimed">Claimed %1$s ORE and %2$s SOL from the grid.</string>

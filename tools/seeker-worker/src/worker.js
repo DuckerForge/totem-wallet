@@ -77,6 +77,12 @@ const DOLPHIN_CHUNKS_PER_RUN = 12;
 
 import { oreTick } from "./ore.js";
 
+/** Le letture che il telefono puo' chiedere passando da qui. Niente invii, niente programmi interi. */
+const RPC_METHODS = new Set([
+  "getSignaturesForAddress", "getTransaction", "getTokenAccountsByOwner", "getMultipleAccounts",
+  "getAccountInfo", "getBalance", "getTokenSupply", "getSlot", "getEpochInfo",
+]);
+
 async function rpc(env, method, params) {
   const r = await fetch(env.HELIUS_URL, {
     method: "POST",
@@ -707,6 +713,25 @@ export default {
           "cache-control": "public, max-age=900",
           "access-control-allow-origin": "*",
         },
+      });
+    }
+    // Il nodo, per il telefono che non porta una chiave sua. Solo le letture
+    // che servono a guardare un portafoglio: la chiave dello scanner stava
+    // dentro l'APK, e ogni pagina di una persona spendeva la sua quota.
+    if (url.searchParams.get("rpc") !== null) {
+      if (request.method !== "POST" || !env.HELIUS_URL) return new Response('{"error":"post"}', { status: 405, headers: { "content-type": "application/json" } });
+      const body = await request.json().catch(() => null);
+      const ok = body && RPC_METHODS.has(body.method) && Array.isArray(body.params) && JSON.stringify(body.params).length < 4096;
+      if (!ok) return new Response('{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"not here"}}', { status: 403, headers: { "content-type": "application/json" } });
+      const r = await fetch(env.HELIUS_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: body.id ?? 1, method: body.method, params: body.params }),
+      }).catch(() => null);
+      if (!r) return new Response('{"error":"no"}', { status: 502, headers: { "content-type": "application/json" } });
+      return new Response(await r.text(), {
+        status: r.status,
+        headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" },
       });
     }
     // Il ponte, quando il telefono non ha una chiave sua.

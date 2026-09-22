@@ -113,6 +113,8 @@ object TraderLoop {
         val oreLamportsPerDay: Long = 50_000_000L,
         /** Su quante caselle a giro. */
         val oreSquares: Int = 3,
+        /** Alla chiusura, il guadagno (non il capitale) si scambia in ORE e va a casa in moneta dura. */
+        val oreBury: Boolean = false,
     ) {
         // One lane. There used to be two and the agent asked which; on Solana
         // the honest answer is that the wild one is where the money goes to die,
@@ -135,6 +137,7 @@ object TraderLoop {
             oreOn = p.getBoolean("oreOn", false),
             oreLamportsPerDay = p.getLong("oreDay", 50_000_000L),
             oreSquares = p.getInt("oreSquares", 3),
+            oreBury = p.getBoolean("oreBury", false),
         )
     }
 
@@ -144,6 +147,7 @@ object TraderLoop {
             .putInt("max", c.maxPositions).putInt("tp", c.takeProfitPct)
             .putInt("sl", c.stopLossPct).putInt("slice", c.slicePercent).putInt("fee", c.maxFeePct)
             .putBoolean("oreOn", c.oreOn).putLong("oreDay", c.oreLamportsPerDay).putInt("oreSquares", c.oreSquares)
+            .putBoolean("oreBury", c.oreBury)
             .apply()
     }
 
@@ -348,6 +352,40 @@ object TraderLoop {
                 is AgentBroker.Verdict.Timeout -> ctx.getString(R.string.trader_needed_you)
                 else -> v.reason ?: ctx.getString(R.string.trader_net_down)
             }
+        }
+    }
+
+    /**
+     * Seppellire il guadagno: [lamports] di SOL della paghetta diventano ORE,
+     * con la stessa strada di ogni acquisto (rotta Jupiter, scontrino, collare).
+     * Si chiama alla chiusura, quando quello che c'e' sopra il capitale e' gia'
+     * tutto in SOL. Torna null se e' andata, altrimenti il perche'.
+     *
+     * Il collare vale anche qui: la fetta non supera il tetto per mossa, e se
+     * la regola chiede una persona alla chiusura non c'e' nessuno, quindi il
+     * guadagno resta in SOL e torna a casa cosi'. Meglio di una domanda a vuoto.
+     */
+    suspend fun buryInOre(ctx: Context, lamports: Long): String? {
+        val s = SessionWallet.current(ctx) ?: return ctx.getString(R.string.trader_stop_nobudget)
+        val p = SessionWallet.policy(ctx) ?: return ctx.getString(R.string.trader_stop_nobudget)
+        val ceiling = minOf(p.perTxLamports, p.askAboveLamports.takeIf { it > 0 } ?: p.perTxLamports)
+        val amount = minOf(lamports, ceiling)
+        if (amount <= FEE * 4) return ctx.getString(R.string.trader_stop_toosmall)
+        val built = SessionActions.buildSwap(Jupiter.SOL_MINT, com.clearsign.core.Ore.MINT, amount, s.pubkey) ?: return ctx.getString(R.string.trader_no_route)
+        val reason = ctx.getString(R.string.trader_why_bury)
+        val intent = JSONObject().put("action", "swap").put("outMint", "SOL").put("outAmount", amount / 1e9)
+            .put("inMint", "ORE").put("inAmount", built.quote.outAmount / 1e11)
+            .put("expectMint", com.clearsign.core.Ore.MINT)
+            .put("agent", AGENT).put("reason", reason)
+        return when (val v = handle(ctx, built.tx, intent, AgentBroker.Job.Source.IN_APP, built.ultraRequestId)) {
+            is AgentBroker.Verdict.SignedSilently, is AgentBroker.Verdict.Confirmed -> {
+                val m = ctx.getString(R.string.trader_buried, fmtSol(amount, 4))
+                AgentTrace.say(m, AgentTrace.Kind.ACTED)
+                note(ctx, m)
+                null
+            }
+            is AgentBroker.Verdict.Timeout -> ctx.getString(R.string.trader_needed_you)
+            else -> v.reason ?: ctx.getString(R.string.trader_net_down)
         }
     }
 

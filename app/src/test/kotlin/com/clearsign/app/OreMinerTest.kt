@@ -80,8 +80,8 @@ class OreMinerTest {
 
     @Test fun `il conto alla rovescia scende senza chiedere niente`() {
         val v = OreMiner.View(null, board, null, slot = 449318204L, at = 1_000_000L)
-        assertEquals(65.6, v.secondsLeft(1_000_000L), 0.01)
-        assertEquals(55.6, v.secondsLeft(1_010_000L), 0.01)
+        assertEquals(164 * 0.26, v.secondsLeft(1_000_000L), 0.01)
+        assertEquals(164 * 0.26 - 10, v.secondsLeft(1_010_000L), 0.01)
         assertTrue(v.open(1_000_000L))
         assertTrue(!v.open(1_061_000L))
     }

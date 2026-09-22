@@ -35,7 +35,7 @@ class OreTest {
         assertEquals(413544L, b.roundId)
         assertEquals(200L, b.endSlot - b.startSlot)
         assertEquals(457905902L, b.productionCostEma)
-        assertEquals(65.6, b.secondsLeft(449318204L), 0.01)
+        assertEquals(164 * 0.26, b.secondsLeft(449318204L), 0.01)
         assertEquals(0.0, b.secondsLeft(b.endSlot + 10))
         assertFalse(b.waiting)
     }

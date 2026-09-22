@@ -1539,6 +1539,7 @@
     <string name="notif_sell_now">Sell now</string>
     <string name="notif_stop">Stop the agent</string>
     <string name="notif_stopped_by_you">Stopped from the notification</string>
+    <string name="comp_stopped_by_you">Stopped from the bubble</string>
     <string name="agent_copy_title">Copy who you follow</string>
     <string name="agent_copy_none">No wallet followed yet. In Scout, tap the star next to a wallet: what it buys comes here as a candidate, through the same gates as everything else.</string>
     <string name="agent_copy_how">When a wallet you follow buys, or two whales buy the same coin within the hour, that coin goes to the front of the list. It passes the same checks as any other.</string>

@@ -250,7 +250,7 @@ class CompanionService : Service() {
 
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(12f), 0, 0) }
         val sell = button(getString(R.string.notif_sell_now), p.accent.toArgb()) { sellNow() }
-        val stop = button(getString(R.string.notif_stop), p.amber.toArgb()) { stopAgent() }
+        val stop = button(getString(R.string.notif_stop), p.amber.toArgb()) { toggleAgent() }
         actions.addView(sell); actions.addView(stop)
 
         main.addView(head); main.addView(targets); main.addView(bar)
@@ -560,8 +560,30 @@ class CompanionService : Service() {
         }
     }
 
-    private fun stopAgent() {
-        TraderLoop.stopSelf(this, getString(R.string.notif_stopped_by_you))
+    /**
+     * The one button: stop when it runs, start when it does not.
+     *
+     * It used to stop in both cases. The label said Start when the loop was
+     * off, and the tap underneath wrote «stopped from the notification» as the
+     * loop's last word, on a loop that had not been started. When starting is
+     * not possible the reason is the loop's own, said here, not a generic note.
+     */
+    private fun toggleAgent() {
+        val ctx = this
+        if (TraderLoop.config(ctx).on) {
+            TraderLoop.stopSelf(ctx, getString(R.string.comp_stopped_by_you))
+            refresh()
+            return
+        }
+        val why = TraderLoop.cannotStart(ctx)
+        if (why != null) {
+            agentLine?.text = why
+            agentLine?.visibility = View.VISIBLE
+            agentLine?.setTextColor(Halo.palette.amber.toArgb())
+            return
+        }
+        TraderLoop.start(ctx, TraderLoop.config(ctx))
+        TraderKeeper.sync(ctx)
         refresh()
     }
 

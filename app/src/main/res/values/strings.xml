@@ -512,6 +512,7 @@
     <string name="ore_hold_claim">Hold to claim</string>
     <string name="ore_sent">Sent. The grid updates in a moment.</string>
     <string name="ore_stake_link">ORE also has staking, on ore.com.</string>
+    <string name="ore_round_gone">This round is over. Go back and dig again on the next one.</string>
     <string name="agent_ore_title">Dig ORE</string>
     <string name="agent_ore_sub">Hands part of the budget to an executor that plays the grid every minute. Same collar.</string>
     <string name="agent_ore_day">SOL per day, at most</string>

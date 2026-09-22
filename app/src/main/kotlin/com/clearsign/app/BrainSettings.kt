@@ -224,7 +224,7 @@ internal fun LinkHelpSheet(onScan: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.link_help_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
             Text(stringResource(R.string.link_help_body), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted, lineHeight = 19.sp)
             Column(
-                Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).padding(12.dp),
+                Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12)).padding(12.dp),
             ) {
                 Text(stringResource(R.string.link_help_cmd), fontFamily = Mono, fontSize = 11.sp, color = Halo.ink, lineHeight = 17.sp)
             }

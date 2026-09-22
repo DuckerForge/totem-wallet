@@ -67,7 +67,20 @@ object JupiterTokens {
     @Volatile private var top: List<Tok> = emptyList()
     @Volatile private var topAt = 0L
 
-    fun cached(mint: String): Tok? = cache[mint]
+    fun cached(mint: String): Tok? = cache[mint]?.also { touch(mint) }
+
+    /** Quando una moneta e' stata usata l'ultima volta: decide chi resta sul disco. */
+    private val touchedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private fun touch(mint: String) { touchedAt[mint] = System.currentTimeMillis() }
+
+    /** Quante monete tiene il disco, al massimo. Oltre, vanno via quelle usate da piu' tempo. */
+    const val DISK_MAX = 2000
+    /** Un file piu' grande di cosi' non si legge: e' un file cresciuto prima del tetto. */
+    const val DISK_MAX_BYTES = 1_000_000L
+
+    /** Le [max] monete usate piu' di recente, per il disco. Pura, per il test. */
+    internal fun keepNewest(all: Collection<Tok>, touched: Map<String, Long>, max: Int): List<Tok> =
+        all.sortedByDescending { touched[it.mint] ?: 0L }.take(max)
 
     // ---- l'archivio e il disco -------------------------------------------
     //
@@ -89,7 +102,12 @@ object JupiterTokens {
         diskFile = f
         runCatching {
             if (!f.exists()) return
-            parse(JSONArray(f.readText())).forEach { cache[it.mint] = it }
+            // Un file cresciuto senza tetto si butta invece di leggerlo: il tetto
+            // di adesso lo riscrive piccolo alla prima occasione.
+            if (f.length() > DISK_MAX_BYTES) { f.delete(); return }
+            // `putIfAbsent`: adesso questo gira dopo il primo fotogramma, e una
+            // moneta chiesta nel frattempo, col prezzo, non va sovrascritta dal disco.
+            parse(JSONArray(f.readText())).forEach { cache.putIfAbsent(it.mint, it) }
         }
     }
 
@@ -103,7 +121,7 @@ object JupiterTokens {
      */
     private fun saveDisk() {
         val f = diskFile ?: return
-        runCatching { f.writeText(rawOf(cache.values.map { it.copy(usd = null, change24h = null) })) }
+        runCatching { f.writeText(rawOf(keepNewest(cache.values, touchedAt, DISK_MAX).map { it.copy(usd = null, change24h = null) })) }
     }
 
     /**
@@ -179,7 +197,7 @@ object JupiterTokens {
         val out = HashMap<String, Tok>()
         todo.chunked(100)
             .flatMap { chunk -> fetch("/search?query=" + chunk.joinToString(",")) }
-            .forEach { out[it.mint] = it; cache[it.mint] = it }
+            .forEach { out[it.mint] = it; cache[it.mint] = it; touch(it.mint) }
         saveDisk()
         return out
     }
@@ -262,7 +280,7 @@ object JupiterTokens {
 
     /** Una moneta dall'archivio nella cache, se c'e'. Ritorna null se non c'era. */
     private fun fromArchiveInto(mint: String): Tok? =
-        fromArchive(listOf(mint)).firstOrNull()?.also { cache[it.mint] = it }
+        fromArchive(listOf(mint)).firstOrNull()?.also { cache[it.mint] = it; touch(it.mint) }
 
     /**
      * One coin, with its trading windows, so a receipt can judge the thing it is
@@ -362,6 +380,7 @@ object JupiterTokens {
                 holders = o.optInt("holderCount"),
             )
             cache[mint] = t
+            touch(mint)
             TokenSymbols.seed(mint, t.symbol, t.name, t.icon)
             out.add(t)
         }

@@ -157,6 +157,18 @@ internal val HaloScheme get() = darkColorScheme(
 /** Material scheme + per-theme letter-spacing, applied once at each screen root. */
 @Composable
 fun HaloRoot(content: @Composable () -> Unit) {
+    // Una fase sola per tutti i bordi vivi, mossa a fotogramma solo sulle
+    // palette che li hanno. I bordi la leggono in draw: vedi `haloBorder`.
+    val living = Halo.palette.livingStroke
+    androidx.compose.runtime.LaunchedEffect(living) {
+        if (!living) return@LaunchedEffect
+        val start = androidx.compose.runtime.withFrameNanos { it }
+        while (true) {
+            androidx.compose.runtime.withFrameNanos { t ->
+                LivingStroke.phase.floatValue = (((t - start) / 1_000_000L) % LivingStroke.PERIOD_MS) / LivingStroke.PERIOD_MS.toFloat()
+            }
+        }
+    }
     MaterialTheme(colorScheme = HaloScheme) {
         androidx.compose.material3.ProvideTextStyle(androidx.compose.material3.LocalTextStyle.current.copy(letterSpacing = Halo.palette.fonts.tracking.sp)) { content() }
     }
@@ -382,7 +394,7 @@ private fun DappIcon(dApp: DappId, size: androidx.compose.ui.unit.Dp) {
         }
     }
     Box(
-        Modifier.size(size).clip(CircleShape).background(Halo.cardSoft).border(cardBorder(), CircleShape),
+        Modifier.size(size).clip(CircleShape).background(Halo.cardSoft).haloBorder(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         val b = bmp
@@ -395,7 +407,7 @@ private fun DappIcon(dApp: DappId, size: androidx.compose.ui.unit.Dp) {
 @Composable
 private fun DappPill(dApp: DappId) {
     Row(
-        Modifier.clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999))
+        Modifier.clip(rs(999)).background(Halo.cardSoft).haloBorder(rs(999))
             .padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -431,30 +443,6 @@ private fun DappHero(dApp: DappId, subtitle: String) {
  * Solana's purple and green sliding along the edge — one gradient translated by
  * exactly its own width per cycle, so it flows without ever showing a seam.
  */
-@Composable
-internal fun cardBorder(width: androidx.compose.ui.unit.Dp = 1.dp): androidx.compose.foundation.BorderStroke {
-    if (!Halo.palette.livingStroke) return androidx.compose.foundation.BorderStroke(width, Halo.stroke)
-    // The gradient repeats along its own axis, so to loop without a seam the
-    // animation has to travel exactly one axis vector per cycle — not one
-    // horizontal span. It used to slide (span, 0) along an axis of (span, 0.7·span):
-    // 0.82 of a period each time round, and the missing 0.18 was the visible snap,
-    // in position and in colour both.
-    val dx = 520f
-    val dy = 520f * 0.7f
-    val t by rememberInfiniteTransition(label = "livingStroke").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "slide",
-    )
-    return androidx.compose.foundation.BorderStroke(
-        width + 0.2.dp,
-        androidx.compose.ui.graphics.Brush.linearGradient(
-            // Purple at both ends of the tile, so the seam meets its own colour.
-            listOf(Color(0xFF9945FF), Color(0xFF14F195), Color(0xFF9945FF)),
-            start = androidx.compose.ui.geometry.Offset(t * dx, t * dy),
-            end = androidx.compose.ui.geometry.Offset(t * dx + dx, t * dy + dy),
-            tileMode = androidx.compose.ui.graphics.TileMode.Repeated,
-        ),
-    )
-}
 
 @Composable
 internal fun GlassCard(content: @Composable () -> Unit) {
@@ -463,7 +451,7 @@ internal fun GlassCard(content: @Composable () -> Unit) {
         (if (slot != null) Modifier.staggeredEntrance(slot.coerceAtMost(7)) else Modifier).fillMaxWidth()
             .clip(rs(22))
             .background(Halo.card)
-            .border(cardBorder(), rs(22))
+            .haloBorder(rs(22))
             // 16 and not 20. The screen already keeps its own margin outside this
             // card, so every line of text was starting 40dp in from the edge on a
             // phone that is 411dp wide — a tenth of the screen on each side, spent
@@ -551,7 +539,7 @@ internal fun GhostButton(
     val shape = rs(16)
     val src = remember { MutableInteractionSource() }
     Row(
-        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(height).clip(shape).border(cardBorder(), shape).clickable(interactionSource = src, indication = null) { onClick() },
+        modifier.pressScale(src).then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(height).clip(shape).haloBorder(shape).clickable(interactionSource = src, indication = null) { onClick() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { HaloIcon(icon, tint, 17.dp); Spacer(Modifier.width(8.dp)) }
@@ -625,7 +613,7 @@ internal fun Avatar(pubkey: String, size: androidx.compose.ui.unit.Dp) {
     val c1 = Color.hsl(((h and 0xFFFF) % 360).toFloat(), 0.7f, 0.6f)
     val c2 = Color.hsl(((h ushr 16 and 0xFFFF) % 360).toFloat(), 0.8f, 0.45f)
     Box(
-        Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(c1, c2))).border(cardBorder(), CircleShape),
+        Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(c1, c2))).haloBorder(CircleShape),
         contentAlignment = Alignment.Center,
     ) { Text(pubkey.take(2), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.34f).sp, color = Halo.ground.copy(alpha = 0.85f)) }
 }
@@ -771,7 +759,7 @@ private fun AccountPickPrompt(ui: MwaUi.AccountPick) {
             val hasFunds = (lamports ?: 0L) > 0L || tokenCount > 0
             Box(
                 Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card)
-                    .border(cardBorder(), rs(16))
+                    .haloBorder(rs(16))
                     .clickable { ui.onPick(acc) }.padding(14.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1065,7 +1053,7 @@ internal fun SignReceiptBody(
                         radius = 520f,
                     ),
                 )
-                .border(cardBorder(), rs(18)),
+                .haloBorder(rs(18)),
         ) {
             NodeMap(dests = dests, danger = danger, coin = outCoin) { d -> if (d.address != null) sheetAddr = d }
             Text(
@@ -1156,7 +1144,7 @@ private fun rememberPkgIcon(pkg: String): androidx.compose.ui.graphics.ImageBitm
 @Composable
 private fun StatTile(modifier: Modifier, icon: HIcon, value: String, label: String, tint: Color = Halo.cyan) {
     Column(
-        modifier.clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)).padding(horizontal = 8.dp, vertical = 9.dp),
+        modifier.clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12)).padding(horizontal = 8.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1194,11 +1182,11 @@ private fun DappStoreCard(store: StoreInfo) {
     var open by remember(store.packageName) { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
+        Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).haloBorder(rs(16)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(rs(12)).background(Halo.cardSoft).border(cardBorder(), rs(12)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(44.dp).clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12)), contentAlignment = Alignment.Center) {
                 if (icon != null) androidx.compose.foundation.Image(icon, contentDescription = null, modifier = Modifier.size(38.dp).clip(rs(10)))
                 else HaloIcon(HIcon.WALLET, Halo.muted, 20.dp)
             }
@@ -1219,7 +1207,7 @@ private fun DappStoreCard(store: StoreInfo) {
                 }
             }
             Box(
-                Modifier.size(26.dp).clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999)).clickable { open = !open },
+                Modifier.size(26.dp).clip(rs(999)).background(Halo.cardSoft).haloBorder(rs(999)).clickable { open = !open },
                 contentAlignment = Alignment.Center,
             ) { HaloIcon(HIcon.INFO, if (open) Halo.cyan else Halo.muted, 14.dp) }
         }
@@ -1842,7 +1830,7 @@ private fun AddressSheet(
 @Composable
 private fun TraceBlock(t: AddressTrace.Trace?, running: Boolean, ran: Boolean, isPro: Boolean, onRun: () -> Unit) {
     val ctx = LocalContext.current
-    Column(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).border(cardBorder(), rs(14)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).haloBorder(rs(14)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HaloIcon(HIcon.SCAN, Halo.cyan, 14.dp); Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.trace_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
@@ -2250,7 +2238,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
         PrimaryButton(stringResource(R.string.back_to_dapp, left), danger = false, icon = HIcon.CHEVRON_RIGHT) { activity?.backToDapp(explicit = true) }
         ui.signedTx?.let { raw ->
             Column(
-                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
+                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).haloBorder(rs(16)).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -2262,7 +2250,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
         }
         ui.signature?.let { sig ->
             Box(
-                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).border(cardBorder(), rs(16)).padding(14.dp),
+                Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).haloBorder(rs(16)).padding(14.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.signature_hdr), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
@@ -2280,7 +2268,7 @@ private fun DoneScreen(ui: MwaUi.Done) {
         // never from software — the whole point of signing on this device.
         Box(
             Modifier.fillMaxWidth().clip(rs(16))
-                .background(Halo.card).border(cardBorder(), rs(16)).padding(16.dp),
+                .background(Halo.card).haloBorder(rs(16)).padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 26.dp)

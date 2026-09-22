@@ -182,7 +182,7 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
         Box(
             // The same living hairline as the cards, so a theme that moves moves
             // everywhere rather than in one place.
-            Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.pill)),
+            Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft).haloBorder(rs(Radius.pill)),
             contentAlignment = Alignment.Center,
         ) {
             // This button wears the Seeker itself rather than a generic glyph: it
@@ -384,7 +384,7 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
 @Composable
 private fun MoreRow(icon: HIcon, label: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.panel))
+        Modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel))
             .clickable(onClick = onClick).padding(Space.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -462,7 +462,7 @@ internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(rs(Radius.panel)).background(Halo.cardSoft).border(cardBorder(), rs(Radius.panel)),
+            Modifier.size(40.dp).clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel)),
             contentAlignment = Alignment.Center,
         ) { HaloIcon(icon, Halo.ink, 20.dp) }
         androidx.compose.foundation.layout.Spacer(Modifier.size(Space.md))
@@ -471,7 +471,7 @@ internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -
             if (sub != null) Text(sub, style = HaloType.small, color = Halo.muted)
         }
         Box(
-            Modifier.size(34.dp).clip(rs(Radius.pill)).background(Halo.card).border(cardBorder(), rs(Radius.pill))
+            Modifier.size(34.dp).clip(rs(Radius.pill)).background(Halo.card).haloBorder(rs(Radius.pill))
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
         ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }

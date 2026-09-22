@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -200,10 +201,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Themes.load(this)
         Settings.load(this)
-        // Quello che questo telefono ha gia' imparato sulle monete: nomi, decimali,
-        // icone. Non cambiano mai, e senza questo si richiedevano tutti a ogni avvio.
-        runCatching { JupiterTokens.warmDisk(this) }
-        runCatching { Gecko.warmPools(this) }
         Pro.load(this)
         // Hand the radio back and forth as the tap screen arms and disarms.
         //
@@ -222,6 +219,17 @@ class MainActivity : ComponentActivity() {
         signer = SeedVaultSigner(this, bridge)
         enableEdgeToEdge()
         setContent { ScaledText { HomeScreen(signer) } }
+        // Quello che questo telefono ha gia' imparato sulle monete: nomi, decimali,
+        // icone. Non cambiano mai, e senza questo si richiedevano tutti a ogni avvio.
+        // Ma si legge **dopo il primo fotogramma** e su IO: erano due file JSON
+        // letti sul thread principale prima di `setContent`, e lo splash restava
+        // nero per tutto il tempo che ci mettevano, sempre di piu' col passare dei mesi.
+        window.decorView.post {
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { JupiterTokens.warmDisk(this@MainActivity) }
+                runCatching { Gecko.warmPools(this@MainActivity) }
+            }
+        }
     }
 }
 
@@ -289,7 +297,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
         val scanHome = rememberAgentScan { scanError = it }
         val walletScroll = rememberScrollState()
         val density = androidx.compose.ui.platform.LocalDensity.current
-        val collapse by remember {
+        // Uno stato, non un numero: chi lo legge lo fa dentro `graphicsLayer` o
+        // `layout`, cosi' lo scorrimento muove i livelli e non ricompone la pagina.
+        // Letto qui come Float, `HomeScreen` intera si ricomponeva a ogni fotogramma.
+        val collapse = remember {
             derivedStateOf { (walletScroll.value / with(density) { 180.dp.toPx() }).coerceIn(0f, 1f) }
         }
         // A tapped or linked request opens the ordinary send form, already filled in.
@@ -702,7 +713,7 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
 
 /** Five tabs on a hairline-topped bar; the active one sits on a soft pill. */
 @Composable
-private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
+private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>, onSelect: (Tab) -> Unit) {
     val ctx = LocalContext.current
     Row(
         Modifier.fillMaxWidth().background(Halo.card).border(androidx.compose.foundation.BorderStroke(1.dp, Halo.stroke)).padding(horizontal = 12.dp, vertical = 8.dp),
@@ -740,24 +751,31 @@ private fun BottomBar(tab: Tab, collapse: Float, onSelect: (Tab) -> Unit) {
                 HaloIcon(icon, tint, 22.dp)
                 // Scrolling down hands the screen back to the content: the labels
                 // fade and the bar closes up. Coming back up brings them out again.
-                if (collapse < 0.98f) {
-                    Text(
-                        stringResource(label), style = HaloType.label,
-                        color = if (active) Halo.mint else Halo.muted,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = 1f - collapse
-                            scaleY = 1f - collapse
+                // Sempre composta: si schiaccia in layout e sfuma in graphicsLayer,
+                // cosi' la barra si chiude senza ricomporre niente.
+                Text(
+                    stringResource(label), style = HaloType.label,
+                    color = if (active) Halo.mint else Halo.muted,
+                    modifier = Modifier
+                        .layout { measurable, constraints ->
+                            val p = measurable.measure(constraints)
+                            val h = (p.height * (1f - collapse.value)).toInt().coerceAtLeast(0)
+                            layout(p.width, h) { p.placeRelative(0, 0) }
+                        }
+                        .graphicsLayer {
+                            val c = collapse.value
+                            alpha = 1f - c
+                            scaleY = 1f - c
                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
                         },
-                    )
-                }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: Float = 0f, onScan: (() -> Unit)? = null, onChip: () -> Unit = {}) {
+private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: androidx.compose.runtime.State<Float>? = null, onScan: (() -> Unit)? = null, onChip: () -> Unit = {}) {
     // Scanning an Agent Gate request lives here, where wallets put the scanner.
     var scanError by remember { mutableStateOf<String?>(null) }
     val ownScan = rememberAgentScan { scanError = it }
@@ -786,13 +804,13 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
             if (headline != null) {
                 Text(
                     headline, style = HaloType.small, color = Halo.ink,
-                    modifier = Modifier.graphicsLayer { alpha = collapse },
+                    modifier = Modifier.graphicsLayer { alpha = collapse?.value ?: 0f },
                 )
             }
         }
         if (account != null) {
             Row(
-                Modifier.clip(rs(999)).background(Halo.cardSoft).border(cardBorder(), rs(999)).clickable(onClick = onChip).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                Modifier.clip(rs(999)).background(Halo.cardSoft).haloBorder(rs(999)).clickable(onClick = onChip).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(account.pubkeyBase58, 20.dp)

@@ -48,7 +48,7 @@ private fun SplitMapBox(dests: List<NodeDest>, danger: Boolean, coin: ImageBitma
     Box(
         Modifier.fillMaxWidth().height(if (dests.size > 2) 250.dp else 200.dp).clip(rs(18)).background(Halo.cardSoft)
             .background(Brush.radialGradient(colors = listOf((if (danger) Halo.red else Halo.cyan).copy(alpha = 0.10f), Color.Transparent), radius = 520f))
-            .border(cardBorder(), rs(18)),
+            .haloBorder(rs(18)),
     ) {
         NodeMap(dests = dests, danger = danger, coin = coin, backCoin = backCoin) { d -> if (d.address != null) onTap(d) }
         Text(stringResource(R.string.tap_node), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
@@ -103,7 +103,7 @@ internal fun PaperReceipt(r: Receipt, dests: List<NodeDest>, danger: Boolean, ba
     val paper = Halo.cardSoft
     Column(Modifier.staggeredEntrance(0, r)) {
         Column(
-            Modifier.fillMaxWidth().clip(rs(6)).background(paper).border(cardBorder(), rs(6)).padding(horizontal = 18.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth().clip(rs(6)).background(paper).haloBorder(rs(6)).padding(horizontal = 18.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(stringResource(R.string.paper_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Halo.ink, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
@@ -191,7 +191,7 @@ internal fun TerminalReceipt(r: Receipt, dests: List<NodeDest>, danger: Boolean,
         }
     }
     Column(
-        Modifier.staggeredEntrance(0, r).fillMaxWidth().clip(rs(4)).background(Halo.ground.copy(alpha = 0.6f)).border(cardBorder(), rs(4)).padding(14.dp),
+        Modifier.staggeredEntrance(0, r).fillMaxWidth().clip(rs(4)).background(Halo.ground.copy(alpha = 0.6f)).haloBorder(rs(4)).padding(14.dp),
     ) {
         Text("+" + "-".repeat(80), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted.copy(alpha = 0.6f), maxLines = 1, modifier = Modifier.fillMaxWidth().clipToBounds())
         Spacer(Modifier.height(6.dp))

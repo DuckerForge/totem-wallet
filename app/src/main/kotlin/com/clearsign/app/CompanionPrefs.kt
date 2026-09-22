@@ -92,148 +92,180 @@ object CompanionPrefs {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val cx = px / 2f
-        val ground = p.ground.toArgb()
+        // La sfera sta un pelo sopra il centro e lascia sotto lo spazio per la
+        // sua ombra: senza ombra una palla sopra un'altra app non e' appoggiata
+        // da nessuna parte.
+        val cy = px * 0.47f
+        val r = px * 0.44f
+        val body0 = p.card.toArgb()
 
-        // --- il corpo della sfera -------------------------------------------
-        val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // --- l'ombra sotto --------------------------------------------------
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                px * 0.34f, px * 0.30f, px * 0.82f,
-                intArrayOf(lift(ground, 0.38f), ground, sink(ground, 0.45f)),
-                floatArrayOf(0f, 0.52f, 1f), Shader.TileMode.CLAMP,
+                cx, cy + r * 0.32f, r * 1.05f,
+                intArrayOf(AColor.argb(120, 0, 0, 0), AColor.argb(0, 0, 0, 0)),
+                floatArrayOf(0.55f, 1f), Shader.TileMode.CLAMP,
             )
         }
-        c.drawCircle(cx, cx, cx, body)
+        c.drawCircle(cx, cy + r * 0.32f, r * 1.05f, shadow)
+
+        // --- il bagliore, quando lavora --------------------------------------
+        if (d.trading) {
+            val a = p.accent.toArgb()
+            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    cx, cy, r * 1.14f,
+                    intArrayOf(AColor.argb(0, AColor.red(a), AColor.green(a), AColor.blue(a)), AColor.argb(70, AColor.red(a), AColor.green(a), AColor.blue(a)), AColor.argb(0, AColor.red(a), AColor.green(a), AColor.blue(a))),
+                    floatArrayOf(0.80f, 0.92f, 1f), Shader.TileMode.CLAMP,
+                )
+            }
+            c.drawCircle(cx, cy, r * 1.14f, glow)
+        }
+
+        // --- il corpo della sfera ---------------------------------------------
+        //
+        // Sul colore delle schede, non su quello del fondo: era una palla nera
+        // su fondi neri, e la luce dipinta sopra non aveva niente da illuminare.
+        val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * 0.35f, cy - r * 0.42f, r * 1.75f,
+                intArrayOf(lift(body0, 0.34f), body0, sink(body0, 0.55f)),
+                floatArrayOf(0f, 0.50f, 1f), Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawCircle(cx, cy, r, body)
 
         // La specchiatura: dove la luce batte per prima.
         val spec = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                px * 0.33f, px * 0.25f, px * 0.32f,
-                intArrayOf(AColor.argb(70, 255, 255, 255), AColor.argb(0, 255, 255, 255)),
+                cx - r * 0.34f, cy - r * 0.48f, r * 0.62f,
+                intArrayOf(AColor.argb(84, 255, 255, 255), AColor.argb(0, 255, 255, 255)),
                 null, Shader.TileMode.CLAMP,
             )
         }
-        c.drawCircle(px * 0.33f, px * 0.25f, px * 0.32f, spec)
+        c.drawCircle(cx - r * 0.34f, cy - r * 0.48f, r * 0.62f, spec)
 
         // Il bordo: chiaro in alto dove la luce lo prende, scuro in basso.
         val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = px * 0.028f
+            strokeWidth = r * 0.05f
             shader = LinearGradient(
-                0f, 0f, 0f, px.toFloat(),
-                intArrayOf(AColor.argb(110, 255, 255, 255), AColor.argb(18, 255, 255, 255), AColor.argb(90, 0, 0, 0)),
+                0f, cy - r, 0f, cy + r,
+                intArrayOf(AColor.argb(120, 255, 255, 255), AColor.argb(14, 255, 255, 255), AColor.argb(110, 0, 0, 0)),
                 floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP,
             )
         }
-        c.drawCircle(cx, cx, cx - px * 0.014f, rim)
+        c.drawCircle(cx, cy, r - r * 0.025f, rim)
 
-        // --- l'anello coi numeri --------------------------------------------
-        //
-        // Sottile. Era spesso un decimo del diametro, cioe' su una bolla da 54
-        // un anello da 5: a quel punto il colore non e' piu' un bordo, e' meta'
-        // della bolla, e il numero dentro sta in un buco.
-        val w = px * 0.058f
-        val inset = px * 0.085f
-        val rect = RectF(inset, inset, px - inset, px - inset)
+        // --- l'anello coi numeri ----------------------------------------------
+        val w = r * 0.11f
+        val inset = r * 0.17f
+        val rect = RectF(cx - r + inset, cy - r + inset, cx + r - inset, cy + r - inset)
         val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = w; strokeCap = Paint.Cap.ROUND }
-        arc.color = AColor.argb(120, AColor.red(p.stroke.toArgb()), AColor.green(p.stroke.toArgb()), AColor.blue(p.stroke.toArgb()))
+        val st = p.stroke.toArgb()
+        arc.color = AColor.argb(150, AColor.red(st), AColor.green(st), AColor.blue(st))
         c.drawArc(rect, 0f, 360f, false, arc)
 
         /**
          * Il gradiente del marchio lungo l'anello, dal viola al ciano alla menta.
-         *
-         * Una tinta unica non e' questa app: la V sul lanciatore e' un tratto che
-         * corre dal viola in basso al ciano in alto, ed e' la prima cosa che si
-         * vede di Velum. L'anello e' un cerchio, quindi il gradiente gira
-         * (`SweepGradient`) e parte dall'alto, da dove parte anche l'arco.
-         *
-         * Si usa **solo dove il colore non e' gia' un messaggio**: quando dice
-         * salute bassa o moneta in perdita, il rosso e l'ambra valgono piu' di
-         * qualsiasi bel gradiente, e restano tinta unica.
+         * Si usa solo dove il colore non e' gia' un messaggio: salute bassa e
+         * moneta in perdita restano rosso e ambra, tinta unica.
          */
         fun brand() {
             arc.shader = android.graphics.SweepGradient(
-                cx, cx,
+                cx, cy,
                 intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt(), 0xFF4DFFD0.toInt(), 0xFF9524F3.toInt()),
                 floatArrayOf(0f, 0.34f, 0.67f, 1f),
-            ).apply { setLocalMatrix(android.graphics.Matrix().apply { postRotate(-90f, cx, cx) }) }
+            ).apply { setLocalMatrix(android.graphics.Matrix().apply { postRotate(-90f, cx, cy) }) }
         }
         fun flat(color: Int) { arc.shader = null; arc.color = color }
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.ink.toArgb(); textAlign = Paint.Align.CENTER; isFakeBoldText = true }
         val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.muted.toArgb(); textAlign = Paint.Align.CENTER }
-        // Una sfera ha un'ombra sotto le scritte, se no il testo galleggia.
-        text.setShadowLayer(px * 0.04f, 0f, px * 0.015f, AColor.argb(150, 0, 0, 0))
+        text.setShadowLayer(r * 0.08f, 0f, r * 0.03f, AColor.argb(150, 0, 0, 0))
+
+        /** Il puntino di stato, a ore quattro sull'anello: acceso quando lavora. */
+        fun statusDot(on: Boolean) {
+            val ang = Math.toRadians(45.0)
+            val rr = r - inset
+            val dx = cx + (rr * kotlin.math.cos(ang)).toFloat()
+            val dy = cy + (rr * kotlin.math.sin(ang)).toFloat()
+            val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+            dot.color = sink(body0, 0.5f)
+            c.drawCircle(dx, dy, r * 0.16f, dot)
+            dot.color = (if (on) p.accent else p.muted).toArgb()
+            c.drawCircle(dx, dy, r * 0.10f, dot)
+            if (on) {
+                dot.color = AColor.argb(90, 255, 255, 255)
+                c.drawCircle(dx - r * 0.03f, dy - r * 0.03f, r * 0.04f, dot)
+            }
+        }
+
+        /** Il segno dell'app: una V dal viola al ciano, per quando non c'e' un numero da dire. */
+        fun mark(alpha: Int) {
+            val v = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = r * 0.14f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                shader = LinearGradient(cx - r * 0.3f, cy + r * 0.3f, cx + r * 0.3f, cy - r * 0.3f, intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt()), null, Shader.TileMode.CLAMP)
+                this.alpha = alpha
+            }
+            val path = android.graphics.Path().apply {
+                moveTo(cx - r * 0.34f, cy - r * 0.26f); lineTo(cx, cy + r * 0.30f); lineTo(cx + r * 0.34f, cy - r * 0.26f)
+            }
+            c.drawPath(path, v)
+        }
 
         when (face) {
             Face.AGENT, Face.ROTATE -> {
-                val tint = (if (d.trading) p.accent else p.muted).toArgb()
-                if (d.trading) brand() else flat(tint)
-                c.drawArc(rect, -90f, if (d.trading) 360f else 0f, false, arc)
-                // Il numero e' la cosa piu' grande della bolla, e non e' bianco
-                // piatto: si accende dall'alto verso il basso, dal bianco al
-                // colore del marchio, come il tratto sull'icona.
-                text.textSize = px * 0.40f
-                val top = cx - text.textSize * 0.55f
-                text.shader = LinearGradient(
-                    0f, top, 0f, top + text.textSize,
-                    intArrayOf(0xFFFFFFFF.toInt(), if (d.trading) 0xFF4DFFD0.toInt() else p.muted.toArgb()),
-                    null, Shader.TileMode.CLAMP,
-                )
-                c.drawText(d.openPositions?.toString() ?: "–", cx, cx + text.textSize * 0.28f, text)
-                text.shader = null
-                // "ON" era scritto piccolo in menta su fondo scuro, cioe' due
-                // colori vicini a corpo dieci: si intuiva, non si leggeva.
-                // Adesso e' una pastiglia piena col testo scavato dentro, che a
-                // quella misura e' l'unico modo di farsi leggere.
-                val label = if (d.trading) "ON" else "OFF"
-                small.textSize = px * 0.135f
-                val tw = small.measureText(label)
-                val ph = px * 0.19f
-                val pw = tw + px * 0.14f
-                val py = px - inset * 1.55f - ph * 0.5f
-                val pill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint }
-                c.drawRoundRect(RectF(cx - pw / 2f, py, cx + pw / 2f, py + ph), ph / 2f, ph / 2f, pill)
-                small.color = p.ground.toArgb()
-                small.isFakeBoldText = true
-                c.drawText(label, cx, py + ph * 0.72f, small)
-                small.isFakeBoldText = false
+                if (d.trading) brand() else flat(AColor.argb(0, 0, 0, 0))
+                c.drawArc(rect, -90f, 360f, false, arc)
+                val n = d.openPositions
+                if (d.trading && n != null) {
+                    // Il numero e' la cosa piu' grande della bolla, e si accende
+                    // dall'alto verso il basso, dal bianco al colore del marchio.
+                    text.textSize = r * 0.92f
+                    val top = cy - text.textSize * 0.55f
+                    text.shader = LinearGradient(0f, top, 0f, top + text.textSize, intArrayOf(0xFFFFFFFF.toInt(), 0xFF4DFFD0.toInt()), null, Shader.TileMode.CLAMP)
+                    c.drawText(n.toString(), cx, cy + text.textSize * 0.34f, text)
+                    text.shader = null
+                } else {
+                    // Fermo: il segno dell'app, non un trattino.
+                    mark(if (d.trading) 255 else 190)
+                }
+                statusDot(d.trading)
             }
             Face.HEALTH -> {
                 val s = d.score
                 val tint = when { s == null -> p.muted; s >= 80 -> p.accent; s >= 50 -> p.amber; else -> p.red }.toArgb()
                 if (s != null && s >= 80) brand() else flat(tint)
                 c.drawArc(rect, -90f, if (s != null) 360f * s.coerceIn(0, 100) / 100f else 0f, false, arc)
-                text.textSize = px * 0.34f
-                c.drawText(s?.toString() ?: "–", cx, cx + text.textSize * 0.35f, text)
+                text.textSize = r * 0.78f
+                c.drawText(s?.toString() ?: "–", cx, cy + text.textSize * 0.35f, text)
             }
             Face.TOTAL -> {
                 brand(); c.drawArc(rect, -90f, 360f, false, arc)
                 val t = d.totalText ?: "…"
-                text.textSize = if (t.length > 6) px * 0.20f else px * 0.26f
-                c.drawText(t, cx, cx + text.textSize * 0.35f, text)
+                text.textSize = if (t.length > 6) r * 0.44f else r * 0.58f
+                c.drawText(t, cx, cy + text.textSize * 0.35f, text)
             }
             Face.COIN -> {
                 val ch = d.coinChange
                 val tint = (if (ch == null) p.muted else if (ch >= 0) p.accent else p.red).toArgb()
                 if (ch != null && ch >= 0) brand() else flat(tint)
                 c.drawArc(rect, -90f, 360f, false, arc)
-                text.textSize = px * 0.22f
-                c.drawText(d.coinSymbol?.take(5) ?: "?", cx, cx - px * 0.02f, text)
-                small.textSize = px * 0.16f; small.color = tint
-                c.drawText(ch?.let { String.format(Locale.ROOT, "%+.1f%%", it) } ?: "", cx, cx + px * 0.2f, small)
+                text.textSize = r * 0.50f
+                c.drawText(d.coinSymbol?.take(5) ?: "?", cx, cy - r * 0.04f, text)
+                small.textSize = r * 0.36f; small.color = tint; small.isFakeBoldText = true
+                c.drawText(ch?.let { String.format(Locale.ROOT, "%+.1f%%", it) } ?: "", cx, cy + r * 0.44f, small)
             }
-            // La paghetta: quanto vale adesso, e di quanto si e' mossa da quando
-            // l'hai messa. Non il portafoglio intero, che e' un altro discorso e
-            // un altro numero.
             Face.BUDGET -> {
                 val ch = d.budgetChange
                 val tint = (if (ch == null) p.accent2 else if (ch >= 0) p.accent else p.red).toArgb()
                 if (ch == null || ch >= 0) brand() else flat(tint)
                 c.drawArc(rect, -90f, 360f, false, arc)
                 val t = d.budgetText ?: "…"
-                text.textSize = if (t.length > 6) px * 0.19f else px * 0.24f
-                c.drawText(t, cx, cx - px * 0.01f, text)
-                small.textSize = px * 0.155f; small.color = tint
-                c.drawText(ch?.let { String.format(Locale.ROOT, "%+.1f%%", it) } ?: "", cx, cx + px * 0.21f, small)
+                text.textSize = if (t.length > 6) r * 0.42f else r * 0.54f
+                c.drawText(t, cx, cy - r * 0.02f, text)
+                small.textSize = r * 0.34f; small.color = tint; small.isFakeBoldText = true
+                c.drawText(ch?.let { String.format(Locale.ROOT, "%+.1f%%", it) } ?: "", cx, cy + r * 0.46f, small)
             }
         }
         return bmp

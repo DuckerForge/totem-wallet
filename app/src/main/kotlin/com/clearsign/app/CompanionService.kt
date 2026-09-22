@@ -79,6 +79,7 @@ class CompanionService : Service() {
     private var nowPct: TextView? = null
     private var agentLine: TextView? = null
     private var healthLine: TextView? = null
+    private var moneyBox: LinearLayout? = null
     private var sellButton: TextView? = null
     private var stopButton: TextView? = null
 
@@ -187,8 +188,8 @@ class CompanionService : Service() {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
             background = GradientDrawable().apply {
-                cornerRadius = dp(18f).toFloat()
-                setColor(p.ground.toArgb())
+                cornerRadius = dp(22f).toFloat()
+                setColor(p.ground2.toArgb())
                 setStroke(dp(1f), p.stroke.toArgb())
             }
             setPadding(dp(14f), dp(12f), dp(14f), dp(12f))
@@ -292,7 +293,7 @@ class CompanionService : Service() {
         root = container; params = lp
         bubble = ring; panel = card; mainBox = main; setBox = settings
         symbolLine = symbol; pctLine = pct; targetLine = targets; barFill = fill; barTrack = track
-        putLine = put; nowLine = now; nowPct = nowP; agentLine = agent; healthLine = health
+        putLine = put; nowLine = now; nowPct = nowP; agentLine = agent; healthLine = health; moneyBox = money
         sellButton = sell; stopButton = stop
 
         // Viva per conto sua: ogni minuto i numeri si ridisegnano.
@@ -644,7 +645,10 @@ class CompanionService : Service() {
 
         val pos = last.pos
         val move = last.posPct
-        symbolLine?.text = pos?.symbol ?: getString(if (last.trading) R.string.trader_idle else R.string.companion_agent_off)
+        // The title is the coin, or what the loop is doing, or the app's name:
+        // "agent off" as a title and again as a line under it was one sentence
+        // said twice.
+        symbolLine?.text = pos?.symbol ?: getString(if (last.trading) R.string.trader_idle else R.string.app_name)
         pctLine?.text = move?.let { String.format(java.util.Locale.ROOT, "%+.1f%%", it) } ?: ""
         pctLine?.setTextColor((if ((move ?: 0.0) >= 0) p.accent else p.red).toArgb())
         targetLine?.visibility = if (pos == null) View.GONE else View.VISIBLE
@@ -663,6 +667,8 @@ class CompanionService : Service() {
             (barFill?.background as? GradientDrawable)?.setColor((if ((move ?: 0.0) >= 0) p.accent else p.red).toArgb())
         }
 
+        // No budget, no money rows: "you put in 0 SOL" is not information.
+        moneyBox?.visibility = if (last.fundedLamports > 0L || last.totalLamports != null) View.VISIBLE else View.GONE
         putLine?.text = fmtSol(last.fundedLamports, 4) + " SOL"
         nowLine?.text = last.totalLamports?.let { fmtSol(it, 4) + " SOL" } ?: "…"
         nowLine?.setTextColor((if ((last.diffLamports ?: 0L) >= 0) p.accent else p.red).toArgb())
@@ -672,11 +678,19 @@ class CompanionService : Service() {
         fun show(v: TextView?, on: Boolean, text: String?) { v?.text = text ?: ""; v?.visibility = if (on && !text.isNullOrEmpty()) View.VISIBLE else View.GONE }
         val note = if (last.trading) TraderLoop.lastNote(ctx) ?: getString(R.string.trader_idle) else getString(R.string.companion_agent_off)
         show(agentLine, CompanionPrefs.show(ctx, "agent"), note)
-        show(healthLine, CompanionPrefs.show(ctx, "health"), last.health?.let { getString(R.string.companion_health_line, it.score) + " · " + (it.alert ?: getString(R.string.widget_clean)) })
-        healthLine?.setTextColor((if (last.health?.alert == null) p.accent else p.amber).toArgb())
+        val alert = last.health?.alert?.takeIf { it.isNotBlank() }
+        show(healthLine, CompanionPrefs.show(ctx, "health"), last.health?.let { getString(R.string.companion_health_line, it.score) + " · " + (alert ?: getString(R.string.widget_clean)) })
+        healthLine?.setTextColor((if (alert == null) p.accent else p.amber).toArgb())
 
         sellButton?.visibility = if (pos == null) View.GONE else View.VISIBLE
-        stopButton?.text = if (last.trading) getString(R.string.notif_stop) else getString(R.string.agent_start)
+        // Start is the one full button here; stop is the quiet amber one.
+        stopButton?.let { b ->
+            val on = last.trading
+            b.text = if (on) getString(R.string.notif_stop) else getString(R.string.agent_start)
+            b.setTextColor((if (on) p.amber else p.ground).toArgb())
+            val am = p.amber.toArgb()
+            (b.background as? GradientDrawable)?.setColor(if (on) AColor.argb(34, AColor.red(am), AColor.green(am), AColor.blue(am)) else p.accent.toArgb())
+        }
     }
 
     /** "80 €", "1,2k €": a total that fits a circle. */

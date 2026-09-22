@@ -301,7 +301,19 @@ internal fun SendSheet(
                         }
                         // Four ways to fill the address in, all the same size, all one tap.
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SmallChip(stringResource(R.string.send_paste), HIcon.PASTE) { to = clipboardText(ctx)?.trim().orEmpty() }
+                            SmallChip(stringResource(R.string.send_paste), HIcon.PASTE) {
+                                // A payment link on the clipboard is a request, not
+                                // an address: it says where, and often how much and
+                                // in what. Pasted as a bare string it failed the
+                                // address check and said nothing.
+                                val text = clipboardText(ctx)?.trim().orEmpty()
+                                if (text.startsWith("solana:", ignoreCase = true) || text.contains('?')) {
+                                    val req = parseScanned(text)
+                                    to = req.recipient
+                                    req.amount?.let { amount = fmtUi(it) }
+                                    wantedMint = req.mint ?: com.clearsign.core.NATIVE_SOL_MINT
+                                } else to = text
+                            }
                             SmallChip(stringResource(R.string.send_scan), HIcon.SCAN, tint = Halo.cyan) {
                                 scanLauncher.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(true).setCaptureActivity(ScanPortraitActivity::class.java).setPrompt(""))
                             }
@@ -408,7 +420,16 @@ internal fun SendSheet(
                             },
                             colors = fieldColors(Halo.stroke), shape = rs(14),
                         )
-                        asset?.let { a -> Text(stringResource(R.string.send_available, fmtUnits(a.available, a.decimals) + " " + a.symbol), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, style = Tabular) }
+                        asset?.let { a ->
+                            // What the typed amount is worth, next to what is there:
+                            // the number a person checks before holding to send.
+                            val typed = amount.replace(',', '.').toDoubleOrNull()
+                            val worth = unitFiat[a.mint]?.let { u -> typed?.takeIf { it > 0 }?.let { fmtFiat(it * u, currency) } }
+                            Text(
+                                stringResource(R.string.send_available, fmtUnits(a.available, a.decimals) + " " + a.symbol) + (worth?.let { " · ≈ $it" } ?: ""),
+                                style = HaloType.label, color = Halo.muted,
+                            )
+                        }
 
                         // Privato: una riga sua, larga, sotto la cifra.
                         //
@@ -633,6 +654,12 @@ private const val SOL_RESERVE = 1_500_000L
 private suspend fun buildAndAnalyze(ctx: Context, owner: String, dest: String, asset: Asset, raw: Long, memo: String? = null): Pair<List<WalletTx.Instruction>, ReceiptEngine.Analyzed> {
     val rpc = SolanaRpc.urlFor(null)
     val ownerKey = Base58.decode(owner); val destKey = Base58.decode(dest)
+    // The address has to be a wallet. A token account or a program has a valid
+    // shape and takes the money all the same: SOL sent to a program account is
+    // gone, and a coin sent to an address derived from a token account is gone
+    // too. The other wallets stop here, and this one did not.
+    val destOwner = withContext(Dispatchers.IO) { SolanaRpc.getAccountInfoRaw(rpc, dest)?.owner }
+    if (SendChecks.notAWallet(destOwner)) throw IllegalStateException(ctx.getString(R.string.send_not_wallet))
     val base: List<WalletTx.Instruction> = when (asset) {
         is Asset.Sol -> listOf(WalletTx.systemTransfer(ownerKey, destKey, raw))
         is Asset.Token -> withContext(Dispatchers.IO) {
@@ -702,3 +729,15 @@ private fun fieldColors(border: Color) = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = Halo.cardSoft, unfocusedContainerColor = Halo.cardSoft,
     cursorColor = Halo.mint, focusedTextColor = Halo.ink, unfocusedTextColor = Halo.ink,
 )
+
+/** The checks on a destination that need no network of their own. */
+internal object SendChecks {
+    private const val SYSTEM = "11111111111111111111111111111111"
+
+    /**
+     * An account that exists and is not owned by the System Program is not a
+     * wallet: a token account, a program, a PDA. Null is an account that does
+     * not exist yet, which is an ordinary fresh wallet.
+     */
+    fun notAWallet(ownerProgram: String?): Boolean = ownerProgram != null && ownerProgram != SYSTEM
+}

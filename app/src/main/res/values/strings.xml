@@ -315,6 +315,7 @@
     <string name="send_analyzing">Simulating and building the receipt…</string>
     <string name="send_invalid_amount">Enter a valid amount.</string>
     <string name="send_self">That is your own address.</string>
+    <string name="send_not_wallet">That address is not a wallet. It is a program or a token account, and money sent there is lost.</string>
     <string name="send_insufficient">Not enough %1$s.</string>
     <string name="send_available">Available: %1$s</string>
     <string name="send_hold">Hold to send</string>
@@ -1883,6 +1884,8 @@
     <string name="bridge_history_title">Your bridges</string>
     <string name="bridge_history_sub">What crossed over, and where to go and look.</string>
     <string name="bridge_history_empty">No bridge yet. What you send to another chain lands here, with the transaction on both sides.</string>
+    <string name="bridge_unpaid">Order opened, deposit never sent. Nothing left this phone.</string>
+    <string name="bridge_h_remove">Remove</string>
     <string name="bridge_history_note">The state is what RocketX says. The proof it arrived is the transaction on the other chain: that page is the only one that knows.</string>
     <string name="bridge_asking">Asking…</string>
     <string name="bridge_landed">Landed</string>

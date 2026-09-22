@@ -78,8 +78,8 @@ internal fun FeedBuyPanel(
     // toccare per un altro giro.
     var giveUp by remember(mint) { mutableStateOf(false) }
     LaunchedEffect(mint, chartTry) {
-        Gecko.warmPools(ctx)
         withContext(Dispatchers.IO) {
+            Gecko.warmPools(ctx)
             px = runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()
             decimals = runCatching { JupiterTokens.byMints(listOf(mint))[mint]?.decimals }.getOrNull()
             series = runCatching { Gecko.series(mint, spanFor(moves)) }.getOrDefault(emptyList())

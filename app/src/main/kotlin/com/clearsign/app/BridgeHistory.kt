@@ -68,7 +68,7 @@ import java.util.Locale
 internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val all = remember { RocketX.bridges(ctx) }
+    var all by remember { mutableStateOf(RocketX.bridges(ctx)) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(
@@ -115,6 +115,10 @@ internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
                     }
                     Text(
                         when {
+                            // The order was opened and the deposit never signed:
+                            // nothing left this phone. It used to sit here as a
+                            // bridge that "could not be asked", for ever.
+                            b.signature.isBlank() -> stringResource(R.string.bridge_unpaid)
                             !asked -> stringResource(R.string.bridge_asking)
                             st == null -> stringResource(R.string.bridge_status_none)
                             st!!.good -> stringResource(R.string.bridge_landed)
@@ -142,6 +146,11 @@ internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
                         SmallChip("RocketX", HIcon.EXTERNAL, tint = Halo.amber) {
                             copyText(ctx, b.requestId)
                             open(ctx, RocketX.ORDERS_URL)
+                        }
+                        if (b.signature.isBlank()) {
+                            SmallChip(stringResource(R.string.bridge_h_remove), HIcon.TRASH, tint = Halo.muted) {
+                                RocketX.forget(ctx, b.requestId); all = RocketX.bridges(ctx); Haptics.tick(ctx)
+                            }
                         }
                     }
                 }

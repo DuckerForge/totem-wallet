@@ -315,6 +315,7 @@
     <string name="send_analyzing">Simulo e costruisco la ricevuta…</string>
     <string name="send_invalid_amount">Inserisci un importo valido.</string>
     <string name="send_self">È il tuo stesso indirizzo.</string>
+    <string name="send_not_wallet">Quell\'indirizzo non è un portafoglio. È un programma o un conto token, e i soldi mandati lì si perdono.</string>
     <string name="send_insufficient">%1$s insufficienti.</string>
     <string name="send_available">Disponibili: %1$s</string>
     <string name="send_hold">Tieni premuto per inviare</string>
@@ -1883,6 +1884,8 @@
     <string name="bridge_history_title">I tuoi ponti</string>
     <string name="bridge_history_sub">Cosa è passato di là, e dove andare a guardare.</string>
     <string name="bridge_history_empty">Nessun ponte, per ora. Quello che mandi su un\'altra catena finisce qui, con la transazione da tutte e due le parti.</string>
+    <string name="bridge_unpaid">Ordine aperto, deposito mai inviato. Da questo telefono non è partito niente.</string>
+    <string name="bridge_h_remove">Togli</string>
     <string name="bridge_history_note">Lo stato è quello che dice RocketX. La prova che siano arrivati è la transazione sull\'altra catena: quella pagina è l\'unica che lo sa.</string>
     <string name="bridge_asking">Chiedo…</string>
     <string name="bridge_landed">Arrivati</string>

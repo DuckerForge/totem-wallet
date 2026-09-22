@@ -90,14 +90,15 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                 Box(Modifier.size(40.dp).clip(rs(12)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(HIcon.RECEIPT, Halo.cyan, 20.dp) }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(e.dApp + (e.host?.let { " · $it" } ?: ""), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Halo.ink, maxLines = 1)
+                    Text(e.dApp + (e.host?.let { " · $it" } ?: ""), style = HaloType.title, color = Halo.ink, maxLines = 1)
                     Text(
                         DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH) + " · " + kindLabel(ctx, e.kind) +
                             (if (e.txCount > 1) " · ${e.txIndex + 1}/${e.txCount}" else "") + (e.cluster?.let { " · $it" } ?: ""),
-                        fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted,
+                        style = HaloType.small, color = Halo.muted,
                     )
                 }
-                if (e.attestationSig != null) HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 20.dp)
+                if (e.attestationSig != null) { HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 20.dp); Spacer(Modifier.width(8.dp)) }
+                RoundIconButton(HIcon.CLOSE, onClick = onDismiss)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (e.hasValue) Column { SignReceiptBody(receipt, e.cluster) }
@@ -106,7 +107,7 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                 // ---- ledger facts ---------------------------------------------
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.detail_hdr), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
+                        Text(stringResource(R.string.detail_hdr).uppercase(), style = HaloType.label, color = Halo.cyan)
                         e.fiatValue(currency)?.let { StatRow(stringResource(R.string.detail_value, currency), fmtFiat(it, currency), accent = true) }
                         e.fiat.values.sortedBy { it.currency }.forEach { s -> StatRow("SOL / " + s.currency, fmtFiat(s.solPrice, s.currency) + if (s.source != "spot") " · ${s.source}" else "") }
                         StatRow(stringResource(R.string.detail_proof), if (e.attestationSig != null) stringResource(R.string.detail_attested) else stringResource(R.string.pdf_not_attested), accent = e.attestationSig != null)
@@ -143,11 +144,15 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
             }
             // ---- actions --------------------------------------------------------
             Column(Modifier.fillMaxWidth().background(Halo.ground2).padding(horizontal = 20.dp, vertical = 12.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Un'azione principale piena, le altre leggere: due bottoni fantasma
+                // uguali non dicevano quale fosse quella che uno cerca.
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GhostButton(stringResource(R.string.detail_share_pdf), Modifier.weight(1f), HIcon.PDF, tint = Halo.mint) {
-                        scope.launch { val f = withContext(Dispatchers.IO) { Exports.write(ctx, "clearsign-receipt-${e.id.take(8)}.pdf", ReceiptPdf(ctx).receipt(e, currency)) }; Exports.share(ctx, listOf(f), "application/pdf", "ClearSign receipt") }
+                    Box(Modifier.weight(1f)) {
+                        PrimaryButton(stringResource(R.string.detail_share_pdf), danger = false, icon = HIcon.PDF) {
+                            scope.launch { val f = withContext(Dispatchers.IO) { Exports.write(ctx, "clearsign-receipt-${e.id.take(8)}.pdf", ReceiptPdf(ctx).receipt(e, currency)) }; Exports.share(ctx, listOf(f), "application/pdf", "ClearSign receipt") }
+                        }
                     }
-                    GhostButton(stringResource(R.string.detail_save), Modifier.weight(1f), HIcon.DOWNLOAD) {
+                    GhostButton(stringResource(R.string.detail_save), Modifier.weight(1f), HIcon.DOWNLOAD, height = 54.dp) {
                         scope.launch { val b = withContext(Dispatchers.IO) { ReceiptPdf(ctx).receipt(e, currency) }; save("clearsign-receipt-${e.id.take(8)}.pdf", b) }
                     }
                 }

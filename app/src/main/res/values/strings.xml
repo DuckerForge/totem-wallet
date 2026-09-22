@@ -553,9 +553,10 @@
     <string name="ore_best_label">Emptiest squares now:</string>
     <string name="ore_outlook">Expected: %1$s ORE (≈ %2$s SOL). Expected cost: %3$s SOL, %4$s%% of the stake.</string>
     <string name="ore_outlook_nopx">Expected: %1$s ORE. Expected cost: %2$s SOL, %3$s%% of the stake.</string>
-    <string name="ore_outlook_good">At today\'s ORE price this pays.</string>
-    <string name="ore_outlook_bad">At today\'s ORE price this does not pay.</string>
-    <string name="ore_solo_legend">squares with a dot pay one miner only, drawn by stake</string>
+    <string name="ore_outlook_good">On average, at today\'s ORE price, %1$s SOL come back per SOL staked. Never certain: one square in 25 wins, yours are %2$d.</string>
+    <string name="ore_outlook_bad">On average, at today\'s ORE price, %1$s SOL come back per SOL staked: a loss. One square in 25 wins, yours are %2$d.</string>
+    <string name="ore_outlook_crowd">Your share is counted on what the network usually puts by the end of a round, about %1$s SOL per square, not on today\'s empty grid.</string>
+    <string name="ore_solo_legend">dotted: pays one miner only, drawn by stake</string>
     <string name="ore_last_title">Round %1$d: square %2$d came out</string>
     <string name="ore_last_split">the ORE was split among %1$d miners</string>
     <string name="ore_last_solo">one miner took all the ORE</string>

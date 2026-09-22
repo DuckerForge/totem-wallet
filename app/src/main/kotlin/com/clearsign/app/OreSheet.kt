@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clearsign.core.Ore
 import com.clearsign.core.OreOdds
+import com.clearsign.core.OreCrowd
+import com.clearsign.core.PastRound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -119,6 +121,10 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         delay(2_500)
         reveal = null
     }
+    /** I giri chiusi dall'archivio, per la vista «ultimi giri»: dove scava la rete, e cosa e' uscito. */
+    var past by remember { mutableStateOf<List<PastRound>>(emptyList()) }
+    var history by remember { mutableStateOf(false) }
+    LaunchedEffect(refresh) { past = withContext(Dispatchers.IO) { runCatching { OreArchive.rounds() }.getOrDefault(emptyList()) } }
     /** Quanto vale un ORE in SOL, per dire se al prezzo di oggi la puntata conviene. Null finche' non si sa. */
     var oreSol by remember { mutableStateOf<Double?>(null) }
     LaunchedEffect(Unit) {
@@ -384,7 +390,21 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
 
                     // ---- la griglia: il SOL di tutti su ogni casella, le tue accese, le scelte cerchiate ----
                     val typed = perSquare.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 1e9).toLong() } ?: 0L
-                    Grid(v, picked, digging && state == OreState.Idle, if (digging) typed else 0L, reveal, v.lastRound?.takeIf { reveal == null }?.winningSquare) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
+                    // Adesso, o la media degli ultimi giri: la stessa griglia, un'altra fotografia.
+                    if (past.size >= 5) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SmallChip(stringResource(R.string.ore_view_now), null, tint = if (!history) Halo.mint else Halo.muted) { history = false }
+                            SmallChip(stringResource(R.string.ore_view_history, past.size), null, tint = if (history) Halo.mint else Halo.muted) { history = true }
+                        }
+                    }
+                    val heat = if (history && past.size >= 5) OreCrowd.averageDeployed(past) else null
+                    Grid(v, picked, digging && state == OreState.Idle, if (digging) typed else 0L, reveal, v.lastRound?.takeIf { reveal == null }?.winningSquare, heat) { sq -> picked = if (sq in picked) picked - sq else picked + sq }
+                    if (history && past.size >= 5) {
+                        val wins = OreCrowd.winners(past).take(12).joinToString(" · ") { (it + 1).toString() }
+                        Text(stringResource(R.string.ore_history_wins, wins), style = HaloType.label, color = Halo.muted)
+                        OreCrowd.hottest(past)?.let { (sq, n) -> if (n > 1) Text(stringResource(R.string.ore_history_hot, sq + 1, n), style = HaloType.label, color = Halo.muted) }
+                        Text(stringResource(R.string.ore_history_best, OreCrowd.best(3, past).joinToString(", ") { (it + 1).toString() }), style = HaloType.label, color = Halo.cyan)
+                    }
                     // Legenda: il puntino delle caselle che pagano a uno solo.
                     v.round?.let {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -432,16 +452,17 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
  * scegliendo hanno il bordo acceso. Il numero e' il SOL di tutti.
  */
 @Composable
-private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare: Long, reveal: Int?, lastWin: Int?, onPick: (Int) -> Unit) {
+private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare: Long, reveal: Int?, lastWin: Int?, heat: LongArray?, onPick: (Int) -> Unit) {
     val mine = v.mySquares.toSet()
-    val max = (v.round?.deployed?.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val source = heat ?: v.round?.deployed
+    val max = (source?.maxOrNull() ?: 0L).coerceAtLeast(1L)
     val solo = v.round?.soloMask ?: 0
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         for (row in 0 until 5) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 for (col in 0 until 5) {
                     val s = row * 5 + col
-                    val sol = v.round?.deployed?.getOrNull(s) ?: 0L
+                    val sol = source?.getOrNull(s) ?: 0L
                     val heat = (sol.toDouble() / max).toFloat().coerceIn(0f, 1f)
                     val isMine = s in mine
                     val isPicked = picking && s in picked
@@ -506,8 +527,9 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
     val meTop = v.miner != null && last.topMiner.contentEquals(v.miner.authority)
     val how = if (last.isSplit) stringResource(R.string.ore_last_split, last.count.getOrNull(win)?.toInt() ?: 0) else stringResource(R.string.ore_last_solo)
     val outcome = when {
-        onIt > 0L && last.isSplit && total > 0 -> stringResource(R.string.ore_last_you_won, Ore.ore(java.math.BigInteger.valueOf(last.rewardOre).multiply(java.math.BigInteger.valueOf(onIt)).divide(java.math.BigInteger.valueOf(total)).toLong()))
-        onIt > 0L && meTop -> stringResource(R.string.ore_last_you_won, Ore.ore(last.rewardOre))
+        // Pro quota sull'ORE del giro piu' la pentola, se e' uscita: come `checkpoint.rs`.
+        onIt > 0L && last.isSplit && total > 0 -> stringResource(R.string.ore_last_you_won, Ore.ore(java.math.BigInteger.valueOf(last.rewardOre + last.motherlode).multiply(java.math.BigInteger.valueOf(onIt)).divide(java.math.BigInteger.valueOf(total)).toLong()))
+        onIt > 0L && meTop -> stringResource(R.string.ore_last_you_won, Ore.ore(last.rewardOre + java.math.BigInteger.valueOf(last.motherlode).multiply(java.math.BigInteger.valueOf(onIt)).divide(java.math.BigInteger.valueOf(total.coerceAtLeast(1))).toLong()))
         onIt > 0L -> stringResource(R.string.ore_last_you_lost_draw)
         v.miner?.roundId == last.id -> stringResource(R.string.ore_last_you_missed)
         else -> ""

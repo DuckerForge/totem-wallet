@@ -75,6 +75,8 @@ const BUDGET = 45;
 // tredici, e quello che resta serve a leggere le firme di chi si è mosso.
 const DOLPHIN_CHUNKS_PER_RUN = 12;
 
+import { oreTick } from "./ore.js";
+
 async function rpc(env, method, params) {
   const r = await fetch(env.HELIUS_URL, {
     method: "POST",
@@ -602,6 +604,8 @@ const WARM_LOOK = 12;
 const WARM_MAX = 5;
 /** La sveglia che scalda invece di scansionare, sfasata di cinque minuti. */
 const WARM_CRON = "5-59/10 * * * *";
+/** Ogni minuto il giro di ORE appena chiuso: due chiamate, una scrittura, vedi ore.js. */
+const ORE_CRON = "* * * * *";
 
 /**
  * Nome, simbolo, decimali e icona di una moneta: uno chiede, tutti sanno.
@@ -688,6 +692,7 @@ export default {
   // scaldare. Separate perché le cinquanta chiamate in uscita del piano
   // gratuito si contano per esecuzione, e la scansione le vuole tutte.
   async scheduled(event, env, ctx) {
+    if (event.cron === ORE_CRON) { ctx.waitUntil(fbOn(env) ? oreTick(env, rpc, fbGet, fbPut).catch(() => {}) : Promise.resolve()); return; }
     ctx.waitUntil(event.cron === WARM_CRON ? warm(env) : sweep(env));
   },
   async fetch(request, env, ctx) {

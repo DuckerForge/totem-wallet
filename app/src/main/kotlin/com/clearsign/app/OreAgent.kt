@@ -2,6 +2,7 @@ package com.clearsign.app
 
 import android.content.Context
 import com.clearsign.core.Ore
+import com.clearsign.core.OreCrowd
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -42,6 +43,10 @@ object OreAgent {
     const val MAX_PRODUCTION_COST = 1_000_000_000L
 
     private const val PREFS = "apex_ore_agent"
+    /** Ogni quanto si guarda dove scava la rete e si spostano le caselle. Un Automate costa una fee di rete. */
+    const val RENEW_EVERY_MS = 15 * 60_000L
+    /** Sotto questi giri in archivio lo storico non dice niente e le caselle restano. */
+    const val RENEW_MIN_ROUNDS = 10
 
     /** Quanto mettere per giro e quanto affidare, dai due cursori e da quello che c'e'. */
     data class Sizing(val amountPerSquare: Long, val squares: Int, val deposit: Long, val rounds: Int) {
@@ -78,6 +83,45 @@ object OreAgent {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /**
+     * Le caselle seguono la rete.
+     *
+     * La quota di ORE e' la propria parte della casella, quindi a parita' di
+     * costo rende di piu' la casella che gli altri lasciano vuota. Ogni quarto
+     * d'ora si leggono i giri chiusi dall'archivio, si prendono le meno
+     * affollate, e se sono diverse da quelle di adesso si manda un Automate
+     * con la stessa cifra, la stessa fee e deposito zero: il programma
+     * aggiorna la maschera sul posto. Passa dal collare come ogni mossa, e
+     * costa una fee di rete. Senza abbastanza giri in archivio non si tocca.
+     */
+    private suspend fun renew(ctx: Context, envelope: ByteArray, auto: Ore.Automation): TraderLoop.Tick? {
+        val p = prefs(ctx)
+        val now = System.currentTimeMillis()
+        if (now - p.getLong("renewAt", 0L) < RENEW_EVERY_MS) return null
+        p.edit().putLong("renewAt", now).apply()
+        val rounds = withContext(Dispatchers.IO) { runCatching { OreArchive.rounds() }.getOrDefault(emptyList()) }
+        if (rounds.size < RENEW_MIN_ROUNDS) return null
+        val n = auto.squares.coerceIn(1, Ore.SQUARES)
+        val best = OreCrowd.best(n, rounds).sorted()
+        val current = Ore.squaresOf(auto.mask.toInt()).sorted()
+        if (best == current) return null
+        val ix = OreMiner.automate(
+            envelope, auto.amountPerSquare, best, deposit = 0L, fee = auto.fee, reload = auto.reload,
+            maxProductionCost = auto.maxProductionCost, executor = auto.executor,
+        )
+        val intent = JSONObject().put("action", "other").put("outMint", "SOL").put("outAmount", 0.0)
+            .put("agent", TraderLoop.AGENT).put("reason", ctx.getString(R.string.ore_why_renew))
+        val verdict = submit(ctx, envelope, listOf(ix), intent)
+        if (verdict is AgentBroker.Verdict.SignedSilently) {
+            p.edit().putString("squares", best.joinToString(",")).apply()
+            val m = ctx.getString(R.string.trace_ore_renew, best.joinToString(", ") { (it + 1).toString() }, rounds.size)
+            AgentTrace.say(m, AgentTrace.Kind.ACTED)
+            return TraderLoop.Tick(m, acted = true)
+        }
+        sayRefusal(ctx, verdict)
+        return null
+    }
+
+    /**
      * Un passo del ciclo. Null quando non c'e' niente da dire ne' da fare;
      * un Tick quando l'agente ha agito o ha qualcosa da riferire.
      */
@@ -112,7 +156,7 @@ object OreAgent {
                 p.edit().putLong("spent", spent).putLong("earned", earned).apply()
                 AgentTrace.say(ctx.getString(R.string.trace_ore_progress, Ore.sol(spent), Ore.ore(earned), auto.roundsLeft))
             }
-            return null
+            return renew(ctx, envelope, auto)
         }
 
         // Niente di vivo: si affida, se i numeri lo permettono.

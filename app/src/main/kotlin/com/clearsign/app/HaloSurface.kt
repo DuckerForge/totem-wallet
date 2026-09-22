@@ -98,12 +98,17 @@ fun Modifier.crt(tint: Color, enabled: Boolean): Modifier {
     if (!enabled) return this
     val density = LocalDensity.current.density
     val lines = remember(density) { scanlineBrush(density) }
-    val tr = rememberInfiniteTransition(label = "crt")
-    val roll by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "roll")
-    val tear by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(7000, easing = LinearEasing)), label = "tear")
-    val flick by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "flick")
+    // One clock for the three effects. Forty-two seconds is a whole number of
+    // rolls (4.2 s), tears (7 s) and flickers (1 s), so each phase is a
+    // multiple of it and the loop is seamless. Read in draw, never in
+    // composition: the root of the app does not recompose for a CRT.
+    val clock = rememberInfiniteTransition(label = "crt").animateFloat(0f, 1f, infiniteRepeatable(tween(42_000, easing = LinearEasing)), label = "clock")
     return drawWithContent {
         drawContent()
+        val t = clock.value
+        val roll = (t * 10f) % 1f
+        val tear = (t * 6f) % 1f
+        val flick = (t * 42f) % 1f
         // Phosphor glow: a whisper of the theme colour over everything.
         drawRect(tint, alpha = 0.05f)
         // Scanlines, stronger than the static ones.

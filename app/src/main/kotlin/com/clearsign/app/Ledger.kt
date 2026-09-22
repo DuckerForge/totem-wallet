@@ -40,6 +40,7 @@ data class FiatSnapshot(
     fun priceOf(mint: String): Double? = if (mint == com.clearsign.core.NATIVE_SOL_MINT) solPrice else prices[mint]
 }
 
+@androidx.compose.runtime.Immutable
 data class LedgerEntry(
     val id: String,
     val groupId: String,               // one approval → N transactions share it
@@ -117,6 +118,30 @@ object Ledger {
     fun month(ctx: Context, ym: String): List<LedgerEntry> = synchronized(lock) { readMonth(ctx, ym) }
 
     fun all(ctx: Context): List<LedgerEntry> = months(ctx).flatMap { month(ctx, it) }
+
+    /**
+     * The newest [n] entries, of one [kind] or of any: what a card on a page
+     * shows. Months are read newest first and only until the list is full,
+     * so a card asking for five rows never parses a year of files.
+     */
+    fun recent(ctx: Context, n: Int, kind: String? = null): List<LedgerEntry> = synchronized(lock) {
+        takeAcross(months(ctx).map { ym -> { readMonth(ctx, ym) } }, n) { kind == null || it.kind == kind }
+    }
+
+    /** The entry a signature belongs to, newest months first, or null. */
+    fun bySignature(ctx: Context, signature: String): LedgerEntry? = synchronized(lock) {
+        months(ctx).firstNotNullOfOrNull { ym -> readMonth(ctx, ym).firstOrNull { it.signature == signature } }
+    }
+
+    /** Pure: the first [n] items that pass [keep], pulling each source only when the ones before did not fill the list. */
+    internal fun <T> takeAcross(sources: List<() -> List<T>>, n: Int, keep: (T) -> Boolean): List<T> {
+        val out = ArrayList<T>(n)
+        for (src in sources) {
+            if (out.size >= n) break
+            for (e in src()) { if (keep(e)) { out += e; if (out.size >= n) break } }
+        }
+        return out
+    }
 
     fun range(ctx: Context, fromMs: Long, toMs: Long): List<LedgerEntry> =
         months(ctx).filter { ym -> val (y, m) = ym.split("-").map { it.toInt() }; monthOverlaps(y, m, fromMs, toMs) }

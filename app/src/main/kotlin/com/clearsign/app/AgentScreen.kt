@@ -561,8 +561,10 @@ private fun FollowsSection(refresh: Int) {
 @Composable
 private fun RecentMoves(refresh: Int) {
     val ctx = LocalContext.current
-    val recent = remember(refresh) {
-        runCatching { Ledger.all(ctx).filter { it.kind == "agent" } }.getOrDefault(emptyList()).sortedByDescending { it.at }.take(5)
+    // Five rows from the newest months, read on IO: the page draws at once
+    // and the rows arrive.
+    val recent by androidx.compose.runtime.produceState(emptyList<LedgerEntry>(), refresh) {
+        value = withContext(Dispatchers.IO) { runCatching { Ledger.recent(ctx, 5, "agent") }.getOrDefault(emptyList()) }
     }
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {

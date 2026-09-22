@@ -51,10 +51,14 @@ internal fun ConnectionsSheet(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     val conns = remember(refresh) { Connections.all(ctx) }
-    val signings = remember(refresh) {
-        runCatching { Ledger.all(ctx) }.getOrDefault(emptyList())
-            .filter { it.sent }
-            .groupingBy { (it.dApp ?: "").lowercase() }.eachCount()
+    // The whole ledger, counted per dApp, on IO: the list shows first and
+    // the counts fill in.
+    val signings by androidx.compose.runtime.produceState(emptyMap<String, Int>(), refresh) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { Ledger.all(ctx) }.getOrDefault(emptyList())
+                .filter { it.sent }
+                .groupingBy { (it.dApp ?: "").lowercase() }.eachCount()
+        }
     }
 
     ModalBottomSheet(

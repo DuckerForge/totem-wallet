@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -88,13 +89,13 @@ internal fun EyesDialog(onClose: () -> Unit, onStart: () -> Unit = {}) {
 internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     val ctx = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
-    val open = remember(refresh) { Positions.open(ctx) }
-    val cfg = remember(refresh) { TraderLoop.config(ctx) }
+    // The book and the loop's settings: read once here, then only on the
+    // two-second clock below and on IO. A file read never sits in a
+    // composition, and the ten-times-a-second clock lives inside the rings
+    // now, so the page itself recomposes only when something changed.
+    var open by remember { mutableStateOf(Positions.open(ctx)) }
+    var cfg by remember { mutableStateOf(TraderLoop.config(ctx)) }
     var tickAt by remember { mutableStateOf(TraderLoop.lastTickAt(ctx)) }
-    // The clock the rings run on, ten times a second: enough for an arc to
-    // look alive, few enough not to redraw the charts for nothing.
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(100) } }
     var solUsd by remember { mutableStateOf<Double?>(null) }
     var spot by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var busy by remember { mutableStateOf<String?>(null) }
@@ -169,13 +170,13 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
 
     // One clock for the page: the book and the tick every two seconds, the
     // prices every fifteen. The loop's own reads are its own business.
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refresh) {
         var n = 0
         while (true) {
-            refresh++
-            tickAt = TraderLoop.lastTickAt(ctx)
+            val snap = withContext(Dispatchers.IO) { Triple(Positions.open(ctx), TraderLoop.config(ctx), TraderLoop.lastTickAt(ctx)) }
+            open = snap.first; cfg = snap.second; tickAt = snap.third
             if (n % 7 == 0) {
-                val mints = Positions.open(ctx).map { it.mint } + com.clearsign.core.NATIVE_SOL_MINT
+                val mints = open.map { it.mint } + com.clearsign.core.NATIVE_SOL_MINT
                 val q = withContext(Dispatchers.IO) { runCatching { Prices.usd(mints) }.getOrDefault(emptyMap()) }
                 if (q.isNotEmpty()) { spot = q; solUsd = q[com.clearsign.core.NATIVE_SOL_MINT] ?: solUsd }
             }
@@ -184,29 +185,17 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
         }
     }
 
-    val acted = AgentTrace.lines.count { it.kind == AgentTrace.Kind.ACTED }
-    val ring = rememberReveal(acted, durationMs = 1400)
+    // The count changes only when the loop acts: a derived state, so a line
+    // of any other kind arriving does not recompose the page.
+    val acted by remember { androidx.compose.runtime.derivedStateOf { AgentTrace.lines.count { it.kind == AgentTrace.Kind.ACTED } } }
     val looked = TraderLoop.lookedAt.longValue
     val hunted = TraderLoop.huntedAt.longValue
-    val pulse = rememberReveal(looked, durationMs = 1600)
-    // Time left to the next look and the next hunt, as a share of the wait.
-    val lookLeft = if (looked == 0L) 0L else (looked + TraderLoop.EXIT_EVERY_MS - now).coerceIn(0L, TraderLoop.EXIT_EVERY_MS)
-    val huntLeft = if (hunted == 0L) 0L else (hunted + TraderLoop.HUNT_EVERY_MS - now).coerceIn(0L, TraderLoop.HUNT_EVERY_MS)
-    val breathe by rememberInfiniteTransition(label = "eyes").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "breathe",
-    )
 
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Halo.ground2, Halo.ground))),
     ) {
         // The ring that leaves the middle of the screen when the loop signs.
-        Canvas(Modifier.fillMaxSize()) {
-            if (ring in 0.01f..0.99f) {
-                val r = size.minDimension * (0.1f + 0.9f * ring)
-                drawCircle(Halo.mint.copy(alpha = (1f - ring) * 0.5f), r, center, style = Stroke(2.dp.toPx()))
-                drawCircle(Halo.mint.copy(alpha = (1f - ring) * 0.12f), r * 0.6f, center)
-            }
-        }
+        ActRing(acted)
 
         // In cima si scansava la barra di stato, in fondo niente: non c'era
         // niente in fondo da scansare. Da quando il tasto di accensione sta li',
@@ -224,33 +213,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                 // The clock: an outer arc that drains to the next look, an inner
                 // arc to the next hunt, and the dot in the middle that breathes
                 // and swells once each time the loop looks.
-                Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        val stroke = 3.dp.toPx()
-                        val inset = stroke
-                        val outer = androidx.compose.ui.geometry.Rect(inset, inset, size.width - inset, size.height - inset)
-                        val inner = androidx.compose.ui.geometry.Rect(inset * 3.2f, inset * 3.2f, size.width - inset * 3.2f, size.height - inset * 3.2f)
-                        drawArc(Halo.stroke, -90f, 360f, false, outer.topLeft, outer.size, style = Stroke(stroke))
-                        if (cfg.on && looked > 0L) {
-                            drawArc(
-                                Halo.mint, -90f, 360f * lookLeft / TraderLoop.EXIT_EVERY_MS, false, outer.topLeft, outer.size,
-                                style = Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-                            )
-                        }
-                        drawArc(Halo.stroke.copy(alpha = 0.6f), -90f, 360f, false, inner.topLeft, inner.size, style = Stroke(stroke * 0.6f))
-                        if (cfg.on && hunted > 0L) {
-                            drawArc(
-                                Halo.cyan, -90f, 360f * huntLeft / TraderLoop.HUNT_EVERY_MS, false, inner.topLeft, inner.size,
-                                style = Stroke(stroke * 0.6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-                            )
-                        }
-                        val base = 2.5f.dp.toPx()
-                        val swell = 1f - pulse
-                        drawCircle(Halo.mint.copy(alpha = 0.10f + 0.10f * (1f - breathe)), base * (1.6f + 1.4f * breathe), center)
-                        drawCircle(Halo.mint.copy(alpha = 0.55f * swell), base * (2f + 3f * pulse), center, style = Stroke(1.5f.dp.toPx()))
-                        drawCircle(if (cfg.on) Halo.mint else Halo.muted, base, center)
-                    }
-                }
+                LoopClock(cfg.on, looked, hunted)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.eyes_title).uppercase(), style = HaloType.label, color = Halo.muted)
@@ -260,26 +223,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                         else stringResource(R.string.eyes_watching, open.size),
                         fontFamily = Inter, fontSize = 12.sp, color = if (cfg.on) Halo.ink else Halo.amber,
                     )
-                    if (cfg.on && looked > 0L) {
-                        Row {
-                            Text(stringResource(R.string.eyes_next_look, (lookLeft / 1000).toString()), fontFamily = Mono, fontSize = 10.5.sp, color = Halo.mint, style = Tabular)
-                            Spacer(Modifier.width(10.dp))
-                            // Pieno vuol dire che non caccia, e dirgli quando
-                            // caccia la prossima volta era una promessa che non
-                            // aveva intenzione di mantenere: il ciclo si ferma da
-                            // solo quando i posti sono occupati e ricompra solo
-                            // dopo che ha venduto. Adesso lo dice invece di
-                            // mostrare un conto alla rovescia verso niente.
-                            val full = open.size >= cfg.maxPositions
-                            if (full) Text(
-                                stringResource(R.string.eyes_full, open.size, cfg.maxPositions),
-                                fontFamily = Mono, fontSize = 10.5.sp, color = Halo.amber, style = Tabular,
-                            ) else if (hunted > 0L) Text(
-                                stringResource(R.string.eyes_next_hunt, String.format(Locale.ROOT, "%d:%02d", huntLeft / 60_000, huntLeft / 1000 % 60)),
-                                fontFamily = Mono, fontSize = 10.5.sp, color = Halo.cyan, style = Tabular,
-                            )
-                        }
-                    }
+                    if (cfg.on && looked > 0L) Countdown(looked, hunted, open.size, cfg.maxPositions)
                 }
                 Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp) }
             }
@@ -305,11 +249,18 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                     val move = if (entryUsd != null && now != null && entryUsd > 0) (now - entryUsd) / entryUsd * 100 else null
                     GlassCard {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            val targets = if (entryUsd == null) emptyList() else listOf(
-                                ChartTarget(entryUsd, stringResource(R.string.eyes_entry), Halo.muted, "e" + pos.mint),
-                                ChartTarget(entryUsd * (1 + pos.takeProfitPct / 100.0), "+" + pos.takeProfitPct + "%", Halo.mint, "t" + pos.mint),
-                                ChartTarget(entryUsd * (1 - pos.stopLossPct / 100.0), "−" + pos.stopLossPct + "%", Halo.red, "s" + pos.mint),
-                            )
+                            // The same three lines until the entry or the rule
+                            // changes: a new list every recomposition kept the
+                            // chart from ever skipping.
+                            val entryLabel = stringResource(R.string.eyes_entry)
+                            val muted = Halo.muted; val mint = Halo.mint; val red = Halo.red
+                            val targets = remember(entryUsd, pos.takeProfitPct, pos.stopLossPct, pos.mint, entryLabel, muted) {
+                                if (entryUsd == null) emptyList() else listOf(
+                                    ChartTarget(entryUsd, entryLabel, muted, "e" + pos.mint),
+                                    ChartTarget(entryUsd * (1 + pos.takeProfitPct / 100.0), "+" + pos.takeProfitPct + "%", mint, "t" + pos.mint),
+                                    ChartTarget(entryUsd * (1 - pos.stopLossPct / 100.0), "−" + pos.stopLossPct + "%", red, "s" + pos.mint),
+                                )
+                            }
                             PriceChart(pos.mint, pos.symbol, targets)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -520,12 +471,101 @@ private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
  */
 @Composable
 private fun TubeGlass(modifier: Modifier) {
-    androidx.compose.foundation.Canvas(modifier) {
-        var y = 0f
-        while (y < size.height) {
-            drawLine(Halo.cyan.copy(alpha = 0.045f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 1f)
-            y += 3f
+    // One brush that repeats every three pixels, one rectangle: the same
+    // lines as before, eight hundred draw calls fewer per frame.
+    val line = Halo.cyan.copy(alpha = 0.045f)
+    val glass = remember(line) {
+        Brush.verticalGradient(
+            0f to line, 0.34f to line, 0.34f to Color.Transparent, 1f to Color.Transparent,
+            startY = 0f, endY = 3f, tileMode = androidx.compose.ui.graphics.TileMode.Repeated,
+        )
+    }
+    androidx.compose.foundation.Canvas(modifier) { drawRect(glass) }
+}
+
+/** The ring that leaves the middle of the screen when the loop signs. Its own composable: only it recomposes while it grows. */
+@Composable
+private fun ActRing(acted: Int) {
+    val ring = rememberReveal(acted, durationMs = 1400)
+    Canvas(Modifier.fillMaxSize()) {
+        if (ring in 0.01f..0.99f) {
+            val r = size.minDimension * (0.1f + 0.9f * ring)
+            drawCircle(Halo.mint.copy(alpha = (1f - ring) * 0.5f), r, center, style = Stroke(2.dp.toPx()))
+            drawCircle(Halo.mint.copy(alpha = (1f - ring) * 0.12f), r * 0.6f, center)
         }
+    }
+}
+
+/**
+ * The clock: an outer arc that drains to the next look, an inner arc to the
+ * next hunt, and the dot in the middle that breathes and swells once each
+ * time the loop looks. The ten-times-a-second tick and the breathing are
+ * read in draw, so the rest of the page never hears them.
+ */
+@Composable
+private fun LoopClock(on: Boolean, looked: Long, hunted: Long) {
+    val now = remember { androidx.compose.runtime.mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { now.longValue = System.currentTimeMillis(); delay(100) } }
+    val swellIn = remember(looked) { Animatable(0f) }
+    LaunchedEffect(looked) { swellIn.animateTo(1f, tween(1600, easing = FastOutSlowInEasing)) }
+    val breathe = rememberInfiniteTransition(label = "eyes").animateFloat(
+        0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "breathe",
+    )
+    val mint = Halo.mint; val cyan = Halo.cyan; val muted = Halo.muted; val strokeCol = Halo.stroke
+    Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val t = now.longValue
+            val lookLeft = if (looked == 0L) 0L else (looked + TraderLoop.EXIT_EVERY_MS - t).coerceIn(0L, TraderLoop.EXIT_EVERY_MS)
+            val huntLeft = if (hunted == 0L) 0L else (hunted + TraderLoop.HUNT_EVERY_MS - t).coerceIn(0L, TraderLoop.HUNT_EVERY_MS)
+            val stroke = 3.dp.toPx()
+            val inset = stroke
+            val outer = androidx.compose.ui.geometry.Rect(inset, inset, size.width - inset, size.height - inset)
+            val inner = androidx.compose.ui.geometry.Rect(inset * 3.2f, inset * 3.2f, size.width - inset * 3.2f, size.height - inset * 3.2f)
+            drawArc(strokeCol, -90f, 360f, false, outer.topLeft, outer.size, style = Stroke(stroke))
+            if (on && looked > 0L) {
+                drawArc(
+                    mint, -90f, 360f * lookLeft / TraderLoop.EXIT_EVERY_MS, false, outer.topLeft, outer.size,
+                    style = Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                )
+            }
+            drawArc(strokeCol.copy(alpha = 0.6f), -90f, 360f, false, inner.topLeft, inner.size, style = Stroke(stroke * 0.6f))
+            if (on && hunted > 0L) {
+                drawArc(
+                    cyan, -90f, 360f * huntLeft / TraderLoop.HUNT_EVERY_MS, false, inner.topLeft, inner.size,
+                    style = Stroke(stroke * 0.6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                )
+            }
+            val base = 2.5f.dp.toPx()
+            val pulse = swellIn.value
+            val b = breathe.value
+            drawCircle(mint.copy(alpha = 0.10f + 0.10f * (1f - b)), base * (1.6f + 1.4f * b), center)
+            drawCircle(mint.copy(alpha = 0.55f * (1f - pulse)), base * (2f + 3f * pulse), center, style = Stroke(1.5f.dp.toPx()))
+            drawCircle(if (on) mint else muted, base, center)
+        }
+    }
+}
+
+/** Seconds to the next look and minutes to the next hunt. A clock of its own, once a second: the text cannot change faster. */
+@Composable
+private fun Countdown(looked: Long, hunted: Long, openCount: Int, maxPositions: Int) {
+    var now by remember { androidx.compose.runtime.mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1_000) } }
+    val lookLeft = (looked + TraderLoop.EXIT_EVERY_MS - now).coerceIn(0L, TraderLoop.EXIT_EVERY_MS)
+    val huntLeft = if (hunted == 0L) 0L else (hunted + TraderLoop.HUNT_EVERY_MS - now).coerceIn(0L, TraderLoop.HUNT_EVERY_MS)
+    Row {
+        Text(stringResource(R.string.eyes_next_look, (lookLeft / 1000).toString()), style = HaloType.mono, color = Halo.mint)
+        Spacer(Modifier.width(10.dp))
+        // Pieno vuol dire che non caccia, e dirgli quando caccia la prossima
+        // volta era una promessa che non aveva intenzione di mantenere: il
+        // ciclo si ferma da solo quando i posti sono occupati e ricompra solo
+        // dopo che ha venduto. Adesso lo dice invece di mostrare un conto
+        // alla rovescia verso niente.
+        val full = openCount >= maxPositions
+        if (full) Text(stringResource(R.string.eyes_full, openCount, maxPositions), style = HaloType.mono, color = Halo.amber)
+        else if (hunted > 0L) Text(
+            stringResource(R.string.eyes_next_hunt, String.format(Locale.ROOT, "%d:%02d", huntLeft / 60_000, huntLeft / 1000 % 60)),
+            style = HaloType.mono, color = Halo.cyan,
+        )
     }
 }
 

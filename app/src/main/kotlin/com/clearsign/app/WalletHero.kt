@@ -290,12 +290,15 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
             Text(symbol.take(2).uppercase(), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.36f).sp, color = tint)
         }
     }
-    if (image == null) initials()
-    else coil.compose.SubcomposeAsyncImage(
-        model = image, contentDescription = null,
-        modifier = Modifier.size(size).clip(rs(999)),
-        loading = { initials() }, error = { initials() },
-    )
+    // The initials are always there; the picture lands on top when it has
+    // loaded. One composition per logo, not two, and nothing to swap.
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        initials()
+        if (image != null) coil.compose.AsyncImage(
+            model = image, contentDescription = null,
+            modifier = Modifier.matchParentSize().clip(rs(999)),
+        )
+    }
 }
 
 /**

@@ -54,6 +54,7 @@ import kotlin.math.abs
  * line — a flat line would read as a price that did not move.
  */
 /** A price worth a line on the chart: an order, or an alert. [key] restarts the entrance when it changes. */
+@androidx.compose.runtime.Immutable
 internal data class ChartTarget(val priceUsd: Double, val label: String, val tint: Color, val key: Any)
 
 @Composable
@@ -141,15 +142,25 @@ internal fun Spark(
     // The scale stretches to fit the targets, so a line at +30% is on the
     // picture and not off the top of it. Capped at four times the range of the
     // prices themselves: a target at +300% would flatten the whole story.
-    val range = (values.max() - values.min()).takeIf { it > 0 } ?: (values.max() * 0.02).coerceAtLeast(1e-12)
-    val lo = minOf(values.min(), targets.minOfOrNull { it.priceUsd }?.coerceAtLeast(values.min() - 4 * range) ?: values.min())
-    val hi = maxOf(values.max(), targets.maxOfOrNull { it.priceUsd }?.coerceAtMost(values.max() + 4 * range) ?: values.max())
-    val span = (hi - lo).takeIf { it > 0 } ?: 1.0
+    val (lo, span) = remember(values, targets) {
+        val range = (values.max() - values.min()).takeIf { it > 0 } ?: (values.max() * 0.02).coerceAtLeast(1e-12)
+        val lo = minOf(values.min(), targets.minOfOrNull { it.priceUsd }?.coerceAtLeast(values.min() - 4 * range) ?: values.min())
+        val hi = maxOf(values.max(), targets.maxOfOrNull { it.priceUsd }?.coerceAtMost(values.max() + 4 * range) ?: values.max())
+        lo to ((hi - lo).takeIf { it > 0 } ?: 1.0)
+    }
     // Each target slides in from the top when it first appears, or when its key
     // changes: an order being placed is a line arriving, not a line that was
     // always there.
     val reveals = targets.map { rememberReveal(it.key, durationMs = 700) }
     val tm = androidx.compose.ui.text.rememberTextMeasurer()
+    // Measured once per label, not once per frame while a line slides in.
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val labels = remember(targets, tm) {
+        targets.map { t ->
+            tm.measure(t.label, androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 9.5.sp, color = t.tint, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+        }
+    }
+    val dash = remember(density) { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f * density, 5f * density)) }
 
     Canvas(Modifier.fillMaxWidth().height(if (targets.isEmpty()) 86.dp else 110.dp)) {
         val n = values.size
@@ -178,15 +189,11 @@ internal fun Spark(
         targets.forEachIndexed { i, t ->
             val yEnd = y(t.priceUsd)
             val yNow = yEnd * reveals[i]
-            val dash = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f * density, 5f * density))
             drawLine(
                 t.tint.copy(alpha = 0.35f + 0.55f * reveals[i]), Offset(0f, yNow), Offset(size.width, yNow),
                 strokeWidth = 1.4f * density, pathEffect = dash,
             )
-            val lay = tm.measure(
-                t.label,
-                androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 9.5.sp, color = t.tint, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-            )
+            val lay = labels[i]
             // The label sits above the line, on the left, where nothing else lives.
             val ty = (yNow - lay.size.height - 2f * density).coerceAtLeast(0f)
             drawRoundRect(

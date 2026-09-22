@@ -92,14 +92,19 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
 
             // ---- the preview: the very face the bubble will wear ----
             val px = with(density) { size.dp.roundToPx() }
-            val previewData = remember(tick, face, owner) {
+            // Three files and a preferences read: once here, then on IO when
+            // the face or the coin changes, never in composition again.
+            val currency = Settings.currency.value
+            fun faceData(): CompanionPrefs.FaceData {
                 val trading = TraderLoop.config(ctx).on
-                CompanionPrefs.FaceData(
+                return CompanionPrefs.FaceData(
                     HealthWidgetData.load(ctx)?.score, if (trading) Positions.open(ctx).size else null,
-                    owner?.let { Portfolio.cached(it, Settings.currency.value)?.let { v -> fmtFiat(v.total, v.currency).take(8) } },
+                    owner?.let { Portfolio.cached(it, currency)?.let { v -> fmtFiat(v.total, v.currency).take(8) } },
                     coin?.let { TokenSymbols.symbol(it) }, null, trading,
                 )
             }
+            var previewData by remember { mutableStateOf(faceData()) }
+            LaunchedEffect(tick, face, owner, coin) { previewData = withContext(Dispatchers.IO) { faceData() } }
             GlassCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {

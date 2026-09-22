@@ -140,3 +140,11 @@ dependencies {
     testImplementation("org.json:json:20240303") // real JSON in JVM tests (android.jar ships stubs)
     implementation("androidx.compose.ui:ui-tooling-preview")
 }
+
+// Reports of what the Compose compiler could and could not skip: read them
+// in app/build/compose_reports after assembleRelease. HaloRow, HoldingRow,
+// CoinRow and PriceChart must come out "restartable skippable".
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose_reports")
+    metricsDestination = layout.buildDirectory.dir("compose_metrics")
+}

@@ -1267,7 +1267,12 @@ private fun AgentOrigin(dApp: DappId) {
 @Composable
 private fun DappMemory(dApp: DappId) {
     val ctx = LocalContext.current
-    val stats = remember(dApp.host, dApp.name) { Ledger.statsFor(ctx, dApp.host, dApp.name) }
+    // Read on IO: this row sits on the signing screen, and the signing screen
+    // must draw the moment it opens. Until the count lands the row is empty.
+    val loaded by produceState<SignLog.DappStats?>(null, dApp.host, dApp.name) {
+        value = withContext(Dispatchers.IO) { runCatching { Ledger.statsFor(ctx, dApp.host, dApp.name) }.getOrNull() }
+    }
+    val stats = loaded ?: return
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (stats.count == 0) {
             HaloIcon(HIcon.SPARK, Halo.amber, 13.dp); Spacer(Modifier.width(5.dp))
@@ -1988,8 +1993,10 @@ internal fun rememberCoinBitmap(mint: String?): ImageBitmap? {
     LaunchedEffect(url) {
         if (url == null) return@LaunchedEffect
         val req = coil.request.ImageRequest.Builder(ctx).data(url).size(72).allowHardware(false).build()
-        val d = runCatching { coil.ImageLoader(ctx).execute(req).drawable }.getOrNull() ?: return@LaunchedEffect
-        bmp = runCatching {
+        // The app's one loader, with its memory and disk cache, and the
+        // rasterisation off the main thread: this runs for every coin on a map.
+        val d = runCatching { coil.Coil.imageLoader(ctx).execute(req).drawable }.getOrNull() ?: return@LaunchedEffect
+        bmp = withContext(Dispatchers.Default) { runCatching {
             // A bitmap drawable already is one; anything else gets rasterised once
             // at a size the canvas will never need to grow past.
             (d as? android.graphics.drawable.BitmapDrawable)?.bitmap?.asImageBitmap() ?: run {
@@ -1998,7 +2005,7 @@ internal fun rememberCoinBitmap(mint: String?): ImageBitmap? {
                 d.draw(android.graphics.Canvas(b))
                 b.asImageBitmap()
             }
-        }.getOrNull()
+        }.getOrNull() }
     }
     return bmp
 }

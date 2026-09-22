@@ -33,6 +33,7 @@ object Positions {
      * [units] is in whole tokens, not raw: the raw amount depends on decimals we
      * would have to carry everywhere, and the sell side needs whole units anyway.
      */
+    @androidx.compose.runtime.Immutable
     data class Position(
         val mint: String,
         val symbol: String,

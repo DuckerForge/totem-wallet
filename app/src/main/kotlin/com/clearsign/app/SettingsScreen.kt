@@ -616,13 +616,7 @@ internal fun <T> ChipRow(items: List<Pair<T?, String>>, selected: T?, onSelect: 
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items.forEach { (value, label) ->
             val active = value == selected
-            Box(
-                Modifier.clip(rs(12))
-                    .then(if (active) Modifier.background(Halo.mint.copy(alpha = 0.14f)) else Modifier)
-                    .border(1.dp, if (active) Halo.mint else Halo.stroke, rs(12))
-                    .clickable { onSelect(value) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-            ) { Text(label, fontFamily = Sora, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp, color = if (active) Halo.mint else Halo.muted) }
+            HaloChip(label, tint = if (active) Halo.mint else Halo.muted, selected = active) { onSelect(value) }
         }
     }
 }

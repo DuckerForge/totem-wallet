@@ -823,15 +823,15 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
 }
 
 @Composable
-internal fun SectionTitle(title: String, sub: String, icon: HIcon? = null) {
+internal fun SectionTitle(eyebrow: String, headline: String, icon: HIcon? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
             Box(Modifier.size(36.dp).clip(rs(11)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(icon, Halo.cyan, 20.dp) }
             Spacer(Modifier.width(12.dp))
         }
         Column {
-            Text(title, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
-            Text(sub, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
+            Text(eyebrow, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
+            Text(headline, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
         }
     }
 }

@@ -98,6 +98,9 @@ object OreAgent {
         val now = System.currentTimeMillis()
         if (now - p.getLong("renewAt", 0L) < RENEW_EVERY_MS) return null
         p.edit().putLong("renewAt", now).apply()
+        // Solo le automazioni fatte qui, a caselle fisse: una a caso, o fatta
+        // altrove, non e' nostra da riscrivere.
+        if (auto.strategy != Ore.STRATEGY_PREFERRED.toLong() || auto.mask == 0L) return null
         val rounds = withContext(Dispatchers.IO) { runCatching { OreArchive.rounds() }.getOrDefault(emptyList()) }
         if (rounds.size < RENEW_MIN_ROUNDS) return null
         val n = auto.squares.coerceIn(1, Ore.SQUARES)

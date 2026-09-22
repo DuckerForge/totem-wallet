@@ -494,6 +494,11 @@ object SessionActions {
     suspend fun closeBudget(ctx: Context, owner: String): Pair<Boolean, String> =
         EnvelopeLock.withLock { closeBudgetInner(ctx, owner) }
 
+    /** Sotto questo guadagno non si seppellisce: una transazione per le briciole non vale. */
+    private const val BURY_MIN_LAMPORTS = 5_000_000L
+    /** Quello che resta in SOL per le fee delle uscite che seguono. */
+    private const val BURY_KEEP_LAMPORTS = 1_000_000L
+
     internal suspend fun closeBudgetInner(ctx: Context, owner: String): Pair<Boolean, String> {
         val s = SessionWallet.current(ctx) ?: return false to ctx.getString(R.string.trader_stop_nobudget)
         runCatching { AgentLinkService.revoke(ctx) }
@@ -504,8 +509,31 @@ object SessionActions {
         runCatching { OreAgent.bringHome(ctx, owner) }.getOrDefault(null)?.let { return false to it }
         val stuck = runCatching { sellAllInner(ctx) }.getOrDefault(listOf("?"))
         if (stuck.isNotEmpty()) return false to ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
-        val rent = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)
+        var rent = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)
         if (rent.failed > 0) return false to ctx.resources.getQuantityString(R.plurals.env_rent_stuck, rent.failed, rent.failed)
+        // Seppellire il guadagno. Tutto e' gia' in SOL: quello che sta sopra il
+        // capitale, contando quanto e' gia' tornato a casa durante la paghetta,
+        // si scambia in ORE e parte col resto. Il capitale no, mai. Se lo
+        // scambio non passa (rotta assente, collare che chiede) il guadagno
+        // resta SOL e torna a casa cosi': la chiusura non si ferma per questo.
+        if (TraderLoop.config(ctx).oreBury) {
+            val now = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() }
+            val gain = if (now == null) 0L else now + s.harvestedLamports - s.fundedLamports - BURY_KEEP_LAMPORTS
+            if (gain >= BURY_MIN_LAMPORTS) {
+                val why = runCatching { TraderLoop.buryInOre(ctx, gain) }.getOrElse { it.message }
+                if (why == null) {
+                    // L'ORE sta sul conto della paghetta: va portato a casa, e
+                    // il conto vuoto rende l'affitto come ogni altro.
+                    val stuckOre = runCatching { moveTokensToInner(ctx, owner) }.getOrDefault(listOf("ORE"))
+                    if (stuckOre.isNotEmpty()) return false to ctx.getString(R.string.env_sell_all_stuck, stuckOre.joinToString(", "))
+                    val again = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)
+                    if (again.failed > 0) return false to ctx.resources.getQuantityString(R.plurals.env_rent_stuck, again.failed, again.failed)
+                    rent = Closed(rent.closed + again.closed, 0, rent.rentLamports + again.rentLamports)
+                } else {
+                    AgentTrace.say(ctx.getString(R.string.trader_bury_skipped, why), AgentTrace.Kind.REFUSED)
+                }
+            }
+        }
         // Fail closed here too. This used to read an unreadable balance as zero,
         // which sent nothing home and then forgot the key with the money still on
         // the chain. Every other step of this close already refuses to finish on

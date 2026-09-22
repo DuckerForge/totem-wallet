@@ -647,6 +647,9 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 }
                 Text(stringResource(R.string.ore_wager_note), style = HaloType.small, color = Halo.amber)
             }
+            // Il guadagno in moneta dura: alla chiusura, quello che sta sopra il
+            // capitale diventa ORE. Vale anche senza scavare: e' un'altra cosa.
+            SwitchRow(stringResource(R.string.agent_ore_bury_title), stringResource(R.string.agent_ore_bury_sub), cfg.oreBury) { cfg = cfg.copy(oreBury = it) }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.AGENT) {
                 TraderLoop.start(ctx, cfg)

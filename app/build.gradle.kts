@@ -29,6 +29,10 @@ android {
     // Every phone reads this file; none of them scans. Blank → each phone falls
     // back to scanning for itself, which is fine for one user and absurd for many.
     val crowdUrl = localProps.getProperty("clearsign.crowdUrl", "")
+    // Con il servizio, il telefono legge il nodo passando da li' e la chiave
+    // resta sul servizio: nell'APK non c'e'. La chiave propria vale solo per
+    // una build senza servizio, che e' una build per una persona.
+    val scanUrl = if (crowdUrl.isNotBlank()) crowdUrl.trimEnd('/') + "/?rpc=1" else scanRpcUrl
     // L'archivio condiviso, letto senza chiave. Vuoto: si passa dal servizio.
     val archiveUrl = localProps.getProperty("clearsign.archiveUrl", "")
     // Wallet that receives SKR for premium themes. Blank → purchases disabled in the UI.
@@ -45,7 +49,7 @@ android {
         versionCode = 2
         versionName = "1.0"
         buildConfigField("String", "HELIUS_RPC_URL", "\"$heliusRpcUrl\"")
-        buildConfigField("String", "SCAN_RPC_URL", "\"$scanRpcUrl\"")
+        buildConfigField("String", "SCAN_RPC_URL", "\"$scanUrl\"")
         buildConfigField("String", "ALCHEMY_RPC_URL", "\"$alchemyRpcUrl\"")
         buildConfigField("String", "CHAINSTACK_RPC_URL", "\"$chainstackRpcUrl\"")
         buildConfigField("String", "RPCFAST_RPC_URL", "\"$rpcfastRpcUrl\"")

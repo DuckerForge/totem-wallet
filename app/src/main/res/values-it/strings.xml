@@ -587,6 +587,11 @@
     <string name="agent_ore_squares">Caselle a giro</string>
     <string name="agent_ore_note">%1$s SOL su ognuna di %2$d caselle a giro. Affida %3$s SOL, bastano per %4$d giri.</string>
     <string name="agent_ore_too_small">Non basta per un giro: alza i SOL al giorno o abbassa le caselle.</string>
+    <string name="agent_ore_bury_title">Metti i guadagni in ORE</string>
+    <string name="agent_ore_bury_sub">Alla chiusura il guadagno, non il capitale, si scambia in ORE e torna a casa così. Sotto 0,005 SOL resta SOL.</string>
+    <string name="trader_why_bury">Il guadagno della paghetta messo in ORE, alla chiusura</string>
+    <string name="trader_buried">Guadagno di %1$s SOL messo in ORE</string>
+    <string name="trader_bury_skipped">Il guadagno resta in SOL: %1$s</string>
     <string name="trace_ore_start">Affidati %1$s SOL a ORE: %2$s SOL su %3$d caselle a giro, %4$d giri.</string>
     <string name="trace_ore_progress">ORE finora: spesi %1$s SOL, scavati %2$s ORE, restano %3$d giri.</string>
     <string name="trace_ore_claimed">Riscossi %1$s ORE e %2$s SOL dalla griglia.</string>

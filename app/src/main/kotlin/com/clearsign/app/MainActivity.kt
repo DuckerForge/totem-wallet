@@ -289,7 +289,6 @@ fun HomeScreen(signer: SeedVaultSigner) {
         // quello che era gia' stato scritto di la'.
         var privateSend by remember { mutableStateOf<Pair<String, String>?>(null) }
         var showContactTap by remember { mutableStateOf(false) }
-        var showLinkBox by remember { mutableStateOf(false) }
         var showCustomize by remember { mutableStateOf(false) }
         var showCompanion by remember { mutableStateOf(false) }
         var showChip by remember { mutableStateOf(false) }
@@ -522,7 +521,6 @@ fun HomeScreen(signer: SeedVaultSigner) {
         }
         Proof.incoming.value?.let { text -> ProofCheckSheet(text, owner) { Proof.incoming.value = null } }
         Blinks.incoming.value?.let { link -> if (owner != null) BlinkSheet(link, signer, owner) { Blinks.incoming.value = null } }
-        if (showLinkBox) LinkBoxSheet(onOpen = { showLinkBox = false; Blinks.incoming.value = it }) { showLinkBox = false }
         if (ContactInbox.incoming.value != null && owner != null && !showContactTap) showContactTap = true
         if (showContactTap && owner != null) ContactTapSheet(owner, onSaved = { contacts = Contacts.allowlist(ctx) }) { showContactTap = false; ContactInbox.incoming.value = null }
         val first = accounts.firstOrNull()?.account
@@ -571,7 +569,6 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onContacts = { showMore = false; tab = Tab.SETTINGS },
                 onSettings = { showMore = false; tab = Tab.SETTINGS },
                 onBridge = { showMore = false; showBridge = true },
-                onLink = { showMore = false; showLinkBox = true },
                 onGift = { showMore = false; showGift = true },
                 onContactTap = { showMore = false; showContactTap = true },
                 onCompanion = { showMore = false; showCompanion = true },

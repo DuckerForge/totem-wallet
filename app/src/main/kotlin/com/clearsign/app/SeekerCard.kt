@@ -348,12 +348,16 @@ private fun WhoLine(feed: SeekerFeed.Feed?) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         val shown = rememberCountUp(followed.toFloat(), durationMs = 900).toInt()
+        // Un punto acceso, la cifra, e le parole spente: la riga era tutta
+        // dello stesso colore e si leggeva come un avviso.
+        Box(Modifier.size(6.dp).clip(rs(3)).background(Halo.mint))
+        Spacer(Modifier.width(7.dp))
         Text(
             stringResource(R.string.who_line, thousands(shown)),
-            fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint, style = Tabular,
+            style = HaloType.small, color = Halo.muted,
         )
         if (at > 0) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
             SweepClock(at = at, now = now)
         }
     }
@@ -405,18 +409,18 @@ private fun SweepClock(at: Long, now: Long) {
                 )
             }
         }
-        Spacer(Modifier.width(6.dp))
-        Text(
-            if (overdue) stringResource(R.string.who_clock_late)
-            else stringResource(R.string.who_clock2, mmss(left / 1000L)),
-            fontFamily = Inter, fontSize = 10.5.sp, color = tint,
-        )
+        // Le cifre e basta. C'era scritto "prossimo giro fra", e in ritardo
+        // "sto guardando": due frasi per dire quello che l'anello gia' mostra.
+        if (!overdue) {
+            Spacer(Modifier.width(5.dp))
+            Text(mmss(left / 1000L), style = HaloType.mono.copy(fontSize = 10.5.sp), color = tint)
+        }
     }
 }
 
 private fun mmss(seconds: Long): String {
     val s = seconds.coerceAtLeast(0)
-    return if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s"
+    return String.format(java.util.Locale.ROOT, "%d:%02d", s / 60, s % 60)
 }
 
 private fun thousands(v: Int): String =
@@ -448,34 +452,32 @@ private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES, FOLLOWED }
 @Composable
 private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Unit) {
     val ctx = LocalContext.current
-    Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 18.dp, vertical = 8.dp)) {
-        // Five chips that share the width, instead of five fixed ones on a rail.
-        //
-        // It used to scroll sideways, and a bar that scrolls sideways with no
-        // edge showing is a bar with a hidden tab: the fifth word sat past the
-        // right side of the screen, and the only way to learn it existed was to
-        // drag something that does not look draggable. Following somebody is the
-        // one thing here you do on purpose, and it was the thing you could not
-        // find afterwards. Equal shares always fit, and the words are short
-        // enough to survive the squeeze.
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            val w = Modifier.weight(1f)
-            ModeChip(stringResource(R.string.crowd_tab_live), selected == ScoutTab.LIVE, Halo.cyan, w) {
-                Haptics.tick(ctx); onPick(ScoutTab.LIVE)
-            }
-            ModeChip(stringResource(R.string.crowd_tab_buying), selected == ScoutTab.BUYING, Halo.mint, w) {
-                Haptics.tick(ctx); onPick(ScoutTab.BUYING)
-            }
-            ModeChip(stringResource(R.string.crowd_tab_holding), selected == ScoutTab.HOLDING, Halo.mint, w) {
-                Haptics.tick(ctx); onPick(ScoutTab.HOLDING)
-            }
-            ModeChip(stringResource(R.string.crowd_tab_whales), selected == ScoutTab.WHALES, Halo.amber, w) {
-                Haptics.tick(ctx); onPick(ScoutTab.WHALES)
-            }
-            // Only once there is somebody to put in it.
-            if (follows > 0) {
-                ModeChip(stringResource(R.string.crowd_tab_followed_short), selected == ScoutTab.FOLLOWED, Halo.amber, w) {
-                    Haptics.tick(ctx); onPick(ScoutTab.FOLLOWED)
+    // Un binario solo, e la voce scelta e' una pastiglia in rilievo che ci
+    // scorre sopra: era una fila di cinque chip col bordo, cioe' cinque
+    // bottoni, e a colpo d'occhio non si vedeva quale fosse acceso.
+    val tabs = buildList {
+        add(Triple(ScoutTab.LIVE, R.string.crowd_tab_live, Halo.cyan))
+        add(Triple(ScoutTab.BUYING, R.string.crowd_tab_buying, Halo.mint))
+        add(Triple(ScoutTab.HOLDING, R.string.crowd_tab_holding, Halo.mint))
+        add(Triple(ScoutTab.WHALES, R.string.crowd_tab_whales, Halo.amber))
+        if (follows > 0) add(Triple(ScoutTab.FOLLOWED, R.string.crowd_tab_followed_short, Halo.amber))
+    }
+    Box(Modifier.fillMaxWidth().background(Halo.ground).padding(horizontal = 14.dp, vertical = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).haloBorder(rs(14), living = false).padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            for ((tab, label, tint) in tabs) {
+                val on = tab == selected
+                val bg by androidx.compose.animation.animateColorAsState(if (on) Halo.card else androidx.compose.ui.graphics.Color.Transparent, tween(220), label = "tabBg")
+                val fg by androidx.compose.animation.animateColorAsState(if (on) tint else Halo.muted, tween(220), label = "tabFg")
+                Box(
+                    Modifier.weight(1f).height(34.dp).clip(rs(11)).background(bg)
+                        .then(if (on) Modifier.haloBorder(rs(11), living = false) else Modifier)
+                        .clickable { Haptics.tick(ctx); onPick(tab) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(label), style = HaloType.label.copy(fontSize = 11.5.sp), color = fg, maxLines = 1)
                 }
             }
         }
@@ -573,9 +575,9 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
     ) {
         Row(pad.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(38.dp).clip(rs(12)).background(Halo.cardSoft).clickable { onBack() },
+                Modifier.size(36.dp).clip(rs(18)).background(Halo.cardSoft).haloBorder(rs(18), living = false).clickable { onBack() },
                 contentAlignment = Alignment.Center,
-            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp) }
+            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp) }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.crowd_sheet), style = HaloType.screen, color = Halo.ink)

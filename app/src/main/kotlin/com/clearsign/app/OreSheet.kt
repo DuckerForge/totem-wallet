@@ -88,13 +88,16 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         view = withContext(Dispatchers.IO) { runCatching { OreMiner.read(SolanaRpc.urlFor(null), owner) }.getOrNull() }
         loading = false
     }
-    // Un secondo alla volta. A giro finito si aspetta la pausa e si rilegge.
+    // Un secondo alla volta. A giro finito si aspetta la pausa, quaranta slot,
+    // e si rilegge; se il giro nuovo non e' ancora partito si riprova ogni
+    // dodici secondi, che e' una chiamata ogni dodici secondi solo con il
+    // foglio aperto nella pausa.
     LaunchedEffect(view) {
         val v = view ?: return@LaunchedEffect
         while (true) {
             delay(1_000)
             now = System.currentTimeMillis()
-            if (v.secondsLeft(now) <= 0.0 && now - v.at > 20_000L) { refresh++; break }
+            if (v.secondsLeft(now) <= 0.0 && now - v.at > 12_000L) { refresh++; break }
         }
     }
 
@@ -196,21 +199,24 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 )
                                 Text(stringResource(R.string.ore_wager_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.amber)
                                 val open = v.open(now)
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    GhostButton(stringResource(R.string.back), Modifier.weight(1f)) { digging = false; picked = emptySet() }
-                                    PrimaryButton(
-                                        if (open) stringResource(R.string.ore_dig) else stringResource(R.string.ore_wait_round),
-                                        danger = false, enabled = open && lamports > 0 && picked.isNotEmpty(), fillWidth = false,
-                                    ) {
-                                        val k = ownerKey ?: return@PrimaryButton
-                                        state = OreState.Analyzing
-                                        scope.launch {
-                                            val cfg = withContext(Dispatchers.IO) { OreMiner.config(SolanaRpc.urlFor(null)) }
-                                            if (cfg == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
-                                            review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, v.board, cfg)), ctx.getString(R.string.ore_dig))
-                                        }
+                                PrimaryButton(
+                                    if (open) stringResource(R.string.ore_dig) else stringResource(R.string.ore_wait_round),
+                                    danger = false, enabled = open && lamports > 0 && picked.isNotEmpty(),
+                                ) {
+                                    val k = ownerKey ?: return@PrimaryButton
+                                    state = OreState.Analyzing
+                                    scope.launch {
+                                        // La Board si rilegge adesso, non quella di quando si e' aperto
+                                        // il foglio: il giro cambia ogni minuto e il programma rifiuta
+                                        // un Deploy sul giro sbagliato. Visto sul telefono il 22 settembre.
+                                        val rpc = SolanaRpc.urlFor(null)
+                                        val (cfg, fresh) = withContext(Dispatchers.IO) { OreMiner.config(rpc) to runCatching { OreMiner.read(rpc, owner, withRound = false) }.getOrNull() }
+                                        if (cfg == null || fresh == null) { state = OreState.Error(ctx.getString(R.string.ore_unreachable)); return@launch }
+                                        if (!fresh.open()) { view = fresh; state = OreState.Error(ctx.getString(R.string.ore_wait_round)); return@launch }
+                                        review("ore_dig", listOf(OreMiner.deploy(k, lamports, picked, fresh.board, cfg)), ctx.getString(R.string.ore_dig))
                                     }
                                 }
+                                GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { digging = false; picked = emptySet() }
                             }
                         }
                         OreState.Analyzing -> Working(stringResource(R.string.send_analyzing))

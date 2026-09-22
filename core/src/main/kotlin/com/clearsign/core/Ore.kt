@@ -28,8 +28,13 @@ object Ore {
     const val OPEN_EXECUTOR = "executor11111111111111111111111111111111112"
     const val SQUARES = 25
     const val CHECKPOINT_FEE_LAMPORTS = 10_000L
-    /** Uno slot, all'incirca. Serve solo per il conto alla rovescia. */
-    const val SLOT_MS = 400L
+    /**
+     * Uno slot, all'incirca. Serve solo per il conto alla rovescia. Il valore
+     * nominale e' 400 ms; misurato il 22 settembre 2026 sulla rete: 46 slot in
+     * dodici secondi, cioe' 260 ms. Con 400 il conto andava a meta' velocita'
+     * e diceva «sei secondi» a giro gia' finito.
+     */
+    const val SLOT_MS = 260L
     const val ONE_ORE = 100_000_000_000L
 
     /** I seed delle PDA, in byte. */

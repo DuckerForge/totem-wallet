@@ -83,6 +83,6 @@ class OreMinerTest {
         assertEquals(65.6, v.secondsLeft(1_000_000L), 0.01)
         assertEquals(55.6, v.secondsLeft(1_010_000L), 0.01)
         assertTrue(v.open(1_000_000L))
-        assertTrue(!v.open(1_070_000L))
+        assertTrue(!v.open(1_061_000L))
     }
 }

@@ -638,7 +638,7 @@ internal fun ProtectionsSheet(onDismiss: () -> Unit) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.prot_intro), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted)
                 Protections.items.forEachIndexed { i, it ->
-                    Row(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).haloBorder(rs(14)).padding(12.dp), verticalAlignment = Alignment.Top) {
+                    Row(Modifier.fillMaxWidth().clip(rs(14)).background(Halo.cardSoft).haloBorder(rs(14), living = false).padding(12.dp), verticalAlignment = Alignment.Top) {
                         Box(Modifier.size(32.dp).clip(rs(10)).background(Halo.cyanSoft), contentAlignment = Alignment.Center) { HaloIcon(it.icon, Halo.cyan, 17.dp) }
                         Spacer(Modifier.width(10.dp))
                         Column {
@@ -660,7 +660,7 @@ internal fun AttestationKeyRow() {
     val key = remember { Attestation.publicKeyBase64() } ?: return
     var copied by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12)).clickable { copyText(ctx, key); copied = true; Haptics.tick(ctx) }.padding(10.dp),
+        Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12), living = false).clickable { copyText(ctx, key); copied = true; Haptics.tick(ctx) }.padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HaloIcon(HIcon.SHIELD_LOCK, Halo.muted, 13.dp); Spacer(Modifier.width(6.dp))

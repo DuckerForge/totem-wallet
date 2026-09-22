@@ -65,6 +65,11 @@ import kotlinx.coroutines.delay
  * La regola che tiene insieme tutto: **un chevron e' una promessa.** Solo cio'
  * che apre qualcosa lo porta, e tutto cio' che apre qualcosa lo porta. Un
  * pannello che si legge e basta non ha ne' chevron ne' pressione.
+ *
+ * E la seconda: **l'orlo vivo e' delle schede.** Solo `GlassCard` porta il
+ * gradiente che scorre. Una riga, una tessera, un pannello, un chip si
+ * distinguono col riempimento, e al massimo con un filo del colore `stroke`.
+ * Messo su ogni riga, l'orlo vivo faceva di una lista una fila di bolle.
  */
 
 // ---- l'orlo ------------------------------------------------------------------------
@@ -90,8 +95,10 @@ private val LIVING_COLORS = listOf(Color(0xFF9945FF), Color(0xFF14F195), Color(0
  * che scorre sulle palette che lo prevedono. Disegnato dentro il bordo, come
  * fa `border`, e letto in draw: un cambio di palette o di fase ridisegna e
  * basta, non ricompone. [color] forza un colore, per un orlo acceso.
+ * [living] falso da' sempre il filo `stroke`, anche sulle palette col
+ * gradiente: e' l'orlo di quello che non e' una scheda.
  */
-fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null): Modifier = this.then(
+fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null, living: Boolean = true): Modifier = this.then(
     Modifier.drawWithCache {
         val w = width.toPx()
         val inner = Size((size.width - w).coerceAtLeast(0f), (size.height - w).coerceAtLeast(0f))
@@ -105,7 +112,7 @@ fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null): M
             translate(w / 2f, w / 2f) {
                 when {
                     color != null -> drawOutline(outline, color, style = Stroke(w))
-                    !Halo.palette.livingStroke -> drawOutline(outline, Halo.stroke, style = Stroke(w))
+                    !living || !Halo.palette.livingStroke -> drawOutline(outline, Halo.stroke, style = Stroke(w))
                     else -> {
                         val t = LivingStroke.phase.floatValue
                         drawOutline(
@@ -125,8 +132,8 @@ fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null): M
 /**
  * Il trattamento di tutto cio' che si tocca, una volta sola.
  *
- * Superficie contenuta, orlo sottile, si stringe appena sotto il dito e si
- * vela d'inchiostro finche' il dito resta. Niente ripple: su questi fondi
+ * Superficie contenuta, senza orlo se non lo si chiede, si stringe appena
+ * sotto il dito e si vela d'inchiostro finche' il dito resta. Niente ripple: su questi fondi
  * scuri non si vede, e un riquadro che cambia forma si vede. La velatura si
  * legge in draw, cosi' una pressione non ricompone la riga.
  */
@@ -149,7 +156,7 @@ fun Modifier.tappable(
         .pressScale(src, down)
         .clip(shape)
         .background(fill)
-        .haloBorder(shape, color = border)
+        .then(if (border != null) Modifier.haloBorder(shape, color = border) else Modifier)
         .drawWithContent {
             drawContent()
             val t = pressT.value
@@ -219,7 +226,7 @@ fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = f
         while (true) { spin.snapTo(0f); spin.animateTo(360f, tween(900, easing = androidx.compose.animation.core.LinearEasing)) }
     }
     Box(
-        Modifier.size(size).tappable(src, rs(Radius.pill), fill = Halo.card, down = 0.92f, onClick = onClick),
+        Modifier.size(size).tappable(src, rs(Radius.pill), fill = Halo.card, border = Halo.stroke, down = 0.92f, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         HaloIcon(icon, tint, 16.dp, Modifier.graphicsLayer { rotationZ = spin.value })
@@ -235,7 +242,7 @@ fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = f
 @Composable
 fun SoftPanel(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel)).padding(padding),
+        modifier.fillMaxWidth().clip(rs(Radius.panel)).background(Halo.cardSoft).haloBorder(rs(Radius.panel), living = false).padding(padding),
         content = content,
     )
 }

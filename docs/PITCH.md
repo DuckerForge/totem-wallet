@@ -20,7 +20,7 @@ A Seeker wallet that reads every transaction before you sign it, and an AI agent
 
 ## Slide 2. The problem
 
-Wallets sign blind. A dApp can ask the signer to approve a transaction that empties your wallet while showing you only its own name: no amount, no recipient, no warning. An unlimited approval is a drain the attacker reuses until you revoke it.
+Wallets sign blind. The Seed Vault signs whatever the wallet hands it: if the wallet shows only the dApp's name and an Approve button, you approve a transaction that empties your wallet without seeing it. Our attacker dApp in the repo does exactly that. An unlimited approval is a drain the attacker reuses until you revoke it.
 
 And now agents want your key. An AI that trades for you needs to sign, and a key in an agent's hands is a key in a prompt injection's hands.
 

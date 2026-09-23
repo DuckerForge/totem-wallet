@@ -85,9 +85,8 @@ sealed class Decision(val code: String) {
  * A round trip home has spent nothing. The daily cap limits what can leave in a day, but it
  * counted turnover: buy and sell back left the pocket as it was and ate the cap twice, so on a
  * small budget the agent made one trip and then asked for the print at every move (measured
- * 17 Sep). The condition is [isExchange], so it cannot be gamed: a different coin must come
- * back into the same pocket; a disguised transfer is stopped by rule five, or ten when the
- * route is ours. Transfers out, spending that does not return and the per-move cap are not exempt.
+ * 17 Sep). The condition is [isExchange], so it cannot be gamed: a different coin must come back
+ * into the same pocket; a disguised transfer is stopped by rule five, or ten when the route is ours. Transfers out and the per-move cap are not exempt.
  */
 fun staysInPocket(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean = false): Boolean {
     if (!isExchange(receipt, policy, routeIsOurs)) return false
@@ -99,12 +98,10 @@ fun staysInPocket(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean = 
 
 /**
  * An exchange, not a payment. An agent's bytes count as one when they pass through a listed
- * exchange program. Bytes we asked for ourselves (route chosen here, taker is this budget,
- * answer from Jupiter) are judged by shape instead: Ultra sometimes fills a sale through a
- * market maker with no aggregator in the transaction, and rule five found the payee in no list
- * and refused (measured 19 Sep: "sell now" refused, the second tap passed because the route
- * changed, a die, not a collar). Shape means something out and a different coin back into the
- * same pocket; rule ten still compares what leaves with what returns, so dust back fails there.
+ * exchange program. Bytes we asked for ourselves (route chosen here, taker is this budget, answer
+ * from Jupiter) are judged by shape: Ultra sometimes fills a sale through a market maker with no
+ * aggregator in the transaction, and rule five refused it (19 Sep: "sell now" refused, the second
+ * tap passed because the route changed, a die, not a collar). Shape means something out and a different coin back into the same pocket; rule ten still compares what leaves with what returns.
  */
 internal fun isExchange(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean): Boolean {
     val programs = receipt.stats?.programs.orEmpty()
@@ -149,12 +146,11 @@ object PolicyEngine {
         val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         /**
-         * An exchange where something comes back into this same pocket. [RiskFlag.DRAINS_BALANCE]
-         * means "this sends out almost everything you have of one thing": on a person's wallet the
-         * shape of a drainer, on the budget the shape of an ordinary trade, since the slice is most of
-         * it by design. It fired on every coin as DANGER and switched the loop off for the night
-         * (0.033 of a 0.036 SOL balance into a swap). Exempting it costs nothing: a swap that really
-         * takes the money fails the rules that measure, allowed program (5), most of it back (10), the caps (11).
+         * An exchange where something comes back into this same pocket. [RiskFlag.DRAINS_BALANCE] means
+         * "this sends out almost everything you have of one thing": on a person's wallet the shape of a
+         * drainer, on the budget the shape of an ordinary trade, since the slice is most of it by design.
+         * It fired on every coin as DANGER and switched the loop off for the night (0.033 of a 0.036 SOL
+         * balance into a swap). Exempting it costs nothing: a swap that takes the money fails the rules that measure, allowed program (5), most of it back (10), the caps (11).
          */
         val exchangeWithReturn = exchange && outs.isNotEmpty() && ins.isNotEmpty()
 
@@ -287,12 +283,10 @@ object PolicyEngine {
     }
 
     /**
-     * The agent coming home: a coin the budget holds, swapped back into the money the budget is
-     * kept in. Every cap bounds what the budget can lose, and a sale loses nothing: the same pocket
-     * holds the SOL afterwards. Running sales past the caps meant the agent could buy a coin it was
-     * then forbidden to sell, and a stop-loss became a ninety-second wait for a fingerprint nobody
-     * was there to give. Narrow on purpose: a real exchange ([isExchange]), no base money leaving,
-     * only base money arriving. [receipt] is the simulated one, so this reads what will happen.
+     * The agent coming home: a coin the budget holds, swapped back into the money the budget is kept
+     * in. Every cap bounds what the budget can lose, and a sale loses nothing. Running sales past
+     * the caps meant the agent could buy a coin it was then forbidden to sell, and a stop-loss became
+     * a ninety-second wait for a fingerprint nobody was there to give. Narrow on purpose: a real exchange ([isExchange]), no base money leaving, only base money arriving. [receipt] is the simulated one.
      */
     fun isUnwind(policy: AgentPolicy, receipt: Receipt, routeIsOurs: Boolean = false): Boolean {
         if (!isExchange(receipt, policy, routeIsOurs)) return false

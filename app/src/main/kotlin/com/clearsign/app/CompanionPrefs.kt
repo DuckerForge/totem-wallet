@@ -165,7 +165,7 @@ object CompanionPrefs {
         val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.muted.toArgb(); textAlign = Paint.Align.CENTER }
         text.setShadowLayer(r * 0.08f, 0f, r * 0.03f, AColor.argb(150, 0, 0, 0))
 
-        /** Il puntino di stato, a ore quattro sull'anello: acceso quando lavora. */
+        /** The status dot, at four o'clock on the ring: lit while it works. */
         fun statusDot(on: Boolean) {
             val ang = Math.toRadians(45.0)
             val rr = r - inset

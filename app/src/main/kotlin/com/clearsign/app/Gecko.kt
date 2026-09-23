@@ -7,12 +7,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * A second opinion on which coins are worth a look. Jupiter alone decided what exists
- * and what is interesting: one vendor, one list to game. GeckoTerminal ranks pools by
- * what moves through them, free, no key. Only mints come back, and they go through
- * [JupiterTokens.byMints] so they reach the gates in the same shape as everything else:
- * a new source widens the field, never walks around the checks. Blocking, IO, failure is
- * an empty list.
+ * A second opinion on which coins are worth a look. Jupiter alone decided what exists and what
+ * is interesting: one vendor, one list to game. GeckoTerminal ranks pools by what moves through
+ * them, free, no key. Only mints come back, and they go through [JupiterTokens.byMints] so they
+ * reach the gates like everything else: a new source widens the field, never walks around the checks. Blocking, IO, failure is an empty list.
  */
 object Gecko {
     private const val TAG = "Apex-Gecko"
@@ -183,12 +181,10 @@ object Gecko {
     }
 
     /**
-     * Of all a coin's pools, the one where it actually trades. The deepest was taken, and
-     * depth says nothing about buying: measured on EDEL, 20 Sep 2026, the deepest pool had
-     * 179k $ sitting still, zero trades, last candle from May at 0.0062 $; the traded one
-     * 127 $ deep, 14k volume, coin at 0.0230 $. From outside it looked like another coin.
-     * So: by volume, with a floor of a fiftieth of the deepest pool's depth, or two dollars
-     * and much volume is two wallets passing a ball. Nothing traded: the deepest stays.
+     * Of all a coin's pools, the one where it actually trades. The deepest was taken, and depth says
+     * nothing about buying: on EDEL, 20 Sep 2026, the deepest pool had 179k $ sitting still, zero
+     * trades, last candle from May at 0.0062 $; the traded one 127 $ deep, 14k volume, coin at
+     * 0.0230 $. So by volume, with a floor of a fiftieth of the deepest pool's depth (two dollars and much volume is two wallets passing a ball). Nothing traded: the deepest stays.
      */
     internal fun busiest(pools: List<Pool>): Pool? {
         val deepest = pools.maxOfOrNull { it.liquidityUsd ?: 0.0 } ?: return null

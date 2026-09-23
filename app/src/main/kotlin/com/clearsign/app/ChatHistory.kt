@@ -6,12 +6,11 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * The conversation, kept between openings. It lived in a `remember` and was gone when the
- * sheet closed, which is worse than it sounds: the transcript is the audit trail, every tool
- * the model ran leaves a line saying what it tried and what Velum decided. On disk and
- * nowhere else: a wallet whose claim is that nothing leaves the phone does not ship this to a
- * server, and there is nothing to synchronize, the budget key exists here only. Filed per
- * wallet, so switching accounts does not show another one's conversation.
+ * The conversation, kept between openings. It lived in a `remember` and was gone when the sheet
+ * closed, and the transcript is the audit trail: every tool the model ran leaves a line saying
+ * what it tried and what Velum decided. On disk and nowhere else: a wallet whose claim is that
+ * nothing leaves the phone does not ship this to a server, and the budget key exists here only.
+ * Filed per wallet, so switching accounts does not show another one's conversation.
  */
 object ChatHistory {
     private const val DIR = "chat"

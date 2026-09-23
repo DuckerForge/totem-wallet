@@ -8,14 +8,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The agent that digs. Not one round a minute from the phone (1,400 calls a day, the
- * opposite of what the RPC pool exists for): it hands part of the budget to an executor
- * opened with `Automate`, so much SOL on so many squares each round while the deposit
- * lasts, a fee per round to the executor, then checks the account once per tick and claims.
- * The collar applies: the deposit is a spend under the per-move cap, counted in the day, with
- * a receipt. On close the automation stops, the rest returns, the ORE goes to the main wallet.
- * Measured on chain 22 Sep 2026: live automations pay 7,000 lamports a round, so a daily cap
- * too low for one square is said, not silently ignored.
+ * The agent that digs. Not one round a minute from the phone (1,400 calls a day): it hands part
+ * of the budget to an executor opened with `Automate`, so much SOL on so many squares each round
+ * while the deposit lasts, then checks the account once per tick and claims. The collar applies:
+ * the deposit is a spend under the caps, with a receipt. On close the automation stops, the rest
+ * returns, the ORE goes home. Measured 22 Sep 2026: executors take 7,000 lamports a round, so a cap too low for one square is said, not ignored.
  */
 object OreAgent {
     /** What it pays the executor, per round. Measured on live automations. */

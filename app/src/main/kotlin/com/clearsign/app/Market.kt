@@ -149,11 +149,9 @@ object Market {
 
     /**
      * Candles for a coin with no pool to read: bitcoin, ether, anything not on this chain.
-     * GeckoTerminal knows only pools and cannot draw bitcoin, and "no chart" on the most famous
-     * coin reads as a broken screen. CoinGecko's OHLC is the same data one level up, exchange-
-     * weighted, free, every coin. The API picks the candle size from the days asked (a day gives
-     * half-hours, a month four-hours, a year four-day candles), so spans are named after the
-     * range covered. No volume comes back; the screen asks the market data instead of inventing bars.
+     * GeckoTerminal knows only pools, and "no chart" on the most famous coin reads as a broken
+     * screen. CoinGecko's OHLC is the same data one level up, free, every coin. The API picks the
+     * candle size from the days asked (a day gives half-hours, a month four-hours, a year four-day candles), so spans are named after the range covered. No volume comes back.
      */
     private val ohlcCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Gecko.Candle>>>()
     private const val OHLC_TTL_MS = 5 * 60_000L

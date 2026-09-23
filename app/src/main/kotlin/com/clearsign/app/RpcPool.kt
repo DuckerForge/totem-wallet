@@ -3,15 +3,11 @@ package com.clearsign.app
 import org.json.JSONObject
 
 /**
- * The RPC node pool: whom to ask, in what order, what to learn from each answer. Free keys
- * are few and shared, with a monthly quota across every install and a per-second limit
- * that bites first, and a phone cannot know what is left, so it does three things it can
- * do alone. Spread: each install orders providers at random, weighted by quota, with its
- * own seed, so a thousand phones do not hammer one node until it falls. Learn: a `-32099`
- * or a 4xx on a method marks that provider as not doing it. Tell cold from spent: a passing
- * 429 cools for minutes, a 402 or a 429 that stays is a spent month, refused until the 1st.
- * Plus a daily per-phone cap on shared keys that slows the hunt, never the exits, and that
- * the archive can change without an APK. Pure: no Android, no network, clock from outside.
+ * The RPC node pool: whom to ask, in what order, what to learn from each answer. Free keys are
+ * few and shared, with a monthly quota across every install and a per-second limit that bites
+ * first. Spread: each install orders providers at random, weighted by quota, so a thousand
+ * phones do not hammer one node. Learn: a `-32099` or a 4xx on a method marks that provider as
+ * not doing it; a passing 429 cools for minutes, a 402 or a 429 that stays is a spent month, refused until the 1st. Plus a daily per-phone cap on shared keys that slows the hunt, never the exits, changeable from the archive. Pure: clock from outside.
  */
 class RpcPool(
     providers: List<Provider>,

@@ -23,13 +23,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The Agent Gate: the hardware co-signer for AI agents. An agent (another app, a script on a
- * laptop, a browser) never holds a key: it hands Velum a transaction plus a declared intent via
+ * The Agent Gate: the hardware co-signer for AI agents. An agent never holds a key: it hands
+ * Velum a transaction plus a declared intent via
  *   apex://agent/sign?tx=<base64>&intent=<json>[&account=<pubkey>][&cluster=…][&callback=<uri>][&send=0|1]
- * Velum simulates the real bytes and [IntentGuard] checks the claim against the effect: any
- * undeclared outflow, wrong amount, wrong recipient or smuggled approval is a DANGER that blocks
- * approval. The person still holds to sign with biometrics; the key never leaves the Seed Vault.
- * The result (signature, or the signed transaction when send=0) returns via activity result and callback.
+ * Velum simulates the bytes and [IntentGuard] checks the claim against the effect: any undeclared
+ * outflow, wrong amount or recipient, or smuggled approval is a DANGER. The person still holds to sign with biometrics; the result (signature, or the signed transaction when send=0) returns via activity result and callback.
  */
 class AgentGateActivity : ComponentActivity() {
     private lateinit var bridge: ActivityResultBridge

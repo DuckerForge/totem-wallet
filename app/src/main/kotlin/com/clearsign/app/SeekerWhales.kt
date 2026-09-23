@@ -97,13 +97,11 @@ internal class Held(val mint: String, val symbol: String, val amount: Double, va
 internal class Holdings(val top: List<Held>, val unpriced: Int)
 
 /**
- * What one wallet holds right now, priced, read by the service and shared. The census
- * stores a dollar total, so the fourth whale read "$245,846 · 13 SOL" and hid that nine
- * tenths of it was one memecoin. Only what somebody quotes: the unpriced tail is where the
- * counterfeits live (three mints called "USDC", two fakes), and a coin nobody quotes says
- * nothing about where the money is. Read by the service, not the phone: the scanner key
- * used to ship in the APK and the quota was spent one user at a time. The phone's own key
- * is the fallback only when no service is configured, a build for one person.
+ * What one wallet holds right now, priced, read by the service and shared. The census stores a
+ * dollar total, so the fourth whale read "$245,846 · 13 SOL" and hid that nine tenths was one
+ * memecoin. Only what somebody quotes: the unpriced tail is where the counterfeits live (three
+ * mints called "USDC", two fakes). Read by the service, not the phone: the scanner key used to
+ * ship in the APK and the quota was spent one user at a time; the phone's own key is the fallback for a build with no service.
  */
 internal fun holdingsOf(address: String, take: Int = 3): Holdings? {
     shared(address, take)?.let { return it }

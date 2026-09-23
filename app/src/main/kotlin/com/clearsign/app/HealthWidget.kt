@@ -254,12 +254,10 @@ class HealthWidget : GlanceAppWidget() {
 }
 
 /**
- * The widget's own refresh tap. The work is not done here: a widget tap arrives as a
- * broadcast with ten seconds to live, and this refresh makes four network calls in a row
- * (token accounts, balance, price, rate) that eat those seconds on a slow network. It
- * happened, 18 Sep 2026, with the person standing on the home screen: `am_anr ... Broadcast
- * of Intent { dat=glance-action:/… }`. So this only enqueues; WorkManager has the time, and
- * repaints the widgets when done.
+ * The widget's own refresh tap. The work is not done here: a widget tap is a broadcast with ten
+ * seconds to live, and this refresh makes four network calls in a row (token accounts, balance,
+ * price, rate). It happened, 18 Sep 2026, on the home screen: `am_anr ... Broadcast of Intent {
+ * dat=glance-action:/… }`. So this only enqueues; WorkManager has the time, and repaints when done.
  */
 class RefreshHealthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {

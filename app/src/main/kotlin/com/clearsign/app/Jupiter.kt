@@ -91,12 +91,10 @@ object Jupiter {
     }
 
     /**
-     * The fee account, only when it actually exists. Jupiter does not create it: hand it a
-     * missing address and its program aborts with `Custom 6025`. The derived address always
-     * looks fine, so this was invisible in code and fatal in practice: every swap into a coin
-     * whose treasury account was never opened failed, while USDC worked and hid the pattern.
-     * One `getAccountInfo` per mint, remembered for the process. Null means "no fee on this
-     * trade": the difference between earning nothing and breaking the trade.
+     * The fee account, only when it actually exists. Jupiter does not create it: hand it a missing
+     * address and its program aborts with `Custom 6025`. The derived address always looks fine, so
+     * every swap into a coin whose treasury account was never opened failed, while USDC worked and
+     * hid the pattern. One `getAccountInfo` per mint, remembered for the process. Null means no fee on this trade, not a broken trade.
      */
     fun feeAccountIfUsable(outputMint: String): String? {
         val ata = feeAccountFor(outputMint) ?: return null

@@ -5,13 +5,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Who is connected to this wallet, and the ability to end it. MWA hands a dApp an auth token
- * on first approval so it can return without asking, and the wallet is meant to remember:
- * this app held no record, `onReauthorizeRequest` said yes to everything forever, and no
- * screen could say to whom. This is the record, one row per identity, checked when it
- * returns; revoking declines the next reauthorize and the dApp asks again in front of you.
- * Deliberately absent: any standing permission to move money. A connection means "this app
- * may ask"; every signature is still a separate decision with your fingerprint.
+ * Who is connected to this wallet, and the ability to end it. MWA hands a dApp an auth token on
+ * first approval so it can return without asking, and the wallet is meant to remember: this app
+ * held no record, `onReauthorizeRequest` said yes to everything forever. This is the record, one
+ * row per identity, checked when it returns; revoking declines the next reauthorize and the dApp
+ * asks again in front of you. No standing permission to move money: a connection means "this app may ask".
  */
 object Connections {
     private const val PREFS = "apex_connections"

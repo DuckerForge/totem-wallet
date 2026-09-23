@@ -54,13 +54,11 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /**
- * The interface's common language: what says "this is tappable", what says "this is only
- * read", and the pieces every page uses alike. No network and no app state here, only
- * shape, color and motion in `HaloTheme`'s tones; every animation is read in draw or
- * `graphicsLayer`, never in composition. Two rules. A chevron is a promise: only what
- * opens something carries one, and everything that opens something does. The living
- * edge belongs to cards: only `GlassCard` carries the flowing gradient; on every row it
- * turned a list into a row of bubbles.
+ * The interface's common language: what says "tappable", what says "only read", and the pieces
+ * every page uses alike. No network and no app state, only shape, color and motion in
+ * `HaloTheme`'s tones; every animation is read in draw or `graphicsLayer`, never in composition.
+ * Two rules: a chevron is a promise, only what opens something carries one and everything that
+ * opens something does; the living edge belongs to cards, only `GlassCard` carries the flowing gradient.
  */
 
 // ---- l'orlo ------------------------------------------------------------------------

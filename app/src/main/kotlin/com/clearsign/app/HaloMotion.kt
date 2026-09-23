@@ -104,11 +104,10 @@ val LocalEntrance = androidx.compose.runtime.compositionLocalOf<java.util.concur
 
 /**
  * One slow ring of light around a badge, once, then gone: a 270 degree arc with a conic
- * gradient, bright head, tail fading to nothing, so it reads as one traveling point of light
- * rather than a spinner. Two turns over two and a half seconds, then it fades and stops
- * drawing: a permanent spinner on a screen not loading anything is noise, this is a greeting.
- * The glow is two arcs, not a blur: a blur costs a render node per frame. [key] restarts it;
- * pass something that changes once per app launch, or the greeting becomes a tic.
+ * gradient, bright head, tail fading to nothing, one traveling point of light, not a spinner.
+ * Two turns over two and a half seconds, then it fades and stops drawing: a permanent spinner
+ * on a screen not loading anything is noise. The glow is two arcs, not a blur (a render node per
+ * frame). [key] restarts it; pass something that changes once per app launch, or the greeting becomes a tic.
  */
 @Composable
 fun SweepHalo(

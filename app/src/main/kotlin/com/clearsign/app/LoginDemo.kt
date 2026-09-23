@@ -34,14 +34,11 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The mark, made of two phones. First a line of light writes itself on the dark, violet at
- * the bottom to cyan at the top; then two phones light up under it, already posed, and the
- * line turns out to be the fold between them, the V of the mark; then the phones leave into
- * the light and the mark stays. Stroke first, because with the phones first it read as a V
- * of phones with a line added. Not decoration: the V is two phones touching, the thing this
- * app does and others do not. It runs on the one screen where there is nothing to do but
- * wait for a fingerprint. Rules: no stars, nothing falling, one motion at a time, a breath
- * of silence at the end so the V stays in the eye.
+ * The mark, made of two phones. A line of light writes itself on the dark, violet to cyan; two
+ * phones light up under it, already posed, and the line turns out to be the fold between them,
+ * the V of the mark; the phones leave and the mark stays. Stroke first: with the phones first it
+ * read as a V of phones with a line added. The V is two phones touching, the thing this app does.
+ * Rules: no stars, nothing falling, one motion at a time, a breath of silence at the end.
  */
 @Composable
 internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {

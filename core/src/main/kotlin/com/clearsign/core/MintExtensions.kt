@@ -2,11 +2,9 @@ package com.clearsign.core
 
 /**
  * What a Token-2022 mint may do to you after you bought it. The old standard could only lie
- * before the purchase; extensions reach into your wallet afterwards, and one is the engine of
- * the largest automated scam on Solana in 2026: a permanent delegate can burn or move the token
- * out of your account forever, unasked, while the creator keeps the SOL from the pool. "Is
- * Token-2022" alone says nothing, PYUSD and EURC are built on it too; the extensions are in the
- * mint account, free to read, and this parses them. A second wallet does not help: the delegate burns it wherever it sits.
+ * before the purchase; extensions reach into your wallet afterwards, and one is the engine of the
+ * largest automated scam on Solana in 2026: a permanent delegate can burn or move the token out
+ * of your account forever, unasked. "Is Token-2022" alone says nothing, PYUSD and EURC are built on it too; the extensions are in the mint account, and this parses them. A second wallet does not help.
  */
 data class MintExtensions(
     /** Someone can move or burn this token out of your account, for ever, unasked. */

@@ -10,12 +10,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The last question before the money moves: does the internet know something the
- * numbers do not (a team that rugged before, an exploit two hours old). Three rules.
- * One coin, once, for everybody: it runs on the coin already chosen, after the gates,
- * and the verdict goes to the shared archive ([Shared]), so a thousand phones pay twice,
- * not a thousand times. It can only say no. Unknown never blocks: no key, no network,
- * no answer, a non-Anthropic model all mean [Verdict.Unknown] and the numbers decide.
+ * The last question before the money moves: does the internet know something the numbers do
+ * not (a team that rugged before, an exploit two hours old). One coin, once, for everybody: it
+ * runs on the coin already chosen, after the gates, and the verdict goes to the shared archive
+ * ([Shared]), so a thousand phones pay twice, not a thousand times. It can only say no. Unknown
+ * never blocks: no key, no network, no answer, a non-Anthropic model all mean [Verdict.Unknown].
  */
 object CoinCheck {
     private const val TAG = "Apex-CoinCheck"
@@ -27,13 +26,11 @@ object CoinCheck {
     }
 
     /**
-     * Everybody's verdict, and why a no and a yes weigh differently. The question does not
-     * depend on who asks, so the answer sits in the archive (`/clearsign/coin/<mint>`), read
-     * without a key. Phones write those rows and a modified APK writes what it wants: a false
-     * STOP costs one purchase, a false "clean" buys the scam for everyone. So a STOP counts
-     * from anyone at once, a "clean" only from [MIN_CLEAN] installs, and even then it removes
-     * one check while the other gates run on the phone. Signed by a random per-install id,
-     * never the wallet: "budget X checked mint Y" in public would announce the buy.
+     * Everybody's verdict, and why a no and a yes weigh differently. The answer sits in the archive
+     * (`/clearsign/coin/<mint>`), read without a key. Phones write those rows and a modified APK
+     * writes what it wants: a false STOP costs one purchase, a false "clean" buys the scam for
+     * everyone. So a STOP counts from anyone, a "clean" only from [MIN_CLEAN] installs, and even then
+     * the other gates run on the phone. Signed by a random per-install id, never the wallet: "budget X checked mint Y" would announce the buy.
      */
     object Shared {
         private const val PREFS = "apex_coincheck"

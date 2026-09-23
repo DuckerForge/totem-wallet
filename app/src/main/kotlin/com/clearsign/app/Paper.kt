@@ -9,13 +9,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The shadow book: what every exit rule would have done on the coins this agent actually
- * met. A target and a stop are two numbers somebody picked once, and the only way to learn
- * whether +30/−15 fits the coins this scan finds, without paying for the answer, is to run
- * the other rules beside the real one. Two kinds of row: bought, where the shadow answers
- * "was your exit the right exit"; and blocked (collar, silent threshold, scan veto, web
- * check), which answers "did that wall save or cost me money". A safety rule never measured
- * is a belief. Nothing here signs, sends or touches a key: a notebook.
+ * The shadow book: what every exit rule would have done on the coins this agent actually met.
+ * A target and a stop are two numbers somebody picked once, and the only way to learn whether
+ * +30/−15 fits these coins without paying for the answer is to run the other rules beside the
+ * real one. Two kinds of row: bought ("was your exit the right exit") and blocked by collar,
+ * threshold, veto or web check ("did that wall save or cost me money"). Nothing here signs or touches a key: a notebook.
  */
 object Paper {
     private const val PREFS = "apex_paper"

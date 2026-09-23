@@ -10,12 +10,10 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * RocketX, the bridge: one API over 200 chains, DEX and exchange routes, no account.
- * Verified 16 Sep 2026 with the partner key. A quote picks a route, `/swap` opens the
- * order and answers with a deposit address, the money goes there through the ordinary
- * Send (receipt, fingerprint), `/status` follows it. Routes needing a memo are skipped,
- * Send writes none. Privacy: no identity asked and the on-chain thread breaks at the
- * exchange; not a mixer, not anonymity, one less form.
+ * RocketX, the bridge: one API over 200 chains, DEX and exchange routes, no account. Verified
+ * 16 Sep 2026 with the partner key. A quote picks a route, `/swap` opens the order and answers
+ * with a deposit address, the money goes there through the ordinary Send (receipt, fingerprint),
+ * `/status` follows it. Routes needing a memo are skipped. Privacy: no identity asked and the on-chain thread breaks at the exchange; not a mixer, one less form.
  */
 object RocketX {
     private const val TAG = "Apex-RocketX"
@@ -103,12 +101,10 @@ object RocketX {
     data class Order(val requestId: String, val txId: Long, val depositAddress: String?, val memo: String?, val toAmount: Double, val exchange: String)
 
     /**
-     * The quotes, and why the missing ones are missing. A refused route comes back in
-     * `quotes` without `toAmount`, with the reason in `err` ("Min. Amount: 0.462745 SOL").
-     * It used to be dropped and the screen said "no route, try another amount".
-     * [minAmount] is the lowest refused minimum, valid only when nothing usable is left.
-     * [minUsd] stands still: measured 20 Sep 2026, private routes want a round 50 $ in SOL
-     * as in USDC, so the SOL figure changes by the hour and is written nowhere here.
+     * The quotes, and why the missing ones are missing. A refused route comes back in `quotes`
+     * without `toAmount`, with the reason in `err` ("Min. Amount: 0.462745 SOL"); it used to be
+     * dropped and the screen said "no route". [minAmount] is the lowest refused minimum, valid only
+     * when nothing usable is left. [minUsd] stands still: measured 20 Sep 2026, private routes want a round 50 $ in SOL as in USDC, so the SOL figure changes by the hour.
      */
     data class Quotes(val list: List<Quote>, val minAmount: Double?, val minUsd: Double?)
 

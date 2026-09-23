@@ -147,12 +147,10 @@ class MobileWalletAdapterActivity : ComponentActivity() {
     private fun onMain(block: () -> Unit) = runOnUiThread(block)
 
     /**
-     * Hand control back to the dApp from the Done screen. dApps start us with
-     * startActivityForResult, so despite `singleTask` this activity usually lives inside the
-     * dApp's task, and moveTaskToBack() there hid the dApp too and dropped the person on the
-     * launcher. Session closed (the common case, RN `transact()` closes right after the
-     * response): finish, and the dApp shows. Session open: background only when we own the
-     * task; otherwise wait for it to end (finishSoon), and only an explicit tap finishes.
+     * Hand control back to the dApp from the Done screen. dApps start us with startActivityForResult,
+     * so despite `singleTask` this activity usually lives inside the dApp's task, and moveTaskToBack()
+     * hid the dApp too. Session closed (the common case, RN `transact()` closes right after the
+     * response): finish, and the dApp shows. Session open: background only when we own the task; otherwise wait for it to end (finishSoon), and only an explicit tap finishes.
      */
     fun backToDapp(explicit: Boolean = false) {
         if (ui !is MwaUi.Done) return

@@ -5,13 +5,11 @@ import kotlin.math.max
 import kotlin.math.min
 
 /*
- * Which coin is worth looking at, out of everything trading now. [TokenSafety] answers "is
- * this a trap"; this answers which handful of thousands is worth a quote. Ported from the pool
- * builder in the MEGAGEN app, tuned against real outcomes over months, on the fields Jupiter's
- * registry already returns: one call, no key. Two halves in order: [passesGate] is the veto,
- * hard facts about how a coin can hurt you, never a low score that a high score elsewhere
- * could buy back; [runnerScore] ranks what survived, eight weighted components and
- * multipliers that only push down. House rule: missing data is neutral, never bad, because an honest coin launched an hour ago looks like a coin with nothing to show.
+ * Which coin is worth looking at, out of everything trading now. [TokenSafety] answers "is this
+ * a trap"; this answers which handful of thousands is worth a quote. Ported from the pool builder
+ * in the MEGAGEN app, tuned against real outcomes, on the fields Jupiter's registry already
+ * returns: one call, no key. [passesGate] is the veto, hard facts a high score elsewhere cannot
+ * buy back; [runnerScore] ranks what survived, with multipliers that only push down. House rule: missing data is neutral, never bad, an honest coin launched an hour ago has nothing to show.
  */
 
 /** One time window of trading, as Jupiter reports it. Everything optional. */
@@ -220,13 +218,11 @@ internal fun ageScore(minutes: Double?, gate: ScanGate): Double {
 }
 
 /**
- * Does the coin beat the base, or is holding SOL better? The loop answered "is this a trap"
- * and "which of these five is best", not the question that counts when everything rises.
- * Measured 18 Sep 2026 on a real budget: 0.1761 SOL became 0.1671 in thirty-three hours,
- * minus 5.1%, while SOL did +10.4%; fees were 0.9% of the loss, the coins were the cost.
- * Returns the reason in words like [passesGate], or null when buying is fine. Null
- * [baseChange24hPct] or no 24h window passes: what is not known never blocks. [marginPct] is
- * how much it must beat the base, since matching SOL with a small coin's risk is the same deal with more ways to end badly.
+ * Does the coin beat the base, or is holding SOL better? The loop answered "is this a trap" and
+ * "which of these five is best", not the question that counts when everything rises. Measured
+ * 18 Sep 2026 on a real budget: 0.1761 SOL became 0.1671 in thirty-three hours, minus 5.1%,
+ * while SOL did +10.4%; fees were 0.9% of the loss, the coins were the cost. Returns the reason
+ * in words like [passesGate], or null when buying is fine; null [baseChange24hPct] or no 24h window passes. [marginPct] is how much it must beat the base: matching SOL with a small coin's risk is the same deal with more ways to end badly.
  */
 fun beatsBase(c: Candidate, baseChange24hPct: Double?, marginPct: Double = 3.0): String? {
     val base = baseChange24hPct ?: return null

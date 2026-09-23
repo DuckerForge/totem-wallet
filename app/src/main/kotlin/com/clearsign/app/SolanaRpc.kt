@@ -192,12 +192,10 @@ object SolanaRpc {
     // ---- effects -------------------------------------------------------------
 
     /**
-     * The real balance effects on [owner] and on every wallet in [destinations]: simulate
-     * on the cluster, diff SOL and token balances. That shows a payment split across hidden
-     * fee or referral accounts. Only the owner's token accounts among [txKeys] are tracked,
-     * so the one being drained never falls outside the window. The diff is taken only between
-     * two states on the same slot (`result.context.slot`): retry once, else accept a state
-     * boxed in by two identical reads ([alignedPre]), else `Unavailable`, which means retry.
+     * The real balance effects on [owner] and on every wallet in [destinations]: simulate on the
+     * cluster, diff SOL and token balances, which shows a payment split across hidden fee accounts.
+     * Only the owner's token accounts among [txKeys] are tracked, so the one being drained never
+     * falls outside the window. The diff is taken only between two states on the same slot (`result.context.slot`): retry once, else a state boxed in by two identical reads ([alignedPre]), else `Unavailable`.
      */
     fun simulateEffects(
         rpcUrl: String,
@@ -627,12 +625,10 @@ object SolanaRpc {
     }
 
     /**
-     * What a wallet holds, or null when the chain could not be asked. The lenient reader
-     * turns a failed call into an empty list, right for a screen and wrong for anything
-     * that acts: the loop once read a rate-limited node as "holds nothing" and dropped
-     * every open position, coins still in the wallet, no stop watching. Both programs
-     * must answer. Also reads strangers' wallets (whale card) on the scanner's key, never
-     * the agent's. Blocking, two calls: IO only, and only when somebody asked.
+     * What a wallet holds, or null when the chain could not be asked. The lenient reader turns a
+     * failed call into an empty list, right for a screen and wrong for anything that acts: the loop
+     * once read a rate-limited node as "holds nothing" and dropped every open position, no stop
+     * watching. Both programs must answer. Also reads strangers' wallets on the scanner's key, never the agent's. Blocking, two calls: IO only.
      */
     fun tokensOf(rpcUrl: String, owner: String, force: Boolean = false): List<TokenAccountInfo>? {
         val key = "$rpcUrl|$owner"

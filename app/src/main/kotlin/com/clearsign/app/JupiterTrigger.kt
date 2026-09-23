@@ -12,14 +12,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The take-profit that does not need us: a Trigger order is a limit sell on chain that
- * Jupiter's keeper fills, the only exit that survives the app killed and the phone off.
- * Not the other direction: a stop needs the v2 OCO endpoint, which the keyless host does
- * not have (`/trigger/v2/createOrder` answers 404), so the stop stays in [TraderLoop] and
- * that difference is said wherever a person can see it. Every order is simulated and
- * checked by [checkItOnlySellsThis] before signing, since the collar would refuse them all.
- * Quirks: under about five dollars Jupiter refuses, we let the API say so; no platform fee,
- * a plain token account as `feeAccount` fails with `ConstraintTokenOwner` (paid once, MEGAGEN).
+ * The take-profit that does not need us: a Trigger order is a limit sell on chain that Jupiter's
+ * keeper fills, the only exit that survives the app killed and the phone off. Not a stop: that
+ * needs the v2 OCO endpoint, absent on the keyless host (`/trigger/v2/createOrder` answers 404),
+ * so the stop stays in [TraderLoop] and the screens say so. Every order passes [checkItOnlySellsThis]
+ * before signing. Quirks: under about five dollars Jupiter refuses; a plain token account as `feeAccount` fails with `ConstraintTokenOwner` (paid once, MEGAGEN).
  */
 object JupiterTrigger {
     private const val TAG = "Apex-Trigger"
@@ -36,11 +33,9 @@ object JupiterTrigger {
 
     /**
      * Place a sell at the position's own take-profit price for the whole of [position], so the
-     * on-chain order says what the loop would have said and whichever gets there first wins.
-     * Never on the main thread: it was blocking and called from there, where Android forbids
-     * the network with a message-less exception, so the log read "POST /createOrder failed:
-     * null" and looked like Jupiter refusing (17 Sep: a fourteen-dollar order never landed,
-     * the same call from outside worked at once; same pid and tid in the log was the proof).
+     * on-chain order says what the loop would have said and whichever gets there first wins. Never
+     * on the main thread: Android forbids the network there with a message-less exception, so the
+     * log read "POST /createOrder failed: null" and looked like Jupiter refusing (17 Sep: a fourteen-dollar order never landed; the same call from outside worked at once).
      */
     suspend fun placeTakeProfit(ctx: Context, maker: String, position: Positions.Position): Placed = withContext(Dispatchers.IO) {
         placeBlocking(ctx, maker, position)
@@ -132,11 +127,9 @@ object JupiterTrigger {
 
     /**
      * Two checks that replace the collar, which cannot judge these (escrow looks like paying a
-     * stranger). [checkItOnlySellsThis], below: one mint may leave, no more than we hold, no
-     * SOL beyond the fee, and a simulation we cannot get is a refusal, since nobody will be
-     * watching the order. This one, for the cancel: it used to be signed blind from the loop,
-     * found in an audit. A real cancel returns the escrow and sends nothing; nothing may leave
-     * the budget but the network fee. "Could not look" is not "looked and it is fine".
+     * stranger). [checkItOnlySellsThis]: one mint may leave, no more than we hold, no SOL beyond
+     * the fee, and a simulation we cannot get is a refusal. This one, for the cancel, once signed
+     * blind from the loop: a real cancel returns the escrow and sends nothing but the network fee. "Could not look" is not "looked and it is fine".
      */
     private suspend fun checkItOnlyCancels(ctx: Context, tx: ByteArray, maker: String): String? {
         val a = runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, maker, null, requireSim = true) }.getOrNull()

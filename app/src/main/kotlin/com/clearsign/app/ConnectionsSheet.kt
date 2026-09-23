@@ -29,22 +29,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /**
- * Everything this wallet is connected to, and the way to end it.
- *
- * The honest version of a "connected apps" list. Two things it must say and keep
- * saying, because every other wallet's version of this screen quietly implies
- * the opposite:
- *
- *  * a connection means the app **may ask**. It has never meant it may sign.
- *    Every signature is still a separate decision with your fingerprint on it.
- *  * disconnecting does something. It is not a cosmetic list: a revoked identity
- *    is declined the next time it comes back with its old token
- *    ([MobileWalletAdapterActivity] checks [Connections.allowed] on reauthorize),
- *    so it has to ask you again, in front of you, like the first time.
- *
- * What each row counts comes from the ledger, which already records the dApp
- * behind every signature. No second set of books to drift out of step with the
- * first.
+ * Everything this wallet is connected to, and the way to end it. Two things it keeps saying
+ * because other wallets imply the opposite: a connection means the app may ask, never sign;
+ * and disconnecting does something, a revoked identity is declined on reauthorize
+ * ([MobileWalletAdapterActivity] checks [Connections.allowed]) and asks again in front of you.
+ * Row counts come from the ledger, which already records the dApp behind every signature.
  */
 @Composable
 internal fun ConnectionsSheet(onDismiss: () -> Unit) {

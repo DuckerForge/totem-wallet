@@ -11,36 +11,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * I dollari nella valuta di chi guarda.
- *
- * Il mercato lo si legge in dollari perche' in dollari lo scrivono: CoinGecko,
- * Jupiter e GeckoTerminal rispondono tutti in USD, e una moneta non ha un
- * prezzo in euro, ha un prezzo in dollari e un cambio. Il portafoglio pero'
- * gia' contava nella valuta scelta in Impostazioni, e il Mercato no: la stessa
- * app diceva il totale in euro e sotto, riga per riga, i prezzi in dollari.
- * Due unita' nella stessa schermata senza dirlo.
- *
- * Qui sta la conversione, in un posto solo. Il cambio e' il rapporto fra il
- * prezzo di un SOL nelle due valute, che e' un numero che l'app chiede gia'
- * per il portafoglio e che vale per qualsiasi cifra in dollari. Tenuto mezz'ora,
- * perche' un cambio fra monete vere non si muove come una moneta.
- *
- * Finche' non e' arrivato si scrive in dollari **col simbolo del dollaro**: il
- * numero resta vero, cambia solo l'unita' quando la risposta arriva. Un euro
- * stampato su una cifra in dollari sarebbe l'unico errore vero possibile qui.
+ * Dollars in the viewer's currency. The market is read in dollars because CoinGecko, Jupiter
+ * and GeckoTerminal all answer in USD; the portfolio already counted in the currency chosen
+ * in Settings and the Market did not, two units on one screen. The rate is the ratio between
+ * SOL's price in the two currencies, a number the app already asks for, kept half an hour.
+ * Until it arrives amounts are written in dollars with the dollar sign: the number stays true, only the unit changes later.
  */
 @Immutable
 internal data class Fx(val cur: String, val rate: Double) {
-    /** Il prezzo di una moneta. */
+    /** The price of one coin. */
     fun price(usd: Double): String = fmtPrice(usd * rate, cur)
 
-    /** Un totale: quanto vale quello che hai. */
+    /** A total: what you hold is worth. */
     fun fiat(usd: Double): String = fmtFiat(usd * rate, cur)
 
     /** Cifre grandi accorciate: liquidita', volume, capitalizzazione. */
     fun cap(usd: Double): String = fmtCap(usd * rate, cur)
 
-    /** Il numero nudo della scala del grafico, senza simbolo. */
+    /** The bare number for the chart scale, no symbol. */
     fun num(usd: Double): String = axisNum(usd * rate)
 
     companion object {
@@ -49,7 +37,7 @@ internal data class Fx(val cur: String, val rate: Double) {
         private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Double>>()
         private const val TTL_MS = 30 * 60_000L
 
-        /** Quello che si sa gia', senza chiedere niente a nessuno. */
+        /** What is already known, without asking anyone. */
         fun cached(cur: String): Fx? =
             if (cur == "USD") usd
             else cache[cur]?.takeIf { System.currentTimeMillis() - it.first < TTL_MS }?.let { Fx(cur, it.second) }
@@ -66,7 +54,7 @@ internal data class Fx(val cur: String, val rate: Double) {
     }
 }
 
-/** Il cambio di adesso, gia' pronto se qualcun altro l'ha appena chiesto. */
+/** The current rate, ready at once if somebody else just asked. */
 @Composable
 internal fun rememberFx(): Fx {
     val cur by Settings.currency

@@ -27,13 +27,9 @@ import kotlin.math.abs
 import kotlin.math.cos
 
 /**
- * The gesture, performed instead of described.
- *
- * A still picture cannot say "back to back" — you have to watch the screens turn
- * away. So the loop does the whole move: two phones face you, both turn over,
- * they come together, and only then do they talk. Both turn the same way and
- * stay identical, because drawing one with the camera left and one with it right
- * made them read as two different phones.
+ * The gesture, performed instead of described. A still picture cannot say "back to back", so
+ * the loop does the whole move: two phones face you, both turn over, come together, then
+ * talk. Both turn the same way: one with the camera left and one right read as two different phones.
  */
 @Composable
 internal fun TapAnimation(active: Boolean, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 146.dp) {

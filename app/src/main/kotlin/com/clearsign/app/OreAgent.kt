@@ -8,55 +8,43 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * L'agente che scava.
- *
- * Non un giro al minuto dal telefono: sarebbero millequattrocento chiamate
- * al giorno, il contrario di tutto quello che il pool RPC esiste per non
- * fare. L'agente **affida** una parte della paghetta a un esecutore aperto
- * con `Automate`: tanto SOL su tante caselle a ogni giro, finche' il
- * deposito dura, con una fee per giro a chi esegue. Poi guarda il conto una
- * volta per ciclo, come guarda le posizioni, e riscuote quando c'e' da
- * riscuotere.
- *
- * Il collare vale come per ogni altra mossa: il deposito e' una spesa dalla
- * paghetta, sotto il tetto per operazione, contata nel giorno, con lo
- * scontrino nel registro. Alla chiusura della paghetta l'automazione si
- * ferma, il resto torna, e l'ORE scavato va nel portafoglio principale.
- *
- * Le fee misurate: sulla catena il 22 settembre 2026 le automazioni vive
- * pagano 7.000 lamport a giro, che e' anche la costante del compound nel
- * programma. Con questa fee un giro costa sempre almeno quello, e un tetto
- * al giorno troppo basso non basta nemmeno per una casella: lo si dice.
+ * The agent that digs. Not one round a minute from the phone (1,400 calls a day, the
+ * opposite of what the RPC pool exists for): it hands part of the budget to an executor
+ * opened with `Automate`, so much SOL on so many squares each round while the deposit
+ * lasts, a fee per round to the executor, then checks the account once per tick and claims.
+ * The collar applies: the deposit is a spend under the per-move cap, counted in the day, with
+ * a receipt. On close the automation stops, the rest returns, the ORE goes to the main wallet.
+ * Measured on chain 22 Sep 2026: live automations pay 7,000 lamports a round, so a daily cap
+ * too low for one square is said, not silently ignored.
  */
 object OreAgent {
-    /** Quanto paga a chi esegue, per giro. Misurato sulle automazioni vive. */
+    /** What it pays the executor, per round. Measured on live automations. */
     const val FEE_PER_ROUND = 7_000L
     const val ROUNDS_PER_DAY = 1_440
-    /** Sotto questo per casella non vale il giro. */
+    /** Below this per square the round is not worth it. */
     const val MIN_PER_SQUARE = 5_000L
-    /** Quello che si lascia sempre nella paghetta per le fee delle uscite. */
+    /** What always stays in the budget for the exits' fees. */
     const val RESERVE_LAMPORTS = 3_000_000L
-    /** Si riscuote quando c'e' almeno questo, per non pagare una transazione per le briciole. */
+    /** Claim only when there is at least this, so no transaction is paid for crumbs. */
     const val CLAIM_ORE_MIN = Ore.ONE_ORE / 20
     const val CLAIM_SOL_MIN = 5_000_000L
-    /** Sopra questo costo per ORE, in lamport, l'esecutore non gioca. Circa il doppio della media vista. */
+    /** Above this cost per ORE, in lamports, the executor does not play. About twice the average seen. */
     const val MAX_PRODUCTION_COST = 1_000_000_000L
 
     private const val PREFS = "apex_ore_agent"
-    /** Ogni quanto si guarda dove scava la rete e si spostano le caselle. Un Automate costa una fee di rete. */
+    /** How often to look where the network digs and move the squares. An Automate costs a network fee. */
     const val RENEW_EVERY_MS = 15 * 60_000L
-    /** Sotto questi giri in archivio lo storico non dice niente e le caselle restano. */
+    /** Under this many archived rounds the history says nothing and the squares stay. */
     const val RENEW_MIN_ROUNDS = 10
 
-    /** Quanto mettere per giro e quanto affidare, dai due cursori e da quello che c'e'. */
+    /** How much per round and how much to hand over, from the two sliders and what is there. */
     data class Sizing(val amountPerSquare: Long, val squares: Int, val deposit: Long, val rounds: Int) {
         val perRound: Long get() = amountPerSquare * squares + FEE_PER_ROUND
     }
 
     /**
-     * Pura. [lamportsPerDay] e' il tetto scelto, [squares] le caselle,
-     * [ceiling] il tetto per operazione del collare, [free] il SOL libero
-     * nella paghetta. Null quando non basta per un giro decente.
+     * Pure. [lamportsPerDay] is the chosen cap, [squares] the squares, [ceiling] the collar's
+     * per-move cap, [free] the budget's free SOL. Null when not enough for a decent round.
      */
     fun sizing(lamportsPerDay: Long, squares: Int, ceiling: Long, free: Long): Sizing? {
         val n = squares.coerceIn(1, Ore.SQUARES)
@@ -70,7 +58,7 @@ object OreAgent {
         return Sizing(amount, n, rounds * perRound, rounds)
     }
 
-    /** Le caselle di questa paghetta: scelte una volta a caso, poi sempre quelle, cosi' il costo per giro e' certo. */
+    /** This budget's squares: picked once at random, then always the same, so the cost per round is certain. */
     private fun squaresFor(ctx: Context, n: Int): List<Int> {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val saved = p.getString("squares", null)?.split(',')?.mapNotNull { it.toIntOrNull() }?.filter { it in 0 until Ore.SQUARES }
@@ -83,23 +71,19 @@ object OreAgent {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /**
-     * Le caselle seguono la rete.
-     *
-     * La quota di ORE e' la propria parte della casella, quindi a parita' di
-     * costo rende di piu' la casella che gli altri lasciano vuota. Ogni quarto
-     * d'ora si leggono i giri chiusi dall'archivio, si prendono le meno
-     * affollate, e se sono diverse da quelle di adesso si manda un Automate
-     * con la stessa cifra, la stessa fee e deposito zero: il programma
-     * aggiorna la maschera sul posto. Passa dal collare come ogni mossa, e
-     * costa una fee di rete. Senza abbastanza giri in archivio non si tocca.
+     * The squares follow the network. The ORE share is your part of the square, so at equal cost
+     * the square others leave empty pays more. Every quarter hour the closed rounds are read from
+     * the archive, the least crowded squares taken, and if they differ from now an Automate goes
+     * out with the same amount, same fee, zero deposit: the program updates the mask in place.
+     * Through the collar like every move, one network fee. Without enough rounds, nothing changes.
      */
     private suspend fun renew(ctx: Context, envelope: ByteArray, auto: Ore.Automation): TraderLoop.Tick? {
         val p = prefs(ctx)
         val now = System.currentTimeMillis()
         if (now - p.getLong("renewAt", 0L) < RENEW_EVERY_MS) return null
         p.edit().putLong("renewAt", now).apply()
-        // Solo le automazioni fatte qui, a caselle fisse: una a caso, o fatta
-        // altrove, non e' nostra da riscrivere.
+        // Only automations made here, with fixed squares: a random one, or one made
+        // elsewhere, is not ours to rewrite.
         if (auto.strategy != Ore.STRATEGY_PREFERRED.toLong() || auto.mask == 0L) return null
         val rounds = withContext(Dispatchers.IO) { runCatching { OreArchive.rounds() }.getOrDefault(emptyList()) }
         if (rounds.size < RENEW_MIN_ROUNDS) return null
@@ -124,10 +108,7 @@ object OreAgent {
         return null
     }
 
-    /**
-     * Un passo del ciclo. Null quando non c'e' niente da dire ne' da fare;
-     * un Tick quando l'agente ha agito o ha qualcosa da riferire.
-     */
+    /** One step of the loop. Null when there is nothing to say or do; a Tick when the agent acted or has something to report. */
     suspend fun step(ctx: Context, cfg: TraderLoop.Config, session: SessionWallet.Session, ceiling: Long): TraderLoop.Tick? {
         val rpc = SolanaRpc.urlFor(null)
         val envelope = Base58.decodePubkey(session.pubkey) ?: return null
@@ -135,7 +116,7 @@ object OreAgent {
         val auto = v.automation
         val alive = auto != null && auto.balance >= auto.perRound
 
-        // Prima quello che c'e' da riscuotere: soldi fermi sul conto Miner non lavorano.
+        // First what there is to claim: money sitting on the Miner account does not work.
         if (v.claimableOre >= CLAIM_ORE_MIN || v.claimableSol >= CLAIM_SOL_MIN || (v.needsCheckpoint && !alive)) {
             val ixs = OreMiner.claimInstructions(envelope, v)
             if (ixs.isNotEmpty()) {
@@ -152,7 +133,7 @@ object OreAgent {
         }
 
         if (alive) {
-            // Il racconto di quello che e' successo, solo quando e' successo qualcosa.
+            // The account of what happened, only when something did.
             val p = prefs(ctx)
             val spent = auto!!.totalSolSpent; val earned = auto.totalOreEarned
             if (spent != p.getLong("spent", -1L) || earned != p.getLong("earned", -1L)) {
@@ -162,7 +143,7 @@ object OreAgent {
             return renew(ctx, envelope, auto)
         }
 
-        // Niente di vivo: si affida, se i numeri lo permettono.
+        // Nothing live: hand over, if the numbers allow.
         val free = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(rpc, session.pubkey) }.getOrNull() } ?: return null
         val size = sizing(cfg.oreLamportsPerDay, cfg.oreSquares, ceiling, free)
         if (size == null) {
@@ -185,9 +166,8 @@ object OreAgent {
     }
 
     /**
-     * Alla chiusura della paghetta: ferma l'automazione e riprendi il resto,
-     * riscuoti, e porta l'ORE nel portafoglio principale. Firmato dalla
-     * chiave della paghetta, come lo sweep. Torna un errore, o null.
+     * On budget close: stop the automation and take back the rest, claim, bring the ORE to the
+     * main wallet. Signed by the budget key, like the sweep. An error, or null.
      */
     suspend fun bringHome(ctx: Context, owner: String): String? = withContext(Dispatchers.IO) {
         val session = SessionWallet.current(ctx) ?: return@withContext null
@@ -200,7 +180,7 @@ object OreAgent {
         if (v.automation != null) ixs += OreMiner.stopAutomation(envelope)
         ixs += OreMiner.claimInstructions(envelope, v)
         if (ixs.isNotEmpty()) sendDirect(ctx, envelope, ixs, ctx.getString(R.string.ore_log_home))?.let { return@withContext it }
-        // Quello che c'e' in ORE nella paghetta, tutto al proprietario.
+        // Whatever ORE is in the budget, all to the owner.
         val ata = Pda.associatedTokenAddress(envelope, OreMiner.MINT, WalletTx.TOKEN_PROGRAM)
         val held = runCatching { SolanaRpc.tokenAccountsOf(rpc, session.pubkey, force = true) }.getOrDefault(emptyList())
             .firstOrNull { it.mint == Ore.MINT && it.amount > 0 } ?: return@withContext null
@@ -212,7 +192,7 @@ object OreAgent {
         sendDirect(ctx, envelope, move, ctx.getString(R.string.ore_log_home))
     }
 
-    /** Una proposta al collare, come ogni mossa dell'agente. */
+    /** A proposal to the collar, like every move of the agent. */
     private suspend fun submit(ctx: Context, envelope: ByteArray, ixs: List<WalletTx.Instruction>, intent: JSONObject): AgentBroker.Verdict {
         val rpc = SolanaRpc.urlFor(null)
         val bh = withContext(Dispatchers.IO) { SolanaRpc.latestBlockhash(rpc) } ?: return AgentBroker.Verdict.Refused(ctx.getString(R.string.wa_no_blockhash))
@@ -220,7 +200,7 @@ object OreAgent {
         return TraderLoop.handle(ctx, tx, intent, AgentBroker.Job.Source.IN_APP)
     }
 
-    /** Firmato dalla chiave della paghetta, senza collare: e' la chiusura, e i soldi tornano a casa. */
+    /** Signed by the budget key, no collar: this is the close, and the money goes home. */
     private suspend fun sendDirect(ctx: Context, envelope: ByteArray, ixs: List<WalletTx.Instruction>, label: String): String? = withContext(Dispatchers.IO) {
         val rpc = SolanaRpc.urlFor(null)
         val bh = SolanaRpc.latestBlockhash(rpc) ?: return@withContext ctx.getString(R.string.wa_no_blockhash)
@@ -249,7 +229,7 @@ object OreAgent {
         sayOnce(ctx, "refused:$why", ctx.getString(R.string.trace_ore_refused, why))
     }
 
-    /** Una cosa che non cambia si dice una volta al giorno, non a ogni giro. */
+    /** A thing that does not change is said once a day, not every round. */
     private fun sayOnce(ctx: Context, key: String, text: String) {
         val p = prefs(ctx)
         val day = System.currentTimeMillis() / 86_400_000L
@@ -258,6 +238,6 @@ object OreAgent {
         AgentTrace.say(text, AgentTrace.Kind.WARN)
     }
 
-    /** Alla partenza di una paghetta nuova le caselle e i contatori ripartono. */
+    /** When a new budget starts, the squares and the counters start over. */
     fun reset(ctx: Context) { prefs(ctx).edit().clear().apply() }
 }

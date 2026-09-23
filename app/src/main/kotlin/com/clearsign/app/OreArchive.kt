@@ -4,9 +4,8 @@ import com.clearsign.core.PastRound
 import org.json.JSONObject
 
 /**
- * I giri chiusi di ORE pubblicati dal worker in `/clearsign/ore.json`: uno al
- * minuto, gli ultimi centoventi. Vale se non e' piu' vecchio di [maxAgeMs].
- * Bloccante: chiamare su IO. Vedi `tools/seeker-worker/src/ore.js`.
+ * The closed ORE rounds the worker publishes in `/clearsign/ore.json`: one a minute, the last
+ * hundred and twenty. Valid when no older than [maxAgeMs]. Blocking, call on IO. See `tools/seeker-worker/src/ore.js`.
  */
 object OreArchive {
     fun rounds(maxAgeMs: Long = 30 * 60_000L): List<PastRound> {

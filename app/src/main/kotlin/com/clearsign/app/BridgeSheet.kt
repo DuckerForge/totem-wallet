@@ -45,20 +45,17 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * The bridge: SOL or USDC from here to another chain, through RocketX.
- *
- * Pick the chain, paste the address there, type the amount; the quotes come
- * in and the best deposit route is chosen; "Continue" opens the order and
- * hands the deposit address to the ordinary Send, so the receipt and the
- * fingerprint are the same as for any payment. The line under the button
- * says what this is and what it is not.
+ * The bridge: SOL or USDC to another chain through RocketX. Pick the chain, paste the
+ * address there, type the amount; quotes come in and the best deposit route is chosen;
+ * Continue opens the order and hands the deposit address to the ordinary Send, same
+ * receipt and fingerprint as any payment. The line under the button says what this is not.
  */
 @Composable
 internal fun BridgeSheet(
     owner: String,
     onSend: (PayRequest, String?, RocketX.Deal) -> Unit,
     onHistory: () -> Unit,
-    /** Aperto dal Manda: arriva gia' in modo privato, con indirizzo e cifra dentro. */
+    /** Opened from Send: arrives already in private mode, address and amount inside. */
     startPrivate: Boolean = false,
     startDest: String = "",
     startAmount: String = "",
@@ -74,12 +71,9 @@ internal fun BridgeSheet(
     var usdc by remember { mutableStateOf(false) }
     var target by remember { mutableStateOf<RocketX.Network?>(null) }
     /**
-     * Privato vuol dire Solana da tutte e due le parti.
-     *
-     * E' lo stesso meccanismo del ponte — preventivo, ordine, indirizzo di
-     * deposito, scontrino, firma — con la stessa catena sulle due sponde.
-     * RocketX le chiama Privacy Route e Monero Rails, e sono rotte `walletLess`
-     * come tutte quelle che quest'app sa gia' pagare.
+     * Private means Solana on both sides: the bridge's own machinery (quote, order, deposit,
+     * receipt, signature) with the same chain on both shores. RocketX calls them Privacy Route
+     * and Monero Rails, `walletLess` routes like every one this app already pays.
      */
     var private by remember { mutableStateOf(startPrivate) }
     var sameCoin by remember { mutableStateOf(true) }
@@ -89,19 +83,19 @@ internal fun BridgeSheet(
     var quotes by remember { mutableStateOf<List<RocketX.Quote>>(emptyList()) }
     var quoting by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf<String?>(null) }
-    // Quale rotta, scelta da chi paga. Si azzera quando i preventivi cambiano.
+    // Which route, chosen by the payer. Reset when the quotes change.
     var picked by remember { mutableStateOf(0) }
-    // Il numero che l'ordine ha davvero portato, quando e' peggio del preventivo.
+    // The number the order really brought, when worse than the quote.
     var worse by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-    // L'ordine gia' aperto e messo in attesa di una risposta. Senza questo, il
-    // secondo tocco su "accetta" apriva un secondo ordine a RocketX e pagava
-    // quello, mentre i numeri sullo schermo erano del primo.
+    // The order already open and waiting for an answer. Without this a second tap
+    // on "accept" opened a second order at RocketX and paid that one while the
+    // screen showed the first.
     var pending by remember { mutableStateOf<RocketX.Order?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    // La cifra sotto la quale nessuno accetta. Viene dal preventivo rifiutato,
-    // non da noi: dipende dal prezzo del momento e cambia da un'ora all'altra.
+    // The amount below which nobody accepts. It comes from the refused quote, not
+    // from us: it depends on the price of the moment and changes hour to hour.
     var minAmount by remember { mutableStateOf<Double?>(null) }
-    // Lo stesso numero, saputo prima di provare. Vedi [RocketX.PROBE].
+    // The same number, known before trying. See [RocketX.PROBE].
     var floor by remember { mutableStateOf<Pair<Double, Double?>?>(null) }
     val fromMint = if (usdc) USDC_MINT else null
     val fromSym = if (usdc) "USDC" else "SOL"
@@ -109,8 +103,8 @@ internal fun BridgeSheet(
     LaunchedEffect(Unit) {
         networks = withContext(Dispatchers.IO) { runCatching { RocketX.networks() }.getOrDefault(emptyList()) }
         home = withContext(Dispatchers.IO) { runCatching { RocketX.home() }.getOrNull() }
-        // Si parte da Ethereum, non dalla prima che manda RocketX, che e'
-        // Bitcoin: su un ponte da Solana la prima e' quella che si usa di piu'.
+        // Start from Ethereum, not from RocketX's first, which is Bitcoin: on a
+        // bridge from Solana the first is the one used most.
         target = RocketX.popular(networks).firstOrNull() ?: networks.firstOrNull()
     }
 
@@ -123,21 +117,17 @@ internal fun BridgeSheet(
     }
 
     /**
-     * Il minimo chiesto all'apertura, non dopo il rifiuto.
-     *
-     * Solo sull'invio privato. Li' le rotte sono tutte private e condividono la
-     * stessa soglia, quindi sotto quella cifra la pagina si svuota per intero e
-     * non parte niente: e' una regola della schermata, e una regola si scrive
-     * prima. Su un ponte normale invece non c'e' un minimo da scrivere —
-     * misurato: Relay accetta un millesimo di SOL — e annunciarne uno vorrebbe
-     * dire inventare un divieto che non esiste.
+     * The minimum asked at opening, not after a refusal, and only for the private send: there
+     * every route is private and shares one floor, so under it the page empties and nothing
+     * moves. On a normal bridge there is no minimum to write (measured: Relay takes a
+     * thousandth of a SOL) and announcing one would invent a ban.
      */
     LaunchedEffect(private, usdc) {
         floor = null
         if (!private) return@LaunchedEffect
         val probe = withContext(Dispatchers.IO) {
-            // [RocketX.home] la prima volta e' una chiamata, non una lettura:
-            // va chiesta di qua e non sul thread che sta disegnando.
+            // [RocketX.home] the first time is a call, not a read: ask it here, not
+            // on the drawing thread.
             val t = RocketX.home() ?: return@withContext null
             home = t
             runCatching { RocketX.quote(fromMint, "solana", fromMint, t.id, RocketX.PROBE) }.getOrNull()
@@ -154,22 +144,21 @@ internal fun BridgeSheet(
         delay(500)
         quoting = true
         val answer = withContext(Dispatchers.IO) {
-            // Anche qui la sponda si risolve dentro l'IO: [RocketX.home] la
-            // prima volta va in rete, e andarci di qua bloccava il disegno.
+            // The shore resolves inside IO here too: [RocketX.home] goes to the
+            // network the first time, and blocked the drawing from here.
             val t = (if (private) RocketX.home() else target) ?: return@withContext null
-            // Privato: stessa moneta e stessa catena da tutte e due le parti.
+            // Private: same coin and same chain on both sides.
             val to = if (private) fromMint else if (usdc && sameCoin) toToken?.contract else null
             runCatching { RocketX.quote(fromMint, "solana", to, t.id, amt) }.getOrNull()
         } ?: RocketX.Quotes(emptyList(), null, null)
         quotes = answer.list.filter { it.walletLess }
         minAmount = answer.minAmount?.takeIf { quotes.isEmpty() }
-        // Il minimo appena detto da una risposta fresca vale piu' di quello
-        // chiesto all'apertura: e' lo stesso numero, mezz'ora dopo.
+        // The minimum a fresh answer just said beats the one asked at opening: the
+        // same number, half an hour later.
         minAmount?.let { floor = it to answer.minUsd }
         quoting = false
-        // "Nessuna rotta, prova un altro importo" mandava a indovinare un numero
-        // che la risposta conteneva gia'. Quando il no e' per la cifra, si dice
-        // qual e' la cifra.
+        // "No route, try another amount" sent people guessing a number the answer
+        // already held. When the no is about the amount, say the amount.
         if (quotes.isEmpty()) {
             error = minAmount?.let { ctx.getString(R.string.bridge_min, minText(it), fromSym) }
                 ?: ctx.getString(R.string.bridge_no_route)
@@ -198,14 +187,13 @@ internal fun BridgeSheet(
             if (!private) {
             Text(stringResource(R.string.bridge_to), style = HaloType.label, color = Halo.muted)
             if (networks.isEmpty()) Text(stringResource(R.string.w_analyzing), style = HaloType.small, color = Halo.muted)
-            // Otto catene davanti e una ricerca per il resto: [ChainPickerSheet]
-            // racconta perche'. Qui c'erano tutte e duecentosette in fila.
+            // Eight chains in front and a search for the rest: [ChainPickerSheet] says
+            // why. All two hundred and seven used to sit here in a row.
             var pickChain by remember { mutableStateOf(false) }
             val popular = remember(networks) { RocketX.popular(networks) }
-            // Quella scelta resta sempre in prima fila, anche quando non e' fra
-            // le otto: una catena che sparisce dallo schermo dopo che l'hai
-            // scelta e' il modo piu' rapido di non sapere piu' dove stai
-            // mandando i soldi.
+            // The chosen chain stays in the front row even when it is not among the eight: a chain that
+            // vanishes from the screen after you picked it is the fastest way to lose track of where the
+            // money is going.
             val chips = remember(popular, target) { (popular + listOfNotNull(target)).distinctBy { it.id } }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 chips.forEach { n ->
@@ -263,22 +251,21 @@ internal fun BridgeSheet(
                 colors = pickerField(), shape = rs(12),
             )
 
-            // Quanto ci vuole come minimo, detto prima di scrivere la cifra.
-            // In dollari accanto, perche' quello e' il numero che sta fermo: la
-            // cifra in SOL cambia a ogni movimento del prezzo, e senza i
-            // dollari accanto sembra che l'app non sappia decidersi.
+            // The minimum, said before the amount is typed, with dollars next to it: that is the number
+            // that stands still. The SOL figure moves with the price, and without the dollars the app
+            // seems unable to make up its mind.
             floor?.let { (m, usd) ->
                 Text(
                     if (usd == null) stringResource(R.string.bridge_floor, minText(m), fromSym)
-                    // [fmtPrice] e non [fmtFiat]: il minimo e' un cartello
-                    // pubblico, non un tuo saldo, e non va nascosto in ospite.
+                    // [fmtPrice] and not [fmtFiat]: the minimum is a public sign, not
+                    // your balance, and is not hidden in guest mode.
                     else stringResource(R.string.bridge_floor_usd, minText(m), fromSym, fmtPrice(usd, "USD")),
                     style = HaloType.small, color = Halo.muted,
                 )
             }
 
-            // Il giudizio sull'indirizzo, mentre lo incolli e non dopo.
-            // Dove arrivano i soldi: l'altra catena, oppure Solana stessa.
+            // The verdict on the address while you paste it, not after.
+            // Where the money lands: the other chain, or Solana itself.
             val landing = if (private) home else target
             val fits = landing?.let { t -> dest.takeIf { it.isNotBlank() }?.let { RocketX.addressFits(t, it) } }
             if (fits == false) {
@@ -289,9 +276,8 @@ internal fun BridgeSheet(
 
             if (quoting) Text(stringResource(R.string.bridge_quoting), style = HaloType.small, color = Halo.muted)
             error?.let { Banner(it, Halo.amber, HIcon.WARNING) }
-            // Il minimo non e' solo una notizia, e' una cifra da mettere nel
-            // campo: ricopiarla a mano da un avviso e' lavoro che il telefono
-            // sa fare da solo, e a mano si sbaglia una cifra e si riprova.
+            // The minimum is not just news, it is a figure to put in the field: copying
+            // it by hand from a notice is work the phone can do, and by hand a digit goes wrong.
             minAmount?.let { m ->
                 Row {
                     SmallChip(stringResource(R.string.bridge_use_min, minText(m), fromSym), HIcon.PEN, tint = Halo.mint) {
@@ -300,12 +286,9 @@ internal fun BridgeSheet(
                     }
                 }
             }
-            // Tre rotte, e quella scelta e' quella che parte.
-            //
-            // Prima se ne mostravano tre e il bottone prendeva sempre la prima:
-            // l'elenco era decorativo, e su una pagina dove ogni riga porta un
-            // numero diverso di soldi in arrivo, tre scelte finte sono peggio di
-            // una sola vera.
+            // Three routes, and the chosen one is the one that goes. Three were shown and the button
+            // always took the first: a decorative list, and on a page where every row means a different
+            // amount arriving, three fake choices are worse than one real one.
             quotes.take(3).forEachIndexed { i, q ->
                 val best = i == picked
                 Column(
@@ -318,19 +301,11 @@ internal fun BridgeSheet(
                         Text(q.exchange + " · " + q.keyword.lowercase().replaceFirstChar { it.uppercase() }, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
                         Text(String.format(Locale.ROOT, "%.6f", q.toAmount).trimEnd('0').trimEnd('.') + " " + (if (private || (usdc && sameCoin)) fromSym else landing?.native ?: ""), fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (best) Halo.mint else Halo.ink)
                     }
-                    // Quanto ti costa la strada, per intero e in soldi.
-                    //
-                    // La riga sotto diceva solo le commissioni dichiarate, e
-                    // quelle sono meno della meta' del conto: su un SOL valgono
-                    // 0,86 $ mentre fra partenza e arrivo ne mancano 1,10. Il
-                    // resto e' il cambio dentro la rotta, che non sta in nessun
-                    // campo e si vede solo sottraendo. Questa riga e' quella
-                    // sottrazione, ed e' la cifra che paghi davvero.
-                    //
-                    // Si puo' fare solo dove la moneta e' la stessa sulle due
-                    // sponde: l'invio privato e USDC verso USDC. Su un ponte
-                    // vero partono SOL e arriva ETH, e sottrarre due monete
-                    // diverse non vuol dire niente.
+                    // What the road costs you, whole and in money. The line below said only the declared fees,
+                    // less than half the bill: on one SOL they are 0.86 $ while 1.10 go missing between
+                    // departure and arrival, the rest being the exchange inside the route, seen only by
+                    // subtracting. This line is that subtraction. Only where the coin is the same on both
+                    // shores (private send, USDC to USDC): subtracting SOL from ETH means nothing.
                     val sameUnit = private || (usdc && sameCoin)
                     val cost = if (sameUnit && amt != null && amt > 0 && q.toAmount > 0) amt - q.toAmount else null
                     if (cost != null && cost > 0) {
@@ -347,8 +322,8 @@ internal fun BridgeSheet(
                             color = if (pctCost > 5) Halo.red else if (pctCost > 2) Halo.amber else Halo.mint,
                         )
                     }
-                    // Le commissioni dichiarate: sotto il totale sono un
-                    // dettaglio, da sole sono tutto quello che si sa.
+                    // The declared fees: under the total they are a detail, alone
+                    // they are all that is known.
                     Text(
                         stringResource(
                             if (cost != null && cost > 0) R.string.bridge_quote_of_which else R.string.bridge_quote_line,
@@ -378,29 +353,22 @@ internal fun BridgeSheet(
                 val t = (if (private) home else target) ?: return@PrimaryButton
                 busy = ctx.getString(R.string.bridge_opening)
                 scope.launch {
-                    // Se un ordine e' gia' aperto e in attesa del tuo si', e' quello
-                    // che si paga: non se ne apre un secondo.
+                    // If an order is already open and waiting for your yes, that is the one
+                    // paid: no second one is opened.
                     val order = pending ?: withContext(Dispatchers.IO) { runCatching { RocketX.swap(q.fromId, q.toId, owner, dest, amt!!) }.getOrNull() }
                     busy = null
                     val deposit = order?.depositAddress
                     when {
                         order == null || deposit == null -> error = ctx.getString(R.string.bridge_open_failed)
-                        // Il preventivo diceva che questa rotta pretende un memo, e
-                        // l'ordine non ne ha portato uno. Un deposito senza memo su
-                        // una catena che lo pretende arriva e non viene accreditato
-                        // a nessuno: e' il preventivo stesso a dirlo, e quel campo
-                        // non veniva guardato da nessuna parte.
+                        // The quote said this route needs a memo and the order carried none. A deposit without its
+                        // memo on a chain that needs one arrives credited to nobody; the quote itself says so, and
+                        // that field was never read.
                         q.memoRequired && order.memo.isNullOrBlank() ->
                             error = ctx.getString(R.string.bridge_memo_missing)
-                        // Il preventivo non e' l'ordine.
-                        //
-                        // Fra il numero che hai guardato e l'ordine aperto passa
-                        // del tempo e una rotta puo' muoversi. Si firmava sulla
-                        // fiducia di una cifra vista prima, e l'app ha gia'
-                        // questo schema fatto bene sulle vendite: se il reale e'
-                        // peggio oltre una soglia, si dicono i due numeri e si
-                        // aspetta una risposta. Sotto il due per cento non vale
-                        // la pena fermare nessuno.
+                        // The quote is not the order. Time passes between the number you saw and the order, and a
+                        // route can move; we signed on a figure seen earlier. The app already does this right on
+                        // sales: if the real one is worse beyond a threshold, both numbers are said and an answer
+                        // awaited. Under two percent nobody is stopped.
                         order.toAmount > 0 && q.toAmount > 0 && order.toAmount < q.toAmount * 0.98 && worse == null -> {
                             worse = q.toAmount to order.toAmount
                             pending = order
@@ -408,9 +376,8 @@ internal fun BridgeSheet(
                         else -> {
                             // The deposit is a payment like any other: Send, receipt, print. A memo, when the route wants one, rides in the transaction.
                             val toSym = if (private || (usdc && sameCoin)) fromSym else t.native
-                            // Quanto arriva lo dice l'ordine, non il preventivo: e'
-                            // l'ordine il patto. Il preventivo serve solo se
-                            // l'ordine non l'ha detto.
+                            // What arrives is what the order says, not the quote: the
+                            // order is the deal. The quote fills in only when the order did not say.
                             val lands = order.toAmount.takeIf { it > 0 } ?: q.toAmount
                             RocketX.remember(
                                 ctx,
@@ -425,12 +392,9 @@ internal fun BridgeSheet(
                                 toAmount = lands, toSymbol = toSym, network = t.name, toAddress = dest,
                                 exchange = order.exchange.ifBlank { q.exchange }, minutes = q.minutes, explorer = t.explorer,
                             )
-                            // La destinazione finale finisce sullo scontrino.
-                            //
-                            // Quello che si firma e' un pagamento a RocketX, quindi
-                            // sullo scontrino compariva l'indirizzo del deposito e
-                            // mai quello dove i soldi vanno a finire: l'unica cosa
-                            // che conta davvero non si vedeva al momento della firma.
+                            // The final destination goes on the receipt. What is signed is a payment to RocketX, so the
+                            // receipt showed the deposit address and never where the money ends up: the one thing that
+                            // counts was invisible at signing.
                             pending = null
                             val tail = if (dest.length > 10) dest.take(6) + "…" + dest.takeLast(6) else dest
                             onSend(
@@ -451,13 +415,9 @@ internal fun BridgeSheet(
                 style = HaloType.small, color = Halo.muted, lineHeight = 15.sp,
             )
 
-            // I ponti gia' aperti stanno in una pagina loro.
-            //
-            // Qui sotto ce n'erano tre, con un tasto che chiedeva lo stato e
-            // scriveva una parola. Non bastava: un ponte che si pianta si
-            // guarda sull'esploratore della catena di arrivo o si porta a
-            // RocketX col numero d'ordine in mano, e nessuna di queste due cose
-            // stava da nessuna parte.
+            // The bridges already opened have a page of their own. Three sat here with a button that
+            // asked the status and wrote one word: a stuck bridge is checked on the destination chain's
+            // explorer or taken to RocketX with the order number, and neither was anywhere.
             val past = remember { RocketX.bridges(ctx) }
             if (past.isNotEmpty()) {
                 GhostButton(stringResource(R.string.bridge_past_all, past.size), Modifier.fillMaxWidth(), HIcon.HISTORY, tint = Halo.cyan) { onHistory() }
@@ -468,20 +428,18 @@ internal fun BridgeSheet(
 }
 
 /**
- * Il minimo, scritto per eccesso.
- *
- * Arrotondato per difetto rimette la cifra sotto il minimo, e la rotta dice di
- * no una seconda volta con lo stesso avviso: l'unico arrotondamento che vale
- * qui e' quello che sta dalla parte giusta della soglia.
+ * The minimum, rounded up. Rounded down it lands back under the minimum and the route says
+ * no a second time with the same notice: the only rounding that counts here is the one on
+ * the right side of the threshold.
  */
 internal fun minText(v: Double): String {
     val up = kotlin.math.ceil(v * 10_000.0) / 10_000.0
     return String.format(Locale.getDefault(), "%.4f", up).trimEnd('0').trimEnd { !it.isDigit() }
 }
 
-/** Una cifra in moneta, senza zeri in coda. */
+/** An amount in coin, no trailing zeros. */
 internal fun coinText(v: Double): String =
     String.format(Locale.ROOT, "%.6f", v).trimEnd('0').trimEnd('.')
 
-/** L'unico USDC vero su Solana. Scritto una volta, letto da chi manda e da chi fa il ponte. */
+/** The one real USDC on Solana. Written once, read by Send and by the bridge. */
 internal const val USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"

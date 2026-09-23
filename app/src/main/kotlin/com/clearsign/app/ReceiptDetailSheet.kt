@@ -147,8 +147,8 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
             }
             // ---- actions --------------------------------------------------------
             Column(Modifier.fillMaxWidth().background(Halo.ground2).padding(horizontal = 20.dp, vertical = 12.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Un'azione principale piena, le altre leggere: due bottoni fantasma
-                // uguali non dicevano quale fosse quella che uno cerca.
+                // One filled primary action, the others light: two identical ghost buttons
+                // did not say which one you were looking for.
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(1f)) {
                         PrimaryButton(stringResource(R.string.detail_share_pdf), danger = false, icon = HIcon.PDF) {

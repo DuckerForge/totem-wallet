@@ -11,22 +11,11 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /**
- * What puts the trader back on its feet.
- *
- * A foreground service is the right host for the loop, but it is not immortal:
- * Android kills services under memory pressure, and a reboot ends it outright.
- * On its own that would mean a position with a stop-loss quietly stops being
- * watched, and nobody would be told. So two cheap guards:
- *
- *  * [Keeper], a periodic worker. WorkManager's floor is fifteen minutes, which
- *    is far too slow to trade on but exactly right for asking "is it still
- *    running?". WorkManager also persists its own schedule across reboots.
- *  * [BootReceiver], so the loop resumes at the first unlock after a reboot
- *    rather than waiting for the first worker window. Deliberately not
- *    direct-boot aware: the settings it needs are encrypted until then.
- *
- * Both only ever *start* the service. The decision to trade lives in
- * [TraderLoop.config], and neither of these can turn it on.
+ * What puts the trader back on its feet. A foreground service is the right host for the loop
+ * but not immortal: memory pressure kills it, a reboot ends it, and a stop-loss would quietly
+ * go unwatched. Two guards: [Keeper], a fifteen-minute worker asking "is it still running",
+ * and [BootReceiver], resuming at first unlock (not direct-boot aware, the settings are encrypted
+ * until then). Both only start the service; the decision to trade is [TraderLoop.config].
  */
 object TraderKeeper {
     private const val WORK = "apex-trader-keeper"

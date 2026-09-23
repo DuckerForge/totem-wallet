@@ -31,12 +31,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 /**
- * The other end of a gift link.
- *
- * Somebody sent a key by message; this screen says how much is behind it and
- * moves it into your wallet. There is no negotiation and nothing to approve on
- * chain: the key in the link *is* the authority, which is exactly why the
- * sending side warns that whoever holds the link holds the money.
+ * The other end of a gift link: how much is behind it, and moving it into your wallet. Nothing
+ * to approve on chain, the key in the link is the authority, which is why the sending side
+ * warns that whoever holds the link holds the money.
  */
 class ClaimActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

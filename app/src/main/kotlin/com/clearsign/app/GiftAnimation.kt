@@ -35,13 +35,9 @@ import kotlin.math.sin
 private const val SKR_MINT = "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3"
 
 /**
- * What a gift link does, in one picture: money leaves this phone and lands on
- * somebody else's, with nothing in between but a message.
- *
- * The coins are the real token marks rather than drawn circles — the app already
- * has them, and a real SOL mark says "money" faster than any glyph we could
- * invent. The phones are the same Seeker outline the tap screen draws, lit from
- * the giving side so the direction is readable before the first coin moves.
+ * What a gift link does, in one picture: money leaves this phone and lands on somebody else's
+ * with nothing between but a message. Real token marks, not drawn circles, a real SOL mark
+ * says "money" faster; the phones are the tap screen's Seeker outline, lit from the giving side.
  */
 @Composable
 internal fun GiftAnimation(modifier: Modifier = Modifier, height: Dp = 156.dp) {

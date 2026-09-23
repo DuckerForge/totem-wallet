@@ -11,13 +11,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.Inflater
 
 /**
- * Decodes a call to an *unknown* program by reading the IDL the program
- * published on-chain (Anchor convention: an account at
- * `createWithSeed(findProgramAddress([], pid), "anchor:idl", pid)` holding a
- * zlib-compressed JSON). "Unknown program, 200 bytes of data" becomes
- * "Jupiter v6 · route(in_amount: 2 000 000, slippage_bps: 50)".
- *
- * IDLs are cached on disk per program for a week (negative results for a day).
+ * Decodes a call to an unknown program from the IDL it published on chain (Anchor: an account
+ * at `createWithSeed(findProgramAddress([], pid), "anchor:idl", pid)` holding zlib-compressed
+ * JSON). "Unknown program, 200 bytes" becomes "Jupiter v6 · route(in_amount: 2 000 000,
+ * slippage_bps: 50)". IDLs are cached on disk per program for a week, misses for a day.
  */
 object AnchorIdl {
     private const val TAG = "ClearSign-IDL"

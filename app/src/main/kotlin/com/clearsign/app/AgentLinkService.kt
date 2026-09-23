@@ -21,23 +21,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The agent's hands on the phone, while the app is closed.
- *
- * Two jobs live here, either of which keeps the service up:
- *
- *  * the **link**, polling the bridge for work from an agent on a computer and
- *    handing each job to [AgentBroker];
- *  * the **trader**, [TraderLoop] ticking on its own clock, which is what makes
- *    "start looking" a thing that happens rather than a thing that is described.
- *
- * A foreground service and not a periodic worker because fifteen minutes is the
- * shortest period WorkManager will accept, and a stop-loss that looks every
- * fifteen minutes is not a stop-loss. Android makes the notification permanent
- * in exchange, which is the correct trade: money is moving on its own, and that
- * should be visible from the lock screen.
- *
- * The notification is also the kill switch: Pause stops signing without losing
- * the rules, Stop trading ends the loop, Revoke drops the link entirely.
+ * The agent's hands on the phone while the app is closed. Two jobs keep the service up: the
+ * link, polling the bridge for work from an agent on a computer and handing each job to
+ * [AgentBroker]; and the trader, [TraderLoop] ticking on its own clock. A foreground service,
+ * not a periodic worker: fifteen minutes is WorkManager's floor, and a stop-loss that looks
+ * every fifteen minutes is not one. The permanent notification is the right trade, money is
+ * moving on its own, and it is the kill switch: Pause, Stop trading, Revoke.
  */
 class AgentLinkService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -115,12 +104,9 @@ class AgentLinkService : Service() {
     }
 
     /**
-     * The trading clock.
-     *
-     * Exits are checked often and the hunt runs rarely, because they cost
-     * different things: pricing what we hold is one quote per position, while a
-     * hunt pulls the whole candidate list and grades it. A position falling
-     * through its stop is also the only thing here that gets worse by waiting.
+     * The trading clock. Exits are checked often and the hunt runs rarely: pricing what we hold
+     * is one quote per position, a hunt grades the whole candidate list, and a position falling
+     * through its stop is the only thing here that gets worse by waiting.
      */
     private fun startTrader() {
         trader?.cancel()

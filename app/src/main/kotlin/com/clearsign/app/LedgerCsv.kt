@@ -7,9 +7,8 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Tax-tool exports. One row per movement; a swap (one sent leg + one received
- * leg) becomes a single row. The network fee appears once per transaction and
- * only when this wallet paid it. Pure Kotlin — unit-tested.
+ * Tax-tool exports, one row per movement; a swap (sent leg plus received leg) is one row. The
+ * network fee appears once per transaction and only when this wallet paid it. Pure Kotlin, unit-tested.
  */
 object LedgerCsv {
     val KOINLY_HEADER = "Date,Sent Amount,Sent Currency,Received Amount,Received Currency,Fee Amount,Fee Currency,Net Worth Amount,Net Worth Currency,Label,Description,TxHash"

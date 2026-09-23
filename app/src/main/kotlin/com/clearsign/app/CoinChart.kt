@@ -48,47 +48,28 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * The coin, drawn properly.
- *
- * The sheet used to carry the same eighty-pixel line the swap button carries,
- * which is the right picture for "am I about to buy into a crash" and the wrong
- * one for "what is this coin doing". The difference is not decoration: a line
- * hides the range inside each bar, and the range is where the violence is. What
- * is here instead is what a person opening a coin actually reads — candles with
- * their wicks, the volume under them, the scale written down the side, and a
- * crosshair that answers "what was it worth *there*" by touching the screen.
- *
- * Two sources, chosen by what the coin is.
- *
- *  - It lives on Solana: the busiest pool on GeckoTerminal, which is the same
- *    data DexTools and DexScreener read, with real per-candle volume and the
- *    pool's own depth underneath.
- *  - It does not: CoinGecko's OHLC, exchange-weighted. Bitcoin has no Solana
- *    pool and never will, and a blank rectangle where its chart belongs reads as
- *    a broken screen rather than as an honest absence.
- *
- * Whichever answers, the timeframes are named after the range they cover and
- * never after a candle size, because only one of the two sources lets us choose
- * the candle size. And when neither has anything, nothing is drawn: a flat line
- * would read as a price that stood still.
+ * The coin, drawn properly. The sheet carried the same eighty-pixel line the swap button
+ * has, right for "am I buying into a crash" and wrong for "what is this coin doing": a line
+ * hides the range inside each bar, where the violence is. Here: candles with wicks, volume
+ * under them, the scale down the side, a crosshair under the finger. Two sources by what the
+ * coin is: on Solana, the busiest GeckoTerminal pool (what DexTools and DexScreener read);
+ * elsewhere CoinGecko OHLC, since Bitcoin has no Solana pool. Timeframes are named after
+ * the range covered, never a candle size. When neither has anything, nothing is drawn.
  */
 @Composable
 internal fun CoinChart(coin: Market.Coin, mint: String?) {
     val ctx = LocalContext.current
-    // Il grafico e' in dollari perche' la fonte risponde in dollari. Qui si
-    // converte quello che si scrive, scala compresa: una moneta letta in euro
-    // non puo' avere l'asse in dollari, o la riga sotto il dito dice un numero
-    // che non sta da nessuna parte.
+    // The chart is in dollars because the source answers in dollars. What is written is
+    // converted here, scale included: a coin read in euros cannot have a dollar axis, or the
+    // line under the finger says a number that exists nowhere.
     val fx = rememberFx()
     var span by remember(coin.key) { mutableStateOf(Gecko.Span.HOURS) }
     var candles by remember(coin.key) { mutableStateOf<List<Gecko.Candle>>(emptyList()) }
     var loading by remember(coin.key) { mutableStateOf(true) }
     var pool by remember(coin.key) { mutableStateOf<Gecko.Pool?>(null) }
-    // Which vendor answered, decided at every load and never remembered as a
-    // decision. The mint arrives after the sheet opens — the coin page is where
-    // we go and look it up — so anything settled at first composition would
-    // settle on "no mint" and stay there, and every Solana coin would be drawn
-    // from the market with its pool sitting right there unread.
+    // Which vendor answered, decided at every load, never remembered. The mint arrives after
+    // the sheet opens, so anything settled at first composition would settle on "no mint" and
+    // every Solana coin would be drawn from the market with its pool unread.
     var fromPool by remember(coin.key) { mutableStateOf(mint != null) }
     var cursor by remember(coin.key) { mutableStateOf<Int?>(null) }
 
@@ -131,23 +112,17 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
 
     GlassCard {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // The head of the card is either the price now or, while a finger
-            // is on the chart, the candle under it. One line doing two jobs,
-            // because a readout that appears somewhere else makes the eye leave
-            // the chart. Its height is fixed: a header that grows by a row would
-            // shove the picture down at the exact moment you are reading it.
+            // The head of the card is the price now or, with a finger on the chart, the candle under
+            // it: one line doing two jobs, so the eye never leaves the chart. Fixed height: a header
+            // that grows by a row shoves the picture down while you read it.
             Box(Modifier.fillMaxWidth().height(46.dp)) {
                 if (at == null) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                // Il prezzo di mercato prima della candela: la
-                                // candela e' di una pool sola e puo' essere
-                                // vecchia di un'ora, il prezzo in cima e' lo
-                                // stesso che la riga dietro questa scheda ha
-                                // appena mostrato. Due numeri diversi per la
-                                // stessa moneta sullo stesso schermo sono un
-                                // errore, anche quando tutti e due sono veri.
+                                // The market price before the candle: the candle is one pool's and may be an hour old, the
+                                // price on top is what the row behind this sheet just showed. Two numbers for the same coin
+                                // on one screen are an error, even when both are true.
                                 (coin.priceUsd ?: last)?.let { fx.price(it) } ?: stringResource(R.string.market_no_price),
                                 fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 21.sp, color = Halo.ink, maxLines = 1,
                             )
@@ -246,16 +221,10 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
                 }
             }
 
-            // The whole thing, at the place that does nothing else. We draw what
-            // fits in a wallet; depth, holders and every pool are a website's
-            // job, and pretending otherwise would mean shipping a browser.
-            //
-            // Il sito e' quello da cui arriva il numero, non quello piu' famoso.
-            // L'identificativo della pool ce lo da' GeckoTerminal; infilarlo
-            // nell'indirizzo di DexTools voleva dire chiedere a un altro sito di
-            // riconoscere un codice di casa d'altri, e quando non lo riconosce
-            // non risponde "non lo trovo", apre qualcosa. Cosi' il link apre
-            // esattamente la pool disegnata qui sopra.
+            // The whole thing, where nothing else is drawn: depth, holders and every pool are a
+            // website's job. The site is the one the number came from, not the famous one: the pool id
+            // is GeckoTerminal's, and DexTools given a foreign code opens something rather than saying
+            // "not found". So the link opens exactly the pool drawn above.
             val url = p?.let { "https://www.geckoterminal.com/solana/pools/${it.id}" }
                 ?: coin.id.takeIf { it != mint && it != coin.mint }?.let { "https://www.coingecko.com/en/coins/$it" }
             if (url != null) {
@@ -273,12 +242,9 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
 }
 
 /**
- * The picture itself: candles, their volume, the scale, and the crosshair.
- *
- * Drawn as candles down to about two pixels a bar and as a filled line below
- * that. A year of daily bars on a phone is three hundred and sixty-five wicks
- * across three hundred points — at that width a candle is not a candle, it is a
- * dithering pattern, and the shape reads better as the line it has become.
+ * The picture: candles, their volume, the scale, the crosshair. Candles down to about two
+ * pixels a bar, a filled line below that: a year of daily bars across three hundred points
+ * is a dithering pattern, and reads better as the line it has become.
  */
 @Composable
 private fun Candles(
@@ -447,10 +413,7 @@ private fun Candles(
     }
 }
 
-/**
- * The gutter the prices are written in. Wide enough for eight decimals, because
- * that is what the coins people follow here actually cost.
- */
+/** The gutter the prices are written in. Wide enough for eight decimals, which is what the coins people follow here cost. */
 private val AXIS_W = 58.dp
 
 /** A number for the scale: as many decimals as the price needs, and no currency on it. */

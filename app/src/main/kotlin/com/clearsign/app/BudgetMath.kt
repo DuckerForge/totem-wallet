@@ -27,14 +27,10 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * What a budget's numbers mean before the money moves.
- *
- * The person sets a budget and two ceilings; the loop derives a slice from
- * them; Jupiter accepts an on-chain order only from about five dollars up.
- * Nobody should have to do that arithmetic in their head, or find out from a
- * red line after the first buy that the slice was too small for the chain to
- * guard it. So the same sentence appears wherever a number is set: at
- * creation, in the rules, at start.
+ * What a budget's numbers mean before the money moves. The person sets a budget and two
+ * ceilings, the loop derives a slice, Jupiter accepts an on-chain order only from about five
+ * dollars up. Nobody should do that arithmetic in their head or learn from a red line after
+ * the first buy, so the same sentence appears wherever a number is set.
  */
 object BudgetMath {
     /** Jupiter's floor for a trigger order, measured on the 15th of September. */
@@ -67,12 +63,9 @@ object BudgetMath {
     const val FEE_RESERVE = 5_000L
 
     /**
-     * How much of the budget goes home when it is closed.
-     *
-     * Null in, null out, and that is the whole point. A balance that could not
-     * be read is not a balance of zero: reading it as zero means sending nothing
-     * home and then forgetting the key, which loses everything still sitting
-     * there. Paid for once, with a node that was rate-limiting.
+     * How much goes home when the budget closes. Null in, null out, on purpose: a balance that
+     * could not be read is not zero, and reading it as zero sends nothing home and then forgets
+     * the key. Paid for once, with a rate-limiting node.
      */
     fun sweepBack(balanceLamports: Long?, reserve: Long = FEE_RESERVE): Long? =
         balanceLamports?.let { if (it > reserve) it - reserve else 0L }

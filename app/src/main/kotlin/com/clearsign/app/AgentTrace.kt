@@ -4,38 +4,21 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 
 /**
- * What the agent is doing right now, in its own words, as it happens.
- *
- * The screen used to say two things: "trading" or "watching the market". Both are
- * true and neither tells you whether the thing is alive, stuck, or halfway
- * through refusing a coin for a reason you would have wanted to know. A loop that
- * works invisibly is indistinguishable from a loop that has died — that is what
- * cost sixteen hours this morning.
- *
- * So the loop narrates. Every meaningful step appends one short line here, the
- * chat renders the last few as a console with a caret, and the difference between
- * thinking and stopped becomes something you can see rather than something you
- * have to trust.
- *
- * Deliberately in memory only. This is a window onto a running process, not a
- * record: the ledger is the record, and writing forty lines a minute to disk to
- * produce an effect would be the wrong trade.
+ * What the agent is doing right now, in its own words. The screen said "trading" or
+ * "watching the market", both true and neither telling you whether the thing is alive, stuck,
+ * or refusing a coin for a reason you wanted to know: a loop that works invisibly looks like
+ * one that has died, which cost sixteen hours one morning. So the loop narrates, one short
+ * line per step, and the chat renders the last few as a console. In memory only: a window on
+ * a running process, not a record, the ledger is the record.
  */
 object AgentTrace {
     private const val MAX = 60
 
     /**
-     * Che riga e'.
-     *
-     * `REFUSED` e' rosso con la ics, ed e' giusto cosi': vuol dire che qualcosa
-     * e' stato **fermato**. Ma ci finiva dentro anche "non sono riuscito a
-     * mettere l'ordine su Jupiter", che non e' un rifiuto e non e' un pericolo:
-     * e' una cosa che non si puo' fare e che cambia chi tiene d'occhio la
-     * posizione. Letta in rosso con la ics, subito dopo un acquisto, sembra che
-     * la moneta appena comprata sia esplosa.
-     *
-     * `WARN` e' ambra col punto esclamativo: guarda, sappilo, ma non e' andato
-     * storto niente.
+     * What kind of line. `REFUSED` is red with the x, rightly: something was stopped. But "could
+     * not place the order on Jupiter" landed there too, and it is neither a refusal nor a danger:
+     * read in red right after a buy it looked like the coin had exploded. `WARN` is amber with
+     * the exclamation mark: look, know it, nothing went wrong.
      */
     enum class Kind { STEP, FOUND, REFUSED, WARN, ACTED }
 

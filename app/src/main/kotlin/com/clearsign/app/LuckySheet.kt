@@ -44,19 +44,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The safest two or three coins on Solana today, bought in one gesture.
- *
- * The loop hunts runners: it wants something that moves, and it takes a small
- * slice into whatever the scan ranks highest right now. This is the other kind of
- * buy — a few coins picked because they are **solid**, with the money split
- * evenly between them and no stop-loss watching them minute by minute.
- * [com.clearsign.core.safestPicks] is the ranking, and it does not look at the
- * price at all.
- *
- * It spends the budget, never the Seed Vault account, and every purchase goes
- * through [AgentBroker] exactly like the loop's: same collar, same simulation,
- * same refusals. Nothing here can spend more than the rules already allow, and
- * nothing here signs with a key that can reach your own wallet.
+ * The safest two or three coins on Solana today, bought in one gesture. The loop hunts
+ * runners; this is the other kind of buy, a few coins picked because they are solid, the
+ * money split evenly, no stop-loss watching minute by minute ([com.clearsign.core.safestPicks]
+ * ranks them without looking at the price). It spends the budget, never the Seed Vault, and
+ * every purchase goes through [AgentBroker] like the loop's: same collar, same simulation.
  */
 @Composable
 internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
@@ -206,11 +198,8 @@ private fun fmtCompact(v: Double): String = when {
 }
 
 /**
- * Buy one, through the same door as everything else.
- *
- * No shortcut exists here and none should: the collar simulates it, judges it and
- * signs it, or refuses. A button that bypassed that would be a second way to
- * spend money, and the whole design of this wallet is that there is only one.
+ * Buy one, through the same door as everything else: the collar simulates, judges, signs or
+ * refuses. A button bypassing that would be a second way to spend money, and this wallet has one.
  */
 private suspend fun buyOne(ctx: android.content.Context, owner: String, c: com.clearsign.core.Candidate, slice: Long): Boolean {
     val quote = withContext(Dispatchers.IO) {

@@ -21,9 +21,8 @@ import java.util.Locale
 private const val TAG = "ClearSign-Engine"
 
 /**
- * The receipt engine: turns raw transaction bytes into the plain-language
- * receipt (what moves, to whom, which risks) that every ClearSign screen shows —
- * the MWA endpoint for dApp requests and the wallet's own Send flow alike.
+ * The receipt engine: raw transaction bytes into the plain receipt (what moves, to whom,
+ * which risks) every screen shows, the MWA endpoint and the wallet's own Send alike.
  * Everything a screen needs is derived here once; the UI only renders it.
  */
 object ReceiptEngine {
@@ -41,24 +40,18 @@ object ReceiptEngine {
         val destinations: List<String>,
         val txKeys: Set<String>?,
         /**
-         * The mints this analysis was told to expect. Carried so the pre-signing
-         * re-check can watch the same accounts: without it the preview saw a coin
-         * arriving and the re-check did not, the two delta sets disagreed, and
-         * every purchase of a coin you had never held was blocked as "the state
-         * changed" when nothing had.
+         * The mints this analysis was told to expect, carried so the pre-signing recheck watches the
+         * same accounts: without it the preview saw a coin arriving and the recheck did not, and
+         * every first purchase of a coin was blocked as "the state changed".
          */
         val expectMints: List<String> = emptyList(),
     )
 
     /**
-     * Build a receipt from the real transaction bytes. We itemize what we can
-     * decode on-device (SOL transfers, token ops) and verify the whole thing by
-     * simulating it on the cluster — simulation is what handles v0 + lookup
-     * tables + SPL programs, so a transaction the network accepts is not blocked
-     * as "unverifiable".
-     *
-     * Wire work is concurrent: lookup-table resolution → (simulation ∥ pre-state)
-     * ∥ community reputation. Everything else is local.
+     * A receipt from the real bytes: itemize what decodes on-device (SOL transfers, token ops)
+     * and verify the whole thing by simulating on the cluster, which handles v0, lookup tables
+     * and SPL programs, so a transaction the network accepts is never "unverifiable". Wire work
+     * is concurrent: lookup resolution, then simulation with pre-state, alongside community reputation.
      */
     suspend fun analyze(
         ctx: Context,
@@ -70,12 +63,9 @@ object ReceiptEngine {
         /** Mints the caller expects to receive; see [SolanaRpc.simulateEffects]. */
         expectMints: List<String> = emptyList(),
         /**
-         * This payload comes after another one in the same batch.
-         *
-         * A transaction that needs an account the previous transaction creates
-         * fails when simulated on its own, and that failure is honest: it is not
-         * evidence of anything wrong. Only the first of a batch can be judged by
-         * its own simulation.
+         * This payload comes after another in the same batch. A transaction needing an account the
+         * previous one creates fails when simulated alone, honestly: not evidence of anything wrong.
+         * Only the first of a batch is judged by its own simulation.
          */
         dependent: Boolean = false,
     ): Analyzed = coroutineScope {
@@ -127,7 +117,7 @@ object ReceiptEngine {
                     if (pid in NATIVE_PROGRAMS) null else Triple(pid, ix.data, ix.accounts.map { i -> d.staticAccountKeys.getOrNull(i) ?: "" })
                 }.take(6).map { (pid, data, accounts) ->
                     async {
-                        // ORE non ha un IDL sulla catena: lo si legge a mano, in :core.
+                        // ORE has no IDL on chain: it is read by hand, in :core.
                         if (pid == com.clearsign.core.Ore.PROGRAM) com.clearsign.core.Ore.decode(data, accounts)?.let { com.clearsign.core.Ore.render(it, deviceLocaleTag()) }
                         else runCatching { AnchorIdl.decode(ctx, rpc, pid, data) }.getOrNull()
                     }
@@ -176,12 +166,9 @@ object ReceiptEngine {
 
         val simRisk = when (outcome) {
             is SolanaRpc.SimOutcome.Ok -> null
-            // The node ran it and it errored. That is not a doubt, it is an answer:
-            // this transaction fails on chain, and signing it burns a fee to
-            // achieve nothing. It used to be graded by [requireSim], which meant
-            // the swap screen showed the error in amber and left "hold to swap"
-            // perfectly pressable underneath it. "It ran and failed" and "I could
-            // not ask" are opposites, and only the second one is a maybe.
+            // The node ran it and it errored: not a doubt, an answer. This transaction fails on chain and
+            // signing it burns a fee for nothing. Graded by [requireSim] it showed amber with "hold to
+            // swap" pressable underneath. "It ran and failed" and "I could not ask" are opposites.
             is SolanaRpc.SimOutcome.Failed -> Risk(
                 RiskFlag.SIMULATION_FAILED,
                 if (dependent) Severity.WARN else Severity.DANGER,
@@ -242,11 +229,10 @@ object ReceiptEngine {
         }
 
     /**
-     * Anti-TOCTOU: re-simulate each payload in the instant before signing and abort
-     * if the balance effects drifted from the previewed receipt (beyond the small
-     * tolerance a live market legitimately moves). Returns the drift risk, or null
-     * when everything still matches — or simulation is unavailable: we don't
-     * fabricate drift out of a network hiccup. All payloads are re-checked concurrently.
+     * Anti-TOCTOU: re-simulate each payload the instant before signing and abort if the balance
+     * effects drifted from the preview beyond what a live market legitimately moves. Null when
+     * everything matches, or when simulation is unavailable: no drift is fabricated out of a
+     * network hiccup. All payloads rechecked concurrently.
      */
     suspend fun driftGuard(items: List<Analyzed>, myWallet: String, cluster: String?): Risk? = coroutineScope {
         val rpc = SolanaRpc.urlFor(cluster)

@@ -54,10 +54,9 @@ private fun hsvToLong(h: Float, s: Float, v: Float): Long {
 }
 
 /**
- * The custom-theme editor: pick the accent, the secondary and the background,
- * the corner roundness and text size, the surface effects and the receipt
- * layout. Everything previews live on the app behind the sheet; Save persists it
- * and switches to the Custom theme. Cancel restores whatever was on before.
+ * The custom-theme editor: accent, secondary, background, corner roundness, text size,
+ * surface effects, receipt layout. Everything previews live on the app behind the sheet; Save
+ * persists and switches to Custom, Cancel restores what was on.
  */
 @Composable
 internal fun ThemeEditorSheet(onDismiss: () -> Unit) {

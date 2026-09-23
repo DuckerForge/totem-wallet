@@ -9,10 +9,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Jupiter swap (mainnet): a quote, then a ready-to-sign transaction. ClearSign
- * never signs it blind — the returned bytes go through the normal receipt +
- * Seed Vault flow. A small platform fee (bps) is routed to the fee wallet, and
- * shown honestly in the receipt as one of the destinations.
+ * Jupiter swap (mainnet): a quote, then a ready-to-sign transaction, never signed blind:
+ * the bytes go through the normal receipt and the Seed Vault. A small platform fee (bps)
+ * goes to the fee wallet and shows in the receipt as one of the destinations.
  */
 object Jupiter {
     private const val TAG = "ClearSign-Jup"
@@ -35,13 +34,10 @@ object Jupiter {
     )
 
     /**
-     * Best route for [amount] raw units of [inputMint] → [outputMint]. Null on failure.
-     *
-     * [feeBps] is our cut, and asking for one is a promise to provide a token
-     * account to receive it: Jupiter answers `feeAccount is required for swap
-     * with platformFee` when the quote carries a fee and the build does not.
-     * The agent passes 0, because it trades coins whose fee account does not
-     * exist yet, and a swap that cannot be built earns nothing anyway.
+     * Best route for [amount] raw units of [inputMint] to [outputMint]; null on failure. [feeBps]
+     * is our cut, and asking for one promises a token account to receive it: Jupiter answers
+     * `feeAccount is required for swap with platformFee` when the quote has a fee and the build
+     * does not. The agent passes 0: it trades coins whose fee account does not exist yet.
      */
     fun quote(inputMint: String, outputMint: String, amount: Long, slippageBps: Int = 50, feeBps: Int = PLATFORM_FEE_BPS): Quote? {
         val q = "inputMint=$inputMint&outputMint=$outputMint&amount=$amount&slippageBps=$slippageBps" +
@@ -61,12 +57,9 @@ object Jupiter {
     }
 
     /**
-     * Can this token be sold back again?
-     *
-     * A honeypot quotes beautifully on the way in and has no route out, so the
-     * only honest test is to ask for the opposite trade before buying. Three
-     * answers, not two: true (a route exists), false (Jupiter says there is
-     * none), null (we could not reach it — which is never an accusation).
+     * Can this token be sold back? A honeypot quotes beautifully on the way in and has no route
+     * out, so the honest test is asking for the opposite trade before buying. Three answers:
+     * true (a route exists), false (Jupiter says none), null (unreachable, never an accusation).
      */
     fun sellableBack(mint: String, decimals: Int, usd: Double?): Boolean? {
         if (mint == SOL_MINT || mint == com.clearsign.core.NATIVE_SOL_MINT) return true
@@ -82,9 +75,8 @@ object Jupiter {
     }
 
     /**
-     * Build the swap transaction (base64 v0). [feeAccount] is the platform-fee
-     * token account (an ATA of the fee wallet for the output mint); when it
-     * can't be used, the caller retries without it so the swap still works.
+     * Build the swap transaction (base64 v0). [feeAccount] is the platform-fee token account (the
+     * fee wallet's ATA for the output mint); when unusable the caller retries without it.
      */
     fun swapTransaction(quote: Quote, userPubkey: String, feeAccount: String?): ByteArray? {
         val body = JSONObject()
@@ -99,18 +91,12 @@ object Jupiter {
     }
 
     /**
-     * The fee account, **only when it is actually there**.
-     *
-     * Jupiter does not create the platform fee account for you: hand it an
-     * address that does not exist and its own program aborts the swap with
-     * `Custom 6025`. The derived address always looks fine, so this was invisible
-     * from the code and fatal in practice — every swap into a coin whose treasury
-     * account had never been opened failed, verified coins included, while the one
-     * coin whose account did exist (USDC) worked and hid the pattern.
-     *
-     * One `getAccountInfo` per mint, remembered for the life of the process. Null
-     * means "take no fee on this trade", which is the difference between earning
-     * nothing and breaking the trade.
+     * The fee account, only when it actually exists. Jupiter does not create it: hand it a
+     * missing address and its program aborts with `Custom 6025`. The derived address always
+     * looks fine, so this was invisible in code and fatal in practice: every swap into a coin
+     * whose treasury account was never opened failed, while USDC worked and hid the pattern.
+     * One `getAccountInfo` per mint, remembered for the process. Null means "no fee on this
+     * trade": the difference between earning nothing and breaking the trade.
      */
     fun feeAccountIfUsable(outputMint: String): String? {
         val ata = feeAccountFor(outputMint) ?: return null
@@ -124,10 +110,8 @@ object Jupiter {
     private val feeAccountExists = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
     /**
-     * Forget what we knew about the fee accounts. Called after they are created:
-     * the cache had them as missing for the life of the process, so the swap
-     * right after "activate fees" still took no fee, and so did every swap until
-     * the app was killed.
+     * Forget what we knew about the fee accounts, called after they are created: the cache had
+     * them missing for the process, so the swap right after "activate fees" still took none.
      */
     fun forgetFeeAccounts() = feeAccountExists.clear()
 

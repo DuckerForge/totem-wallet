@@ -5,9 +5,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Local "registro firme": every receipt the user approved, newest first. Plain
- * metadata (what was shown, when, for which dApp, the resulting signature) —
- * never keys. Feeds the home screen history and the trust model via [Contacts].
+ * The local signing log: every receipt the user approved, newest first. Plain metadata (what
+ * was shown, when, which dApp, the signature), never keys. Feeds the home history and the trust model via [Contacts].
  */
 object SignLog {
     private const val PREFS = "clearsign_signlog"

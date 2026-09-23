@@ -49,7 +49,7 @@ enum class HIcon {
     BRIDGE,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
-    // aggiorna: tre quarti d'arco con la punta. HISTORY e' un orologio e diceva un'altra cosa.
+    // refresh: three quarters of an arc with a tip. HISTORY is a clock and said something else.
     REFRESH,
 }
 
@@ -75,7 +75,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
     fun dot(cx: Float, cy: Float, r: Float = 1.3f) = circle(cx, cy, r, fill = true)
     fun arc(cx: Float, cy: Float, r: Float, start: Float, sweep: Float) =
         s.drawArc(tint, start, sweep, false, p(cx - r, cy - r), Size(2 * r * u, 2 * r * u), style = stroke)
-    /** Lo stesso disegno in un altro colore. Solo per le pochissime icone che ne vogliono due. */
+    /** The same drawing in another color. Only for the very few icons that want two. */
     fun two(c: Color, body: G.() -> Unit) = G(s, u, c, sw).body()
     fun poly(vararg pts: Float, close: Boolean = false, fill: Boolean = false) = path(fill, close) {
         moveTo(pts[0], pts[1]); var i = 2; while (i < pts.size) { lineTo(pts[i], pts[i + 1]); i += 2 }
@@ -213,7 +213,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 path { moveTo(12f, 3f); arcTo(12f, 12f, 9f, 270f, 300f); quadTo(12.5f, 15f, 14.5f, 15.5f); quadTo(17f, 16f, 16.5f, 18.5f); quadTo(16f, 21f, 12f, 21f) }
                 dot(8f, 9.5f, 1.4f); dot(12f, 7f, 1.4f); dot(16f, 9.5f, 1.4f); dot(7.5f, 14.5f, 1.4f)
             }
-            // Freccia giu' e vassoio, 15 punti come il resto della fila.
+            // Arrow down and tray, 15 points like the rest of the row.
             HIcon.RECEIVE -> { line(12f, 4.5f, 12f, 15.5f); poly(7.5f, 11f, 12f, 15.5f, 16.5f, 11f); line(4.5f, 19.5f, 19.5f, 19.5f) }
             HIcon.PASTE -> {
                 path { moveTo(9f, 5f); lineTo(6.5f, 5f); quadTo(5f, 5f, 5f, 6.5f); lineTo(5f, 19.5f); quadTo(5f, 21f, 6.5f, 21f); lineTo(17.5f, 21f); quadTo(19f, 21f, 19f, 19.5f); lineTo(19f, 6.5f); quadTo(19f, 5f, 17.5f, 5f); lineTo(15f, 5f) }
@@ -241,8 +241,8 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.CHECK -> poly(5f, 12.5f, 10f, 17.5f, 19.5f, 7f)
             HIcon.WARNING -> { path { moveTo(12f, 3.5f); lineTo(21.5f, 20f); lineTo(2.5f, 20f); close() }; line(12f, 9.5f, 12f, 14f); dot(12f, 17f, 1.1f) }
             HIcon.PEN -> { path { moveTo(4f, 20f); lineTo(8f, 20f); lineTo(19.5f, 8.5f); lineTo(15.5f, 4.5f); lineTo(4f, 16f); close() }; line(13f, 7f, 17f, 11f) }
-            // L'aeroplanino stava in 18 punti e accanto a Ricevi, che ne prende 15,
-            // sembrava un'altra misura. Ora sta nella stessa scatola degli altri.
+            // The paper plane was 18 points and next to Receive, which takes 15, looked
+            // like another size. Now it sits in the same box as the others.
             HIcon.SEND -> { path { moveTo(4.5f, 11.5f); lineTo(19.5f, 4.5f); lineTo(14.5f, 19.5f); lineTo(11.6f, 13f); close() }; line(11.6f, 13f, 19.5f, 4.5f) }
             HIcon.SIGN -> {
                 path { moveTo(14f, 3f); lineTo(7f, 3f); quadTo(5.5f, 3f, 5.5f, 4.5f); lineTo(5.5f, 19.5f); quadTo(5.5f, 21f, 7f, 21f); lineTo(17f, 21f); quadTo(18.5f, 21f, 18.5f, 19.5f); lineTo(18.5f, 7.5f); close() }
@@ -288,22 +288,12 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 path { moveTo(9f, 16.6f); quadTo(12f, 18.2f, 15f, 16.6f) }
             }
             HIcon.BRIDGE -> {
-                // Era un ponte: arcata, piloni e strada. Disegnava la parola, non
-                // la cosa. A ventiquattro punti si legge "ponte sul fiume", e
-                // quello che succede qui e' che dei soldi passano su un'altra
-                // catena e qualcosa torna indietro.
-                //
-                // Due archi e due punte: uno va di la', l'altro e' quello che
-                // torna.
-                //
-                // Erano di due colori, ciano e ambra. Ma sulla prima pagina i
-                // cerchi sono otto e sono neutri **apposta**: se uno solo si
-                // accende, l'accento smette di voler dire "questa e' l'azione" e
-                // torna a essere decorazione. Un'icona che urla in mezzo a sette
-                // che parlano piano non si legge meglio, si legge storta.
-                //
-                // Le due direzioni si distinguono lo stesso, dentro la stessa
-                // tinta: quella che torna e' piu' spenta.
+                // It was a bridge: arch, piers and road, drawing the word, not the thing. At twenty-four
+                // points it read "bridge over a river", and what happens here is money crossing to another
+                // chain and something coming back: two arcs and two tips, one going, one returning. They
+                // were two colors, cyan and amber, but the eight home circles are neutral on purpose: one
+                // lit icon turns the accent into decoration. The two directions still differ within one
+                // tint: the returning one is dimmer.
                 path { moveTo(4.5f, 12f); quadTo(12f, 3.8f, 19.5f, 12f) }
                 poly(16.1f, 10.8f, 19.5f, 12f, 18.6f, 8.5f)
                 two(tint.copy(alpha = 0.5f)) {

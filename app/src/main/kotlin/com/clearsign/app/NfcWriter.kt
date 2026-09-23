@@ -11,17 +11,10 @@ import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 
 /**
- * Writing a payment request onto a real NFC sticker.
- *
- * A tag costs a few cents and any phone reads it: Apex, Phantom, Solflare, or
- * a browser when the request is the web form. The shop sticks it to the
- * counter, the tip jar, the van; the customer touches it and the payment
- * opens. The Seeker writes it here, once, and can lock it so nobody rewrites
- * it with their own address later: that is the sticker version of address
- * poisoning, and the lock is the answer.
- *
- * Reader mode is one per activity, so while this is on the ordinary reader
- * (the one that opens Send from a tag) is off; [stop] hands the radio back.
+ * Writing a payment request onto a real NFC sticker. A tag costs cents and any phone reads
+ * it: this wallet, Phantom, Solflare, or a browser when the request is the web form. Written
+ * once, and lockable so nobody rewrites it with their own address later, the sticker version of
+ * address poisoning. Reader mode is one per activity: while this is on the ordinary reader is off, [stop] hands the radio back.
  */
 object NfcWriter {
     sealed class Outcome {

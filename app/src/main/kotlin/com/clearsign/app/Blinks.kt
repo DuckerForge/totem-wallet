@@ -10,13 +10,10 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 /**
- * Solana Actions, the thing behind a Blink.
- *
- * A link in a feed points at an API: GET says what it is (icon, title, a
- * description, buttons with their parameters); POST with the account gives
- * back a transaction. Here that transaction goes where every transaction goes,
- * the receipt, and only then the fingerprint. Spec read on the 16th of
- * September 2026 (solana.com/docs/advanced/actions).
+ * Solana Actions, the thing behind a Blink. A link points at an API: GET says what it is
+ * (icon, title, description, buttons with parameters), POST with the account gives back a
+ * transaction, which goes where every transaction goes, the receipt, then the fingerprint.
+ * Spec read 16 Sep 2026 (solana.com/docs/advanced/actions).
  */
 object Blinks {
     const val MAINNET = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"

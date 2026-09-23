@@ -9,18 +9,10 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 /**
- * A payment, proven on the spot.
- *
- * Every receipt this phone signs carries a statement (what left, what came
- * in, to whom, the chain signature) signed with the phone's own P‑256 key.
- * Packed into one line it fits a QR: the person who was paid points their
- * phone at it and sees the same numbers, checked against the key inside,
- * without waiting for an explorer. Format, one line, four parts:
- *
- *   apex-proof:1.<key b64url>.<statement b64url>.<signature b64url>
- *
- * The statement travels as the exact bytes that were signed, never
- * re-serialised, so the check is the check.
+ * A payment, proven on the spot. Every receipt this phone signs carries a statement (what
+ * left, what came in, to whom, the chain signature) signed with the phone's own P-256 key.
+ * One line, four parts, fits a QR: `apex-proof:1.<key b64url>.<statement b64url>.<signature b64url>`.
+ * The statement travels as the exact bytes signed, never re-serialized, so the check is the check.
  */
 object Proof {
     const val PREFIX = "apex-proof:1."

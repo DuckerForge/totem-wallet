@@ -60,18 +60,11 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Seeing what the loop sees.
- *
- * A full screen that never sleeps, meant to sit next to a computer: one chart
- * per coin in play with the three lines that matter (where it came in, where it
- * sells, where it stops) and the price ticking against them; under that, the
- * loop's own reasoning arriving line by line, typed, as it happens. A pulse
- * says the loop is alive; a ring leaves the screen when it acts.
- *
- * Everything on it already exists. The lines are [AgentTrace], written by the
- * loop as it works, not by a model asked to narrate. The prices are Jupiter's,
- * the history is GeckoTerminal's. No key, no credit, nothing new leaves the
- * phone.
+ * Seeing what the loop sees. A full screen that never sleeps, meant to sit next to a
+ * computer: one chart per coin with the three lines that matter (entry, target, stop) and
+ * the price ticking against them; under that the loop's own reasoning arriving line by
+ * line. Everything already exists: the lines are [AgentTrace], written by the loop, not a
+ * model narrating; prices Jupiter's, history GeckoTerminal's. Nothing new leaves the phone.
  */
 @Composable
 internal fun EyesDialog(onClose: () -> Unit, onStart: () -> Unit = {}) {
@@ -89,10 +82,9 @@ internal fun EyesDialog(onClose: () -> Unit, onStart: () -> Unit = {}) {
 internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     val ctx = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
-    // The book and the loop's settings: read once here, then only on the
-    // two-second clock below and on IO. A file read never sits in a
-    // composition, and the ten-times-a-second clock lives inside the rings
-    // now, so the page itself recomposes only when something changed.
+    // The book and the loop's settings: read once here, then only on the two-second clock on
+    // IO. No file read sits in a composition, and the ten-times-a-second clock lives inside
+    // the rings, so the page recomposes only when something changed.
     var open by remember { mutableStateOf(Positions.open(ctx)) }
     var cfg by remember { mutableStateOf(TraderLoop.config(ctx)) }
     var tickAt by remember { mutableStateOf(TraderLoop.lastTickAt(ctx)) }
@@ -119,19 +111,10 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     }
     val scanning = stringResource(R.string.trace_scanning)
     /**
-     * La voce dice le cose che contano, non tutte.
-     *
-     * Leggeva ogni riga trovata o fatta. Le righe arrivano piu' in fretta di
-     * quanto una voce parli, quindi partiva, si fermava a meta', ripartiva su
-     * un'altra: dava l'impressione di una macchina che balbetta invece di una
-     * che lavora. E leggere venti righe non e' venti volte piu' informativo di
-     * leggerne una.
-     *
-     * Quindi: le cose fatte coi soldi si dicono sempre, perche' sono quelle che
-     * uno vorrebbe sentire anche dall'altra stanza. Del resto si dice una riga
-     * ogni dodici secondi, l'ultima arrivata, e le altre si guardano e basta.
-     * Una voce che tace mentre lo schermo scorre non sta nascondendo niente: sta
-     * lasciando leggere.
+     * The voice says what counts, not everything. Reading every line, it started, stopped
+     * halfway, restarted on another: a machine that stutters. Things done with money are always
+     * said, the ones you want to hear from the other room; of the rest, one line every twelve
+     * seconds, the latest. A voice silent while the screen scrolls is letting you read.
      */
     LaunchedEffect(voice) {
         if (!voice) return@LaunchedEffect
@@ -142,9 +125,9 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
             if (lines.size < seen) seen = 0
             val fresh = lines.drop(seen)
             seen = lines.size
-            // Tutto quello che ha mosso dei soldi, sempre e in ordine.
+            // Everything that moved money, always, in order.
             fresh.filter { it.kind == AgentTrace.Kind.ACTED }.forEach { Voice.add(ctx, it.text) }
-            // Del resto, una sola, e non piu' spesso di una ogni dodici secondi.
+            // Of the rest, one only, and no more often than one every twelve seconds.
             val rest = fresh.lastOrNull { it.kind != AgentTrace.Kind.ACTED && (it.kind == AgentTrace.Kind.FOUND || it.kind == AgentTrace.Kind.REFUSED || it.text == scanning) }
             val now = System.currentTimeMillis()
             if (rest != null && now - lastSaid > 12_000L) {
@@ -197,12 +180,9 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
         // The ring that leaves the middle of the screen when the loop signs.
         ActRing(acted)
 
-        // In cima si scansava la barra di stato, in fondo niente: non c'era
-        // niente in fondo da scansare. Da quando il tasto di accensione sta li',
-        // la barra dei gesti gli passava sopra e la parola veniva tagliata a
-        // meta' dal bordo dello schermo.
-        // Le due barre di sistema, tolte a mano perche' qui dentro nessuno le
-        // toglie. Vedi [systemBars].
+        // The two system bars, removed by hand because nothing in here does it: see [systemBars].
+        // The top dodged the status bar, the bottom nothing, and once the start button lived there
+        // the gesture bar cut the word in half.
         val bars = systemBars()
         Column(
             Modifier.padding(top = bars.top, bottom = bars.bottom)
@@ -361,24 +341,15 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                         }
                     }
                 }
-                // Il tasto che accende, appena sotto la riga in cui gli si parla.
-                //
-                // Era in cima, sopra tutto, con due terzi di schermo vuoto sotto. Poi
-                // inchiodato in fondo allo schermo, che e' peggio: da solo in mezzo al
-                // vuoto, lontano da tutto quello a cui si riferisce. Le due cose che si
-                // fanno qui sono chiedergli una cosa e accenderlo, e stanno una sotto
-                // l'altra a un dito di distanza.
+                // The start button just under the line you talk to it with. It was on top with two thirds
+                // of the screen empty below, then pinned to the bottom, alone in the void: the two things
+                // done here, asking and starting, sit one under the other, a finger apart.
                 if (!cfg.on) {
                 ArmBar(stringResource(R.string.agent_start)) { onStart() }
             } else {
-                // Acceso, la barra non spariva: restava un piede vuoto.
-                //
-                // E mancavano le due cose che servono appena hai venduto. I tre
-                // tasti (vendi, compra ancora, vendine una e cercane un'altra)
-                // stanno **sulla riga della moneta**, quindi appena la riga
-                // sparisce non c'e' piu' niente: ne' un modo di dirgli "cerca
-                // adesso", ne' un modo di fermarlo. Restava aspettare fino a sei
-                // minuti davanti a uno schermo senza tasti.
+                // On, the bar did not disappear: an empty foot. And the two things needed right after a
+                // sale were missing: the three buttons live on the coin's row, so once it vanished there was
+                // no "hunt now" and no stop, up to six minutes in front of a screen with no buttons.
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         ArmBar(stringResource(R.string.eyes_hunt_now)) {
@@ -417,17 +388,10 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
 private val clock = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
 /**
- * Una riga della traccia, scritta come la scriverebbe una macchina.
- *
- * Era in carattere proporzionale dentro una scheda di vetro, e si leggeva come
- * un racconto. Ma qui non sta raccontando: sta lavorando, e quello che si vuole
- * guardare e' proprio il lavoro. Monospaziato, ogni riga con il suo segno
- * davanti, e i segni sono quelli di un terminale perche' quella grammatica la
- * conoscono tutti senza spiegarla: la freccia e' un passo, il piu' e' una cosa
- * trovata, la ics e' una cosa rifiutata, il dollaro e' una cosa fatta coi soldi.
- *
- * L'ultima si batte da sola. Le vecchie sono gia' scritte: ribatterle a ogni
- * ridisegno direbbe che stanno succedendo di nuovo.
+ * One trace line, written as a machine would. Proportional type in a glass card read like
+ * a story, and this is not telling, it is working. Monospace, a mark in front, terminal
+ * grammar everybody knows: arrow a step, plus a find, x a refusal, dollar a thing done with
+ * money. Only the last line types itself: retyping old ones on redraw says they are happening again.
  */
 @Composable
 private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
@@ -462,12 +426,9 @@ private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
 }
 
 /**
- * Il vetro del tubo: righe di scansione e un alone, dietro la console.
- *
- * Non aggiunge nessuna informazione ed e' esattamente per questo che ci sta: da'
- * alle righe un posto dove stare che sembri uno strumento acceso invece di una
- * scheda dell'interfaccia. La stessa lingua dello scontrino terminale e
- * dell'attesa di Scout.
+ * The tube's glass: scanlines and a glow behind the console. Adds no information, which is
+ * why it belongs: the lines get a place that looks like a lit instrument, not an interface
+ * card. Same language as the terminal receipt and the Scout wait.
  */
 @Composable
 private fun TubeGlass(modifier: Modifier) {
@@ -497,9 +458,8 @@ private fun ActRing(acted: Int) {
 }
 
 /**
- * The clock: an outer arc that drains to the next look, an inner arc to the
- * next hunt, and the dot in the middle that breathes and swells once each
- * time the loop looks. The ten-times-a-second tick and the breathing are
+ * The clock: an outer arc draining to the next look, an inner arc to the next hunt, and a
+ * dot that breathes and swells each time the loop looks. The fast tick and the breathing are
  * read in draw, so the rest of the page never hears them.
  */
 @Composable
@@ -555,11 +515,9 @@ private fun Countdown(looked: Long, hunted: Long, openCount: Int, maxPositions: 
     Row {
         Text(stringResource(R.string.eyes_next_look, (lookLeft / 1000).toString()), style = HaloType.mono, color = Halo.mint)
         Spacer(Modifier.width(10.dp))
-        // Pieno vuol dire che non caccia, e dirgli quando caccia la prossima
-        // volta era una promessa che non aveva intenzione di mantenere: il
-        // ciclo si ferma da solo quando i posti sono occupati e ricompra solo
-        // dopo che ha venduto. Adesso lo dice invece di mostrare un conto
-        // alla rovescia verso niente.
+        // Full means it does not hunt, and a countdown to the next hunt was a promise it would not
+        // keep: the loop stops on its own when the slots are taken and buys only after selling. Now
+        // it says so instead of counting down to nothing.
         val full = openCount >= maxPositions
         if (full) Text(stringResource(R.string.eyes_full, openCount, maxPositions), style = HaloType.mono, color = Halo.amber)
         else if (hunted > 0L) Text(
@@ -578,22 +536,12 @@ private fun Caret() {
 }
 
 /**
- * L'interruttore di accensione, in fondo e per tutta la riga.
- *
- * Questa pagina e' l'unica dell'app che sta a guardare una macchina mentre
- * lavora, e il suo linguaggio e' gia' quello: monospaziato, righe con un segno
- * davanti, un anello che pulsa. Il tasto per accenderla era un rettangolo con
- * un bordo che respira, cioe' un bottone qualunque con le parentesi intorno.
- *
- * Adesso e' un quadro strumenti: quattro angoli invece di una cornice chiusa,
- * una luce che scorre da sinistra a destra come una scansione, e la parola in
- * mezzo con le lettere larghe. Gli angoli sono la differenza che si legge senza
- * accorgersene: una cornice intera e' un bottone, quattro angoli sono una cosa
- * **inquadrata**, cioe' una macchina che sta per partire.
- *
- * Niente di piu'. Un colore solo, quello del tema, e nessun bagliore addosso al
- * testo: la pagina sotto e' fatta di numeri, e se il tasto brilla piu' dei
- * numeri la pagina l'ha persa.
+ * The start switch, at the bottom, full width. This is the one page that watches a machine
+ * work, in monospace and marked lines and a pulsing ring, and the button was a rectangle
+ * with a breathing border: an ordinary button in brackets. Now an instrument panel: four
+ * corners instead of a closed frame, a light sweeping left to right, wide letters. Corners
+ * read as a thing framed, a machine about to start. One color, no glow: if the button
+ * shines more than the numbers, the page has lost.
  */
 @Composable
 private fun ArmBar(label: String, onStart: () -> Unit) {
@@ -616,8 +564,8 @@ private fun ArmBar(label: String, onStart: () -> Unit) {
             val w = size.width
             val h = size.height
             drawRect(Halo.mint.copy(alpha = 0.07f))
-            // La scansione: una banda tenue che attraversa e riparte. E' quello
-            // che fa capire, senza scriverlo, che la macchina e' pronta e ferma.
+            // The sweep: a faint band crossing and starting again. It says, without
+            // writing it, that the machine is ready and still.
             val x = w * sweep
             drawRect(
                 Brush.horizontalGradient(
@@ -646,7 +594,7 @@ private fun ArmBar(label: String, onStart: () -> Unit) {
     }
 }
 
-/** Le due barre di sistema e quello che resta in mezzo. Vedi [systemBars]. */
+/** The two system bars and what is left between them. See [systemBars]. */
 private data class Bars(
     val top: androidx.compose.ui.unit.Dp,
     val bottom: androidx.compose.ui.unit.Dp,
@@ -654,26 +602,12 @@ private data class Bars(
 )
 
 /**
- * Quanto si prendono le barre di sistema, e quanto schermo resta.
- *
- * Questa pagina vive dentro un `Dialog`, e li' dentro le cose normali non
- * funzionano, per tre motivi che si sommavano. Tutti e tre finivano nello
- * stesso punto: il tasto di accensione in fondo, tagliato a meta' dal bordo.
- *
- *  * `navigationBarsPadding()` vale **zero** dentro un Dialog. Due schermate
- *    prese prima e dopo averlo aggiunto avevano il tasto sulla stessa identica
- *    riga di pixel;
- *  * il primo conto fatto a mano tornava zero lo stesso, perche' li' dentro
- *    `LocalContext` non e' l'Activity ma un involucro e il cast falliva in
- *    silenzio. Il difetto peggiore di un numero e' tornare zero invece di
- *    rompersi;
- *  * e anche con i numeri giusti, un margine qui **sposta in giu' senza
- *    accorciare**: la colonna si prendeva comunque tutta l'altezza della
- *    finestra, e usciva sotto di quanto l'avevi spostata.
- *
- * Quindi niente margini che dovrebbero accorciare: si misura la finestra vera,
- * si tolgono le due barre, e l'altezza che resta si da' alla colonna come
- * numero. Un'altezza esatta non la sposta nessuno.
+ * What the system bars take and how much screen is left. Inside a `Dialog` the normal
+ * tools fail, and all three failures cut the start button in half: `navigationBarsPadding()`
+ * is zero in a Dialog; the first hand count was zero too, because `LocalContext` there is a
+ * wrapper, not the Activity, and the cast failed silently; and even with right numbers a
+ * margin here shifts down without shortening, the column still took the window's full
+ * height. So no margins: measure the real window, subtract the bars, hand the column an exact height.
  */
 @Composable
 private fun systemBars(): Bars {

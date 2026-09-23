@@ -46,11 +46,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
 /**
- * ClearSign's Mobile Wallet Adapter endpoint — the "phone as a Ledger".
- *
- * dApps start a local association (solana-wallet://) that Android routes here.
- * For every request we build a plain-language receipt from the *real*
- * transaction bytes, and only sign with the Seed Vault after the user approves
+ * Velum's Mobile Wallet Adapter endpoint, the phone as a Ledger: dApps start a local
+ * association (solana-wallet://) that Android routes here, every request becomes a plain
+ * receipt from the real bytes, and the Seed Vault signs only after the person approves
  * what they actually see.
  */
 private const val TAG = "ClearSign-MWA"
@@ -67,9 +65,8 @@ class MobileWalletAdapterActivity : ComponentActivity() {
     private var watchdog: Job? = null
 
     /**
-     * Nothing should hang forever on a spinner. If we sit in a waiting state with no
-     * request to show, either the dApp never connected (show an actionable error) or
-     * it connected, got what it needed and went idle (hand control back, don't freeze).
+     * Nothing hangs forever on a spinner: waiting with no request means the dApp never connected
+     * (an actionable error) or connected, got what it needed and went idle (hand control back).
      */
     private fun armWaitWatchdog() {
         watchdog?.cancel()
@@ -150,16 +147,12 @@ class MobileWalletAdapterActivity : ComponentActivity() {
     private fun onMain(block: () -> Unit) = runOnUiThread(block)
 
     /**
-     * Hand control back to the dApp from the Done screen.
-     *
-     * dApps start us with startActivityForResult, so despite `singleTask` this
-     * activity usually lives INSIDE the dApp's task: moveTaskToBack() there would
-     * hide the dApp as well and drop the user on the launcher. Once the dApp has
-     * closed the session (the common case: RN `transact()` closes right after the
-     * response) simply finishing reveals the dApp underneath. With a still-open
-     * session we only background ourselves when we own the task; otherwise the
-     * automatic countdown waits for the session to end (finishSoon) and only an
-     * explicit tap finishes — which closes the session, as the user asked to leave.
+     * Hand control back to the dApp from the Done screen. dApps start us with
+     * startActivityForResult, so despite `singleTask` this activity usually lives inside the
+     * dApp's task, and moveTaskToBack() there hid the dApp too and dropped the person on the
+     * launcher. Session closed (the common case, RN `transact()` closes right after the
+     * response): finish, and the dApp shows. Session open: background only when we own the
+     * task; otherwise wait for it to end (finishSoon), and only an explicit tap finishes.
      */
     fun backToDapp(explicit: Boolean = false) {
         if (ui !is MwaUi.Done) return
@@ -575,9 +568,9 @@ class MobileWalletAdapterActivity : ComponentActivity() {
 }
 
 /**
- * Who is asking. [name] is what gets shown; when it came from the request itself
- * (an agent naming itself) [nameIsClaimed] is true and [origin] carries what we
- * could actually verify — the calling package, or how the request arrived.
+ * Who is asking. [name] is shown; when it came from the request itself (an agent naming
+ * itself) [nameIsClaimed] is true and [origin] carries what we could verify: the calling
+ * package, or how the request arrived.
  */
 data class DappId(
     val name: String,
@@ -617,13 +610,9 @@ sealed interface MwaUi {
         val onApprove: () -> Unit,
         val onDecline: () -> Unit,
         /**
-         * Why the agent could not do this on its own.
-         *
-         * The collar's own words — "it would exceed the daily cap of 0.047 SOL" —
-         * and the first thing a person needs on this screen. It used to be
-         * appended to a risk row's detail text, which is the right information in
-         * the one place nobody reads first: you were handed a signature request
-         * for money with no answer to "why are you asking me".
+         * Why the agent could not do this on its own, in the collar's own words ("it would exceed
+         * the daily cap of 0.047 SOL"): the first thing a person needs on this screen. It used to
+         * be appended to a risk row's detail, the one place nobody reads first.
          */
         val askedWhy: String? = null,
     ) : MwaUi {

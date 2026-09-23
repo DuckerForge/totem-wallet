@@ -22,15 +22,10 @@ object Prices {
     data class Px(val usd: Double, val change24h: Double?)
 
     /**
-     * Quotes for [mints] (native SOL priced as wSOL). Missing = unknown.
-     *
-     * Two sources, in order. The price endpoint answers for anything with real
-     * liquidity and is the cheapest call there is. What it does not answer for is
-     * exactly the kind of coin the agent buys: young, thin, and absent from the
-     * price index. Those used to show a dash in the portfolio, which reads as "we
-     * lost it" rather than "nobody publishes a price", and they were the only
-     * holdings the person actually wanted to watch. The token registry prices
-     * them, and it is the same call the swap screen already makes.
+     * Quotes for [mints] (native SOL priced as wSOL); missing means unknown. Two sources in
+     * order: the price endpoint answers for anything with real liquidity and is the cheapest call
+     * there is, but not for exactly what the agent buys, young and thin. Those showed a dash,
+     * which reads as "we lost it"; the token registry prices them, the same call the swap makes.
      */
     fun quotes(mints: Collection<String>): Map<String, Px> {
         val ids = mints.map { if (it == NATIVE_SOL_MINT) WSOL else it }.distinct()

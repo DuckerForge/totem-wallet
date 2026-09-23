@@ -7,14 +7,10 @@ import com.clearsign.core.TransactionScanner
 import org.json.JSONObject
 
 /**
- * A no-API-key implementation of the [TransactionScanner] port: it matches every
- * address the transaction touches (instruction destinations *and* all static
- * account keys — a hidden writable account or a malicious program counts) against
- * a bundled blocklist of known drainers and sanctioned wallets.
- *
- * The list ships in `assets/known_bad.json` and can be refreshed without a code
- * change; a small embedded seed is used if the asset is missing. This is the
- * cheap first line before (optionally) a networked scanner like Blockaid.
+ * The keyless [TransactionScanner]: every address the transaction touches (instruction
+ * destinations and all static account keys, a hidden writable account counts) against a bundled
+ * blocklist of known drainers and sanctioned wallets. The list ships in `assets/known_bad.json`
+ * and refreshes without a code change; a small embedded seed covers a missing asset.
  */
 class BlocklistScanner(context: Context) : TransactionScanner {
 

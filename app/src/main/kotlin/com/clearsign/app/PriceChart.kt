@@ -38,20 +38,11 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /*
- * What the coin has been doing, under the thing that is about to buy it.
- *
- * Buying a name and a number with no idea of the shape behind them is the part
- * of a swap that feels like a coin toss, and the fix is small: a line, three
- * spans, and the change across the one you are looking at.
- *
- * Deliberately a line and not candles. At this size candles are decoration —
- * nobody reads a wick two pixels wide — and the question here is only "which way
- * has this been going, and how violently".
- *
- * The prices come from the busiest pool on GeckoTerminal: free, no key, and a
- * different vendor from the one quoting the swap, which is the point. Nothing
- * here blocks or delays the swap, and no history means no chart, never a flat
- * line — a flat line would read as a price that did not move.
+ * What the coin has been doing, under the thing about to buy it: a line, three spans, and
+ * the change across the one you look at. A line, not candles: at this size a wick two pixels
+ * wide is decoration, and the question is only which way and how violently. Prices from the
+ * busiest pool on GeckoTerminal, a different vendor from the one quoting the swap, which is
+ * the point. Nothing blocks the swap; no history means no chart, never a flat line.
  */
 /** A price worth a line on the chart: an order, or an alert. [key] restarts the entrance when it changes. */
 @androidx.compose.runtime.Immutable
@@ -69,7 +60,7 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
         withContext(Dispatchers.IO) {
             val p = pool ?: runCatching { Gecko.topPool(mint) }.getOrNull()
             pool = p
-            // Col mint, non senza: in una pool ci sono due monete e questa e' quella chiesta.
+            // With the mint, not without: a pool has two coins and this is the one asked for.
             series = if (p == null) emptyList() else runCatching { Gecko.closes(p, span, mint) }.getOrElse { emptyList() }
         }
         loading = false
@@ -122,12 +113,9 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
 }
 
 /**
- * A moment on the line: somebody was in or out of this coin right here.
- *
- * [at] is a fraction of the chart's width, zero at the oldest candle and one at
- * the newest, so the mark lands at the time it happened. The price under it is
- * whatever the line is doing there. Nobody publishes the price a wallet
- * actually paid, so nothing here claims to know it.
+ * A moment on the line: somebody was in or out of this coin right here. [at] is a fraction of
+ * the chart's width, zero at the oldest candle, one at the newest. The price under it is
+ * whatever the line does there: nobody publishes what a wallet actually paid.
  */
 internal class SparkMark(val at: Float, val sell: Boolean)
 

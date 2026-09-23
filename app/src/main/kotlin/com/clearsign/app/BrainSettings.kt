@@ -36,9 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Where the model's credentials live, and the one paragraph that says what
- * leaves the phone. The key is written masked and stored sealed by [Secrets];
- * it is never logged and never sent anywhere except the provider it belongs to.
+ * Where the model's credentials live, and the one paragraph saying what leaves the phone. The
+ * key is written masked and stored sealed by [Secrets], never logged, never sent anywhere but its provider.
  */
 @Composable
 internal fun BrainFields(compact: Boolean = false) {
@@ -187,10 +186,8 @@ internal fun BrainCard() {
 }
 
 /**
- * The same fields as a sheet, reachable from the Agent tab.
- *
- * The key belongs where the agent is. Burying it in Settings meant people could
- * not find the one thing the chat needs before it can say anything.
+ * The same fields as a sheet, from the Agent tab: the key belongs where the agent is. Buried
+ * in Settings, people could not find the one thing the chat needs.
  */
 @Composable
 internal fun BrainSheet(onDismiss: () -> Unit) {
@@ -207,11 +204,8 @@ internal fun BrainSheet(onDismiss: () -> Unit) {
 }
 
 /**
- * What "link an agent" actually involves, said before the camera opens.
- *
- * It is the advanced path: it needs a bridge running on your own computer. The
- * camera appearing with no explanation was the reason nobody could tell what
- * this button did.
+ * What "link an agent" involves, said before the camera opens: the advanced path, a bridge on
+ * your own computer. A camera with no explanation was why nobody could tell what this button did.
  */
 @Composable
 internal fun LinkHelpSheet(onScan: () -> Unit, onDismiss: () -> Unit) {

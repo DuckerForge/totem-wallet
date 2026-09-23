@@ -3,10 +3,9 @@ package com.clearsign.app
 import java.io.ByteArrayOutputStream
 
 /**
- * The wallet's own transaction builder (legacy message format): revoke a
- * delegate, close empty accounts, send SOL / tokens, pay for a theme. The
- * signature slot is left zeroed for the Seed Vault; ClearSign then runs the
- * same receipt pipeline on these bytes as on any dApp transaction.
+ * The wallet's own transaction builder (legacy message format): revoke a delegate, close empty
+ * accounts, send SOL or tokens, pay for a theme. The signature slot is left zeroed for the Seed
+ * Vault, and the bytes go through the same receipt pipeline as any dApp transaction.
  */
 object WalletTx {
     val SYSTEM_PROGRAM = ByteArray(32)

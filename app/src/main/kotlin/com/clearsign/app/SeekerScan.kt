@@ -14,17 +14,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * What the Seeker crowd is buying, read straight off the chain.
- *
- * Runs on its own Helius key, never the agent's. The scan reads ten thousand
- * wallets on a schedule and the agent trades with real money: if the scan ever
- * exhausts its month, the trading must not even notice. That separation is the
- * whole reason [BuildConfig.SCAN_RPC_URL] exists.
- *
- * The cost trick that makes this affordable: asking *who moved* is one call per
- * hundred wallets, because a swap always changes the balance if only by the fee.
- * Only the handful that moved then cost a lookup each. One call per wallet
- * instead would be a hundred times the price and would not fit a free key.
+ * What the Seeker crowd is buying, read off the chain, on its own Helius key, never the
+ * agent's: if the scan exhausts its month, trading must not notice. That is why
+ * [BuildConfig.SCAN_RPC_URL] exists. The cost trick: asking who moved is one call per hundred
+ * wallets, since a swap always changes the balance if only by the fee, and only the movers
+ * cost a lookup each. One call per wallet would be a hundred times the price.
  */
 object SeekerScan {
     private const val TAG = "ClearSign-Seeker"
@@ -47,12 +41,9 @@ object SeekerScan {
     }
 
     /**
-     * One pass. [tier] null means everyone; [cap] bounds how many movers we look up,
-     * so a quiet key cannot be drained by one unusually busy hour.
-     *
-     * Returns how many purchases were recorded. The first ever pass records none:
-     * with no previous balances there is nothing to compare against, and inventing
-     * movement from a cold start would file every wallet as active.
+     * One pass. [tier] null means everyone; [cap] bounds how many movers are looked up, so one
+     * busy hour cannot drain a quiet key. Returns how many purchases were recorded; the first
+     * pass records none: with no previous balances there is nothing to compare against.
      */
     fun pass(ctx: Context, tier: SeekerTier? = null, cap: Int = 400): Int {
         val all = roster(ctx)
@@ -160,12 +151,9 @@ object SeekerScan {
     }
 
     /**
-     * A purchase, or null.
-     *
-     * "Bought" means money left and a coin arrived in the same transaction. Both
-     * halves are required: a coin arriving on its own is an airdrop, and on this
-     * crowd airdrops outnumber purchases by a wide margin — SEKR, CHAPTER2, HM and
-     * the rest shipped with the phone and are worth nothing.
+     * A purchase, or null. "Bought" means money left and a coin arrived in the same transaction,
+     * both halves required: a coin arriving alone is an airdrop, and on this crowd airdrops
+     * outnumber purchases (SEKR, CHAPTER2, HM shipped with the phone and are worth nothing).
      */
     private fun swapOf(tx: JSONObject, w: SeekerWallet, at: Long): CrowdBuy? {
         val meta = tx.optJSONObject("meta") ?: return null

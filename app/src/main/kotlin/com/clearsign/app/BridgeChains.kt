@@ -40,19 +40,11 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 /**
- * Le catene: otto davanti, il resto dietro una ricerca.
- *
- * La prima versione le metteva tutte sulla pagina, duecentosette pastiglie una
- * dietro l'altra. Non e' una scelta, e' un muro: si scorre col pollice per
- * cinque schermate e si finisce per selezionare quello che capita sotto il dito
- * (successo dal vivo: EVMOS EVM NETWORK, che nessuno stava cercando). E
- * l'ordine era quello di RocketX, che al terzo posto mette Robinhood Chain.
- *
- * Qui invece: [RocketX.POPULAR] davanti, nell'ordine in cui si usano, e tutte
- * le altre in questa pagina, **in ordine alfabetico**, con una casella di
- * ricerca sopra. L'alfabetico non e' una classifica, ed e' proprio per questo
- * che va bene per una lista lunga: e' l'unico ordine in cui uno sa gia' dove
- * guardare.
+ * The chains: eight in front, the rest behind a search. The first version put all two
+ * hundred and seven pills on the page: not a choice, a wall, and you end up picking whatever
+ * is under your thumb (live: EVMOS EVM NETWORK, which nobody wanted), in RocketX's order,
+ * Robinhood Chain third. Here [RocketX.POPULAR] in front, the rest alphabetical with a
+ * search: alphabetical is the one order where you already know where to look.
  */
 @Composable
 internal fun ChainPickerSheet(
@@ -67,8 +59,8 @@ internal fun ChainPickerSheet(
     val popular = remember(all) { RocketX.popular(all) }
     val rest = remember(all, popular) { (all - popular.toSet()).sortedBy { it.name.lowercase(Locale.ROOT) } }
     val q = query.trim().lowercase(Locale.ROOT)
-    // Cercando, la divisione fra "le solite" e "le altre" non serve piu': chi
-    // scrive tre lettere vuole una lista sola di cose che le contengono.
+    // While searching, the split between the usual and the rest is gone: whoever
+    // types three letters wants one list of things containing them.
     val hits = remember(q, all) {
         if (q.isEmpty()) emptyList()
         else (popular + rest).filter { it.name.lowercase(Locale.ROOT).contains(q) || it.native.lowercase(Locale.ROOT).contains(q) || it.short.lowercase(Locale.ROOT).contains(q) }
@@ -112,7 +104,7 @@ private fun SectionLabel(text: String) {
     Text(text.uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
 }
 
-/** Una riga: il nome come lo chiama chi ci vive, e la moneta con cui si paga li' sopra. */
+/** One row: the name as the people living there call it, and the coin you pay with up there. */
 @Composable
 private fun ChainRow(n: RocketX.Network, on: Boolean, onClick: () -> Unit) {
     Row(
@@ -128,11 +120,8 @@ private fun ChainRow(n: RocketX.Network, on: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * "BITCOIN Network" e "APTOS MAINNET" sono nomi da riga di database.
- *
- * Tutto maiuscolo su una lista lunga urla e si legge peggio, e le parole
- * "Network", "Chain" e "Mainnet" sono le stesse su meta' delle voci: occupano
- * spazio senza distinguere niente.
+ * "BITCOIN Network" and "APTOS MAINNET" are database row names: all caps on a long list
+ * shouts, and "Network", "Chain" and "Mainnet" repeat on half the entries and distinguish nothing.
  */
 internal fun chainLabel(n: RocketX.Network): String {
     val bare = n.name

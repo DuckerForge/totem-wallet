@@ -14,9 +14,8 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Printable receipts, no third-party library: A4 pages drawn line by line in the
- * bundled monospace, with the attestation (public key + signature) at the bottom
- * so the document can be verified independently of the app.
+ * Printable receipts, no third-party library: A4 pages drawn line by line in the bundled
+ * monospace, with the attestation (public key and signature) at the bottom for independent verification.
  */
 class ReceiptPdf(private val ctx: Context) {
     private val W = 595; private val H = 842; private val M = 40f

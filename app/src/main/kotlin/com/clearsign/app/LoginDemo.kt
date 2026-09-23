@@ -34,41 +34,26 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Il marchio, fatto da due telefoni.
- *
- * Prima una riga di luce che si scrive da sola sul buio, dal viola in basso al
- * ciano in alto. Poi, sotto di lei, si accendono due telefoni gia' in posa, e si
- * scopre che quella riga e' la piega fra i due: la V del marchio. Poi i telefoni
- * se ne vanno nella luce e il marchio resta.
- *
- * L'ordine e' quello perche' e' quello che dice la cosa. Con i telefoni per
- * primi si vedeva una V di telefoni a cui veniva aggiunta una riga: un disegno
- * finito e poi un ornamento. Col tratto per primo, il marchio si scrive e poi si
- * scopre di cosa e' fatto.
- *
- * Non e' decorazione. La V del marchio **e' due telefoni che si toccano**, cioe'
- * la cosa che quest'app sa fare e le altre no: avvicinarne due e far passare dei
- * soldi senza indirizzi, senza link, senza nessuno in mezzo. La schermata su cui
- * gira e' quella dove non c'e' niente da fare tranne aspettare un'impronta, ed e'
- * l'unica animazione dell'app che parte senza che nessuno l'abbia chiesta.
- *
- * Prima c'era un pianeta con un campo stellato, una meteora e tre richieste in
- * arrivo. Diceva una cosa giusta e la diceva con troppa roba: sei elementi che si
- * muovono e nessuno che sia il marchio. Le regole di adesso: niente stelle,
- * niente cose che cadono, un solo movimento alla volta, e un respiro di silenzio
- * alla fine del giro, cosi' la V resta negli occhi invece di scorrere via.
+ * The mark, made of two phones. First a line of light writes itself on the dark, violet at
+ * the bottom to cyan at the top; then two phones light up under it, already posed, and the
+ * line turns out to be the fold between them, the V of the mark; then the phones leave into
+ * the light and the mark stays. Stroke first, because with the phones first it read as a V
+ * of phones with a line added. Not decoration: the V is two phones touching, the thing this
+ * app does and others do not. It runs on the one screen where there is nothing to do but
+ * wait for a fingerprint. Rules: no stars, nothing falling, one motion at a time, a breath
+ * of silence at the end so the V stays in the eye.
  */
 @Composable
 internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
-    // Una volta sola. Un racconto che riparte in continuazione smette di essere
-    // un racconto e diventa uno sfondo che si muove: la prima volta lo guardi,
-    // la terza ti da' fastidio. Arrivato in fondo resta il marchio, fermo.
+    // Once only. A story that keeps restarting stops being a story and becomes a
+    // moving background: the first time you watch, the third annoys. At the end
+    // the mark stays, still.
     val run = remember { Animatable(0f) }
     LaunchedEffect(Unit) { run.animateTo(1f, tween(6000, easing = LinearEasing)) }
     val t = run.value
 
-    // Il marchio vero, non un disegno che gli somiglia. E' la stessa immagine che
-    // sta sul lanciatore: se un giorno cambia, cambia anche qui da sola.
+    // The real mark, not a drawing that resembles it: the same image as the
+    // launcher, so if it ever changes it changes here too.
     val mark = ImageBitmap.imageResource(R.mipmap.brand_bird)
 
     val open = remember { Animatable(0f) }
@@ -79,18 +64,15 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val h = size.height
         val op = open.value
 
-        // Il marchio vive in un quadrato suo, non nella scatola che gli tocca:
-        // quella qui e' `weight(1f)` e si prende tutta l'altezza che avanza.
+        // The mark lives in a square of its own, not in the box it gets: that one is
+        // `weight(1f)` and takes all the height left over.
         val d = min(w * 0.46f, h * 0.62f)
         val cx = w / 2f
         val cy = h * 0.17f
 
-        // La V dei telefoni non e' una V qualsiasi che gli somiglia: e' **quella
-        // del marchio**, presa appoggiando le sagome dei due telefoni sopra
-        // l'icona finche' non ci cascano dentro. Il vertice e' basso, a 0,82 del
-        // lato, e i bracci si aprono di 38 gradi dalla verticale: leggerli da un
-        // ritaglio di righe li dava molto piu' chiusi, perche' la parte bassa
-        // dell'immagine e' un'altra cosa e sporcava la misura.
+        // The phones' V is the mark's V, taken by laying the two phone silhouettes over the icon
+        // until they fell into it: vertex low at 0.82 of the side, arms 38 degrees off vertical.
+        // Reading it off a crop of lines gave them much narrower, because the bottom of the image is something else.
         val vertex = Offset(cx, cy + d * 0.320f)
         val armX = d * 0.480f
         val armY = d * 0.615f
@@ -98,48 +80,34 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val rightTip = Offset(cx + armX, vertex.y - armY)
         val armLen = hypot(armX, armY)
 
-        // --- i tempi, che sono il racconto ---------------------------------
-        //
-        // Prima il tratto, poi quello di cui e' fatto.
-        //
-        // Sul buio non c'e' niente, e una riga di luce si disegna da sola. Per un
-        // momento e' l'unica cosa sullo schermo: il marchio che si scrive. Quando
-        // e' acceso e fermo, sotto di lui si accendono i due Seeker, gia' in posa
-        // e gia' al loro posto sotto la riga, e si scopre che quella riga e' la
-        // piega fra due telefoni che si toccano. Poi i telefoni se ne vanno nella
-        // luce e resta il marchio.
-        //
-        // I telefoni erano li' dal primo fotogramma e il tratto arrivava dopo: si
-        // vedeva una V di telefoni a cui veniva aggiunta una riga.
+        // --- the timing, which is the story -----------------------------------------------
+        // Stroke first, then what it is made of. A line of light draws itself on the dark and for a
+        // moment is the only thing on screen: the mark writing itself. Lit and still, the two Seekers
+        // light up under it, already in place, and the line turns out to be the fold between two
+        // phones touching. Then the phones leave into the light and the mark stays.
         val spark = ease(seg(t, 0.05f, 0.30f))
-        // Una battuta ferma col tratto acceso e niente sotto. Senza, i telefoni
-        // entrerebbero mentre lo sto ancora disegnando, e non si vedrebbe ne' la
-        // riga che si scrive ne' loro che arrivano.
+        // A still beat with the stroke lit and nothing under it. Without it the phones
+        // would enter while it is still being drawn, and neither the line writing
+        // itself nor their arrival would show.
         val arrive = ease(seg(t, 0.38f, 0.55f))
-        // E un'altra a V intera, prima della dissolvenza. Prima `become` partiva
-        // troppo presto e il tratto cominciava a scivolare **mentre** lo stavo
-        // ancora disegnando, quindi si staccava dal telefono a meta' corsa.
+        // And another beat at the full V, before the dissolve. `become` used to start
+        // too early and the stroke began sliding while still being drawn, so it came
+        // off the phone mid-run.
         val become = ease(seg(t, 0.68f, 0.84f))
 
-        // L'apertura della porta non salta il racconto, lo lascia finire e poi
-        // ritira tutto.
-        //
-        // Prima `opening` spingeva la scena dritta al marchio: telefoni a zero,
-        // logo a uno. Ma quella bandiera resta accesa mentre la porta prova lo
-        // sblocco, e dopo un'impronta non riconosciuta ci restava. Risultato: i
-        // telefoni non si vedevano piu' **mai**, e la porta mostrava un logo fermo.
-        // Adesso il giro va per conto suo e l'apertura lo sfuma via.
+        // Opening the door does not skip the story, it lets it finish and then pulls everything
+        // back. `opening` used to push the scene straight to the mark, and the flag stayed up while
+        // the door tried the unlock, so after a failed print the phones were never seen again and
+        // the door showed a frozen logo. Now the cycle runs on its own and the opening fades it out.
         val leaving = 1f - op * 0.85f
-        // I telefoni se ne vanno in fretta una volta cominciato: a dissolvenza
-        // lineare il corpo sparisce ma le isole della fotocamera restano
-        // leggibili, e sembrano due macchie che galleggiano sul marchio.
+        // The phones leave fast once started: with a linear fade the body vanishes
+        // but the camera islands stay legible, two blots floating on the mark.
         val gone = (1f - become).let { it * it * it }
-        // Si accendono, non arrivano: nessuno spostamento, si scoprono sotto una
-        // luce che c'era gia'.
+        // They light up, they do not arrive: no movement, revealed under a light that
+        // was already there.
         val phoneAlpha = arrive * gone * leaving
-        // Niente smorzatura in coda: serviva a nascondere lo stacco quando il
-        // giro ripartiva, e il giro non riparte piu'. Lasciandola, il marchio
-        // restava per sempre al quarantacinque per cento.
+        // No damping at the tail: it hid the cut when the cycle restarted, and the
+        // cycle no longer restarts. Left in, the mark stayed at forty-five percent forever.
         val markAlpha = become * leaving
 
         // --- il respiro dietro ---------------------------------------------
@@ -151,14 +119,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
             radius = d * 0.95f, center = Offset(cx, cy),
         )
 
-        // --- i due telefoni, finche' ci sono -------------------------------
+        // --- the two phones, while they last --------------------------------
         val phoneLen = armLen * 0.98f
         val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
-        // Nella luce non svaniscono sul posto: si avvicinano di un soffio, come
-        // se venissero assorbiti. E' l'unico spostamento rimasto.
+        // In the light they do not vanish in place: they draw a breath closer, as if
+        // absorbed. The only movement left.
         val pull = become * d * 0.06f
-        // Dove sta un telefono adesso. Serve due volte, ai telefoni e al tratto
-        // che ci corre sopra, e finche' e' un conto solo non possono staccarsi.
+        // Where a phone is now. Used twice, by the phones and by the stroke running on
+        // them, and as long as it is one computation they cannot come apart.
         fun seat(tip: Offset, side: Float): Offset {
             val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
             return Offset(
@@ -169,51 +137,40 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         if (phoneAlpha > 0.01f) {
             listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
                 val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
-                // Uno di fronte e uno di dorso. Due dorsi uguali erano la stessa
-                // cosa detta due volte, e per non farli sembrare inclinati in
-                // modo diverso andava pure specchiato quello di sinistra, che e'
-                // una toppa. Cosi' invece i due lati del telefono si vedono
-                // tutti e due, e il tratto corre sul dorso, dove sta nel marchio.
-                // Arrivano gia' caldi: la luce sopra di loro e' accesa da prima.
+                // One facing, one from the back. Two identical backs said the same thing twice and the left
+                // one had to be mirrored, a patch. This way both sides of the phone show, and the stroke
+                // runs on the back, where it sits in the mark. They arrive already warm: the light above is on.
                 phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, arrive * (0.4f + spark), back = side > 0f)
             }
         }
 
-        // --- la riga di luce, che viene per prima ---------------------------
-        // Si disegna sul buio e resta accesa finche' i telefoni non sono andati.
-        // Il marchio, una volta arrivato, il suo tratto ce l'ha gia' dipinto
-        // dentro, quindi qui sparisce.
-        //
-        // Il tratto corre **sul vetro**, non accanto: stesso centro e stessa
-        // lunghezza del telefono destro, rientrato di un raggio d'angolo perche'
-        // la punta tonda si fermi dentro il bordo. Il conto non guarda se il
-        // telefono c'e': il tratto si disegna dove il telefono **sara'**, e per
-        // questo, quando arriva, gli casca addosso invece di avvicinarglisi. Prima andava da vertice a
-        // punta e sbordava di un decimo per parte, e quando i telefoni venivano
-        // tirati dentro restava dov'era: due oggetti vicini invece di uno.
+        // --- the line of light, which comes first ------------------------------------------
+        // Drawn on the dark and kept lit until the phones are gone; the mark carries its own stroke
+        // painted in, so here it vanishes. It runs on the glass, not beside it: same center and length
+        // as the right phone, inset by a corner radius so the round tip stops inside the edge. Drawn
+        // where the phone will be, so when it arrives it lands on it. Before, it ran vertex to tip,
+        // overshot a tenth each side, and stayed put when the phones were pulled in: two objects, not one.
         if (spark > 0f && become < 1f) {
             val ux = (rightTip.x - vertex.x) / armLen
             val uy = (rightTip.y - vertex.y) / armLen
-            // Non in mezzo al telefono: sul suo **bordo sinistro**, quello che
-            // guarda il vertice. Nel marchio il tratto e' la piega fra i due
-            // pannelli, non una riga in mezzo a uno.
+            // Not in the middle of the phone: on its left edge, the one facing the
+            // vertex. In the mark the stroke is the fold between the two panels, not a
+            // line across one.
             val edge = Offset(uy, -ux)
             val c = seat(rightTip, 1f) + edge * (phoneW * 0.46f)
             val half = phoneLen / 2f - phoneW * 0.15f
-            // Nel marchio il tratto non e' l'asse del braccio: parte sotto il
-            // vertice, taglia la V ed esce dalla punta destra, molto piu'
-            // inclinato. Misurato dentro l'immagine. Mentre i telefoni si
-            // dissolvono il tratto ci scivola sopra, cosi' il marchio non
-            // arriva: si posa su qualcosa che e' gia' al posto giusto.
+            // In the mark the stroke is not the arm's axis: it starts below the vertex, cuts the V and
+            // leaves at the right tip, steeper. Measured in the image. As the phones dissolve the stroke
+            // slides onto it, so the mark does not arrive, it settles on something already in place.
             val a = mix(Offset(c.x - ux * half, c.y - uy * half), Offset(cx - d * 0.310f, cy + d * 0.280f), become)
             val b = mix(Offset(c.x + ux * half, c.y + uy * half), Offset(cx + d * 0.360f, cy - d * 0.330f), become)
             neon(a, b, spark, (1f - become) * (0.4f + 0.6f * spark), d, (1f - become * 0.8f) * leaving)
         }
 
-        // --- e arriva il marchio -------------------------------------------
+        // --- and the mark arrives --------------------------------------------
         if (markAlpha > 0.01f) {
-            // Entra di un soffio piu' grande e si posa: arrivare senza muoversi
-            // non e' arrivare.
+            // It enters a breath larger and settles: arriving without moving is not
+            // arriving.
             val k = d * (1.06f - 0.06f * become)
             drawImage(
                 image = mark,
@@ -227,23 +184,20 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     }
 }
 
-/** Il viola in basso e il ciano in alto: i due estremi del marchio. */
+/** Violet at the bottom and cyan at the top: the two ends of the brand. */
 private val NEON_LOW = Color(0xFF9524F3)
 private val NEON_MID = Color(0xFF666CF4)
 private val NEON_HIGH = Color(0xFF0BF5EC)
 
 /**
- * Il tratto che si disegna da solo, con il colore che scorre lungo la sua
- * lunghezza.
- *
- * A pezzi e non in un colpo solo perche' il colore cambia strada facendo, e
- * perche' e' cosi' che si mostra solo la parte gia' arrivata. Tre passate: un
- * alone largo e tenue, una media, e il filo vero, che e' quello che si legge.
+ * The stroke that draws itself, color flowing along its length. In pieces, not one go, because
+ * the color changes along the way and that is how only the arrived part shows. Three passes:
+ * a wide faint halo, a medium one, and the real thread, which is the one read.
  */
 private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: Float, fade: Float = 1f) {
     if (reveal <= 0f) return
-    // Spesso come nel logo, non come un tubo al neon: misurato sul marchio, che
-    // e' l'unica cosa di cui il tratto e' una parte.
+    // As thick as in the logo, not a neon tube: measured on the mark, the one
+    // thing the stroke is part of.
     val core = d * 0.017f
     val steps = 44
     for (i in 0 until steps) {
@@ -258,8 +212,8 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
         drawLine(c.copy(alpha = (0.24f + 0.22f * glow) * fade), p0, p1, core * 2.1f, StrokeCap.Round)
         drawLine(c.copy(alpha = fade), p0, p1, core, StrokeCap.Round)
     }
-    // La punta accesa mentre viaggia, e niente quando e' arrivata: un filo che
-    // continua a brillare in cima direbbe che sta ancora succedendo qualcosa.
+    // The tip lit while traveling, nothing once arrived: a thread still glowing
+    // at the top would say something is still happening.
     if (reveal < 1f) {
         val head = Offset(a.x + (b.x - a.x) * reveal, a.y + (b.y - a.y) * reveal)
         val c = if (reveal < 0.5f) lerp(NEON_LOW, NEON_MID, reveal * 2f) else lerp(NEON_MID, NEON_HIGH, (reveal - 0.5f) * 2f)
@@ -269,18 +223,11 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: 
 }
 
 /**
- * Un Seeker.
- *
- * Il telefono e' gia' disegnato altrove, e non a occhio: `drawPhone` in
- * TapAnimation viene dal disegno di fabbrica del Seeker, isola a tre obiettivi
- * col flash di fianco, tasti sul lato, 150,86 x 69,56 mm. Lo usa il tocco fra
- * due telefoni. Disegnarne un altro qui voleva dire tenere due Seeker diversi
- * nella stessa app e vederli divergere alla prima correzione.
- *
- * Uno dei due di dorso, perche' davanti, a questa misura, un telefono e' un
- * rettangolo nero che potrebbe essere di chiunque: l'isola a tre obiettivi e'
- * quello che dice Seeker. L'altro di fronte, cosi' del telefono si vedono tutti
- * e due i lati invece della stessa cosa detta due volte.
+ * A Seeker. The phone is already drawn elsewhere, not by eye: `drawPhone` in TapAnimation
+ * comes from the Seeker's factory drawing (three-lens island with the flash beside it, side
+ * keys, 150.86 x 69.56 mm) and the tap between two phones uses it; a second drawing here
+ * would diverge at the first fix. One from the back, because at this size a phone seen from
+ * the front is a black rectangle that could be anyone's: the island says Seeker.
  */
 private fun DrawScope.phone(
     center: Offset,
@@ -292,8 +239,8 @@ private fun DrawScope.phone(
     back: Boolean,
 ) {
     if (alpha <= 0.01f) return
-    // Il corpo si scalda quando il tratto passa: e' l'unica cosa che lega i due
-    // oggetti invece di lasciarli uno accanto all'altro.
+    // The body warms as the stroke passes: the one thing that ties the two
+    // objects instead of leaving them side by side.
     val body = lerp(Color(0xFF24243A), NEON_MID, 0.18f * glow)
     rotate(angle, center) {
         drawPhone(
@@ -310,10 +257,10 @@ private fun DrawScope.phone(
     }
 }
 
-/** Un punto a meta' strada fra due, che serve solo qui. */
+/** A point halfway between two, needed only here. */
 private fun mix(a: Offset, b: Offset, k: Float) = Offset(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k)
 
-/** La fetta di tempo fra due istanti del giro, da zero a uno. */
+/** The slice of time between two instants of the cycle, zero to one. */
 private fun seg(t: Float, from: Float, to: Float): Float =
     if (t <= from) 0f else if (t >= to) 1f else (t - from) / (to - from)
 

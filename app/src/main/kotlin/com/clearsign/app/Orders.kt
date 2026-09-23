@@ -14,19 +14,12 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * The orders the person placed on Jupiter from the main account, and the
- * price alerts they asked for. Kept on the phone so the app can show them; the
- * truth about an order is on chain, and this list is corrected against it.
- *
- * An order here is one of three: sell this coin at a price above today's (take
- * profit), buy this coin at a price below today's (limit), or buy it a slice
- * at a time (DCA). All three live on Jupiter and fire with the phone off. What
- * none of them can be is a stop loss: that needs Jupiter's keyed API, and the
- * screens say so instead of implying otherwise.
- *
- * An alert costs nothing and signs nothing: a price, a direction, and one
- * notification when it is crossed. Then it is spent, so it does not ring every
- * fifteen minutes for as long as the price stays there.
+ * The orders placed on Jupiter from the main account, and the price alerts asked for. Kept on
+ * the phone to show them; the truth is on chain and the list is corrected against it. An
+ * order is one of three: sell above today's price (take profit), buy below it (limit), or buy
+ * a slice at a time (DCA), all on Jupiter, firing with the phone off. None can be a stop loss:
+ * that needs Jupiter's keyed API, and the screens say so. An alert signs nothing: a price, a
+ * direction, one notification when crossed, then spent.
  */
 object Orders {
     private const val PREFS = "apex_orders"
@@ -79,10 +72,9 @@ object Orders {
     // ---- the pure parts, tested ----------------------------------------------
 
     /**
-     * The book against the chain. An order Jupiter no longer lists is filled,
-     * expired or cancelled: off the list, and worth one notification. A chain
-     * that could not be asked ([liveTrigger] or [liveDca] null) changes nothing
-     * on that side: not knowing is not the same as gone.
+     * The book against the chain. An order Jupiter no longer lists is filled, expired or
+     * cancelled: off the list, worth one notification. A chain that could not be asked
+     * ([liveTrigger] or [liveDca] null) changes nothing on that side: not knowing is not gone.
      */
     fun reconcile(book: List<Order>, liveTrigger: Set<String>?, liveDca: Set<String>?): Pair<List<Order>, List<Order>> {
         val keep = ArrayList<Order>()
@@ -150,12 +142,9 @@ object Orders {
 }
 
 /**
- * The fifteen-minute look at orders and alerts.
- *
- * Runs only while there is something to look at, and cancels itself when the
- * last order and the last alert are gone. WorkManager's floor is fifteen
- * minutes, which is fine here: an order is filled by Jupiter's keeper whether
- * we look or not, and an alert a quarter of an hour late is still an alert.
+ * The fifteen-minute look at orders and alerts. Runs only while there is something to look at
+ * and cancels itself when the last is gone. WorkManager's floor is fifteen minutes, fine here:
+ * Jupiter's keeper fills an order whether we look or not, and a late alert is still an alert.
  */
 object OrdersKeeper {
     private const val WORK = "apex-orders-keeper"

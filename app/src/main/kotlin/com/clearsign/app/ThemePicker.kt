@@ -45,9 +45,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The Themes card: four tiles, each a miniature of its palette. Halo is free;
- * the others unlock with a real SKR payment signed by the Seed Vault — the
- * token buys something you see every day.
+ * The Themes card: four tiles, each a miniature of its palette. Halo is free; the others
+ * unlock with a real SKR payment signed by the Seed Vault.
  */
 @Composable
 internal fun ThemesCard(signer: SeedVaultSigner, owner: String?, onNeedPro: () -> Unit) {

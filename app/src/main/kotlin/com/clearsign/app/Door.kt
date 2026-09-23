@@ -1,20 +1,17 @@
 package com.clearsign.app
 
 /**
- * La porta chiede l'impronta ogni volta che si rientra nell'app. Ma aprire la
- * fotocamera per uno scan, o il foglio di condivisione, e' un'altra activity
- * sopra la nostra: la nostra va in stop e la porta scattava lo stesso, e al
- * ritorno chiedeva il dito per una cosa che non era mai stata lasciata.
- *
- * Chi lancia una di quelle schermate chiama [hold] un attimo prima; lo stop
- * che arriva subito dopo lo lascia passare, una volta sola.
+ * The door asks for the print every time you come back into the app. But the camera for a
+ * scan, or the share sheet, is another activity over ours: ours stops, the door fired anyway,
+ * and on return it asked for the finger for something never left. Whoever launches one of
+ * those calls [hold] just before; the stop that follows is let through, once.
  */
 internal object Door {
     @Volatile private var heldAt = 0L
 
     fun hold() { heldAt = System.currentTimeMillis() }
 
-    /** Vero se uno stop e' arrivato entro tre secondi da un [hold]: si consuma. */
+    /** True if a stop arrived within three seconds of a [hold]; consumed on read. */
     fun consumeHold(): Boolean {
         val ok = System.currentTimeMillis() - heldAt < 3_000L
         heldAt = 0L

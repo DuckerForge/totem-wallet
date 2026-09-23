@@ -11,9 +11,8 @@ import java.io.ByteArrayOutputStream
 import java.util.Locale
 
 /**
- * The card people post: how a trade or a budget went, as one picture in
- * the theme's colours. Big number, a line above and a line below, the
- * app's name small in the corner. Nothing that identifies the wallet.
+ * The card people post: how a trade or a budget went, one picture in the theme's colors. Big
+ * number, a line above and below, the app's name small in the corner. Nothing that identifies the wallet.
  */
 object PnlCard {
     private const val W = 1200

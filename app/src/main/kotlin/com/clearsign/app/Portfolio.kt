@@ -20,9 +20,8 @@ data class Holding(
 }
 
 /**
- * Money that is yours and is not a token in the wallet: SOL in a stake
- * account, a deposit in Jupiter Lend. Jupiter's wallet lists these under
- * DeFi; the token list alone would say you have less than you do.
+ * Money that is yours and not a token in the wallet: SOL in a stake account, a deposit in
+ * Jupiter Lend. Jupiter's wallet files these under DeFi; the token list alone would undercount you.
  */
 @androidx.compose.runtime.Immutable
 data class DefiPosition(
@@ -30,12 +29,12 @@ data class DefiPosition(
     val image: String? = null, val state: String? = null,
     /** What it pays, per year, as a percentage; null when nobody can say. */
     val aprPct: Double? = null,
-    /** Quello che il foglio di dettaglio dice in piu' della tessera. Null nelle cache vecchie. */
+    /** What the detail sheet says beyond the tile. Null in old caches. */
     val detail: Detail? = null,
 ) {
     enum class Kind { STAKE, LEND, ORE }
 
-    /** Il dettaglio di una posizione, letto insieme al portafoglio e salvato con lui. */
+    /** A position's detail, read with the portfolio and saved with it. */
     sealed interface Detail {
         data class Stake(val account: String, val voter: String?, val activationEpoch: Long, val deactivationEpoch: Long, val epoch: Long) : Detail
         data class Guardians(val account: String, val guardian: String, val shares: String, val sharePrice: Double, val poolUi: Double) : Detail
@@ -56,10 +55,9 @@ data class PortfolioView(
     val others: List<Holding> get() = holdings.filter { !it.isMain }
     /** How much the priced part of the portfolio moved over 24h, in [currency] (null when nothing has a change). */
     val change24hValue: Double? get() {
-        // A coin down a hundred percent divides by zero and poisons the whole
-        // sum with an infinity, so the header reads NaN in exactly the case this
-        // app exists for. Yesterday's price of something now worth nothing is not
-        // knowable from a percentage, so that coin is left out of the sum.
+        // A coin down a hundred percent divides by zero and poisons the sum with an infinity, so the
+        // header read NaN in exactly the case this app exists for. Yesterday's price of something now
+        // worth nothing cannot be known from a percentage, so that coin is left out.
         val parts = holdings.filter { h ->
             h.fiat != null && h.change24h != null && (1 + h.change24h / 100.0) > 0.0
         }
@@ -78,13 +76,10 @@ object Portfolio {
     )
 
     /**
-     * The last view loaded, kept for the life of the process.
-     *
-     * Switching tabs throws the wallet page's composition away, so coming back
-     * started from null: the hero drew itself empty, the cards under it sat high,
-     * and half a second later the numbers arrived and shoved everything down. The
-     * data had not changed, only our memory of it had. A total half a second stale
-     * is not a lie; a page that jumps is simply broken.
+     * The last view loaded, kept for the process. Switching tabs throws the page's composition
+     * away, so coming back started from null: the hero drew empty, the cards sat high, and half
+     * a second later the numbers shoved everything down. A total half a second stale is not a
+     * lie; a page that jumps is broken.
      */
     @Volatile private var last: Pair<String, PortfolioView>? = null
 
@@ -93,8 +88,8 @@ object Portfolio {
         "SKRuTecmFDZHjs2DxRTJNEK7m7hunKGTWJiaZ3tMVVA" to "Seeker",
     )
     /**
-     * Da quanto uno stake e' attivo: epoche passate e giorni stimati. Un'epoca
-     * e' 432.000 slot, e uno slot dura quello che si e' misurato in `Ore.SLOT_MS`.
+     * How long a stake has been active: epochs passed and estimated days. An epoch is 432,000
+     * slots, and a slot lasts what `Ore.SLOT_MS` measured.
      */
     fun stakeSince(epoch: Long, activationEpoch: Long): Pair<Long, Double> {
         val epochs = (epoch - activationEpoch).coerceAtLeast(0L)
@@ -113,17 +108,11 @@ object Portfolio {
         last?.takeIf { it.first == "$owner|$currency" }?.second
 
     /**
-     * The same, but it also survives the app being closed.
-     *
-     * Memory alone fixed the jump between tabs and did nothing for the one that
-     * matters more: open the app cold and the page drew itself empty, the cards
-     * sat high, and a second later the numbers arrived and shoved everything
-     * down. It is the first thing anybody sees, every morning, and it looked
-     * like the app was rebuilding itself.
-     *
-     * Same lesson as the crowd archive: a cache dies with the process, a written
-     * file does not. The page opens at its real size with yesterday's truth, and
-     * the network corrects it in place a moment later.
+     * The same, and it survives the app being closed. Memory fixed the jump between tabs and
+     * nothing for the one that matters more: a cold open drew the page empty, and a second later
+     * the numbers shoved everything down, every morning, the first thing anybody sees. Same
+     * lesson as the crowd archive: a cache dies with the process, a written file does not. The
+     * page opens at its real size with yesterday's truth and the network corrects it in place.
      */
     fun cached(ctx: Context, owner: String?, currency: String): PortfolioView? {
         val key = "$owner|$currency"
@@ -243,7 +232,7 @@ object Portfolio {
                 defi += DefiPosition(DefiPosition.Kind.LEND, d.symbol, "Jupiter Lend", d.symbol, ui, usd?.let { p -> fx?.let { p * it * ui } }, image = d.logo, aprPct = d.aprPct, detail = DefiPosition.Detail.Lend(d.asset))
             }
         }
-        // ORE: una riga solo per chi ha un conto Miner. Una chiamata, senza il giro.
+        // ORE: a row only for whoever has a Miner account. One call, without the round.
         runCatching {
             val v = OreMiner.read(rpc, owner, withRound = false)
             val m = v?.miner
@@ -274,7 +263,7 @@ object Portfolio {
     }
 }
 
-/** Il JSON della cache del portafoglio, la parte che cambia: le posizioni DeFi con il loro dettaglio. Puro, per il test. */
+/** The portfolio cache JSON, the part that changes: DeFi positions with their detail. Pure, for the test. */
 internal object PortfolioJson {
     private fun d(j: org.json.JSONObject, n: String): Double? = if (j.isNull(n)) null else j.optDouble(n).takeIf { !it.isNaN() }
     private fun t(j: org.json.JSONObject, n: String): String? = if (j.isNull(n)) null else j.optString(n).ifEmpty { null }

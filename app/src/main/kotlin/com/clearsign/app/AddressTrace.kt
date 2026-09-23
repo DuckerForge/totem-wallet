@@ -6,11 +6,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * "What does this address actually do?" — a scan of its recent activity from
- * the Helius Enhanced Transactions API (one call): kinds of operations,
- * programs used, counterparties, whether an exchange funded it, and the
- * patterns that matter for safety (a payout fan-out, a collector of many
- * inflows). Mainnet + Helius key only; absent otherwise.
+ * What an address actually does: one call to Helius Enhanced Transactions for its recent
+ * activity, the kinds of operations, programs, counterparties, whether an exchange funded it,
+ * and the patterns that matter (a payout fan-out, a collector of many inflows). Mainnet with a Helius key only.
  */
 object AddressTrace {
     private const val TAG = "ClearSign-Trace"

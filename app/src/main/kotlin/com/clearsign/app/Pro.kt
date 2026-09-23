@@ -4,13 +4,9 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 
 /**
- * Everything is free.
- *
- * This used to gate premium themes, background alerts, deep address scans and
- * unlimited exports behind a one-off SKR payment. Apex earns from the swap fee
- * instead, so charging twice for the same app was a second toll on the same
- * road. The flag stays, always true, because a dozen screens ask it and one
- * honest answer in one place beats a dozen edits that all have to agree.
+ * Everything is free. This gated premium themes, background alerts, deep scans and unlimited
+ * exports behind a one-off SKR payment; the app earns from the swap fee, so charging twice was
+ * a second toll on the same road. The flag stays, always true, because a dozen screens ask it.
  */
 object Pro {
     private const val PREFS = "clearsign_pro"

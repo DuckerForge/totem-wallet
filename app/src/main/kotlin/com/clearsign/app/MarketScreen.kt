@@ -51,17 +51,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * The market, the way everyone already knows how to read one.
- *
- * Ranked by market capitalisation, every chain in it, a star to follow, a search
- * that reaches past the first hundred. The wallet's own lists answer what this
- * wallet can trade; this one answers what the market is doing, which is a
- * different question and deserves a different screen.
- *
- * Two things it does that a price site cannot. It knows which coins have a Solana
- * mint, so a followed coin that can be bought says so and the rest do not pretend.
- * And it takes **your own amount** for anything you hold somewhere else, so the
- * followed list is a portfolio and not a list of prices belonging to nobody.
+ * The market, the way everyone knows how to read one: ranked by market cap, every chain, a
+ * star to follow, a search past the first hundred. The wallet's lists say what this wallet
+ * can trade; this says what the market is doing. Two things a price site cannot do: it knows
+ * which coins have a Solana mint, so a followed coin that can be bought says so; and it takes
+ * your own amount for what you hold elsewhere, so the followed list is a portfolio.
  */
 @Composable
 internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null, onBuy: (String) -> Unit = {}) {
@@ -78,7 +72,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     val keys = remember(refresh) { Watchlist.reconcile(ctx); Watchlist.all(ctx) }
     var unfollow by remember { mutableStateOf<Market.Coin?>(null) }
     val currency by Settings.currency
-    // Il mercato risponde in dollari; qui si legge nella valuta scelta.
+    // The market answers in dollars; here it reads in the chosen currency.
     val fx = rememberFx()
 
     LaunchedEffect(refresh) {
@@ -114,10 +108,9 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 Market.Coin(id = id, symbol = if (key.startsWith("cg:")) id.uppercase().take(10) else shorten(key, 4), name = id.replaceFirstChar { it.uppercase() }, image = null, priceUsd = null, marketCap = null, rank = null, change24h = null, mint = key.takeIf { !it.startsWith("cg:") })
             }
         }.let { coins ->
-            // One coin, one key. A coin followed by its CoinGecko name that turns
-            // out to live on Solana is the same coin as the one followed by mint,
-            // and two rows with one key crashed the list. The mint wins: the
-            // amount moves over and the name key goes.
+            // One coin, one key. A coin followed by its CoinGecko name that turns out to live on Solana
+            // is the same coin as the one followed by mint, and two rows with one key crashed the list.
+            // The mint wins: the amount moves over and the name key goes.
             var moved = false
             keys.zip(coins).forEach { (stored, c) ->
                 // The markets list rarely carries the mint; the coin page does.
@@ -164,7 +157,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 }
             }
         }
-        // Chi non segue niente lo legge qui, dove starebbe la lista, con cosa fare.
+        // Whoever follows nothing reads it here, where the list would be, with what to do.
         if (keys.isEmpty() && q.length < 2) item { EmptyLine(HIcon.STAR, stringResource(R.string.market_empty)) }
 
         // What is standing on Jupiter in your name, before the watchlist: an order
@@ -183,12 +176,12 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 val favUsd = followed.sumOf { c -> Watchlist.amount(ctx, c.key) * (c.priceUsd ?: 0.0) }
                 val wallet = remember(refresh, currency) { Portfolio.cached(owner, currency)?.total }
                 if (favUsd > 0 || (wallet ?: 0.0) > 0) {
-                    // Un pannello che si legge e basta: niente chevron, niente pressione.
+                    // A panel that is only read: no chevron, no press.
                     SoftPanel {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             StatRow(stringResource(R.string.market_total_followed), fx.fiat(favUsd))
                             wallet?.let { w -> StatRow(stringResource(R.string.market_total_wallet), fmtFiat(w, currency)) }
-                            // La somma si fa solo quando le due meta' sono nella stessa unita'.
+                            // The sum is taken only when both halves are in the same unit.
                             val r = fx.rate.takeIf { fx.cur == currency }
                             if (r != null) {
                                 val all = favUsd * r + (wallet ?: 0.0)
@@ -231,9 +224,9 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
             )
         }
         when (marketState(loading, ranked.isEmpty(), q, searching, shown.isEmpty())) {
-            // Sei righe segnaposto: la pagina ha gia' la sua forma mentre il listino arriva.
+            // Six placeholder rows: the page already has its shape while the list arrives.
             MarketState.LOADING -> items(6) { PlaceholderRow() }
-            // Il listino non e' arrivato: prima restava un'etichetta sopra il nulla.
+            // The listing did not arrive: before, a label sat over nothing.
             MarketState.DOWN -> item {
                 EmptyState(HIcon.CHART_DOWN, stringResource(R.string.market_down_title), stringResource(R.string.market_down_body), stringResource(R.string.market_retry) to { refresh++ })
             }
@@ -271,20 +264,11 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
 }
 
 /**
- * "If it were as big as Solana, one of these would cost…"
- *
- * The same arithmetic as marketcapof.com, with the one thing a website cannot
- * have: **your** amount. Holding the supply fixed, a coin at another coin's market
- * cap is worth `target ÷ current` times more, so the multiplier and the price come
- * straight from the two capitalisations.
- *
- * Which coins to compare against is chosen rather than listed: the one directly
- * above it in the ranking, because that is the next real step; Solana, because
- * that is the chain it lives on; and Bitcoin, because it is the ceiling everybody
- * measures against. A page of thirty comparisons is a toy — three is a thought.
- *
- * It says what it is, once, underneath: supply does not stay still while a coin
- * grows a hundredfold, and this is not a forecast.
+ * "If it were as big as Solana, one of these would cost…", the arithmetic of marketcapof.com
+ * with the one thing a website cannot have: your amount. Supply fixed, a coin at another's
+ * market cap is worth `target ÷ current` times more. Three comparisons, chosen: the coin
+ * directly above in the ranking (the next real step), Solana (its chain), Bitcoin (the
+ * ceiling). It says once, underneath, that supply does not stay still and this is not a forecast.
  */
 @Composable
 private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
@@ -427,8 +411,8 @@ private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
 
 /** A market cap in three characters and a unit: 1,2 Mld$, 340 M$, 52 k$. */
 internal fun fmtCap(v: Double, cur: String = "USD"): String {
-    // Il simbolo sta attaccato alla scala quando e' un segno ("128 k$", "128 k€")
-    // e staccato quando e' una parola, perche' "128 kSOL" non si legge.
+    // The symbol sticks to the scale when it is a sign ("128 k$", "128 k€") and stands
+    // apart when it is a word: "128 kSOL" does not read.
     val sym = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)
     fun s(scale: String) = if (sym.length > 1) "$scale $sym" else "$scale$sym"
     val l = java.util.Locale.getDefault()
@@ -456,17 +440,14 @@ private fun SectionLabel(text: String) {
 }
 
 /**
- * One row: rank, logo, name, what it costs, how the day went, and the star.
- *
- * The star is the only thing that follows or unfollows. Tapping the row opens the
- * coin, which is where the amount and the buy button live — a row that both
- * navigates and mutates on the same tap is how a list adds things you did not ask
- * for.
+ * One row: rank, logo, name, price, the day, the star. Only the star follows or unfollows;
+ * tapping the row opens the coin, where the amount and the buy live. A row that navigates
+ * and mutates on one tap adds things you did not ask for.
  */
 @Composable
 private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, onOpen: () -> Unit, onStar: () -> Unit) {
-    // Contenuta e con la pressione, senza chevron: la stella in coda e' il
-    // controllo, e un chevron accanto farebbe a pugni. La riga si tocca lo stesso.
+    // Contained and pressable, no chevron: the star at the end is the control, and
+    // a chevron beside it would clash. The row still taps.
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().tappable(src, rs(Radius.panel), fill = Halo.card, onClick = onOpen).padding(vertical = 8.dp, horizontal = 10.dp),
@@ -479,11 +460,9 @@ private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, o
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(c.name, style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink, maxLines = 1)
-            // Quanto ne hai, e quanto vale adesso. La quantita' da sola non e'
-            // la risposta alla domanda per cui uno la scrive: chi digita
-            // "millecinquecento" vuole sapere quanto fanno, e il prezzo a
-            // destra e' il prezzo di una moneta, non della sua parte. La
-            // moltiplicazione e' qui, sulla riga, non solo nel totale in fondo.
+            // How much you have, and what it is worth now. The quantity alone is not why anyone types
+            // it: "fifteen hundred" wants to know what that makes, and the price on the right is one
+            // coin's, not your share's. The multiplication is here on the row, not only in the total.
             val mine = amount.takeIf { it > 0 }?.let { amt ->
                 fmtUi(amt) + " " + c.symbol + (c.priceUsd?.let { " · " + fx.fiat(amt * it) } ?: "")
             }
@@ -507,10 +486,7 @@ private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, o
     }
 }
 
-/**
- * One coin, opened: what it costs, how much of it you have, and — only when the
- * coin actually exists on Solana — the way to buy some.
- */
+/** One coin, opened: what it costs, how much you have, and, only when it exists on Solana, the way to buy some. */
 @Composable
 private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String?, onBuy: (String) -> Unit, onSaved: () -> Unit, onDismiss: () -> Unit) {
 
@@ -527,14 +503,10 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
         looking = false
     }
 
-    // Il prezzo, quando la lista non ce l'aveva.
-    //
-    // La riga arriva senza prezzo ogni volta che il listino e Jupiter tacciono
-    // insieme, e da li' in poi la scheda non poteva piu' fare la moltiplicazione:
-    // scrivevi quanto ne hai e sotto non compariva niente, che e' l'unica cosa
-    // per cui uno quel numero lo scrive. Aperta la scheda, una domanda sola alla
-    // fonte giusta - il listino per una moneta di un'altra catena, Jupiter per un
-    // mint - e la cifra torna.
+    // The price, when the list did not have it. The row arrives priceless whenever the listing
+    // and Jupiter are both silent, and then the sheet could not multiply: you typed how much you
+    // have and nothing appeared. Opened, one question to the right source (the listing for
+    // another chain's coin, Jupiter for a mint) brings the figure back.
     var price by remember(coin.key) { mutableStateOf(coin.priceUsd) }
     LaunchedEffect(coin.key, mint) {
         if (price != null) return@LaunchedEffect
@@ -546,7 +518,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
         }
     }
 
-    // La stessa moneta col prezzo ritrovato, per tutto quello che sotto ci fa i conti.
+    // The same coin with its price found again, for everything below that does the arithmetic.
     val priced = if (price != null && coin.priceUsd == null) coin.copy(priceUsd = price) else coin
 
     ModalBottomSheet(
@@ -572,10 +544,8 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                     Text(fx.price(it), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink)
                 }
                 Spacer(Modifier.width(10.dp))
-                // The star was missing here, so opening a coin you already follow
-                // showed nothing that said so: the sheet looked like it had
-                // forgotten. It is the same star as the row behind it, and it
-                // means the same thing.
+                // The star was missing here, so opening a coin you already follow showed nothing saying so.
+                // It is the same star as the row behind, and it means the same thing.
                 var starred by remember(coin.key) { mutableStateOf(coin.key in Watchlist.all(ctx)) }
                 Box(
                     Modifier.size(38.dp).clip(rs(999))
@@ -681,7 +651,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
     }
 }
 
-/** In che stato e' la lista del mercato. Pura, per il test. */
+/** What state the market list is in. Pure, for the test. */
 internal enum class MarketState { LOADING, DOWN, LIST, SEARCHING, NO_RESULTS }
 
 internal fun marketState(loading: Boolean, rankedEmpty: Boolean, query: String, searching: Boolean, shownEmpty: Boolean): MarketState = when {
@@ -693,7 +663,7 @@ internal fun marketState(loading: Boolean, rankedEmpty: Boolean, query: String, 
     else -> MarketState.LIST
 }
 
-/** Una riga vuota con la forma di una riga: la pagina ha la sua altezza mentre il listino arriva. */
+/** An empty row shaped like a row: the page keeps its height while the listing arrives. */
 @Composable
 private fun PlaceholderRow() {
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -64,18 +64,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The conversation with the agent, as a page of its own.
- *
- * A page and not a sheet: it sits over everything, tab bar included, because it
- * is somewhere you go rather than something you peek at. The sheet it replaces
- * ended at 96% of the screen with a keyboard that could push the composer off
- * the bottom; a page owns its insets.
- *
- * Three things the old chat did not do. The answer **streams**: the first word
- * lands in a second, not the whole paragraph after ten. A proposal comes back
- * as a **receipt card** with its verdict in colour, not a line of JSON. And a
- * strip at the top says what the agent is doing and what it holds, so you never
- * leave the chat to find out whether the thing you are talking to is alive.
+ * The conversation with the agent, as a page: it sits over everything, tab bar included,
+ * somewhere you go rather than something you peek at, and a page owns its insets (the sheet
+ * ended at 96% and the keyboard could push the composer off). The answer streams, the first
+ * word in a second; a proposal comes back as a receipt card with its verdict in color; a
+ * strip at the top says what the agent does and holds, so you never leave to check it is alive.
  */
 @Composable
 internal fun ChatScreen(onClose: () -> Unit) {
@@ -181,10 +174,9 @@ internal fun ChatScreen(onClose: () -> Unit) {
             error?.let { e -> item { Banner(e, Halo.red, HIcon.WARNING) } }
         }
 
-        // Suggestions come back whenever the field is empty, which is exactly
-        // when you would want one. Grouped, because "what do I look at" and
-        // "what do I do" are different questions, and nine chips in a row were
-        // nine things to read before finding the one you meant.
+        // Suggestions come back whenever the field is empty, exactly when you want one. Grouped:
+        // "what do I look at" and "what do I do" are different questions, and nine chips in a row
+        // were nine things to read.
         if (turns.isNotEmpty() && draft.isBlank()) {
             val asked = false
             Box(Modifier.fillMaxWidth()) {
@@ -219,10 +211,8 @@ internal fun ChatScreen(onClose: () -> Unit) {
         }
 
         Row(
-            // The row is as tall as the field wants to be, bounded. Forcing 86dp
-            // and stretching the field to fill it put the text box taller than the
-            // line it draws, and the placeholder was sliced in half along the
-            // bottom edge. Let the field measure itself; cap the growth instead.
+            // The row is as tall as the field wants, bounded. Forcing 86dp and stretching the field put
+            // the box taller than its line and sliced the placeholder along the bottom. Let it measure itself.
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -249,9 +239,8 @@ internal fun ChatScreen(onClose: () -> Unit) {
 }
 
 /**
- * One line that answers "is this thing alive" without leaving the chat: the
- * loop's state with its breathing dot, what the budget can still spend, how
- * many coins it holds. Tap to open the live trace underneath.
+ * One line answering "is this thing alive" without leaving the chat: the loop's state with
+ * its breathing dot, what the budget can spend, how many coins it holds. Tap opens the trace.
  */
 @Composable
 private fun StatusStrip(open: Boolean, onToggle: () -> Unit) {
@@ -304,11 +293,7 @@ private fun StatusStrip(open: Boolean, onToggle: () -> Unit) {
     }
 }
 
-/**
- * What the agent is doing, line by line, while it works. Shared with the Agent
- * tab's Pro view: the same six lines in both places, because "is it alive" is
- * asked from both.
- */
+/** What the agent is doing, line by line. Shared with the Agent tab's Pro view: "is it alive" is asked from both. */
 @Composable
 internal fun AgentConsole() {
     val ctx = LocalContext.current
@@ -373,9 +358,8 @@ private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
 private data class OpenerGroup(val label: Int, val tint: Color, val items: List<Int>)
 
 /**
- * The openers, in three groups: what to look at, what to do, and the agent
- * itself. The last one flips with the state: while the loop is running, "start
- * working on your own" is the one suggestion that cannot do anything.
+ * The openers in three groups: what to look at, what to do, the agent itself. The last flips
+ * with the state: while the loop runs, "start working on your own" can do nothing.
  */
 @Composable
 private fun openerGroups(): List<OpenerGroup> {
@@ -424,12 +408,9 @@ private fun AssistantBubble(text: String, live: Boolean) {
 }
 
 /**
- * A proposal and what became of it, as a receipt.
- *
- * The three things a person wants from it, in this order: did it happen, what
- * was it, why not. The verdict is the colour, the claim is the title, the
- * judge's reason is the line under it. The signature is there for whoever wants
- * to go and look.
+ * A proposal and what became of it, as a receipt. In this order: did it happen, what was it,
+ * why not. The verdict is the color, the claim the title, the judge's reason the line under
+ * it. The signature is there for whoever wants to look.
  */
 @Composable
 private fun ReceiptCard(t: Brain.Turn) {
@@ -477,10 +458,7 @@ private fun ReceiptCard(t: Brain.Turn) {
     }
 }
 
-/**
- * A tool that only read something: one quiet line, and the raw answer behind a
- * tap for whoever wants to see what the model saw.
- */
+/** A tool that only read something: one quiet line, and the raw answer behind a tap. */
 @Composable
 private fun ToolLine(t: Brain.Turn) {
     var open by remember(t.text) { mutableStateOf(false) }
@@ -504,13 +482,9 @@ private fun ToolLine(t: Brain.Turn) {
 }
 
 /**
- * The little markdown a model writes anyway, rendered instead of printed.
- *
- * The prompt asks for none, and every model produces some: `**Borsello di
- * spesa**` arrived on screen with the asterisks in it. Two marks and no more,
- * because those are the two that turn up: `**bold**`, and a leading `- ` that
- * becomes a real bullet. Anything else is left exactly as written, which is the
- * safe half of the bargain.
+ * The little markdown a model writes anyway, rendered instead of printed: the prompt asks for
+ * none and every model produces some (`**Borsello di spesa**` arrived with its asterisks).
+ * Two marks only, `**bold**` and a leading `- ` as a bullet; anything else stays as written.
  */
 private fun lite(text: String): androidx.compose.ui.text.AnnotatedString = androidx.compose.ui.text.buildAnnotatedString {
     val clean = text.replace(Regex("(?m)^\\s*[-*]\\s+"), "· ")

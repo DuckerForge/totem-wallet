@@ -8,25 +8,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Two ways to move money with a link, neither of which needs a program on chain.
- *
- * **Asking** is free of risk: a Solana Pay URI is a request, not a transfer. The
- * person who pays signs with their own wallet and we never touch anything.
- *
- * **Giving** is a real trade-off, stated plainly wherever it appears: the link
- * *contains* a throwaway key, so whoever opens it first can take the money. That
- * is the price of a claim link with no escrow contract. It is right for a tip,
- * wrong for a salary, and the gift stays reclaimable until someone takes it.
+ * Two ways to move money with a link, neither needing a program on chain. Asking is free
+ * of risk: a Solana Pay URI is a request, the payer signs with their own wallet. Giving is
+ * a real trade-off, stated wherever it appears: the link contains a throwaway key, so
+ * whoever opens it first can take the money. Right for a tip, wrong for a salary, and
+ * reclaimable until someone takes it.
  */
 object MoneyLinks {
     private const val PREFS = "apex_gifts"
 
     /**
-     * The web page behind every link we hand out. A `solana:` URI is invisible to a
-     * phone with no wallet on it — the camera reads the text and nothing happens —
-     * so both kinds of link now travel as ordinary https. Apex opens them directly
-     * (verified App Links); anything else lands on a page that says who is asking,
-     * how much, and where to get the app.
+     * The web page behind every link we hand out. A `solana:` URI is invisible to a phone with
+     * no wallet, so both kinds travel as https: Velum opens them directly (verified App Links),
+     * anything else lands on a page that says who asks, how much, and where to get the app.
      */
     const val WEB = "https://duckerforge.github.io/apex"
 
@@ -42,9 +36,8 @@ object MoneyLinks {
     }
 
     /**
-     * The classic Solana Pay URI. Still the right thing between two wallets — Phantom,
-     * Solflare and Backpack catch it without a web page in the middle — so Receive
-     * keeps it one switch away.
+     * The classic Solana Pay URI, still right between two wallets (Phantom, Solflare and
+     * Backpack catch it with no page in between), so Receive keeps it one switch away.
      */
     fun solanaPay(address: String, amountSol: Double?, label: String?, message: String?): String {
         val b = Uri.Builder().scheme("solana").opaquePart(address).build().toString().let { StringBuilder(it) }
@@ -66,11 +59,10 @@ object MoneyLinks {
     }
 
     /**
-     * `https://…/apex/g/#k=<seed base58>&n=<note>` — the key travels in the link, by
-     * design, and in the **fragment** on purpose: a fragment is never sent to the
-     * server, so the host serving the page never sees the key. Apex opens the link
-     * itself; a phone without it gets the page, which can hand the gift over to any
-     * Solana address the person pastes.
+     * `https://…/apex/g/#k=<seed base58>&n=<note>`: the key travels in the link by design, and
+     * in the fragment on purpose, which is never sent to the server, so the host never sees it.
+     * Velum opens the link itself; a phone without it gets the page, which can hand the gift
+     * over to any Solana address the person pastes.
      */
     fun claimUrl(seed: ByteArray, note: String): String =
         WEB + "/g/#k=" + Base58.encode(seed) + (if (note.isNotBlank()) "&n=" + Uri.encode(note.take(60)) else "")
@@ -86,14 +78,10 @@ object MoneyLinks {
     private fun fragmentParam(uri: Uri, key: String): String? =
         uri.fragment?.split('&')?.firstOrNull { it.startsWith("$key=") }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
 
-    /*
-     * Create a gift: a fresh key, funded from the Seed Vault with one approval.
-     * Returns the link, or an error message.
-     */
     /**
-     * The same transfer `createGift` will sign, read back before anyone signs it.
-     * The destination is a throwaway key that does not exist yet, so this builds
-     * one and keeps it: `createGift` reuses it rather than making a second.
+     * The same transfer `createGift` will sign, read back before anyone signs it. The
+     * destination is a throwaway key that does not exist yet, so this builds one and keeps it:
+     * `createGift` reuses it rather than making a second.
      */
     suspend fun previewGift(ctx: Context, owner: String, lamports: Long): ReceiptEngine.Analyzed? {
         val from = Base58.decodePubkey(owner) ?: return null
@@ -117,11 +105,9 @@ object MoneyLinks {
             recipient = pubkey,
             recipientLabel = ctx.getString(R.string.gift_log),
         )
-        // Sealed before the signature, not after. The key that will hold the money
-        // existed only in this local variable: a send whose answer got lost on the
-        // way back, or the process being killed in between, left the SOL sitting
-        // at an address whose seed had just gone out of scope. Writing it first
-        // costs one file; the gift is dropped again if the send really failed.
+        // Sealed before the signature, not after. The key that will hold the money existed only in
+        // this local: a send whose answer got lost, or the process killed in between, left the SOL
+        // at an address whose seed had just gone out of scope. Written first; dropped if the send failed.
         val gift = Gift(pubkey, lamports, note, System.currentTimeMillis())
         remember(ctx, gift, seed)
         return when (val r = WalletActions.signAndSend(ctx, signer, owner, listOf(WalletTx.systemTransfer(from, to, lamports)), log)) {

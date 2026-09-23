@@ -22,14 +22,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /**
- * Una posizione DeFi, aperta: quanto, da quando, cosa rende, dove sta.
- * Niente firma. Si legge dalla stessa fotografia del portafoglio da cui
- * viene la tessera, cosi' si apre subito e dice le stesse cose.
- *
- * Lo stake e' un `getProgramAccounts`, la chiamata piu' cara che c'e', e la
- * tessera si disegna dalla cache al primo avvio: rileggere la catena qui
- * vorrebbe dire un foglio che aspetta e che puo' non essere d'accordo con
- * la riga sopra. Tirare giu' per aggiornare ricarica tutto, foglio compreso.
+ * One DeFi position, opened: how much, since when, what it yields, where it sits. No signing.
+ * Read from the same portfolio snapshot the tile comes from, so it opens at once and agrees
+ * with the row above: stake is a `getProgramAccounts`, the most expensive call there is, and
+ * the tile draws from cache on first launch. Pull to refresh reloads everything, sheet included.
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable

@@ -323,8 +323,8 @@ private fun WhoLine(feed: SeekerFeed.Feed?) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         val shown = rememberCountUp(followed.toFloat(), durationMs = 900).toInt()
-        // Un punto acceso, la cifra, e le parole spente: la riga era tutta
-        // dello stesso colore e si leggeva come un avviso.
+        // A lit dot, the number, and the words dimmed: the row was all one color
+        // and read like a warning.
         Box(Modifier.size(6.dp).clip(rs(3)).background(Halo.mint))
         Spacer(Modifier.width(7.dp))
         Text(

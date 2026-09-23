@@ -6,31 +6,27 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 
 /**
- * Il pool RPC dentro l'app: i fornitori compilati, le preferenze dove il pool
- * ricorda, un semaforo per fornitore, e il tetto letto dall'archivio.
- *
- * Il semaforo e' il pezzo che rende di piu'. Una sola analisi di uno scontrino
- * spara dalle nove alle quindici chiamate quasi insieme, e le dieci al secondo
- * di una chiave gratuita sono globali su tutti gli utenti: cinque approvazioni
- * contemporanee nel mondo saturavano ogni fornitore con la quota ancora piena.
- * Qui ogni fornitore concede pochi posti alla volta, e chi non trova posto in
- * due secondi passa al prossimo invece di farsi dire 429.
+ * The RPC pool inside the app: compiled providers, the prefs where the pool remembers, one
+ * semaphore per provider, the cap read from the archive. The semaphore pays most: one
+ * receipt analysis fires nine to fifteen calls almost at once, and a free key's ten per
+ * second are global across all users, so five simultaneous approvals worldwide saturated
+ * every provider with quota to spare. Each provider grants a few slots; whoever finds none
+ * within two seconds moves on instead of being told 429.
  */
 object Rpc {
     private const val TAG = "ClearSign-RPC"
     private const val PREFS = "clearsign_rpc"
 
-    /** Il nodo scritto nelle impostazioni. Viene prima di tutto, e il pool sta dietro. */
+    /** The node written in Settings. Comes before everything, with the pool behind. */
     @Volatile var ownNode: String? = null
 
-    /** Il nodo proprio come fornitore: senza quota nostra, senza tetto. */
+    /** The own node as a provider: no quota of ours, no cap. */
     private fun ownProvider(): RpcPool.Provider? =
         ownNode?.takeIf { it.isNotBlank() }?.let { RpcPool.Provider("own", it, perSecond = 20, weight = 1, das = false) }
 
     /**
-     * I fornitori che questa build conosce. Un campo vuoto in `local.properties`
-     * e' un fornitore che non c'e'. I pesi seguono la quota mensile, che e' quello
-     * che decide quanto spesso ogni installazione deve pescarne uno.
+     * The providers this build knows. An empty field in `local.properties` is a provider that
+     * is not there; weights follow the monthly quota, which decides how often an install picks one.
      */
     private fun providers(): List<RpcPool.Provider> = listOfNotNull(
         BuildConfig.HELIUS_RPC_URL.takeIf { it.isNotBlank() }?.let { RpcPool.Provider("helius", it, perSecond = 10, weight = 10, das = true) },
@@ -39,15 +35,15 @@ object Rpc {
         BuildConfig.RPCFAST_RPC_URL.takeIf { it.isNotBlank() }?.let {
             RpcPool.Provider(
                 "rpcfast", it, perSecond = 15, weight = 15,
-                // Misurato sul gratuito: risponde -32099 a questi, e limita getProgramAccounts a una al secondo.
+                // Measured on the free tier: answers -32099 to these, and limits getProgramAccounts to one a second.
                 unsupported = setOf("getTokenAccountsByOwner", "getTokenAccountsByDelegate", "getTokenLargestAccounts", "getProgramAccounts"),
             )
         },
-        // dRPC: la quota piu' grande di tutte, limite per indirizzo IP e non per
-        // chiave, ma il gratuito gira su nodi pubblici: letture si', invii no.
+        // dRPC: the biggest quota of all, limited per IP and not per key, but the free
+        // tier runs on public nodes: reads yes, sends no.
         BuildConfig.DRPC_RPC_URL.takeIf { it.isNotBlank() }?.let { RpcPool.Provider("drpc", it, perSecond = 20, weight = 25, sends = false) },
         RpcPool.Provider("mainnet", "https://api.mainnet-beta.solana.com", perSecond = 5, weight = 1, lastResort = true),
-        // publicnode blocca le chiamate sui conti token: lo si impara comunque, ma si sa gia'.
+        // publicnode blocks the token-account calls: it would be learned anyway, but it is already known.
         RpcPool.Provider("publicnode", "https://solana-rpc.publicnode.com", perSecond = 5, weight = 1, lastResort = true, unsupported = setOf("getTokenAccountsByOwner", "getTokenAccountsByDelegate", "getProgramAccounts")),
     )
 
@@ -61,10 +57,8 @@ object Rpc {
     private val semaphores = java.util.concurrent.ConcurrentHashMap<String, Semaphore>()
 
     /**
-     * Il pool, con il seme di questa installazione. Il seme e' un numero a
-     * caso fatto una volta, salvato nelle preferenze: un telefono che si
-     * riavvia resta nella sua fila invece di raggrupparsi con gli altri. Mai
-     * derivato dal portafoglio.
+     * The pool with this install's seed: a random number made once and saved, so a rebooted
+     * phone keeps its queue instead of regrouping with the others. Never derived from the wallet.
      */
     fun init(ctx: Context) {
         val store = Prefs(ctx)
@@ -75,19 +69,15 @@ object Rpc {
     val pool: RpcPool get() = built ?: RpcPool(providers(), 0L).also { built = it }
 
     /**
-     * In che ordine provare [method] per chi ha chiesto [rpcUrl].
-     *
-     * Una rete di prova si chiede solo a se stessa. Il nodo proprio viene per
-     * primo e il pool dietro, mai da solo: un nodo personale ballerino con
-     * nessun ripiego trasforma ogni cancello in `Unavailable`, che non blocca
-     * mai, ed e' lo spegnimento silenzioso reintrodotto da un campo nelle
-     * impostazioni. Un indirizzo che non e' ne' il nodo proprio ne' uno del pool
-     * si tratta come un nodo proprio.
+     * In what order to try [method] for whoever asked [rpcUrl]. A test network is asked only of
+     * itself. The own node comes first with the pool behind, never alone: a flaky personal node
+     * with no fallback turns every gate into `Unavailable`, which never blocks, a silent
+     * switch-off reintroduced by a settings field. An unknown URL is treated as an own node.
      */
     fun lanes(rpcUrl: String, method: String): List<RpcPool.Provider> {
         if (rpcUrl.contains("devnet") || rpcUrl.contains("testnet")) return listOf(RpcPool.Provider("cluster", rpcUrl, perSecond = 10, weight = 1, lastResort = true))
         val p = pool
-        // DAS e' di Helius e basta: il nodo proprio non ha i nomi delle monete.
+        // DAS is Helius only: the own node has no coin names.
         if (method.startsWith("getAsset")) return p.lanes(method, System.currentTimeMillis(), null)
         val own = ownProvider()
         val first = when {
@@ -100,9 +90,8 @@ object Rpc {
     }
 
     /**
-     * Un posto sul fornitore, per il tempo di una chiamata. Null quando non
-     * c'e' posto entro due secondi: chi chiama passa al prossimo, senza che
-     * questo conti come un errore del fornitore.
+     * A slot on the provider for one call. Null when none within two seconds: the caller moves
+     * on, and it does not count against the provider.
      */
     fun <T> withLane(p: RpcPool.Provider, block: () -> T): T? {
         val s = semaphores.computeIfAbsent(p.name) { Semaphore((p.perSecond / 2).coerceIn(2, 8), true) }
@@ -110,7 +99,7 @@ object Rpc {
         try { return block() } finally { s.release() }
     }
 
-    /** Una riga per chiamata: il nome del fornitore, mai l'indirizzo. */
+    /** One line per call: the provider's name, never the URL. */
     fun record(p: RpcPool.Provider, method: String, outcome: RpcPool.Outcome, ms: Long, detail: String? = null) {
         val now = System.currentTimeMillis()
         val pool = pool
@@ -121,26 +110,25 @@ object Rpc {
         Log.i(TAG, "${p.name} $method $outcome ${ms}ms" + (detail?.let { " $it" } ?: ""))
     }
 
-    /** Sopra il tetto del giorno sulle chiavi condivise. Con un nodo proprio non c'e' tetto. */
+    /** Over the day's cap on shared keys. With an own node there is no cap. */
     fun overBudget(): Boolean {
         if (ownNode != null) return false
         refreshCap()
         return pool.overBudget(System.currentTimeMillis())
     }
 
-    /** Il fornitore che serve DAS. Helius, e non il nodo proprio: un nodo qualsiasi non ha i nomi delle monete. */
+    /** The provider that serves DAS. Helius, not the own node: an ordinary node has no coin names. */
     fun dasUrl(): String? = pool.providers.firstOrNull { it.das && pool.state(it.name, System.currentTimeMillis()) == RpcPool.State.OK }?.url
 
-    // ---- il tetto dall'archivio ---------------------------------------------------
+    // ---- the cap from the archive -------------------------------------------------
 
     @Volatile private var capAt = 0L
     private const val CAP_EVERY_MS = 60 * 60_000L
 
     /**
-     * Il tetto lo puo' cambiare l'archivio: `/clearsign/rpc.json` con `{"cap": N}`.
-     * Cosi' si stringe o si allarga per tutti senza spedire un APK, che e' la
-     * sola manopola che esiste quando le chiavi sono di tutti e i telefoni no.
-     * Letto una volta l'ora; se non c'e' resta quello che si sa.
+     * The archive can change the cap: `/clearsign/rpc.json` with `{"cap": N}`, tightened or
+     * widened for everyone without an APK, the one knob there is when the keys are everybody's
+     * and the phones are not. Read once an hour; absent, the known value stays.
      */
     private fun refreshCap() {
         val now = System.currentTimeMillis()
@@ -150,7 +138,7 @@ object Rpc {
         if (cap != pool.cap) { pool.cap = cap; Log.i(TAG, "cap from archive: $cap") }
     }
 
-    /** Le righe della diagnostica, piu' quante chiamate oggi e il tetto. */
+    /** The diagnostics rows, plus today's call count and the cap. */
     fun report(): Pair<List<RpcPool.Line>, Pair<Int, Int>> {
         val now = System.currentTimeMillis()
         return pool.report(now) to (pool.usedToday(now) to pool.cap)

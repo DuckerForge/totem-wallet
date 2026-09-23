@@ -36,17 +36,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The terminal, inside the row.
- *
- * The loop used to be: see that somebody bought, press Buy, watch Scout be
- * destroyed, land in a sheet with an empty amount field, type, wait, review,
- * sign, come back to a feed rebuilt from scratch and moved on. Four taps and a
- * different screen, for a decision that took one second to make.
- *
- * Now the row opens downward and everything happens in it: what the coin costs,
- * what it has done, what that person put in, how much you want to put in, the
- * receipt built from the real bytes, and the hold. Nothing is hidden to make it
- * fast. The speed comes from not going anywhere, which is the whole point.
+ * The terminal, inside the row. The loop used to be: see a buy, press Buy, watch Scout be
+ * destroyed, land in a sheet with an empty amount, type, wait, review, sign, come back to a
+ * feed rebuilt from scratch. Now the row opens downward and it all happens in it: the
+ * coin's price and shape, what that person put in, your amount, the receipt from the real
+ * bytes, the hold. The speed comes from not going anywhere.
  */
 @Composable
 internal fun FeedBuyPanel(
@@ -68,14 +62,10 @@ internal fun FeedBuyPanel(
     var balance by remember(owner) { mutableStateOf<Long?>(null) }
 
     var chartTry by remember(mint) { mutableIntStateOf(0) }
-    // Insiste da sola, invece di arrendersi al primo no.
-    //
-    // La fonte dei grafici rifiuta a raffiche e poi torna disponibile. Prima
-    // dell'attesa fra una richiesta e l'altra il pannello ritentava per conto suo
-    // a ogni ricomposizione, e il grafico "compariva dopo un po'": brutto da
-    // dentro, giusto da fuori. Adesso riprova tre volte a otto secondi, e la
-    // riga dice che sta ancora guardando. Solo dopo si arrende, e si puo'
-    // toccare per un altro giro.
+    // It insists on its own instead of giving up at the first no. The chart source refuses in
+    // bursts and then returns; before the pacing, the panel retried on every recomposition and
+    // the chart "appeared after a while". Three tries eight seconds apart while the row says it
+    // is still looking, then it gives up, and a tap asks again.
     var giveUp by remember(mint) { mutableStateOf(false) }
     LaunchedEffect(mint, chartTry) {
         withContext(Dispatchers.IO) {
@@ -120,13 +110,9 @@ internal fun FeedBuyPanel(
             }
         }
 
-        // Two days of hourly closes, with this wallet's moves marked on them.
-        //
-        // This is the whole point of the panel. A row saying "somebody bought
-        // BONK" is a name and a coin; the same row with a ring on the line where
-        // they went in, and the line's shape since, is a thing you can have an
-        // opinion about. Drawn as nothing when the pool is too young, never as a
-        // flat line, which would read as a price that did not move.
+        // Two days of hourly closes with this wallet's moves marked on them, the whole point of the
+        // panel: "somebody bought BONK" is a name; a ring where they went in, and the line since, is
+        // a thing you can have an opinion about. Nothing is drawn when the pool is too young, never a flat line.
         if (series.size > 2) {
             val from = series.first().at
             val to = series.last().at
@@ -140,11 +126,8 @@ internal fun FeedBuyPanel(
             Box(Modifier.fillMaxWidth().height(if (marks.isEmpty()) 58.dp else 72.dp)) {
                 Spark(series.map { it.close }, if ((px?.change24h ?: 0.0) >= 0) Halo.mint else Halo.red, marks = marks)
             }
-            // How far back this is. Without it the line has no width: the same
-            // shape means one thing over five hours and another over three
-            // months, and the rings sitting on it mean nothing at all until you
-            // know which. Three marks, because two look like a caption and four
-            // start to crowd a line this small.
+            // How far back this is. Without it the line has no width: the same shape means one thing
+            // over five hours and another over three months. Three marks: two look like a caption, four crowd.
             Row(Modifier.fillMaxWidth()) {
                 listOf(from, (from + to) / 2, to).forEachIndexed { i, t ->
                     Text(
@@ -173,24 +156,16 @@ internal fun FeedBuyPanel(
             }
         }
 
-        // No chart at all, said rather than left blank.
-        //
-        // A coin nobody has made a pool for, or one made an hour ago, has no
-        // price history anywhere, and the panel simply had a hole where the
-        // picture goes. A hole reads as a thing that failed to load, and people
-        // tap it again.
+        // No chart at all, said rather than left blank: a hole where the picture goes reads as a
+        // failed load, and people tap it again.
         if (series.size <= 2 && !giveUp) {
             Text(stringResource(R.string.feed_chart_wait), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
         }
         if (series.size <= 2 && giveUp) {
-            // Said as what it is, and not as a fact about the coin.
-            //
-            // It used to read "nobody runs a pool deep enough to chart it",
-            // which sounds authoritative and is usually false: measured, a coin
-            // the app had just written that about had twenty pools. The chart
-            // source refuses after a few quick requests, and a refusal arrives
-            // here looking exactly like an absence. We cannot tell the two apart,
-            // so we say the only thing we know, and offer to go and look again.
+            // Said as what it is, not as a fact about the coin. "Nobody runs a pool deep enough to chart
+            // it" sounded authoritative and was usually false: a coin the app said that about had
+            // twenty pools. The source refuses after a few quick requests and a refusal looks exactly
+            // like an absence, so we say the one thing we know and offer to look again.
             Text(
                 stringResource(R.string.feed_no_chart),
                 style = HaloType.small, color = Halo.cyan, lineHeight = 16.sp,
@@ -199,14 +174,9 @@ internal fun FeedBuyPanel(
         }
 
         if (sell) {
-            // The fact, and nothing after it.
-            //
-            // It used to carry a sentence about somebody walking away and looking
-            // before you follow them in. True once. Printed under every single
-            // sale in the list it became wallpaper, and advice that repeats
-            // itself word for word stops being advice. What this panel says about
-            // a sale is already in what it does not offer: there is no buy button
-            // under it.
+            // The fact, and nothing after it. A sentence about somebody walking away, printed under
+            // every sale, became wallpaper. What this panel says about a sale is in what it does not
+            // offer: no buy button under it.
             Text(
                 stringResource(R.string.feed_they_sold, fmtSol((solSpent * 1e9).toLong(), 3)),
                 style = HaloType.small, color = Halo.amber, lineHeight = 16.sp,
@@ -259,10 +229,9 @@ private fun BuyBody(
         working = false
     }
 
-    // The price keeps moving while you look at it, and so does the blockhash
-    // inside the transaction. Same fifteen seconds as the swap sheet, and the
-    // same rule: a fresher price on the same route is swapped in, a different
-    // route is not, because that would change the thing you are reading.
+    // The price keeps moving while you look, and so does the blockhash in the transaction.
+    // Same fifteen seconds and same rule as the swap sheet: a fresher price on the same route
+    // is swapped in, a different route is not, because that would change what you are reading.
     LaunchedEffect(built) {
         val b = built ?: return@LaunchedEffect
         val lamports = chosen ?: return@LaunchedEffect
@@ -299,13 +268,9 @@ private fun BuyBody(
     error?.let { Text(it, style = HaloType.small, color = Halo.red, lineHeight = 16.sp) }
 
     built?.let { b ->
-        // Three lines, not the whole signing sheet.
-        //
-        // The full receipt is right where it is right: on a screen that exists
-        // only to be read before a signature. Dropped into a feed row it buried
-        // the one thing the row is for under distributions, addresses and risk
-        // cards. What is out, what is in, what it costs, and anything the engine
-        // actually flagged. Everything else is one tap away and stays there.
+        // Three lines, not the whole signing sheet: the full receipt belongs on a screen that exists
+        // to be read before a signature, and in a feed row it buried the point under distributions
+        // and risk cards. What is out, what is in, what it costs, what the engine flagged.
         Column(
             Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -340,13 +305,9 @@ private fun BuyBody(
         if (b.analyzed.receipt.blocksApproval) {
             Text(stringResource(R.string.feed_blocked), style = HaloType.small, color = Halo.red, lineHeight = 16.sp)
         } else {
-            // Nothing is signed from inside a row any more.
-            //
-            // The three lines above are the menu: the dish and the price, enough
-            // to decide whether to go on. What you sign is a different thing, and
-            // in this app it has a screen of its own, every time. It used to be
-            // signed straight from here off a four-line summary, which is the one
-            // place in the whole product where the receipt was optional.
+            // Nothing is signed from inside a row any more. The three lines above are the menu; what
+            // you sign has a screen of its own, every time. It used to be signed off a four-line
+            // summary, the one place in the product where the receipt was optional.
             PrimaryButton(stringResource(R.string.gift_see_receipt), danger = false, enabled = !working, icon = HIcon.RECEIPT) {
                 review = true
             }

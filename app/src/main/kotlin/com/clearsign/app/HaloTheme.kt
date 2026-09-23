@@ -23,12 +23,9 @@ enum class ReceiptStyle { CARDS, PAPER, TERMINAL }
 data class HaloFonts(val display: FontFamily, val body: FontFamily, val mono: FontFamily, val tracking: Float = 0f)
 
 /**
- * A full colour palette for the app. Every screen paints through [Halo], which
- * forwards to the palette currently selected, so swapping a theme is one
- * assignment — no screen knows more than "accent" or "card".
- *
- * Contrast is a contract, not a hope: `PaletteContrastTest` checks every palette
- * (muted ≥ 4.5:1, accent ≥ 7:1, ink ≥ 12:1 against the ground).
+ * A full color palette. Every screen paints through [Halo], which forwards to the selected
+ * palette, so swapping a theme is one assignment. Contrast is a contract: `PaletteContrastTest`
+ * checks every palette (muted ≥ 4.5:1, accent ≥ 7:1, ink ≥ 12:1 against the ground).
  */
 data class HaloPalette(
     val id: String,
@@ -120,12 +117,9 @@ object Palettes {
     )
 
     /**
-     * Solana as a whole palette: violet ground, its green and its purple.
-     *
-     * Free, and it was not: a theme nobody can select is a theme nobody can judge,
-     * and this one turned out to be the one that suits the link and mint screens.
-     * [flow] is the other half of the same idea — Halo's colours with only the
-     * hairline moving — and both exist because they answer different moods.
+     * Solana as a whole palette: violet ground, its green and purple. Free, because a theme
+     * nobody can select is one nobody can judge; it turned out to suit the link and mint screens.
+     * [flow] is the other half of the idea, Halo's colors with only the hairline moving.
      */
     val solana = p(
         "solana", R.string.theme_solana,
@@ -136,12 +130,9 @@ object Palettes {
     )
 
     /**
-     * Home, with a living edge.
-     *
-     * Every colour is Halo's, unchanged — the point was never a new palette. The
-     * only difference is the hairline around each card, where Solana's purple and
-     * green slide past each other instead of sitting still. A theme is allowed to
-     * change one thing.
+     * Home, with a living edge. Every color is Halo's; the only difference is the hairline
+     * around each card, where Solana's purple and green slide past each other. A theme is
+     * allowed to change one thing.
      */
     val flow = p(
         "flow", R.string.theme_flow,
@@ -161,10 +152,8 @@ object Palettes {
     )
 
     // ---- candidates -----------------------------------------------------------
-    // Four treatments of the same idea, free so they can actually be worn for a
-    // while on every real screen. They share one ground and one neutral ladder
-    // (a cool-white veil, no accent tint) and differ only in which colour means
-    // "this is the action". The loser ones get deleted once a winner is picked.
+    // Four treatments of one idea, free so they can be worn on every real screen. Same ground,
+    // same neutral ladder, different color for "this is the action". The losers go once a winner is picked.
     private const val G0 = 0xFF070B12
     private const val G2 = 0xFF12161E
     private const val CS = 0xFF181D25
@@ -216,11 +205,9 @@ object Palettes {
     fun withCustom(ctx: android.content.Context): List<HaloPalette> = all + CustomTheme.palette(ctx)
 
     /**
-     * The theme a phone starts with, and what an unknown id falls back to.
-     *
-     * Not [halo] any more. Menta is the same palette with the accent mixed back
-     * towards the card on large filled surfaces, and on a big button that is the
-     * difference between a colour and a glare.
+     * The theme a phone starts with, and the fallback for an unknown id. Not [halo] any more:
+     * Menta is the same palette with the accent mixed back toward the card on large filled
+     * surfaces, the difference between a color and a glare on a big button.
      */
     val default: HaloPalette get() = mintSoft
 
@@ -232,10 +219,9 @@ object Palettes {
 }
 
 /**
- * The user's own palette, edited live in the theme editor: accent, secondary,
- * background, corner roundness, grain, CRT and receipt layout. Colours the user
- * doesn't set (card, stroke, ink, muted) are derived from the ones they do, so
- * the result always reads as one coherent theme.
+ * The user's own palette, edited live: accent, secondary, background, corner roundness,
+ * grain, CRT and receipt layout. What they do not set (card, stroke, ink, muted) is derived
+ * from what they do, so it always reads as one theme.
  */
 object CustomTheme {
     const val ID = "custom"
@@ -297,9 +283,8 @@ object CustomTheme {
     }
 
     /**
-     * One rung of the surface ladder: the ground mixed towards a pale version of
-     * the theme's own second accent. Keeping the hue is what makes a raised panel
-     * read as the same material rather than as grey paint.
+     * One rung of the surface ladder: the ground mixed toward a pale version of the second
+     * accent. Keeping the hue makes a raised panel read as the same material, not grey paint.
      */
     private fun step(ground: Long, accent2: Long, f: Float): Int {
         val tint = mix(accent2.toInt(), 0xFFFFFFFF.toInt(), 0.72f)
@@ -325,9 +310,8 @@ object CustomTheme {
 }
 
 /**
- * The colours every screen reads. Backed by Compose state, so composition and
- * draw lambdas that read a slot re-run when the palette changes; `Themes.select`
- * is the only writer (main thread).
+ * The colors every screen reads. Compose state, so anything reading a slot re-runs when the
+ * palette changes; `Themes.select` is the only writer, main thread.
  */
 object Halo {
     var palette: HaloPalette by mutableStateOf(Palettes.default)
@@ -390,17 +374,11 @@ val Mono: FontFamily get() = Halo.palette.fonts.mono
 val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
 /**
- * The type scale: six roles, no invented sizes.
- *
- * Before this there were 21 different font sizes in the app, six of them
- * fractional, each chosen by eye on one screen. That is what makes an interface
- * look assembled rather than designed — the sizes carry no meaning, so nothing
- * on a page is visibly more important than anything else.
- *
- * Sizes stay in `sp` so the text-size slider (`ScaledText`) still moves them all
- * together, and the families are palette getters so a theme can change the face.
- * Colour is deliberately not here: colour is information, decided at the call
- * site, not a property of a size.
+ * The type scale: six roles, no invented sizes. There were 21 font sizes in the app, six
+ * fractional, each picked by eye on one screen, which is what makes an interface look
+ * assembled rather than designed. Sizes stay in `sp` so the text-size slider moves them
+ * together; families are palette getters so a theme can change the face. Color is not here:
+ * color is information, decided at the call site.
  */
 object HaloType {
     /** Captions, units, the small print inside a chip. The legibility floor. */
@@ -424,14 +402,13 @@ object HaloType {
     /** Addresses, signatures, anything meant to be compared character by character. */
     val code: TextStyle get() = TextStyle(fontFamily = Mono, fontSize = 13.sp, lineHeight = 19.sp)
 
-    /** Un importo o un indirizzo dentro una riga: piu' piccolo di `code`, tabulare. */
+    /** An amount or an address inside a row: smaller than `code`, tabular. */
     val mono: TextStyle get() = TextStyle(fontFamily = Mono, fontSize = 12.sp, lineHeight = 16.sp, fontFeatureSettings = "tnum")
 }
 
 /**
- * The radius scale. Four values, and each one means a level: a pill is a control,
- * 10 is something inside a panel, 16 is a panel, 22 is a card or a sheet. Pass
- * these to [rs] instead of a number picked by eye — there were fifteen of those.
+ * The radius scale. Four values, each a level: a pill is a control, 10 is something inside a
+ * panel, 16 a panel, 22 a card or a sheet. Pass these to [rs]; there were fifteen picked by eye.
  */
 object Radius {
     const val pill = 999

@@ -7,19 +7,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Jupiter Ultra: the swap engine the pros use, without a key.
- *
- * One call gives the transaction with the route already chosen, the slippage
- * already estimated from the coin's own volatility, the priority fee already
- * set, and sometimes nobody to pay gas at all. After the signature the bytes
- * go back to Jupiter, which lands them itself, in private, out of the reach
- * of the sandwich bots that read the public mempool. Verified on the 15th of
- * September 2026: `lite-api.jup.ag/ultra/v1/order` answers with no key.
- *
- * What does not change: the bytes are read by the receipt and simulated
- * before anybody signs, exactly as with swap v1. Ultra decides the route; the
- * receipt decides whether it is signed. When Ultra does not answer the caller
- * falls back to swap v1 and says so once in the ledger.
+ * Jupiter Ultra: the swap engine the pros use, without a key. One call gives the transaction
+ * with route, slippage (from the coin's own volatility) and priority fee already chosen, and
+ * sometimes nobody to pay gas at all. After the signature the bytes go back to Jupiter, which
+ * lands them privately, out of the sandwich bots' reach. Verified 15 Sep 2026:
+ * `lite-api.jup.ag/ultra/v1/order` answers keyless. The receipt still reads and simulates the
+ * bytes before signing; when Ultra does not answer the caller falls back to swap v1, and says so once.
  */
 object JupiterUltra {
     private const val TAG = "Apex-Ultra"

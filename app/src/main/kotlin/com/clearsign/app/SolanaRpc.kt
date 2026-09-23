@@ -272,7 +272,7 @@ object SolanaRpc {
         return effectsOf(pre, sim, tracked, allTokens, { TokenSymbols.symbol(it) }) { JupiterTokens.cached(it)?.decimals ?: 6 }
     }
 
-    /** Una simulazione che il nodo ha eseguito e ha visto fallire, gia' nella forma che va a valle. */
+    /** A simulation the node ran and saw fail, already in the shape that flows downstream. */
     private fun failureOf(sim: Sim): SimOutcome? =
         if (sim.value.isNull("err")) null
         else SimOutcome.Failed(sim.value.get("err").toString()).also { Log.i(TAG, "simulate Failed: ${it.err}") }
@@ -282,10 +282,10 @@ object SolanaRpc {
         fun order(): List<String> = listOf(owner) + tokens.map { it.pubkey } + dests + fresh
     }
 
-    /** Lo stato di partenza: i conti letti, e lo slot in cui la catena li ha letti. */
+    /** The starting state: the accounts read, and the slot the chain read them at. */
     internal data class PreState(val slot: Long?, val accounts: Map<String, AcctPre>)
 
-    /** Una simulazione riuscita a parlare col nodo: il suo `value`, e lo slot su cui ha girato. */
+    /** A simulation that reached the node: its `value`, and the slot it ran on. */
     internal data class Sim(val slot: Long?, val value: JSONObject)
 
     /**

@@ -3,14 +3,10 @@ package com.clearsign.app
 import android.util.Log
 
 /**
- * Client for the on-chain ClearSign reputation registry (the "Trustpilot for
- * wallets"). Reputation is a fact about an *address*, independent of the cluster
- * a transaction is on, so it lives on devnet (free, safe, mock-SKR staking) while
- * ClearSign can still be signing real mainnet transactions. We read a target's
- * aggregate at sign-time and turn it into a trust verdict.
- *
- * The account is found by its indexed `target` field (memcmp at offset 8) so no
- * ed25519 PDA derivation is needed on-device.
+ * Client for the on-chain reputation registry, the "Trustpilot for wallets". Reputation is a
+ * fact about an address, independent of cluster, so it lives on devnet (free, mock-SKR
+ * staking) while real transactions are on mainnet. The account is found by its indexed
+ * `target` field (memcmp at offset 8), so no PDA derivation on device.
  */
 object Reputation {
 
@@ -43,12 +39,10 @@ object Reputation {
     enum class Verdict { TRUSTED, MIXED, FLAGGED, NONE }
 
     /**
-     * Se il programma c'e'. Misurato il 22 settembre 2026: su devnet l'account
-     * del programma non esiste, zero conti, e ogni scontrino pagava lo stesso
-     * un `getProgramAccounts` che non poteva rispondere niente. Devnet si
-     * azzera ogni tanto, quindi questa e' una domanda che va rifatta, ma non a
-     * ogni scontrino: una volta ogni sei ore, e la risposta «non c'e'» si
-     * tiene. Quando il programma torna, la reputazione torna da sola.
+     * Whether the program exists. Measured 22 Sep 2026: on devnet the program account did not
+     * exist, zero accounts, and every receipt still paid a `getProgramAccounts` that could answer
+     * nothing. Devnet resets now and then, so the question is asked again, once every six hours,
+     * and "not there" is kept. When the program returns, reputation returns by itself.
      */
     @Volatile private var deployed: Triple<Long, String, Boolean>? = null
     private const val DEPLOYED_TTL_MS = 6 * 60 * 60_000L
@@ -56,7 +50,7 @@ object Reputation {
     private fun isDeployed(): Boolean {
         val now = System.currentTimeMillis()
         deployed?.let { (at, on, ok) -> if (on == rpc && now - at < DEPLOYED_TTL_MS) return ok }
-        // Senza risposta si prova lo stesso, come prima: un silenzio non dice che non c'e'.
+        // Without an answer we still try, as before: silence does not mean it is not there.
         val ok = SolanaRpc.accountExists(rpc, PROGRAM_ID) ?: return true
         deployed = Triple(now, rpc, ok)
         if (!ok) Log.i("ClearSign-Rep", "program not on $rpc, skipping lookups for a while")

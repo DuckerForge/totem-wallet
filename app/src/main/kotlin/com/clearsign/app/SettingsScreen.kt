@@ -43,9 +43,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 /**
- * Settings tab. Sixteen cards in one flat stack were impossible to scan, so they
- * live in five named groups now — graphics with graphics, agent with agent — and
- * each group opens only when you ask for it.
+ * Settings. Sixteen cards in one flat stack could not be scanned, so they live in five named
+ * groups that open only when asked.
  */
 @Composable
 internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Composable () -> Unit = {}) {
@@ -99,8 +98,8 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
 }
 
 /**
- * One named drawer of settings. Closed it is a single row you can read at a
- * glance; open it holds its cards, spaced like the rest of the screen.
+ * One named drawer of settings: closed, a single row read at a glance; open, its cards,
+ * spaced like the rest of the screen.
  */
 @Composable
 private fun SettingsGroup(title: String, sub: String, icon: HIcon, content: @Composable ColumnScope.() -> Unit) {
@@ -188,11 +187,9 @@ private fun AgentGateCard() {
 }
 
 /**
- * The way in to the list of who can ask this wallet for things.
- *
- * Lives under the wallet group rather than the agent one: an agent is one of the
- * things that can ask, not the only one, and the person looking for "which sites
- * am I logged into" is thinking about the wallet.
+ * The way in to who can ask this wallet for things. Under the wallet group, not the agent
+ * one: an agent is one of the things that can ask, and "which sites am I logged into" is a
+ * question about the wallet.
  */
 @Composable
 private fun ConnectionsCard() {
@@ -262,14 +259,10 @@ private fun CompanionCard() {
 }
 
 /**
- * Il nodo con cui questo telefono parla con Solana.
- *
- * L'app ne porta dentro uno, di chi la pubblica, e tutte le installazioni se lo
- * dividono. Con l'agente acceso un telefono solo fa qualche migliaio di chiamate
- * al giorno: mille telefoni finiscono un piano intero, e lo finiscono per tutti
- * nello stesso momento, compreso chi sta solo guardando il saldo. Quindi chi
- * macina puo' portare il suo, come porta la sua chiave del modello. Vuoto vuol
- * dire quello di serie.
+ * The node this phone talks to Solana with. The app ships with one, the publisher's, shared
+ * by every install; with the agent on one phone makes thousands of calls a day and a thousand
+ * phones finish a whole plan, for everyone at once, including whoever is only looking at a
+ * balance. So heavy users bring their own, like they bring their model key. Empty means the built-in.
  */
 @Composable
 private fun RpcCard() {
@@ -291,8 +284,8 @@ private fun RpcCard() {
                 shape = rs(12),
             )
             Text(stringResource(R.string.rpc_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
-            // Il pool, fornitore per fornitore: nome, stato, chiamate, ultimo
-            // errore. Mai l'indirizzo, che contiene la chiave.
+            // The pool, provider by provider: name, state, calls, last error. Never the
+            // URL, which holds the key.
             val (lines, today) = remember { Rpc.report() }
             SoftPanel {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -431,8 +424,8 @@ private fun FollowAlertsCard() {
 }
 
 /**
- * The one setting in the app that spends money on something other than a trade,
- * so it says so in the same breath as the switch, and starts off.
+ * The one setting that spends money on something other than a trade, so it says so in the
+ * same breath as the switch, and starts off.
  */
 @Composable
 private fun WebCheckCard() {

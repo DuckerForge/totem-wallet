@@ -48,11 +48,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 /**
- * "Delegations & accounts": the wallet hygiene most wallets hide. Lists every
- * token account a third party can still spend from (an approval left behind by
- * a dApp) with a one-tap revoke, and every empty token account whose rent can
- * be reclaimed by closing it. Each action is a real transaction: mini receipt,
- * hold-to-sign, Seed Vault.
+ * Delegations and accounts, the hygiene most wallets hide: every token account a third party
+ * can still spend from, with a one-tap revoke, and every empty account whose rent comes back by
+ * closing it. Each action is a real transaction: mini receipt, hold to sign, Seed Vault.
  */
 @Composable
 internal fun AccountsCard(signer: SeedVaultSigner, owner: String?) {
@@ -81,7 +79,7 @@ internal fun AccountsCard(signer: SeedVaultSigner, owner: String?) {
                     owner == null -> stringResource(R.string.home_accounts_sub)
                     loading && accounts == null -> stringResource(R.string.deleg_loading)
                     delegated.isEmpty() && empties.isEmpty() -> stringResource(R.string.deleg_clean)
-                    // Solo i lati che contano qualcosa: «0 deleghe · 3 account vuoti» era un numero in piu' da leggere.
+                    // Only the sides that count: "0 delegations · 3 empty accounts" was one more number to read.
                     else -> listOfNotNull(
                         delegated.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.deleg_delegations_n, it, it) },
                         empties.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.deleg_empties_n, it, it) },

@@ -47,13 +47,10 @@ object LedgerRecorder {
     private val WATCH_STEPS_MS = longArrayOf(4_000, 10_000, 25_000, 60_000)
 
     /**
-     * A row is written when the node accepts the bytes, and the node can
-     * accept bytes the chain then refuses: a swap past its slippage, a send
-     * that lost the race for a blockhash. That row used to say "sent" for
-     * ever, with its legs, and the P&L counted it. Now the chain is asked
-     * four times over a hundred seconds; a refusal tags the row, the
-     * receipts say it, and the analytics skip it. A silence changes nothing:
-     * not knowing is not the same as failed.
+     * A row is written when the node accepts the bytes, and the chain can then refuse them: a
+     * swap past its slippage, a send that lost the blockhash race. That row said "sent" forever
+     * and the P&L counted it. Now the chain is asked four times over a hundred seconds; a refusal
+     * tags the row, the receipts say it, the analytics skip it. Silence changes nothing: not knowing is not failed.
      */
     fun watch(ctx: Context, e: LedgerEntry) {
         val sig = e.signature ?: return

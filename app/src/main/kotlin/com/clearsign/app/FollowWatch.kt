@@ -14,22 +14,11 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * The phone buzzes when somebody you follow buys.
- *
- * Following used to mean one thing only, and a quiet one: the coin went to the
- * agent as a candidate, if a budget happened to be open, on the agent's own
- * clock. With no budget the star did nothing at all and never said so. Now it
- * does the obvious thing as well, the thing the star looks like it should do.
- *
- * Fifteen minutes because that is WorkManager's floor for repeating work, and
- * the scanner publishes every ten, so nothing finer would see anything new. It
- * is not instant and the screen should not pretend otherwise.
- *
- * **The button does not buy.** It opens the feed with that coin already
- * unfolded, on the receipt. A purchase signed from a notification would be a
- * purchase nobody read, which is the one thing this app refuses to build, and
- * the ten seconds a broadcast receiver gets would not be enough to quote,
- * simulate and sign anyway.
+ * The phone buzzes when somebody you follow buys. Following used to only feed the agent a
+ * candidate, if a budget was open; with no budget the star did nothing and never said so.
+ * Fifteen minutes because that is WorkManager's floor and the scanner publishes every ten. The
+ * button does not buy: it opens the feed with that coin unfolded, on the receipt. A purchase
+ * signed from a notification is a purchase nobody read, and a receiver's ten seconds could not quote, simulate and sign anyway.
  */
 object FollowWatch {
     private const val WORK = "follow-watch"

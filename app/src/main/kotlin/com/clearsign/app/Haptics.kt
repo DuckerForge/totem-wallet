@@ -6,9 +6,8 @@ import android.os.Vibrator
 import android.os.VibratorManager
 
 /**
- * Physical feedback on the Seeker: a sharp double-buzz when a receipt carries a
- * DANGER risk (you feel the warning even before reading it), a soft tick on a
- * successful signature. minSdk 31 → VibratorManager is always available.
+ * Feedback you feel: a sharp double buzz when a receipt carries a DANGER risk, a soft tick
+ * on a landed signature. minSdk 31, so VibratorManager is always there.
  */
 object Haptics {
 

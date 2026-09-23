@@ -30,13 +30,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Jupiter's shield: what Jupiter itself says about a mint before it lets
- * you trade it. Not verified, freeze authority, transfer fees, a copy of a
- * known symbol. One call, no key, a few warnings with a severity.
- *
- * It sits under our own gates, never in their place: the collar and the
- * safety grade decide; this adds what a second pair of eyes saw. Unknown
- * never blocks.
+ * Jupiter's shield: what Jupiter itself says about a mint before it lets you trade it (not
+ * verified, freeze authority, transfer fees, a copy of a known symbol). One call, no key, a
+ * few warnings with a severity. Under our gates, never in their place: the collar and the
+ * safety grade decide, this adds a second pair of eyes. Unknown never blocks.
  */
 object TokenShield {
     data class Warning(val type: String, val message: String, val severity: String) {
@@ -44,16 +41,10 @@ object TokenShield {
         val warning: Boolean get() = severity.equals("warning", true)
 
         /**
-         * La commissione che la moneta stessa trattiene, in percento, se e' questo.
-         *
-         * Jupiter marca critico il fatto che un token trattenga una commissione a
-         * ogni trasferimento, e ha ragione a segnalarlo: e' una tassa che paghi
-         * entrando e uscendo. Ma non e' una truffa come lo sono una liquidita'
-         * fasulla o un conio aperto, e' un costo. Un costo lo si accetta o no, ed
-         * e' una decisione che spetta a chi mette i soldi.
-         *
-         * Letta dal testo perche' e' li' che Jupiter la scrive. Se non si riesce
-         * a leggerla, questo non e' una commissione e la porta resta chiusa.
+         * The fee the coin itself keeps, in percent, if this is that. Jupiter marks a per-transfer
+         * fee critical, rightly, it is a tax paid in and out; but it is a cost, not a scam like fake
+         * liquidity or an open mint, and a cost is accepted or not by whoever puts the money in. Read
+         * from the text, where Jupiter writes it. Unreadable, it is not a fee and the door stays closed.
          */
         val transferFeePct: Double?
             get() {

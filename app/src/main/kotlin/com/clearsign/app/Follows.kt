@@ -4,16 +4,10 @@ import android.content.Context
 import org.json.JSONArray
 
 /**
- * The Seeker wallets this person follows.
- *
- * Following a wallet means one thing: when it buys, the coin it bought goes to
- * the agent as a candidate. Not "buy what they buy": a candidate, which then
- * meets the same gates, the same collar and the same slice as anything the
- * scan turns up on its own. Somebody with a bigger wallet is somebody who can
- * afford to be wrong; the gates are what keep their mistakes from becoming
- * yours at four minutes' delay.
- *
- * Addresses only, kept on the phone. Nothing about who anybody is.
+ * The Seeker wallets this person follows. Following means one thing: when it buys, the coin
+ * goes to the agent as a candidate, not "buy what they buy", and it meets the same gates,
+ * collar and slice as anything the scan finds. A bigger wallet can afford to be wrong; the
+ * gates keep their mistakes from becoming yours four minutes later. Addresses only, on the phone.
  */
 object Follows {
     private const val PREFS = "apex_follows"
@@ -52,11 +46,9 @@ object Follows {
     }
 
     /**
-     * The newest event the alerts have already spoken about.
-     *
-     * Zero means "never looked": the first round after switching alerts on sets
-     * this and stays quiet, because announcing a whole window at once is how a
-     * useful notification becomes one you turn off.
+     * The newest event the alerts have spoken about. Zero means never looked: the first round
+     * after switching alerts on sets this and stays quiet, because announcing a whole window at
+     * once is how a notification gets turned off.
      */
     fun lastSeenAt(ctx: Context): Long = prefs(ctx).getLong("seen_at", 0L)
     fun setLastSeenAt(ctx: Context, at: Long) { prefs(ctx).edit().putLong("seen_at", at).apply() }

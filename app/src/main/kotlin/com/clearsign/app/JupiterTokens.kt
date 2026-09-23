@@ -10,15 +10,10 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Jupiter's token registry (Token API v2): the same list the Jupiter app itself
- * shows, so a swap can offer every coin instead of six hardcoded ones.
- *
- * It answers the three things a picker needs and that nothing else in the app
- * could provide: the **name and logo** of a mint we do not hold, and — the real
- * blocker — its **decimals**, which the DAS path in [SolanaRpc.dasAssets] drops.
- *
- * Everything learned here is pushed into [TokenSymbols] too, so receipts and the
- * portfolio get better names and logos for free.
+ * Jupiter's token registry (Token API v2), the list the Jupiter app shows, so a swap offers
+ * every coin instead of six. It answers what nothing else could: the name and logo of a
+ * mint we do not hold and, the real blocker, its decimals, which [SolanaRpc.dasAssets]
+ * drops. Everything learned is pushed into [TokenSymbols] too.
  */
 object JupiterTokens {
     private const val TAG = "ClearSign-JupTok"
@@ -49,10 +44,9 @@ object JupiterTokens {
         val holders: Int = 0,
     ) {
         /**
-         * [sellable] comes from an actual quote back to SOL; null when nobody asked.
-         * [ext] is what the mint account says it can still do to you after the
-         * purchase; left out, it comes from whatever has already been read, so a
-         * list can show the flag without every row making its own call.
+         * [sellable] comes from an actual quote back to SOL; null when nobody asked. [ext] is what
+         * the mint account can still do to you after the purchase; left out, it comes from whatever
+         * was already read, so a list shows the flag without one call per row.
          */
         fun facts(sellable: Boolean? = null, ext: com.clearsign.core.MintExtensions? = null) = com.clearsign.core.TokenFacts(
             verified = verified, organic = organic, canMint = canMint, canFreeze = canFreeze,
@@ -69,31 +63,25 @@ object JupiterTokens {
 
     fun cached(mint: String): Tok? = cache[mint]?.also { touch(mint) }
 
-    /** Quando una moneta e' stata usata l'ultima volta: decide chi resta sul disco. */
+    /** When a coin was last used: decides who stays on disk. */
     private val touchedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private fun touch(mint: String) { touchedAt[mint] = System.currentTimeMillis() }
 
     /** Quante monete tiene il disco, al massimo. Oltre, vanno via quelle usate da piu' tempo. */
     const val DISK_MAX = 2000
-    /** Un file piu' grande di cosi' non si legge: e' un file cresciuto prima del tetto. */
+    /** A file bigger than this is not read: it grew before the cap existed. */
     const val DISK_MAX_BYTES = 1_000_000L
 
-    /** Le [max] monete usate piu' di recente, per il disco. Pura, per il test. */
+    /** The [max] most recently used coins, for the disk. Pure, for the test. */
     internal fun keepNewest(all: Collection<Tok>, touched: Map<String, Long>, max: Int): List<Tok> =
         all.sortedByDescending { touched[it.mint] ?: 0L }.take(max)
 
-    // ---- l'archivio e il disco -------------------------------------------
+    // ---- the archive and the disk -------------------------------------------------
     //
-    // Nome, simbolo, decimali e icona di una moneta non cambiano mai, e finora
-    // questa mappa viveva solo in memoria: ogni riavvio dell'app ricominciava da
-    // zero e richiedeva tutto. Nessuno paga in denaro, si paga in limiti di
-    // frequenza, ed e' la stessa quota che serve a mostrare un prezzo o un
-    // grafico mentre qualcuno sta guardando.
-    //
-    // Due passi, dal piu' economico. Il disco: quello che questo telefono ha
-    // gia' visto non si richiede mai piu'. L'archivio condiviso: quello che
-    // questo telefono non ha mai visto ma qualcun altro si'. Solo se manca da
-    // tutte e due si disturba Jupiter.
+    // Name, symbol, decimals and icon never change, and this map lived in memory only: every
+    // restart asked for everything again, paid not in money but in rate limits, the same quota
+    // that shows a price while someone watches. Two steps, cheapest first: the disk for what this
+    // phone has seen, the shared archive for what another phone has. Only then Jupiter.
     @Volatile private var diskFile: File? = null
 
     fun warmDisk(ctx: Context) {
@@ -102,22 +90,19 @@ object JupiterTokens {
         diskFile = f
         runCatching {
             if (!f.exists()) return
-            // Un file cresciuto senza tetto si butta invece di leggerlo: il tetto
-            // di adesso lo riscrive piccolo alla prima occasione.
+            // A file that grew with no cap is thrown away rather than read: the current
+            // cap rewrites it small at the first chance.
             if (f.length() > DISK_MAX_BYTES) { f.delete(); return }
-            // `putIfAbsent`: adesso questo gira dopo il primo fotogramma, e una
-            // moneta chiesta nel frattempo, col prezzo, non va sovrascritta dal disco.
+            // `putIfAbsent`: this runs after the first frame now, and a coin asked for in
+            // the meantime, with its price, must not be overwritten by the disk.
             parse(JSONArray(f.readText())).forEach { cache.putIfAbsent(it.mint, it) }
         }
     }
 
     /**
-     * Il disco ricorda come si chiama una moneta, mai quanto vale.
-     *
-     * Un nome non invecchia. Un prezzo si': riletto domani da un file sarebbe un
-     * numero vecchio con l'aria di essere quello di adesso, ed e' peggio di
-     * nessun numero. Quindi qui `usd` e la variazione escono azzerati, e chi ha
-     * bisogno di un prezzo lo va a prendere.
+     * The disk remembers what a coin is called, never what it is worth. A name does not age; a
+     * price reread tomorrow from a file is an old number with the air of a current one, worse
+     * than none. So `usd` and the change leave zeroed, and whoever needs a price fetches it.
      */
     private fun saveDisk() {
         val f = diskFile ?: return
@@ -125,12 +110,9 @@ object JupiterTokens {
     }
 
     /**
-     * Quello che l'archivio sa: come si chiama e quante cifre ha, nient'altro.
-     *
-     * Niente prezzo, niente liquidita', niente giudizio sulla moneta. Un token
-     * che arriva da qui ha zero liquidita' e non verificato, che e' esattamente
-     * come appare una moneta sconosciuta: chi la deve giudicare la trattera' col
-     * sospetto che merita, invece di fidarsi di un dato che non abbiamo.
+     * What the archive knows: name and decimals, nothing else. No price, no liquidity, no
+     * judgment: a token from here has zero liquidity and is unverified, exactly how an unknown
+     * coin looks, so whoever judges it treats it with the suspicion it deserves.
      */
     private fun fromArchive(mints: List<String>): List<Tok> {
         val base = BuildConfig.CROWD_URL.takeIf { it.isNotBlank() } ?: return emptyList()
@@ -149,10 +131,7 @@ object JupiterTokens {
         }.getOrDefault(emptyList())
     }
 
-    /**
-     * The popular list, by Jupiter's 24h organic score. Served from memory, then
-     * from disk (a day old at most), then from the network. Blocking: call on IO.
-     */
+    /** The popular list by Jupiter's 24h organic score: memory, then disk (a day old at most), then the network. Blocking, IO. */
     fun top(ctx: Context): List<Tok> {
         top.takeIf { it.isNotEmpty() && System.currentTimeMillis() - topAt < TOP_TTL_MS }?.let { return it }
         val file = File(ctx.filesDir, TOP_FILE)
@@ -182,18 +161,10 @@ object JupiterTokens {
     fun byMints(mints: List<String>): Map<String, Tok> {
         val todo = mints.distinct().filter { it != com.clearsign.core.NATIVE_SOL_MINT }
         if (todo.isEmpty()) return emptyMap()
-        // Questa chiede a Jupiter, sempre, e non passa ne' dal disco ne'
-        // dall'archivio.
-        //
-        // Chi la chiama vuole un prezzo, e un prezzo ha un'eta'. Il disco e
-        // l'archivio sanno come si chiama una moneta, quante cifre ha e che
-        // faccia: cose che non cambiano mai. Non sanno quanto vale, e per un po'
-        // oggi hanno risposto lo stesso, con `usd` vuoto: il Mercato scriveva
-        // "no price" su monete che un prezzo ce l'hanno eccome.
-        //
-        // Il risparmio vero e' in `warm`, che e' la strada del volume: i nomi
-        // per la diretta, per il censimento, per i grafici. Li' una risposta
-        // scritta ieri vale quanto una di adesso.
+        // This one asks Jupiter, always, and skips disk and archive. Callers want a price, and a
+        // price has an age; disk and archive know name, decimals and face, and for a while today they
+        // answered anyway with `usd` empty, so the Market wrote "no price" on coins that have one.
+        // The real saving is in `warm`, the volume road for names.
         val out = HashMap<String, Tok>()
         todo.chunked(100)
             .flatMap { chunk -> fetch("/search?query=" + chunk.joinToString(",")) }
@@ -203,18 +174,11 @@ object JupiterTokens {
     }
 
     /**
-     * The pool the agent picks from: what is traded most and what real wallets
-     * are buying right now, merged and de-duplicated.
-     *
-     * Two lists rather than one because they disagree in a useful way: the
-     * traded list is where the money is, the organic list is where the people
-     * are. The freshly-launched list (`/recent`) is deliberately left out: those
-     * rows come back with two or three holders, which no gate will pass and no
-     * budget should buy.
-     *
-     * Returns [com.clearsign.core.Candidate], not [Tok], because the trading
-     * windows in the answer go stale in minutes and must never be cached.
-     * Blocking: call on IO.
+     * The pool the agent picks from: what is traded most and what real wallets are buying,
+     * merged and de-duplicated. Two lists because they disagree usefully: traded is where the
+     * money is, organic where the people are. `/recent` is left out: two or three holders, which
+     * no gate passes. Returns [com.clearsign.core.Candidate], not [Tok]: the trading windows go
+     * stale in minutes and must never be cached. Blocking, IO.
      */
     fun pool(): List<com.clearsign.core.Candidate> {
         val seen = LinkedHashMap<String, com.clearsign.core.Candidate>()
@@ -226,10 +190,9 @@ object JupiterTokens {
                 seen.getOrPut(c.mint) { c }
             }
         }
-        // Four of Jupiter's own lists, because they disagree in useful ways: traded
-        // is where the money is, organic is where the people are, trending is what
-        // is being talked about, and the same question over an hour and over a day
-        // returns different coins.
+        // Four of Jupiter's lists, because they disagree usefully: traded is where the money is,
+        // organic where the people are, trending what is talked about, and an hour and a day return
+        // different coins.
         listOf(
             "/toptraded/24h?limit=100",
             "/toporganicscore/1h?limit=100",
@@ -250,22 +213,11 @@ object JupiterTokens {
     }
 
     /**
-     * Put names on a pile of mints in as few calls as possible.
-     *
-     * The crowd feed arrives as addresses, and an address is not something anybody
-     * reads: "Vesper bought 25zrhp…pump" says nothing, "Vesper bought KITTY" says
-     * the whole thing. One search per fifty mints, and whatever the registry has
-     * never heard of simply keeps its address, which is honest.
-     *
-     * Blocking: call on IO.
-     */
-    /**
-     * Solo come si chiamano, e questa e' la strada del volume.
-     *
-     * Serve alla diretta, al censimento, ai grafici: posti dove di una moneta si
-     * vuole il simbolo e la faccia, non il prezzo. Quindi puo' passare dal disco
-     * e dall'archivio condiviso, dove un nome scritto ieri vale quanto uno di
-     * adesso, e disturba Jupiter solo per quelle che non conosce nessuno.
+     * Names on a pile of mints in as few calls as possible: "Vesper bought 25zrhp…pump" says
+     * nothing, "Vesper bought KITTY" says it all. This is the volume road (feed, census, charts),
+     * where a name written yesterday is as good as today's, so it may go through disk and shared
+     * archive and bothers Jupiter only for what nobody knows; the registry's unknowns keep their
+     * address. Blocking, IO.
      */
     fun warm(mints: Collection<String>) {
         val missing = mints.filter { it.isNotEmpty() && cache[it] == null }.distinct()
@@ -278,13 +230,13 @@ object JupiterTokens {
         saveDisk()
     }
 
-    /** Una moneta dall'archivio nella cache, se c'e'. Ritorna null se non c'era. */
+    /** A coin from the archive into the cache, if there. Null when it was not. */
     private fun fromArchiveInto(mint: String): Tok? =
         fromArchive(listOf(mint)).firstOrNull()?.also { cache[it.mint] = it; touch(it.mint) }
 
     /**
-     * One coin, with its trading windows, so a receipt can judge the thing it is
-     * about to receive and not only the transaction that brings it. Blocking.
+     * One coin with its trading windows, so a receipt can judge the thing it is about to
+     * receive and not only the transaction that brings it. Blocking.
      */
     fun candidateOf(mint: String): com.clearsign.core.Candidate? {
         val arr = HOSTS.firstNotNullOfOrNull { getArray(it + "/search?query=" + URLEncoder.encode(mint, "UTF-8")) } ?: return null

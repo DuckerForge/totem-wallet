@@ -103,21 +103,12 @@ fun rememberReveal(key: Any?, durationMs: Int = 700): Float {
 val LocalEntrance = androidx.compose.runtime.compositionLocalOf<java.util.concurrent.atomic.AtomicInteger?> { null }
 
 /**
- * One slow ring of light around a badge, once, then gone.
- *
- * The house version of the "something is alive in here" sweep: a 270 degree arc
- * with a conic gradient whose head is bright and whose tail fades to nothing, so
- * the ring reads as a single travelling point of light rather than a spinner.
- * Two turns over two and a half seconds, easing out, then it fades and stops
- * drawing entirely. Nothing loops: a permanent spinner on a screen that is not
- * loading anything is noise, and this is a greeting.
- *
- * The glow is two arcs and not a blur. A blur costs a render node per frame for
- * an effect nobody can name, and a wide arc at low alpha under a thin bright one
- * reads the same at this size.
- *
- * [key] restarts it. Pass something that changes once per app launch, not per
- * recomposition, or the greeting becomes a tic.
+ * One slow ring of light around a badge, once, then gone: a 270 degree arc with a conic
+ * gradient, bright head, tail fading to nothing, so it reads as one traveling point of light
+ * rather than a spinner. Two turns over two and a half seconds, then it fades and stops
+ * drawing: a permanent spinner on a screen not loading anything is noise, this is a greeting.
+ * The glow is two arcs, not a blur: a blur costs a render node per frame. [key] restarts it;
+ * pass something that changes once per app launch, or the greeting becomes a tic.
  */
 @Composable
 fun SweepHalo(
@@ -169,10 +160,8 @@ fun SweepHalo(
 }
 
 /**
- * Something that changes once per app launch.
- *
- * A greeting keyed on a composable's lifetime plays again every time you leave
- * the tab and come back, which is how a nice touch turns into a nervous one.
+ * Something that changes once per app launch. A greeting keyed on a composable's lifetime
+ * replays every time you come back to the tab, how a nice touch turns nervous.
  */
 object FirstRun {
     val at: Long = System.currentTimeMillis()

@@ -67,11 +67,11 @@ object TraderLoop {
         val maxFeePct: Int = 0,
         /** The agent digs ORE: hands part of the budget to an executor, under the collar. */
         val oreOn: Boolean = false,
-        /** Quanto SOL al giorno, al massimo, fra caselle e fee. */
+        /** How much SOL a day at most, squares and fees together. */
         val oreLamportsPerDay: Long = 50_000_000L,
-        /** Su quante caselle a giro. */
+        /** How many squares per round. */
         val oreSquares: Int = 3,
-        /** Alla chiusura, il guadagno (non il capitale) si scambia in ORE e va a casa in moneta dura. */
+        /** At close, the profit (not the capital) is swapped into ORE and goes home as hard money. */
         val oreBury: Boolean = false,
     ) {
         // One lane. The wild one is where the money goes to die, and the paid bots that

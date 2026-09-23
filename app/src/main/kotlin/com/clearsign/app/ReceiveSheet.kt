@@ -61,19 +61,10 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
 
-            // The address, first, and the copy under it filled in.
-            //
-            // It used to be last, under tapping and QR codes and links, in the
-            // same outlined button as everything else on the page. Four ways of
-            // doing one thing, all weighted the same, and the one that always
-            // works was at the bottom. Somebody in a hurry wants to paste an
-            // address into a chat; that is the common case and it should be the
-            // loud one.
-            //
-            // And it is written whole. It was cut into blocks of four, which is
-            // what you do to something a person is meant to read aloud or check
-            // digit by digit. Nobody reads a Solana address. They copy it, and
-            // chopping it up only made it look like something it is not.
+            // The address first, with the copy under it. It was last, under tapping, QR codes and
+            // links, in the same outlined button as everything else: four ways of doing one thing, and
+            // the one that always works at the bottom. Written whole: cut into blocks of four is what
+            // you do to something read aloud, and nobody reads a Solana address, they copy it.
             Column(
                 Modifier.fillMaxWidth().clip(rs(16)).background(Halo.card).haloBorder(rs(16)).padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -238,9 +229,8 @@ private fun LinkMode(label: String, on: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * One labelled block inside a sheet. Receive used to be a single column where the
- * QR, the link switch and the tap button ran together; two named blocks make it
- * obvious that they are two different ways of handing over the same request.
+ * One labeled block inside a sheet. Receive was one column where the QR, the link switch and
+ * the tap button ran together; two named blocks make them two ways of handing over the same request.
  */
 @Composable
 internal fun SheetBlock(title: String, sub: String, icon: HIcon, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {

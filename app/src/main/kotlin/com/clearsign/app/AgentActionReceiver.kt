@@ -9,12 +9,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * The two buttons under a notification: sell this coin now, or stop the loop.
- *
- * Neither opens the app. A sale from here is exactly the sale the card makes
- * by hand: it goes through the collar, signs alone under the threshold and
- * asks for the print above it. A stop is the loop's own stop, and says how
- * many coins it leaves unwatched, the same as when the loop stops itself.
+ * The two buttons under a notification: sell this coin now, or stop the loop. Neither opens
+ * the app. The sale is the one the card makes by hand, through the collar, alone under the
+ * threshold and with the print above it; the stop is the loop's own, and says how many coins it leaves unwatched.
  */
 class AgentActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

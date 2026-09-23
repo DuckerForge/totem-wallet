@@ -11,18 +11,10 @@ import androidx.compose.ui.graphics.toArgb
 import java.util.Locale
 
 /**
- * Pictures for the shade.
- *
- * A notification can carry one image, and an image says in a glance what a
- * line of text makes you read: where each coin stands between the stop and
- * the target. So every coin gets a track. The stop sits at the left end in
- * red, the target at the right end in the accent, the entry is a faint tick
- * in between, and the coin is a lit dot wherever the market has put it. A
- * coin at +21% with a target at +30% is a dot most of the way to the right,
- * before anybody has read a number.
- *
- * Drawn with the theme's own palette, so the card in the shade looks like the
- * app that sent it. Nothing here touches the network or a model.
+ * Pictures for the shade. A notification carries one image, and an image says at a glance
+ * where each coin stands between stop and target: a track per coin, stop at the left in red,
+ * target at the right in the accent, a faint tick for the entry, a lit dot where the market
+ * put it. Drawn in the theme's palette; nothing here touches the network or a model.
  */
 object NotifArt {
     data class Row(val symbol: String, val movePct: Double?, val takeProfitPct: Int, val stopLossPct: Int)

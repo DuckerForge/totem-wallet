@@ -53,18 +53,12 @@ import kotlinx.coroutines.withContext
 import kotlin.math.pow
 
 /*
- * The four things a person can ask of a coin without staying on the chart:
- * sell it in profit, buy it cheaper, buy it a slice at a time, be told when it
- * moves. The first three are orders on Jupiter and fire with the phone off;
- * the fourth costs nothing and signs nothing.
- *
- * Every order goes through the ordinary receipt and the Seed Vault, like a
- * swap: Jupiter builds the bytes, the receipt says where the money goes (into
- * Jupiter's escrow, labelled), the person holds to confirm. Nothing here is
- * signed blind, and nothing here is signed by the agent's key.
- *
- * What none of these can be is a stop loss. That needs Jupiter's keyed API,
- * and every sheet says so in one line rather than letting anybody assume it.
+ * The four things a person can ask of a coin without staying on the chart: sell it in profit,
+ * buy it cheaper, buy it a slice at a time, be told when it moves. The first three are orders
+ * on Jupiter and fire with the phone off; the fourth signs nothing. Every order goes through
+ * the receipt and the Seed Vault like a swap: Jupiter builds the bytes, the receipt says where
+ * the money goes (Jupiter's escrow, labeled), the person holds to confirm. None can be a stop
+ * loss: that needs Jupiter's keyed API, and every sheet says so in one line.
  */
 
 /** The coin an order is about, the same way every sheet sees it. */
@@ -433,9 +427,8 @@ internal fun AlertSheet(coin: OrderCoin, onDone: () -> Unit, onDismiss: () -> Un
 // ---- the list ---------------------------------------------------------------------
 
 /**
- * Every order and alert, one row each, with the distance from the price of the
- * moment and a way to take it back. Cancelling an order is a transaction, so it
- * gets the same receipt and the same hold as placing one.
+ * Every order and alert, one row each, with the distance from the current price and a way to
+ * take it back. Cancelling is a transaction: same receipt, same hold as placing.
  */
 @Composable
 internal fun OrdersSection(signer: SeedVaultSigner?, owner: String?, refresh: Int, onChange: () -> Unit) {

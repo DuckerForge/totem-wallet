@@ -44,14 +44,10 @@ import androidx.compose.foundation.Canvas
 internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AGENT, BRIDGE, MORE }
 
 /*
- * The action grid: eight round, **neutral** buttons.
- *
- * Neutral on purpose. The three tiles this replaces were tinted — two mint, one
- * cyan — which told you there was a hierarchy between Swap, Send and Receive
- * when there is none. If all eight were the accent, the accent would stop
- * meaning "this is the action" and go back to being decoration. So the colour
- * on this page comes from the balance and the token logos, and the buttons are
- * quiet: a dark circle, a hand-drawn line icon, a label.
+ * The action grid: eight round, neutral buttons. The three tinted tiles this replaces implied
+ * a hierarchy between Swap, Send and Receive that does not exist, and eight accents would
+ * turn the accent into decoration. Color comes from the balance and the logos; the buttons
+ * are a dark circle, a hand-drawn line icon, a label.
  */
 /** Every circle the home can show: its icon and its name. "More" stays out of the list: it is always last. */
 internal fun homeActionIcon(a: HomeAction): HIcon = when (a) {
@@ -195,14 +191,9 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
 }
 
 /**
- * The scout's lens.
- *
- * It had a phone inside it, four ticks around it and a handle, at twenty-six
- * density-independent pixels. All of it was true and none of it was legible:
- * past a certain point an icon stops being a drawing and becomes a smudge.
- *
- * So it lost everything except what it is for. A ring, a line rising inside it,
- * a handle. Looking at a market, in three strokes.
+ * The scout's lens. It had a phone inside, four ticks and a handle, at twenty-six dp: all
+ * true, none legible, past a point an icon becomes a smudge. A ring, a line rising in it, a
+ * handle: looking at a market in three strokes.
  */
 @Composable
 private fun CrowdGlyph(tint: androidx.compose.ui.graphics.Color) {
@@ -260,11 +251,9 @@ private fun SeekerGlyph(tint: androidx.compose.ui.graphics.Color) {
 }
 
 /**
- * The three most recent signatures, where Jupiter puts a promotion.
- *
- * Cheap on purpose: `months()` is already newest-first and each month's list is
- * cached, so taking three normally touches only the current month's file.
- * `Ledger.all` would reparse every month on disk.
+ * The three most recent signatures, where Jupiter puts a promotion. Cheap: `months()` is
+ * newest-first and each month is cached, so three normally touch only the current month's
+ * file; `Ledger.all` would reparse every month on disk.
  */
 @Composable
 internal fun RecentReceiptsCard(onOpen: () -> Unit) {
@@ -278,8 +267,8 @@ internal fun RecentReceiptsCard(onOpen: () -> Unit) {
         }
     }
     if (entries.isEmpty()) return
-    // Una riga si tocca e apre quello scontrino: aveva la stessa forma delle
-    // righe degli Scontrini e non faceva niente, e il titolo apriva la tab.
+    // A row taps and opens that receipt: it had the shape of the Receipts rows and
+    // did nothing, while the title opened the tab.
     var selected by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<LedgerEntry?>(null) }
     selected?.let { e -> ReceiptDetailSheet(e) { selected = null } }
     GlassCard {
@@ -300,11 +289,8 @@ internal fun RecentReceiptsCard(onOpen: () -> Unit) {
 }
 
 /**
- * What the agent has been doing, where Jupiter puts the watchlist.
- *
- * Most days the agent is off and there is nothing to report. An empty box would
- * be the worst answer: an empty screen is an invitation to act, so when there is
- * no agent this is one line and a way in, not a hole.
+ * What the agent has been doing, where Jupiter puts the watchlist. Most days the agent is
+ * off; an empty box invites action, so with no agent this is one line and a way in, not a hole.
  */
 @Composable
 internal fun AgentGlanceCard(onOpen: () -> Unit) {
@@ -343,11 +329,8 @@ private fun shortWhen(at: Long): String {
 }
 
 /**
- * Everything that did not earn a place among the eight.
- *
- * The home is a wallet, not a dashboard — the comment on `SecurityTools` says so
- * and it still holds. Health, cleanup, contacts and the widget live here, one
- * tap away, instead of competing with the money on the front page.
+ * Everything that did not earn a place among the eight. The home is a wallet, not a
+ * dashboard: health, cleanup, contacts and the widget live here, one tap away.
  */
 @Composable
 internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onGift: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, hidden: List<HomeAction> = emptyList(), onAction: (HomeAction) -> Unit = {}, onDismiss: () -> Unit) {
@@ -363,16 +346,14 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             verticalArrangement = Arrangement.spacedBy(Space.md),
         ) {
             // Every row its own icon, so the list can be read by shape alone.
-            // Prima le azioni che uno ha tolto dalla prima pagina: Scambia, Scan,
-            // Agente, la folla. Tolte da li' devono restare a un tocco da qui.
+            // First the actions taken off the front page: Swap, Scan, Agent, the crowd.
+            // Removed from there, they must stay one tap from here.
             for (a in hidden) MoreRow(homeActionIcon(a), stringResource(homeActionLabel(a))) { onAction(a) }
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.BRIDGE, stringResource(R.string.bridge_title), onBridge)
-            // Mandare soldi con un link non stava qui dentro, perche' stava
-            // sempre sulla prima pagina. Quando il ponte ha preso il suo posto e'
-            // rimasto raggiungibile solo dal Manda e da Personalizza, cioe' per
-            // chi sapeva gia' dov'era. Una cosa che esce dalla prima pagina deve
-            // entrare in questa lista nello stesso momento.
+            // Sending money with a link was not in here because it was always on the front page. When
+            // the bridge took its place it stayed reachable only from Send and Customize, for those who
+            // knew. What leaves the front page enters this list at the same moment.
             MoreRow(HIcon.GIFT, stringResource(R.string.gift_title), onGift)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.more_health), onHealth)
@@ -444,9 +425,8 @@ internal fun HealthSheet(owner: String?, onDismiss: () -> Unit) {
 }
 
 /**
- * The header every sheet in this app had written by hand, twelve times over,
- * and only three of them offered a way out. A full-height sheet has to say how
- * to leave it: swiping it down is not something a person should have to guess.
+ * The header every sheet had written by hand, twelve times, only three with a way out. A
+ * full-height sheet must say how to leave it: swiping down is not something to guess.
  */
 @Composable
 internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -> Unit) {

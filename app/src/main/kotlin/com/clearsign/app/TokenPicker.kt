@@ -70,12 +70,9 @@ internal data class PickToken(
 }
 
 /**
- * The coin list, the way a wallet is expected to do it: what you hold first, then
- * what is popular, then live search over Jupiter's whole registry — by name, by
- * symbol, or by pasting a mint address.
- *
- * It fills whatever space the caller gives it, so it can live inside another
- * sheet instead of stacking a second modal on top of one.
+ * The coin list the way a wallet is expected to do it: what you hold, then what is popular,
+ * then live search over Jupiter's whole registry by name, symbol or pasted mint. It fills
+ * whatever space the caller gives it, so it can live inside another sheet.
  */
 @Composable
 internal fun TokenPicker(

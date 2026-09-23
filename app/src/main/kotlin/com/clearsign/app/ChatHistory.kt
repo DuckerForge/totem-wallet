@@ -6,20 +6,12 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * The conversation, kept between openings.
- *
- * It used to live in a `remember` inside the screen, so it was gone the moment
- * the sheet closed, never mind a restart. Which is worse than it sounds: the
- * transcript is also the audit trail, because every tool the model ran leaves a
- * visible line saying what it tried and what Apex decided.
- *
- * On disk and nowhere else. This is the part of the app that talks about
- * somebody's money in plain language, and a wallet whose whole claim is that
- * nothing leaves the phone has no business shipping it to a server. There is
- * also nothing to synchronise: the budget key exists on this phone only.
- *
- * Filed per wallet, because switching the watched account should not show you a
- * conversation about a different one's balances.
+ * The conversation, kept between openings. It lived in a `remember` and was gone when the
+ * sheet closed, which is worse than it sounds: the transcript is the audit trail, every tool
+ * the model ran leaves a line saying what it tried and what Velum decided. On disk and
+ * nowhere else: a wallet whose claim is that nothing leaves the phone does not ship this to a
+ * server, and there is nothing to synchronize, the budget key exists here only. Filed per
+ * wallet, so switching accounts does not show another one's conversation.
  */
 object ChatHistory {
     private const val DIR = "chat"
@@ -28,12 +20,8 @@ object ChatHistory {
     private const val KEEP = 120
 
     /**
-     * How much of it the model is given back.
-     *
-     * The free model tiers meter tokens per minute, and re-sending an entire
-     * afternoon of conversation on every message is the fastest way to spend
-     * that allowance on nothing. Recent turns carry the thread; the rest is for
-     * the person to scroll.
+     * How much of it the model gets back. Free tiers meter tokens per minute, and re-sending an
+     * afternoon of conversation on every message spends that on nothing. Recent turns carry the thread.
      */
     const val CONTEXT_TURNS = 16
 
@@ -81,10 +69,7 @@ object ChatHistory {
         runCatching { file(ctx, wallet).delete() }
     }
 
-    /**
-     * What the model sees: the last few turns, trimmed so the window never opens
-     * on a tool result with no question in front of it.
-     */
+    /** What the model sees: the last few turns, trimmed so the window never opens on a tool result with no question in front of it. */
     fun context(turns: List<Brain.Turn>): List<Brain.Turn> {
         if (turns.size <= CONTEXT_TURNS) return turns
         val tail = turns.takeLast(CONTEXT_TURNS)

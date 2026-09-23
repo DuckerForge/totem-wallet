@@ -5,30 +5,13 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Money already earned and never collected.
- *
- * Whoever put two coins into a concentrated pool on Orca or Raydium earns a cut
- * of every swap that crosses their range. That cut does not arrive in the
- * wallet. It sits inside the position account until somebody presses collect,
- * and a position opened once and forgotten keeps a small pile there for years.
- * A wallet balance cannot show it: the money is not in the wallet, and the
- * position itself is an NFT with no number on it.
- *
- * Reading it needs no key and no third-party service. The wallet holds an NFT
- * for each position. The position account's address is a program address
- * derived from that NFT's mint, the same way on both venues, so one token list
- * plus one getMultipleAccounts finds every position the wallet owns. Verified
- * against the chain on the 16th of September 2026: the derivation matched real
- * positions on both programs, and the mints read out of the pool accounts
- * matched what Orca's and Raydium's own public APIs say about the same pools.
- *
- * What the numbers mean, said honestly: the amount in the account is the fee
- * **checkpointed** at the position's last touch. Anything earned since is still
- * spread across the pool's counters and is not in these bytes. So the real
- * collectable amount is this or more, never less, and the screen says "at
- * least". Collecting itself happens on the venue's own page: building those
- * instructions here would mean shipping two more programs' worth of maths for a
- * button nobody could check before signing.
+ * Money already earned and never collected. A position in a concentrated pool on Orca or
+ * Raydium earns a cut of every swap crossing its range, and it sits in the position account
+ * until somebody presses collect: a balance cannot show it, the position is an NFT with no
+ * number on it. No key needed: the position address derives from the NFT's mint the same way
+ * on both venues, so one token list plus one getMultipleAccounts finds them all (verified on
+ * chain 16 Sep 2026). The amount is the fee checkpointed at the last touch, so the real
+ * figure is this or more, and the screen says "at least". Collecting happens on the venue's page.
  */
 object LpFees {
     const val ORCA_PROGRAM = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
@@ -66,10 +49,7 @@ object LpFees {
 
     // ---- decoders, pure ------------------------------------------------------
 
-    /**
-     * Orca `Position`: whirlpool at 8, position mint at 40, liquidity at 72,
-     * fee owed A at 112, fee owed B at 136.
-     */
+    /** Orca `Position`: whirlpool at 8, position mint at 40, liquidity at 72, fee owed A at 112, fee owed B at 136. */
     fun decodeOrca(address: String, b: ByteArray): Owed? {
         if (b.size < ORCA_POSITION_SIZE) return null
         val a = u64(b, 112)
@@ -78,10 +58,7 @@ object LpFees {
         return Owed(Venue.ORCA, address, base58(b, 8), u128(b, 72), a, bb)
     }
 
-    /**
-     * Raydium `PersonalPositionState`: NFT mint at 9, pool at 41, liquidity at
-     * 81, fees owed at 129 and 137.
-     */
+    /** Raydium `PersonalPositionState`: NFT mint at 9, pool at 41, liquidity at 81, fees owed at 129 and 137. */
     fun decodeRaydium(address: String, b: ByteArray): Owed? {
         if (b.size < RAY_POSITION_SIZE) return null
         val a = u64(b, 129)
@@ -91,11 +68,9 @@ object LpFees {
     }
 
     /**
-     * Meteora `PositionV2`: pair at 8, owner at 40, then seventy bins of fee
-     * accounting from 4552, forty-eight bytes each, with the two pending
-     * amounts at plus thirty-two and plus forty. Unlike the other two this
-     * account names its owner, so it is found by a filter and not by deriving
-     * anything from an NFT.
+     * Meteora `PositionV2`: pair at 8, owner at 40, then seventy bins of fee accounting from 4552,
+     * forty-eight bytes each, the two pending amounts at +32 and +40. This account names its
+     * owner, so it is found by a filter, not derived from an NFT.
      */
     fun decodeMeteora(address: String, b: ByteArray): Owed? {
         if (b.size < METEORA_POSITION_SIZE) return null
@@ -134,9 +109,8 @@ object LpFees {
     }.getOrNull()
 
     /**
-     * A position NFT is a token the wallet holds exactly one of, with no
-     * decimals. Filtering on that first keeps the derivation off every ordinary
-     * coin in the wallet, which is most of them.
+     * A position NFT is a token the wallet holds exactly one of, with no decimals. Filtering on
+     * that keeps the derivation off every ordinary coin, which is most of them.
      */
     fun candidateMints(accounts: List<SolanaRpc.TokenAccountInfo>): List<String> =
         accounts.filter { it.amount == 1L && it.decimals == 0 }.map { it.mint }.distinct()
@@ -163,10 +137,9 @@ object LpFees {
     )
 
     /**
-     * Everything this wallet is owed on both venues. Four calls at most: the
-     * token list (already cached), the position accounts, the pool accounts,
-     * and one price lookup. Empty when the wallet never provided liquidity,
-     * which is the common case, and it costs one getMultipleAccounts to learn.
+     * Everything this wallet is owed on both venues. Four calls at most: the token list (cached),
+     * the position accounts, the pool accounts, one price lookup. Empty when the wallet never
+     * provided liquidity, the common case, and that costs one getMultipleAccounts to learn.
      */
     fun of(rpcUrl: String, owner: String): List<Found> {
         val accounts = runCatching { SolanaRpc.tokenAccountsOf(rpcUrl, owner) }.getOrNull().orEmpty()

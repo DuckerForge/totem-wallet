@@ -5,18 +5,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * ORE per un portafoglio: cosa ha in gioco, cosa puo' riscuotere, e le
- * transazioni per farlo.
- *
- * La lettura e' due chiamate: prima il conto Miner del proprietario e la
- * Board, poi il Round che la Board dice in corso. Tutto passa da
- * `SolanaRpc.call`, quindi dal pool e dal tetto. La Config si legge una volta
- * per processo: serve solo per l'indirizzo dell'entropia che un Deploy vuole
- * fra i conti, e non cambia.
- *
- * Le istruzioni sono scritte con gli stessi conti nello stesso ordine del
- * programma, controllati con una simulazione vera il 22 settembre 2026. I
- * byte li fa `Ore` in core, qui si mettono solo i conti davanti.
+ * ORE for one wallet: what is in play, what can be claimed, and the transactions to do it.
+ * Reading is two calls, the owner's Miner and the Board, then the Round the Board says is
+ * running, all through `SolanaRpc.call`, so the pool and the cap. Config is read once per
+ * process: it only provides the entropy address a Deploy wants among its accounts. The
+ * instructions carry the same accounts in the program's order, checked with a real
+ * simulation on 22 Sep 2026; `Ore` in core makes the bytes, here only the accounts are set.
  */
 object OreMiner {
     val PROGRAM: ByteArray = Base58.decode(Ore.PROGRAM)
@@ -29,22 +23,22 @@ object OreMiner {
     fun minerPda(owner: ByteArray): ByteArray = Pda.findProgramAddress(listOf(Ore.SEED_MINER, owner), PROGRAM)!!.first
     fun automationPda(owner: ByteArray): ByteArray = Pda.findProgramAddress(listOf(Ore.SEED_AUTOMATION, owner), PROGRAM)!!.first
     fun roundPda(id: Long): ByteArray = Pda.findProgramAddress(listOf(Ore.SEED_ROUND, le64(id)), PROGRAM)!!.first
-    /** L'ATA del tesoro per ORE, dove sta l'ORE che si riscuote. */
+    /** The treasury's ORE ATA, where the ORE to claim sits. */
     val treasuryTokens: ByteArray by lazy { Pda.associatedTokenAddress(TREASURY, MINT, WalletTx.TOKEN_PROGRAM) }
 
-    /** Quello che si sa di un portafoglio su ORE, e quando lo si e' letto. */
+    /** What is known about a wallet on ORE, and when it was read. */
     data class View(
         val miner: Ore.Miner?,
         val board: Ore.Board,
         val round: Ore.Round?,
-        /** L'automazione di questo portafoglio, se ne ha una viva. */
+        /** This wallet's automation, if it has a live one. */
         val automation: Ore.Automation? = null,
-        /** Lo slot della risposta: il conto alla rovescia parte da qui. */
+        /** The answer's slot: the countdown starts from here. */
         val slot: Long,
         val at: Long,
-        /** La pentola nel Treasury, in ORE a undici decimali: pesa un cinquecentesimo nell'atteso. */
+        /** The pot in the Treasury, in ORE with eleven decimals: weighs one five-hundredth in the outlook. */
         val motherlode: Long = 0L,
-        /** Il giro appena chiuso, con lo slot hash scritto: da qui si vede chi ha vinto. */
+        /** The round just closed, with its slot hash written: from here you see who won. */
         val lastRound: Ore.Round? = null,
     ) {
         val inPlay: Long get() = miner?.inPlay(board.roundId) ?: 0L
@@ -53,13 +47,13 @@ object OreMiner {
         val needsCheckpoint: Boolean get() = miner?.needsCheckpoint(board.roundId) == true
         val hasClaim: Boolean get() = claimableSol > 0 || claimableOre > 0 || needsCheckpoint
         val mySquares: List<Int> get() = if (miner != null && miner.roundId == board.roundId) miner.squaresNow else emptyList()
-        /** Quanto manca alla fine del giro, adesso, senza chiedere altro alla catena. */
+        /** How much is left of the round, now, without asking the chain anything else. */
         fun secondsLeft(now: Long = System.currentTimeMillis()): Double = (board.secondsLeft(slot) - (now - at) / 1000.0).coerceAtLeast(0.0)
-        /** Fra un giro e l'altro non si puo' mettere niente: il Deploy fallirebbe sul nodo. [margin] e' quanto deve restare. */
+        /** Between rounds nothing can be placed: the Deploy would fail on the node. [margin] is how much must remain. */
         fun open(now: Long = System.currentTimeMillis(), margin: Double = 5.0): Boolean = board.waiting || secondsLeft(now) > margin
     }
 
-    /** Bloccante: chiamare su IO. Null quando la catena non ha risposto. */
+    /** Blocking: call on IO. Null when the chain did not answer. */
     fun read(rpcUrl: String, owner: String, withRound: Boolean = true): View? {
         val ownerKey = Base58.decodePubkey(owner) ?: return null
         val minerKey = Base58.encode(minerPda(ownerKey))
@@ -68,14 +62,14 @@ object OreMiner {
         val board = first.accounts[Ore.BOARD]?.let { Ore.board(it) } ?: return null
         val miner = first.accounts[minerKey]?.let { Ore.miner(it) }
         val automation = first.accounts[autoKey]?.let { Ore.automation(it) }
-        // Il giro serve alla griglia, non alla riga del portafoglio: una chiamata in meno a chi non lo guarda.
+        // The round is for the grid, not the wallet row: one call less for whoever is not looking at it.
         var motherlode = 0L
         var lastRound: Ore.Round? = null
         val round = if (!withRound) null else {
             val roundKey = Base58.encode(roundPda(board.roundId))
             val prevKey = Base58.encode(roundPda(board.roundId - 1))
-            // Il giro prima e il Treasury viaggiano nella stessa chiamata: il
-            // primo dice chi ha vinto, il secondo la pentola. Solo per la griglia.
+            // The previous round and the Treasury travel in one call: the first says
+            // who won, the second the pot. Grid only.
             val second = multi(rpcUrl, listOf(roundKey, prevKey, Ore.TREASURY))
             motherlode = second?.accounts?.get(Ore.TREASURY)?.let { Ore.treasuryMotherlode(it) } ?: 0L
             lastRound = second?.accounts?.get(prevKey)?.let { Ore.round(it) }
@@ -100,7 +94,7 @@ object OreMiner {
 
     @Volatile private var config: Ore.Config? = null
 
-    /** La Config, una volta per processo. Null quando non si e' potuta leggere. */
+    /** The Config, once per process. Null when it could not be read. */
     fun config(rpcUrl: String): Ore.Config? {
         config?.let { return it }
         val got = multi(rpcUrl, listOf(Ore.CONFIG))?.accounts?.get(Ore.CONFIG)?.let { Ore.config(it) } ?: return null
@@ -114,7 +108,7 @@ object OreMiner {
     private fun r(k: ByteArray) = WalletTx.AccountMeta(k, false, false)
     private fun signer(k: ByteArray) = WalletTx.AccountMeta(k, true, true)
 
-    /** Metti [amountPerSquare] su ognuna delle [squares]. Il totale e' per il numero di caselle. */
+    /** Put [amountPerSquare] on each of [squares]. The total is times the number of squares. */
     fun deploy(owner: ByteArray, amountPerSquare: Long, squares: Collection<Int>, board: Ore.Board, config: Ore.Config): WalletTx.Instruction {
         val mask = Ore.maskOf(squares)
         return WalletTx.Instruction(
@@ -128,7 +122,7 @@ object OreMiner {
         )
     }
 
-    /** Porta sul conto i premi di un giro finito. Chiunque puo' farlo per chiunque. */
+    /** Bring a finished round's prizes onto the account. Anyone can do it for anyone. */
     fun checkpoint(owner: ByteArray, roundId: Long): WalletTx.Instruction = WalletTx.Instruction(
         PROGRAM,
         listOf(signer(owner), w(owner), w(automationPda(owner)), w(BOARD), w(minerPda(owner)), w(roundPda(roundId)), w(TREASURY), r(WalletTx.SYSTEM_PROGRAM)),
@@ -151,22 +145,21 @@ object OreMiner {
     )
 
     /**
-     * Affida a un esecutore: [amountPerSquare] su ognuna delle [squares] a
-     * ogni giro, finche' il [deposit] dura, [fee] all'esecutore per giro.
+     * Hand to an executor: [amountPerSquare] on each of [squares] every round while the
+     * [deposit] lasts, [fee] to the executor per round.
      */
     fun automate(owner: ByteArray, amountPerSquare: Long, squares: Collection<Int>, deposit: Long, fee: Long, reload: Boolean, maxProductionCost: Long, executor: ByteArray = OPEN_EXECUTOR): WalletTx.Instruction =
         WalletTx.Instruction(
             PROGRAM,
             listOf(signer(owner), w(automationPda(owner)), w(executor), w(minerPda(owner)), r(WalletTx.SYSTEM_PROGRAM)),
-            // Caselle fisse, scelte da noi: cosi' un giro costa sempre lo stesso e il deposito dura quanto detto.
+            // Fixed squares, chosen by us: a round always costs the same and the deposit lasts as said.
             Ore.automateData(amountPerSquare, deposit, fee, Ore.maskOf(squares).toLong(), Ore.STRATEGY_PREFERRED, reload, maxProductionCost),
             lamportsMoved = deposit,
         )
 
     /**
-     * Ferma l'automazione e riprendi quello che resta: e' `Automate` con
-     * l'esecutore vuoto, che nel programma vuol dire chiudere il conto e
-     * restituire il saldo a chi firma.
+     * Stop the automation and take back what is left: `Automate` with an empty executor, which
+     * the program reads as close the account and return the balance to the signer.
      */
     fun stopAutomation(owner: ByteArray): WalletTx.Instruction = WalletTx.Instruction(
         PROGRAM,
@@ -175,9 +168,8 @@ object OreMiner {
     )
 
     /**
-     * Riscuoti: una transazione sola con quello che serve e niente di piu'.
-     * Prima il giro da chiudere, poi il SOL, poi l'ORE con l'ATA creata se
-     * manca. Vuota quando non c'e' niente da riscuotere.
+     * Claim: one transaction with what is needed and nothing more. First the round to close, then
+     * the SOL, then the ORE with its ATA created if missing. Empty when there is nothing to claim.
      */
     fun claimInstructions(owner: ByteArray, view: View): List<WalletTx.Instruction> {
         val m = view.miner ?: return emptyList()

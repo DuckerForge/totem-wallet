@@ -10,13 +10,10 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Anything secret this app stores at rest: envelope seeds, gift keys, the API
- * key for the model.
- *
- * The encryption key itself lives in the Android Keystore and never appears in
- * this process, so a stolen backup or a file pulled off the device is inert.
- * It is not protection against a rooted phone with the screen unlocked — nothing
- * in software is — and the app says so where it matters.
+ * Anything secret stored at rest: budget seeds, gift keys, the model's API key. The
+ * encryption key lives in the Android Keystore and never appears in this process, so a stolen
+ * backup or a pulled file is inert. Not protection against a rooted phone with the screen
+ * unlocked, nothing in software is, and the app says so where it matters.
  */
 object Secrets {
     private const val KEY_ALIAS = "apex_secrets_aes"

@@ -1,15 +1,10 @@
 package com.clearsign.core
 
 /**
- * Address poisoning: an attacker sends dust from an address that starts and
- * ends like one you already deal with, so that the next time you copy from
- * your history you copy theirs. Wallets show the ends and hide the middle,
- * which is exactly where the two differ.
- *
- * The check is small and pure: a candidate that shares the first and last
- * four characters with a known address, and is not that address, is a
- * lookalike. Known means the addresses this wallet has a reason to trust:
- * contacts, its own accounts, the people it has paid before.
+ * Address poisoning: an attacker sends dust from an address that starts and ends like one you
+ * deal with, so the next copy from your history is theirs. Wallets show the ends and hide the
+ * middle, where the two differ. Pure check: same first and last four characters as a known
+ * address (contacts, own accounts, people paid before), not that address, is a lookalike.
  */
 object AddressPoison {
     const val ENDS = 4

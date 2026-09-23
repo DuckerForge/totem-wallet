@@ -130,13 +130,9 @@ class PositionsTest {
     }
 
     // ---- the book against the chain -----------------------------------------
-    //
-    // The night this was written the agent had spent sixteen hours trying to sell
-    // 1214 LEVERCAT belonging to a budget that had been closed and replaced. The
-    // new key had never held them, so every simulation moved nothing, the collar
-    // read that as the agent lying, and the tick stopped at that position before
-    // it could buy anything either. The book has to be checked against the chain,
-    // and the chain always wins.
+    // The night this was written the agent had spent sixteen hours trying to sell 1214 LEVERCAT
+    // belonging to a closed budget: the new key never held them, every simulation moved nothing,
+    // the collar read that as lying, and the tick stopped there. The chain always wins.
 
     private val old = "Old11111111111111111111111111111111111111111"
 

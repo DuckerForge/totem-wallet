@@ -6,10 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * La regola che rende condivisibile un verdetto pagato da qualcun altro.
- *
- * Un no vale da chiunque, un sì vale da due. Non è simmetria mancata: è che le
- * due bugie possibili non costano uguale. Vedi [CoinCheck.Shared].
+ * The rule that makes a verdict paid for by somebody else shareable: a no counts from anyone,
+ * a yes needs two. Not missing symmetry: the two possible lies do not cost the same. See [CoinCheck.Shared].
  */
 class CoinCheckSharedTest {
     private val now = 1_700_000_000_000L
@@ -31,8 +29,7 @@ class CoinCheckSharedTest {
     }
 
     @Test fun oneCleanIsNotEnough() {
-        // Il punto di tutto: una sola installazione non può spegnere l'ultima
-        // rete a tutti gli altri.
+        // The whole point: one installation cannot switch off the last net for everybody else.
         assertEquals(CoinCheck.Shared.Say.Ask, CoinCheck.Shared.read(row(Triple("a", 0, now - 60_000L)), now))
     }
 
@@ -64,8 +61,7 @@ class CoinCheckSharedTest {
     }
 
     @Test fun rubbishIsNotAVerdict() {
-        // Una riga rotta, un orario nel futuro, un campo che non c'è: niente di
-        // tutto questo è un verdetto, e niente di tutto questo esplode.
+        // A broken line, a time in the future, a missing field: none of it is a verdict, and none of it explodes.
         val v = JSONObject().put("a", "non un oggetto").put("b", JSONObject().put("s", 0).put("at", now + 86_400_000L))
         assertEquals(CoinCheck.Shared.Say.Ask, CoinCheck.Shared.read(JSONObject().put("v", v), now))
     }

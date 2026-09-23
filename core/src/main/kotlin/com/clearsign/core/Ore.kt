@@ -1,21 +1,13 @@
 package com.clearsign.core
 
 /**
- * ORE, letto e scritto a mano.
- *
- * ORE oggi e' una griglia di 25 caselle e un giro al minuto: si mette SOL su
- * una o piu' caselle, una vince, chi ci sta sopra si divide un ORE. Il SOL
- * torna a chi l'ha messo, meno le fee: vedi [OreOdds]. Il programma non e' Anchor, e' Steel: niente IDL sulla catena,
- * quindi lo scontrino non puo' leggerlo da solo e i byte vanno scritti qui.
- *
- * Tutto quello che c'e' in questo file e' stato controllato sulla catena il
- * 22 settembre 2026: le PDA ricalcolate coincidono con i conti fissi, un conto
- * Miner vero si legge con questi offset, e un Deploy costruito con questi byte
- * passa la simulazione. Il programma e' `oreV3…`: i siti danno ancora quello
- * del vecchio v2, che non e' questo.
- *
- * Puro: niente Android, niente rete. Le chiavi girano come stringhe base58
- * gia' fatte da chi chiama, o come 32 byte quando vengono da un conto.
+ * ORE, read and written by hand. Today ORE is a grid of 25 squares and one round a minute:
+ * put SOL on squares, one wins, whoever is on it splits one ORE, and the SOL comes back minus
+ * fees (see [OreOdds]). The program is Steel, not Anchor: no IDL on chain, so the receipt
+ * cannot read it and the bytes are written here. Everything in this file was checked on chain
+ * on 22 Sep 2026: recomputed PDAs match the fixed accounts, a real Miner reads with these
+ * offsets, a Deploy built from these bytes passes simulation. The program is `oreV3…`, not the
+ * v2 the sites still list. Pure: keys travel as base58 strings or 32 bytes from an account.
  */
 object Ore {
     const val PROGRAM = "oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"
@@ -24,36 +16,33 @@ object Ore {
     const val BOARD = "BrcSxdp1nXFzou1YyDnQJcPNBNHgoypZmTsyKBSLLXzi"
     const val CONFIG = "9c9X7aDRAF41faiDs94ELjT19UrGnn72wBW9hPsS4Awy"
     const val TREASURY = "45db2FSR4mcXdSVVZbKbwojU6uYDpMyhpEi7cC8nHaWG"
-    /** L'esecutore aperto: chiunque puo' giocare i giri di chi lo sceglie, per la fee. */
+    /** The open executor: anyone can play the rounds of whoever picks it, for the fee. */
     const val OPEN_EXECUTOR = "executor11111111111111111111111111111111112"
     const val SQUARES = 25
-    /** Il `top_miner` di un giro chiuso il cui premio si divide: `SpLiT111…112`. */
+    /** The `top_miner` of a closed round whose prize is split: `SpLiT111…112`. */
     const val SPLIT_ADDRESS = "SpLiT11111111111111111111111111111111111112"
-    /** Gli stessi 32 byte, decodificati una volta: in `core` non c'e' Base58. */
+    /** The same 32 bytes, decoded once: `core` has no Base58. */
     private val SPLIT_BYTES: ByteArray = byteArrayOf(6, -99, 12, 49, -121, 89, -79, -26, 115, 111, 41, -98, 119, 77, -2, -3, 56, 29, 124, 92, -40, 81, 47, 16, -56, -111, -114, 0, 0, 0, 0, 1)
     const val CHECKPOINT_FEE_LAMPORTS = 10_000L
     /**
-     * Uno slot, all'incirca. Serve solo per il conto alla rovescia. Il valore
-     * nominale e' 400 ms; misurato il 22 settembre 2026 sulla rete: 46 slot in
-     * dodici secondi, cioe' 260 ms. Con 400 il conto andava a meta' velocita'
-     * e diceva «sei secondi» a giro gia' finito.
+     * One slot, roughly, for the countdown only. Nominal is 400 ms; measured 22 Sep 2026 on the
+     * network, 46 slots in twelve seconds, 260 ms. At 400 the countdown ran at half speed and said "six seconds" after the round had ended.
      */
     const val SLOT_MS = 260L
     const val ONE_ORE = 100_000_000_000L
     /**
-     * L'ORE che un giro paga. Il programma lo conia a giro finito,
-     * `min(MAX_SUPPLY - offerta, 1 ORE)`, e lo scrive in `rewards[0]` del giro
-     * chiuso: sul giro in corso `rewards` e' tutto zero. Con un'offerta di
-     * mezzo milione di ORE contro un tetto di tre milioni (`ore_mint_api::MAX_SUPPLY`), e' un ORE.
+     * The ORE a round pays. Minted at round end, `min(MAX_SUPPLY - supply, 1 ORE)`, written in
+     * `rewards[0]` of the closed round; on the live round `rewards` is all zero. With half a
+     * million ORE out of a three million cap (`ore_mint_api::MAX_SUPPLY`), it is one ORE.
      */
     const val ROUND_REWARD = ONE_ORE
 
-    /** I seed delle PDA, in byte. */
+    /** The PDA seeds, as bytes. */
     val SEED_MINER = "miner".toByteArray()
     val SEED_AUTOMATION = "automation".toByteArray()
     val SEED_ROUND = "round".toByteArray()
 
-    // Il primo byte di ogni istruzione.
+    // The first byte of every instruction.
     const val IX_AUTOMATE = 0
     const val IX_CHECKPOINT = 2
     const val IX_CLAIM_SOL = 3
@@ -61,7 +50,7 @@ object Ore {
     const val IX_CLOSE = 5
     const val IX_DEPLOY = 6
 
-    // Il primo byte di ogni conto. Steel ne mette otto davanti al corpo.
+    // The first byte of every account. Steel puts eight before the body.
     const val HEADER = 8
     const val ACC_AUTOMATION = 100
     const val ACC_CONFIG = 101
@@ -71,9 +60,9 @@ object Ore {
 
     // ---- le istruzioni, lette --------------------------------------------------
 
-    /** Una chiamata al programma, nelle parole che servono a uno scontrino. */
+    /** A call to the program, in the words a receipt needs. */
     sealed interface Call {
-        /** [amountPerSquare] va su **ogni** casella scelta. [authority] e' chi paga le caselle: il conto 1. */
+        /** [amountPerSquare] goes on every chosen square. [authority] pays for the squares: account 1. */
         data class Deploy(val amountPerSquare: Long, val squares: List<Int>, val authority: String?) : Call {
             val total: Long get() = amountPerSquare * squares.size
         }
@@ -81,12 +70,12 @@ object Ore {
         object ClaimSol : Call
         /** [bps] su 10000: quanta parte dell'ORE si riscuote. */
         data class ClaimOre(val bps: Long) : Call
-        /** [executor] e' il conto 2: chi giochera' i giri. [deposit] e' quello che gli si affida. */
+        /** [executor] is account 2, who will play the rounds. [deposit] is what is handed over. */
         data class Automate(
             val amountPerSquare: Long, val deposit: Long, val fee: Long, val mask: Long,
             val strategy: Int, val reload: Boolean, val executor: String?,
         ) : Call {
-            /** Le caselle nella maschera. Sulla catena anche le automazioni a caso portano una maschera di caselle. */
+            /** The squares in the mask. On chain even random automations carry a square mask. */
             val squares: Int get() = squaresOf(mask.toInt()).size
         }
         object Close : Call
@@ -96,7 +85,7 @@ object Ore {
     const val STRATEGY_RANDOM = 0
     const val STRATEGY_PREFERRED = 1
 
-    /** I byte di un'istruzione e i suoi conti, nell'ordine del programma. Null se non e' ORE. */
+    /** An instruction's bytes and its accounts, in the program's order. Null if not ORE. */
     fun decode(data: ByteArray, accounts: List<String>): Call? {
         if (data.isEmpty()) return null
         return when (data[0].toInt() and 0xFF) {
@@ -113,22 +102,19 @@ object Ore {
         }
     }
 
-    /** Quanto mette in gioco, in lamport: le caselle di un Deploy, il deposito di un Automate. */
+    /** What it puts in play, in lamports: a Deploy's squares, an Automate's deposit. */
     fun wager(call: Call): Long = when (call) {
         is Call.Deploy -> call.total
         is Call.Automate -> call.deposit
         else -> 0L
     }
 
-    /** Le caselle accese in una maschera di 25 bit, da 0 a 24. */
+    /** The squares lit in a 25-bit mask, 0 to 24. */
     fun squaresOf(mask: Int): List<Int> = (0 until SQUARES).filter { (mask shr it) and 1 == 1 }
 
     fun maskOf(squares: Collection<Int>): Int = squares.fold(0) { m, s -> if (s in 0 until SQUARES) m or (1 shl s) else m }
 
-    /**
-     * La riga dello scontrino. Il metodo e' la frase, gli argomenti i numeri:
-     * e' la stessa forma che `AnchorIdl` produce per i programmi con IDL.
-     */
+    /** The receipt line: the method is the sentence, the arguments the numbers, the same shape `AnchorIdl` produces for programs with an IDL. */
     fun render(call: Call, locale: String = "en"): ProgramCall {
         val it = locale == "it"
         val (method, args) = when (call) {
@@ -160,10 +146,8 @@ object Ore {
     fun closeData(): ByteArray = byteArrayOf(IX_CLOSE.toByte())
 
     /**
-     * Automate nella forma con le condizioni, 66 byte: il programma la
-     * distingue dalla lunghezza. [maxProductionCost] in lamport per ORE, zero
-     * per nessun limite. Le preferenze sulle caselle valgono solo con la
-     * strategia a caso.
+     * Automate in its 66-byte form with conditions; the program tells it apart by length.
+     * [maxProductionCost] in lamports per ORE, zero for no limit. Square preferences only matter with the random strategy.
      */
     fun automateData(
         amountPerSquare: Long, deposit: Long, fee: Long, mask: Long, strategy: Int, reload: Boolean,
@@ -175,9 +159,9 @@ object Ore {
     // ---- i conti -----------------------------------------------------------------
 
     data class Board(val roundId: Long, val startSlot: Long, val endSlot: Long, val productionCostEma: Long) {
-        /** Quanto manca alla fine del giro, dallo slot di adesso. Zero quando e' finito. */
+        /** How much is left of the round, from the current slot. Zero when over. */
         fun secondsLeft(slot: Long): Double = ((endSlot - slot) * SLOT_MS / 1000.0).coerceAtLeast(0.0)
-        /** Il giro non e' ancora partito: il primo Deploy lo apre. */
+        /** The round has not started yet: the first Deploy opens it. */
         val waiting: Boolean get() = endSlot == -1L
     }
 
@@ -197,24 +181,24 @@ object Ore {
 
     data class Round(
         val id: Long, val deployed: LongArray, val count: LongArray, val totalMiners: Long, val topMiner: ByteArray,
-        /** L'ORE coniato per questo giro, scritto quando il giro chiude: zero finche' corre. Vedi [ROUND_REWARD]. */
+        /** The ORE minted for this round, written when it closes: zero while it runs. See [ROUND_REWARD]. */
         val rewards: LongArray = LongArray(SQUARES),
-        /** La pentola, se questo giro l'ha presa: zero quasi sempre. */
+        /** The pot, if this round took it: almost always zero. */
         val motherlode: Long = 0L,
-        /** Scritto a giro finito: da qui esce la casella vincente. Tutti zeri finche' il giro corre. */
+        /** Written at round end: the winning square comes out of it. All zeros while the round runs. */
         val slotHash: ByteArray = ByteArray(32),
         val expiresAt: Long = 0L,
     ) {
         val totalDeployed: Long get() = deployed.sum()
         val rewardOre: Long get() = rewards.sum()
-        /** Il premio da aspettarsi: quello scritto se il giro e' chiuso, altrimenti l'ORE che il programma coniera'. */
+        /** The prize to expect: the written one if the round is closed, otherwise the ORE the program will mint. */
         val expectedReward: Long get() = rewardOre.takeIf { it > 0 } ?: ROUND_REWARD
-        /** Le dieci caselle di questo giro che pagano a uno solo: si sanno prima, dall'id. */
+        /** The ten squares of this round that pay one miner only: known beforehand, from the id. */
         val soloMask: Int get() = distributionMask(id)
         fun isSolo(square: Int): Boolean = soloMask and (1 shl square) != 0
         /** Il giro e' chiuso e diviso pro quota: `top_miner` e' l'indirizzo SPLIT. */
         val isSplit: Boolean get() = topMiner.contentEquals(SPLIT_BYTES)
-        /** La casella vincente, se il giro e' chiuso: `(r1 ^ r2 ^ r3 ^ r4) % 25` sui quattro u64 dello slot hash, come `Round::winning_square`. */
+        /** The winning square, if the round is closed: `(r1 ^ r2 ^ r3 ^ r4) % 25` over the slot hash's four u64, as `Round::winning_square`. */
         val winningSquare: Int? get() {
             if (slotHash.all { it == 0.toByte() } || slotHash.all { it == 0xFF.toByte() }) return null
             val r = le64(slotHash, 0) xor le64(slotHash, 8) xor le64(slotHash, 16) xor le64(slotHash, 24)
@@ -241,10 +225,9 @@ object Ore {
     }
 
     /**
-     * `Round::distribution_mask`, uguale al programma: un keccak dell'id del
-     * giro mescola le venticinque caselle alla Fisher-Yates, due byte per
-     * passo, ricalcolando il keccak quando i byte finiscono; le prime dieci
-     * della mescolata pagano a uno solo. Provato su trenta giri veri.
+     * `Round::distribution_mask`, as the program does it: a keccak of the round id shuffles the
+     * twenty-five squares Fisher-Yates, two bytes per step, rehashing when the bytes run out; the
+     * first ten of the shuffle pay one miner only. Checked on thirty real rounds.
      */
     fun distributionMask(id: Long): Int {
         var randomness = Keccak.hash256(ByteArray(8) { ((id ushr (8 * it)) and 0xFF).toByte() })
@@ -262,10 +245,10 @@ object Ore {
         return mask
     }
 
-    /** La pentola del Treasury: il primo u64 del corpo. Null se i byte non sono un Treasury. */
+    /** The Treasury's pot: the first u64 of the body. Null if the bytes are not a Treasury. */
     fun treasuryMotherlode(bytes: ByteArray): Long? = if (bytes.size < HEADER + 8) null else le64(bytes, HEADER)
 
-    /** Il conto di chi scava: 744 byte di corpo dopo la testata. */
+    /** A miner's account: 744 bytes of body after the header. */
     data class Miner(
         val authority: ByteArray,
         val checkpointId: Long,
@@ -278,15 +261,15 @@ object Ore {
         val lifetimeDeployed: Long,
         val lifetimeRewardsSol: Long,
     ) {
-        /** Il SOL sulle caselle adesso: vale solo se il giro del conto e' quello in corso. */
+        /** The SOL on the squares now: valid only if the account's round is the current one. */
         fun inPlay(boardRoundId: Long): Long = if (roundId == boardRoundId) deployed.sum() else 0L
-        /** Un giro finito i cui premi non sono ancora stati portati sul conto. */
+        /** A finished round whose prizes have not been brought onto the account yet. */
         fun needsCheckpoint(boardRoundId: Long): Boolean = roundId < boardRoundId && checkpointId < roundId
         val claimableOre: Long get() = rewardsOre + refinedOre
         val squaresNow: List<Int> get() = deployed.indices.filter { deployed[it] > 0 }
     }
 
-    /** Il conto di un'automazione: 152 byte di corpo. Letto sulla catena il 22 settembre 2026. */
+    /** An automation's account: 152 bytes of body. Read on chain on 22 Sep 2026. */
     data class Automation(
         val amountPerSquare: Long,
         val authority: ByteArray,
@@ -301,7 +284,7 @@ object Ore {
         val maxProductionCost: Long,
     ) {
         val squares: Int get() = squaresOf(mask.toInt()).size
-        /** Quanto costa un giro: le caselle piu' la fee a chi esegue. */
+        /** What a round costs: the squares plus the executor's fee. */
         val perRound: Long get() = amountPerSquare * squares + fee
         val roundsLeft: Int get() = if (perRound <= 0) 0 else (balance / perRound).toInt()
     }
@@ -336,7 +319,7 @@ object Ore {
 
     // ---- numeri ----------------------------------------------------------------------
 
-    /** Lamport in SOL, con le cifre che servono e senza zeri in coda. */
+    /** Lamports as SOL, with the digits needed and no trailing zeros. */
     fun sol(lamports: Long): String {
         val v = lamports / 1e9
         val s = String.format(java.util.Locale.ROOT, if (v >= 1) "%.4f" else "%.6f", v)

@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/** La cache del portafoglio va e torna con il dettaglio, e legge anche i file di prima, senza. */
+/** The portfolio cache round-trips with the detail, and still reads the older files without it. */
 class PortfolioJsonTest {
     private fun roundTrip(p: DefiPosition): DefiPosition =
         assertNotNull(PortfolioJson.decodePosition(JSONObject(PortfolioJson.encodePosition(p).toString())))

@@ -1,13 +1,9 @@
 package com.clearsign.core
 
 /**
- * Decides how much a counterparty address can be trusted and, crucially,
- * detects address-poisoning "look-alikes".
- *
- * Wallet UIs almost always abbreviate addresses as `first…last`. Poisoners mine
- * vanity addresses whose visible prefix and suffix match an address you have
- * already paid, hoping you copy the wrong one from your history. ClearSign
- * compares the *full* address and warns when only the shown ends collide.
+ * How much a counterparty address can be trusted, and the address-poisoning lookalikes.
+ * Wallets abbreviate as `first…last`; poisoners mine vanity addresses whose visible ends match
+ * one you paid, hoping you copy the wrong one. This compares the full address and warns when only the ends collide.
  */
 class AddressTrust(
     private val allowlist: Map<String, String> = emptyMap(), // address -> contact label
@@ -26,10 +22,7 @@ class AddressTrust(
 
     fun isSanctioned(address: String): Boolean = address in sanctioned
 
-    /**
-     * Returns a known address that `address` is impersonating, or null.
-     * A match means the visible ends collide but the full string differs.
-     */
+    /** A known address that `address` impersonates, or null: the visible ends collide, the full string differs. */
     fun lookalikeOf(address: String, shownChars: Int = 4): String? {
         if (address in allowlist || address in history) return null // it *is* known
         val known = allowlist.keys + history

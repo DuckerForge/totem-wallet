@@ -4,33 +4,28 @@ import java.math.BigInteger
 import kotlin.math.roundToLong
 
 /**
- * Quanto rende una puntata sulla griglia di ORE, con le regole del programma.
- *
- * Lette in `program/src/checkpoint.rs` e `reset.rs` di `regolith-labs/ore` il
- * 22 settembre 2026. Il SOL degli altri non si vince mai: a fine giro ognuno
- * riprende il suo, meno l'1 per cento sulla casella vincente e circa l'11 per
- * cento sulle perdenti. Il premio e' l'ORE del giro, diviso pro quota fra chi
- * sta sulla casella vincente, piu' la pentola una volta ogni cinquecento giri.
- *
- * Quindi la casella non cambia quanto si lascia sul tavolo, cambia solo la
- * quota di ORE: conviene quella con meno SOL sopra. Puro, senza rete.
+ * What a stake on the ORE grid returns, by the program's rules, read in `checkpoint.rs` and
+ * `reset.rs` of `regolith-labs/ore` on 22 Sep 2026. Other people's SOL is never won: at round
+ * end everyone takes theirs back, minus 1% on the winning square and about 11% on the losers.
+ * The prize is the round's ORE, pro rata among those on the winning square, plus the pot once
+ * every five hundred rounds. So the square does not change what stays on the table, only the ORE share: the one with less SOL on it pays best. Pure.
  */
 object OreOdds {
     const val SQUARES = 25
-    /** Una volta ogni cinquecento giri la pentola va alla casella vincente: `rng.reverse_bits() % 500 == 0`. */
+    /** Once every five hundred rounds the pot goes to the winning square: `rng.reverse_bits() % 500 == 0`. */
     const val MOTHERLODE_ODDS = 500
 
-    /** `max(total / 100, 1)`: la fee admin di una casella, come `Round::calculate_fees`. */
+    /** `max(total / 100, 1)`: a square's admin fee, as `Round::calculate_fees`. */
     fun adminFee(total: Long): Long = maxOf(total / 100, 1L)
 
-    /** `max((total - admin) / 10, 1)`: la fee del protocollo su una casella perdente. */
+    /** `max((total - admin) / 10, 1)`: the protocol fee on a losing square. */
     fun protocolFee(total: Long): Long = maxOf((total - adminFee(total)) / 10, 1L)
 
-    /** Quanto torna a chi ha messo [mine] su una casella da [total] in tutto, se quella casella vince. */
+    /** What comes back to whoever put [mine] on a square holding [total], if that square wins. */
     fun backIfWin(mine: Long, total: Long): Long =
         if (mine <= 0 || total <= 0) 0L else mulDiv(mine, total - adminFee(total), total)
 
-    /** Lo stesso, se la casella perde. */
+    /** The same, if the square loses. */
     fun backIfLose(mine: Long, total: Long): Long =
         if (mine <= 0 || total <= 0) 0L else mulDiv(mine, (total - adminFee(total) - protocolFee(total)).coerceAtLeast(0L), total)
 
@@ -38,18 +33,16 @@ object OreOdds {
         BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)).divide(BigInteger.valueOf(c)).toLong()
 
     /**
-     * Cosa aspettarsi da [perSquare] lamport su ogni casella di [others], dove
-     * [others] e' il SOL che gli altri hanno gia' su ognuna. [reward] e' l'ORE
-     * del giro, [motherlode] la pentola nel Treasury, tutti e due in unita'
-     * intere di ORE a undici decimali.
+     * What to expect from [perSquare] lamports on each square of [others], the SOL others already
+     * have on each. [reward] is the round's ORE, [motherlode] the pot in the Treasury, both in whole ORE units with eleven decimals.
      */
     data class Outlook(
         val stake: Long,
-        /** SOL atteso indietro, fee comprese, sull'insieme delle caselle. */
+        /** SOL expected back, fees included, over all the squares. */
         val expectedSolBack: Long,
         /** ORE atteso, undici decimali. */
         val expectedOre: Long,
-        /** Per ogni casella scelta, la quota dell'ORE se fosse lei a vincere. */
+        /** For each chosen square, the ORE share if it were the one to win. */
         val shares: DoubleArray,
     ) {
         val expectedCost: Long get() = stake - expectedSolBack
@@ -71,10 +64,10 @@ object OreOdds {
         return Outlook(perSquare * others.size, back.roundToLong(), ore.roundToLong(), shares)
     }
 
-    /** La quota di ORE con [perSquare] su una casella dove gli altri hanno [others]. */
+    /** The ORE share with [perSquare] on a square where others hold [others]. */
     fun share(perSquare: Long, others: Long): Double = if (perSquare <= 0) 0.0 else perSquare.toDouble() / (others + perSquare)
 
-    /** Le [k] caselle con meno SOL sopra; a parita' quelle con meno minatori, poi le prime. */
+    /** The [k] squares with the least SOL on them; ties to fewer miners, then the first ones. */
     fun best(k: Int, deployed: LongArray, count: LongArray): List<Int> =
         deployed.indices.sortedWith(compareBy({ deployed[it] }, { count.getOrElse(it) { 0L } }, { it })).take(k.coerceIn(0, deployed.size))
 }

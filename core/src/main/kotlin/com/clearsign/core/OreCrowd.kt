@@ -1,30 +1,26 @@
 package com.clearsign.core
 
 /**
- * Dove sta scavando la rete, giro dopo giro.
- *
- * I giri chiusi li pubblica il worker nell'archivio, uno al minuto; qui si
- * leggono per rispondere a tre domande: quali caselle sono di solito le meno
- * affollate, quali sono uscite, e se una esce piu' delle altre. La prima e'
- * l'unica che conta per i soldi: la quota di ORE e' la propria parte della
- * casella, e una casella che la rete lascia vuota rende di piu' a parita' di
- * costo. Puro, senza JSON e senza rete.
+ * Where the network is digging, round after round. The worker publishes the closed rounds in
+ * the archive, one a minute; read here to answer three questions: which squares are usually
+ * least crowded, which came out, whether one comes out more than others. Only the first counts
+ * for money: the ORE share is your part of the square, and a square the network leaves empty pays more at the same cost. Pure, no JSON, no network.
  */
 data class PastRound(
     val id: Long,
-    /** La casella uscita, da zero. */
+    /** The square that came out, zero-based. */
     val win: Int,
-    /** Il premio si e' diviso pro quota; altrimenti l'ha preso uno solo. */
+    /** The prize was split pro rata; otherwise one miner took it. */
     val split: Boolean,
     val deployed: LongArray,
     val count: LongArray,
     val miners: Long,
-    /** Chi ha preso tutto, nei giri a uno solo. */
+    /** Who took everything, in the single-winner rounds. */
     val top: String? = null,
 )
 
 object OreCrowd {
-    /** L'affollamento di ogni casella: la sua quota sul totale del giro, in media sui giri. Zero senza giri. */
+    /** How crowded each square is: its share of the round's total, averaged over rounds. Zero with no rounds. */
     fun crowding(rounds: List<PastRound>): DoubleArray {
         val out = DoubleArray(Ore.SQUARES)
         if (rounds.isEmpty()) return out
@@ -39,7 +35,7 @@ object OreCrowd {
         return out
     }
 
-    /** Il SOL medio per casella sui giri, per scaldare la griglia come col giro in corso. */
+    /** The average SOL per square over the rounds, to warm the grid as with the live round. */
     fun averageDeployed(rounds: List<PastRound>): LongArray {
         val out = LongArray(Ore.SQUARES)
         val good = rounds.filter { it.deployed.size >= Ore.SQUARES }
@@ -48,16 +44,16 @@ object OreCrowd {
         return out
     }
 
-    /** Le [k] caselle che la rete lascia piu' vuote, a parita' le prime. */
+    /** The [k] squares the network leaves emptiest, ties to the first ones. */
     fun best(k: Int, rounds: List<PastRound>): List<Int> {
         val c = crowding(rounds)
         return c.indices.sortedWith(compareBy({ c[it] }, { it })).take(k.coerceIn(0, Ore.SQUARES))
     }
 
-    /** Le caselle uscite, dal giro piu' recente. */
+    /** The squares that came out, most recent round first. */
     fun winners(rounds: List<PastRound>): List<Int> = rounds.sortedByDescending { it.id }.map { it.win }
 
-    /** La casella uscita piu' volte e quante, o null senza giri. */
+    /** The square that came out most often and how many times, or null with no rounds. */
     fun hottest(rounds: List<PastRound>): Pair<Int, Int>? =
         rounds.groupingBy { it.win }.eachCount().entries.maxWithOrNull(compareBy({ it.value }, { -it.key }))?.let { it.key to it.value }
 }

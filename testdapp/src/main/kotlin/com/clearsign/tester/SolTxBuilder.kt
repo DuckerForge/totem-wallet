@@ -3,10 +3,8 @@ package com.clearsign.tester
 import java.io.ByteArrayOutputStream
 
 /**
- * A tiny legacy-Solana transaction encoder — just enough for the test dApp to
- * craft known transactions (transfers, hidden fees, unlimited approvals, memos)
- * and hand them to ClearSign for signing. The signature array is left zero-filled
- * for the wallet to fill in.
+ * A tiny legacy-Solana transaction encoder, just enough for the test dApp to craft known
+ * transactions (transfers, hidden fees, unlimited approvals, memos) and hand them to the wallet. The signature array is left zeroed.
  */
 object SolTxBuilder {
 

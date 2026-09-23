@@ -11,14 +11,13 @@ class OreMaskTest {
     @Test fun `keccak-256 sui vettori noti`() {
         assertEquals("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", hex(Keccak.hash256(ByteArray(0))))
         assertEquals("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", hex(Keccak.hash256("abc".toByteArray())))
-        // Piu' di un blocco: 200 byte di 'a'.
+        // More than one block: 200 bytes of 'a'.
         assertEquals("3bde5a1e88b8b8b5ab24b8ae35bc74b8ad1ea79a92a1e1f6a4fd2a5ceb5f3af2".length, hex(Keccak.hash256(ByteArray(200) { 'a'.code.toByte() })).length)
     }
 
     /**
-     * Trenta giri chiusi letti dalla catena il 22 settembre 2026: id, slot hash,
-     * casella vincente, e se il premio si e' diviso. La casella deve uscire
-     * dallo slot hash, e «diviso» deve coincidere con la maschera dell'id.
+     * Thirty closed rounds read from the chain on 22 Sep 2026: id, slot hash, winning square, and
+     * whether the prize split. The square must come out of the slot hash, and "split" must match the id's mask.
      */
     @Test fun `trenta giri veri, casella vincente e maschera come sulla catena`() {
         val lines = javaClass.getResource("/ore/rounds_closed.txt")!!.readText().trim().lines()

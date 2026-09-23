@@ -8,13 +8,9 @@ import java.util.Base64
 import java.util.zip.Inflater
 
 /**
- * Real accounts, read from mainnet on the 16th of September 2026.
- *
- * The numbers here were checked twice over: the mints decoded out of each pool
- * account match what Orca's and Raydium's own public APIs say about the same
- * pool, and each position's address comes back out of the derivation from its
- * NFT mint. If a program ever changes its layout, these fail loudly rather
- * than quietly reporting the wrong money.
+ * Real accounts, read from mainnet on 16 Sep 2026, checked twice: the mints decoded from each
+ * pool account match what Orca's and Raydium's public APIs say, and each position's address
+ * comes back out of the derivation from its NFT mint. If a program changes its layout, these fail loudly instead of reporting the wrong money.
  */
 class LpFeesTest {
     private fun b(s: String) = Base64.getDecoder().decode(s)

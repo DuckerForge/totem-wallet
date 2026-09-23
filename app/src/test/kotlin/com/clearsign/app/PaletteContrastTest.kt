@@ -27,13 +27,9 @@ class PaletteContrastTest {
     }
 
     /**
-     * Depth is a contract too.
-     *
-     * For a long time the five structural surfaces all lived inside 2% of the
-     * luminance range — `cardSoft` sat 1.03:1 above the page, a card's own border
-     * 1.03:1 above the card — so every screen read as one flat sheet and the only
-     * thing separating a panel from the page was a hairline nobody could see.
-     * Nothing caught it, because the old test only looked at text. This does.
+     * Depth is a contract too. For a long time the five structural surfaces lived inside 2% of
+     * the luminance range, `cardSoft` 1.03:1 above the page, a card's border 1.03:1 above the
+     * card, so every screen read as one flat sheet. The old test only looked at text; this does not.
      */
     @Test fun surfacesAreDistinguishable() {
         for (p in Palettes.all) {

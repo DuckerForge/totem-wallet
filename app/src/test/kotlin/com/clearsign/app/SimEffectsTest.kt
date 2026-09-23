@@ -15,14 +15,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * La parte senza rete di `simulateEffects`, provata da file JSON scritti come
- * li manda il nodo: una risposta di `getMultipleAccounts` e una di
- * `simulateTransaction`, ognuna con il suo slot.
- *
- * E' la prova di non regressione del difetto numero uno del piano RPC: una
- * lettura di partenza mancante che diventava `Ok`, con il cancello anti
- * prosciugamento spento in silenzio. E dello slot: due stati di due momenti
- * diversi non si sottraggono.
+ * The network-free part of `simulateEffects`, driven by JSON files written as the node sends
+ * them: a `getMultipleAccounts` answer and a `simulateTransaction` answer, each with its slot.
+ * The regression test for defect number one of the RPC plan: a missing starting read that
+ * became `Ok`, with the anti-drain gate silently off. And for the slot: two states from two moments are not subtracted.
  */
 class SimEffectsTest {
     private val owner = "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9"
@@ -69,7 +65,7 @@ class SimEffectsTest {
     }
 
     @Test fun `il proprietario assente dallo stato di partenza non e' Ok`() {
-        // Il nodo risponde null per un conto che non conosce: era la falla numero uno.
+        // The node answers null for an account it does not know: that was hole number one.
         val p = pre("pre-transfer-noowner", transfer.order())
         assertEquals(0L, p.accounts[owner]?.lamports)
         val missing = p.copy(accounts = p.accounts - owner)
@@ -97,7 +93,7 @@ class SimEffectsTest {
     }
 
     @Test fun `il saldo di partenza viene dalla lettura, non dall'elenco in cache`() {
-        // L'elenco dice un milione, la catena adesso dice zero: vale la catena.
+        // The list says a million, the chain now says zero: the chain counts.
         val p = pre("pre-drain", drain.order())
         val stale = p.copy(accounts = p.accounts + (tokAcc to SolanaRpc.AcctPre(2_039_280L, 0L)))
         val out = assertIs<SolanaRpc.SimOutcome.Ok>(effects(stale, sim("sim-drain"), drain, listOf(usdc)))

@@ -3,11 +3,8 @@ package com.clearsign.core
 import kotlin.math.pow
 
 /**
- * Core domain model for ClearSign's "What You See Is What You Sign" engine.
- *
- * Everything here is pure Kotlin and device/network independent so it can be
- * fully unit-tested off-device. The Seed Vault, Mobile Wallet Adapter and RPC
- * pieces live behind the interfaces in [Ports.kt].
+ * The domain model of the clear-signing engine. Pure Kotlin, no device or network, fully
+ * unit-tested off-device; Seed Vault, MWA and RPC live behind the interfaces in [Ports.kt].
  */
 
 const val NATIVE_SOL_MINT = "SOL"
@@ -80,10 +77,8 @@ enum class RiskFlag {
 }
 
 /**
- * What the simulation and the wallet know about *this* signing, beyond the
- * instructions: used by [RiskEngine.assessEffects] to judge the effects
- * (a transfer is benign; a transfer of everything you own to a wallet with no
- * history is not).
+ * What the simulation and the wallet know about this signing beyond the instructions, for
+ * [RiskEngine.assessEffects]: a transfer is benign, a transfer of everything to a wallet with no history is not.
  */
 data class EffectContext(
     val myWallet: String,
@@ -106,10 +101,8 @@ data class ScanResult(
 )
 
 /**
- * One external wallet that *receives* value in this transaction, with how big a
- * slice of the total outflow it takes. This is what makes a split visible: a
- * payment that quietly fans out to a recipient + two fee wallets becomes three
- * shares instead of one opaque total.
+ * One external wallet receiving value, with its slice of the total outflow. What makes a split
+ * visible: a payment fanning out to a recipient and two fee wallets is three shares, not one total.
  */
 data class RecipientShare(
     val address: String,
@@ -124,11 +117,7 @@ data class RecipientShare(
     val uiAmount: Double get() = delta.uiAmount
 }
 
-/**
- * "Nerd stats" about the transaction — the numbers a power user wants to see
- * before signing: compute budget, fee breakdown, how many accounts/programs it
- * touches, and the wire version.
- */
+/** The nerd stats a power user wants before signing: compute budget, fee breakdown, accounts and programs touched, wire version. */
 data class TxStats(
     val version: Int,                    // -1 legacy, 0 = v0
     val instructionCount: Int,

@@ -1,10 +1,8 @@
 package com.clearsign.core
 
 /**
- * Minimal message catalog so the receipt reads in the user's own language.
- * Clear-signing is worthless if the human can't read it — yet almost every
- * wallet shows raw program data or English-only. Add locales by extending the
- * [catalog]; unknown locales fall back to English.
+ * A small message catalog so the receipt reads in the user's language. Add locales by
+ * extending the [catalog]; unknown locales fall back to English.
  */
 enum class Msg {
     YOU_SEND, YOU_RECEIVE, TO, FEE, TRUSTED_CONTACT, KNOWN_ADDRESS,

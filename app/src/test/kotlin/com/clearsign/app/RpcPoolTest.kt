@@ -7,9 +7,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Il pool senza rete: l'ordine, la tabella di verita' delle risposte, e quello
- * che si impara da ognuna. Sono le decisioni piu' rischiose del file RPC, e
- * finora non ne aveva nessuna sotto test.
+ * The pool without a network: the order, the truth table of answers, and what is learned from
+ * each. The riskiest decisions in the RPC file, and none of them was under test.
  */
 class RpcPoolTest {
     private val helius = RpcPool.Provider("helius", "https://h", perSecond = 10, weight = 10, das = true)
@@ -60,7 +59,7 @@ class RpcPoolTest {
         assertTrue(pool.lanes("sendTransaction", now).none { it.name == "drpc" })
     }
 
-    // ---- la tabella di verita' ----------------------------------------------------
+    // ---- the truth table ----------------------------------------------------------
 
     private fun err(code: Int, msg: String) = JSONObject().put("code", code).put("message", msg)
 
@@ -91,7 +90,7 @@ class RpcPoolTest {
         assertTrue(pool.lanes("getProgramAccounts", now).none { it.name == "alchemy" })
         assertTrue(pool.lanes("getProgramAccounts", now).any { it.name == "chainstack" })
         assertTrue(pool.lanes("getBalance", now).any { it.name == "alchemy" })
-        // Un altro avvio, stesse preferenze: lo sa ancora.
+        // Another launch, same preferences: it still knows.
         assertTrue(RpcPool(all, 3L, store).lanes("getProgramAccounts", now).none { it.name == "alchemy" })
     }
 
@@ -103,7 +102,7 @@ class RpcPoolTest {
         assertEquals(RpcPool.State.EXHAUSTED, pool.state("helius", now + 5 * RpcPool.DAY_MS))
         assertEquals(RpcPool.State.OK, pool.state("helius", RpcPool.monthEnd(now) + 1))
         assertTrue(pool.lanes("getBalance", now).none { it.name == "helius" })
-        // Anche dopo un riavvio.
+        // Even after a restart.
         assertEquals(RpcPool.State.EXHAUSTED, RpcPool(all, 3L, store).state("helius", now))
     }
 
@@ -140,7 +139,7 @@ class RpcPoolTest {
         assertEquals(listOf("mainnet"), pool.lanes("getBalance", now).map { it.name })
     }
 
-    // ---- il tetto ---------------------------------------------------------------------
+    // ---- the cap ----------------------------------------------------------------------
 
     @Test fun `il tetto conta le chiavi condivise, non la spiaggia, e si azzera a mezzanotte`() {
         val store = MemStore()
@@ -153,7 +152,7 @@ class RpcPoolTest {
         assertEquals(3, pool.usedToday(now))
         assertFalse(pool.overBudget(now + RpcPool.DAY_MS))
         assertEquals(0, pool.usedToday(now + RpcPool.DAY_MS))
-        // Il tetto resta scritto, e zero vuol dire nessun tetto.
+        // The cap stays written, and zero means no cap.
         assertEquals(3, RpcPool(all, 3L, store).cap)
         pool.cap = 0
         assertFalse(pool.overBudget(now))

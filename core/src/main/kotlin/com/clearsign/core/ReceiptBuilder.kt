@@ -4,10 +4,8 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * Builds the human-readable receipt from the raw effects of a transaction.
- * Given the signer's wallet and the simulated balance deltas, it separates what
- * leaves from what arrives, picks the primary recipient, attaches the trust
- * badge, and renders plain-language lines in the user's locale.
+ * The human-readable receipt from a transaction's raw effects: what leaves, what arrives, the
+ * primary recipient, the trust badge, plain-language lines in the user's locale.
  */
 class ReceiptBuilder(private val trust: AddressTrust) {
 
@@ -43,11 +41,9 @@ class ReceiptBuilder(private val trust: AddressTrust) {
     }
 
     /**
-     * Every external wallet that receives value, largest first, each with its
-     * share of the total outflow. Reveals a payment that splits across several
-     * wallets (recipient + hidden fee/referral accounts) instead of one total.
-     * The largest same-mint receiver is the "main" recipient; the smaller
-     * same-mint ones are flagged as fee/side splits.
+     * Every external wallet receiving value, largest first, with its share of the total outflow,
+     * so a payment split across several wallets (recipient plus hidden fee or referral accounts)
+     * shows as such. The largest same-mint receiver is the main recipient; smaller same-mint ones are flagged as fee or side splits.
      */
     private fun distributionsOf(
         deltas: List<BalanceDelta>,

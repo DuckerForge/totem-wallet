@@ -8,10 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Minimal mainnet RPC + Jupiter client for the test dApp. Used only to *build*
- * realistic transactions (recent blockhash, the user's real token accounts, a
- * real Jupiter swap). The transactions are signed by ClearSign but NEVER sent,
- * so nothing here spends money.
+ * Minimal mainnet RPC and Jupiter client for the test dApp, used only to build realistic
+ * transactions (recent blockhash, real token accounts, a real Jupiter swap). Signed by the wallet, never sent: nothing here spends money.
  */
 object MainnetRpc {
     private const val RPC = "https://api.mainnet-beta.solana.com"

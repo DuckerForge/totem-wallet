@@ -3,16 +3,10 @@ package com.clearsign.core
 import kotlin.math.abs
 
 /**
- * Anti-TOCTOU guard. Wallets normally simulate a transaction once, show the
- * result, then sign later — but on-chain state (prices, balances, program
- * accounts) can change in between, so a benign-looking preview can settle as a
- * drain. ClearSign re-simulates in the instant before the Seed Vault signs and
- * aborts if the balance effects drifted from what the user approved.
- *
- * "Drifted" is judged with a small tolerance: a swap re-simulated one slot later
- * legitimately moves by a few lamports, and blocking every real swap would make
- * the guard useless. What is never tolerated: an asset appearing or vanishing,
- * a party appearing or vanishing, or any amount moving more than [DEFAULT_TOLERANCE].
+ * Anti-TOCTOU. Wallets simulate once, show, sign later, and on-chain state can change in
+ * between, so a benign preview can settle as a drain. This re-simulates the instant before the
+ * Seed Vault signs and aborts if the effects drifted from what was approved. Drift has a small
+ * tolerance, a swap one slot later moves by a few lamports; never tolerated: an asset or a party appearing or vanishing, or any amount moving more than [DEFAULT_TOLERANCE].
  */
 object SimulationGuard {
 
@@ -37,10 +31,7 @@ object SimulationGuard {
         }
     }
 
-    /**
-     * Re-simulate and either return the confirmed deltas or a STATE_DRIFT risk.
-     * Returns null effects when drift is detected (caller must not sign).
-     */
+    /** Re-simulate: the confirmed deltas, or a STATE_DRIFT risk with null effects (the caller must not sign). */
     fun confirm(
         previewed: List<BalanceDelta>,
         atApproval: List<BalanceDelta>,

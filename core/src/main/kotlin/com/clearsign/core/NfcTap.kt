@@ -1,17 +1,11 @@
 package com.clearsign.core
 
 /*
- * Paying by holding two phones together.
- *
- * What travels over NFC is a **request**, never a key and never a signature: the
- * merchant's phone pretends to be an NFC tag holding a Solana Pay URI, and the
- * payer's phone reads it and opens its ordinary receipt. Touching the phones
- * does not pay — it fills in the form. Everything after that is unchanged:
- * simulation, risk engine, and a fingerprint on the Seed Vault.
- *
- * All of this is pure bytes, so it lives here and is tested without hardware.
- * A reader's conversation with a tag is a fixed sequence of APDUs; if the bytes
- * are right, the tap is right.
+ * Paying by holding two phones together. What travels over NFC is a request, never a key or
+ * a signature: the merchant's phone pretends to be an NFC tag holding a Solana Pay URI, the
+ * payer's phone reads it and opens its ordinary receipt. Touching does not pay, it fills the
+ * form; simulation, risk engine and fingerprint are unchanged. Pure bytes, tested without
+ * hardware: a reader's conversation with a tag is a fixed sequence of APDUs.
  */
 
 /** NDEF: the tiny message format an NFC tag carries. */
@@ -20,11 +14,8 @@ object Ndef {
     private val TYPE_URI = byteArrayOf('U'.code.toByte())
 
     /**
-     * A one-record NDEF message holding [uri].
-     *
-     * The first payload byte is an abbreviation code for common prefixes
-     * (`http://www.` and friends). `solana:` is not in that table, so it is 0x00
-     * and the URI travels whole.
+     * A one-record NDEF message holding [uri]. The first payload byte abbreviates common prefixes
+     * (`http://www.` and friends); `solana:` is not in that table, so it is 0x00 and the URI travels whole.
      */
     fun uriMessage(uri: String): ByteArray {
         val bytes = uri.toByteArray(Charsets.UTF_8)
@@ -67,12 +58,9 @@ object Ndef {
             repeat(4) { v = (v shl 8) or (message[i++].toInt() and 0xFF) }
             v
         }
-        // The IL flag means the record carries an id: one length byte here, and
-        // the id bytes themselves after the type. Skipping only the length byte
-        // left the id sitting where the payload was expected, so a tag written
-        // with an id handed back an address with a few stray characters on the
-        // front. The person would have seen it, but nobody types an address they
-        // got by touching something.
+        // The IL flag means the record carries an id: one length byte here, the id bytes after the
+        // type. Skipping only the length byte left the id where the payload was expected, and a tag
+        // written with an id handed back an address with stray characters in front.
         val idLen = if ((header and 0x08) != 0) {
             if (message.size < i + 1) return null
             message[i++].toInt() and 0xFF
@@ -88,12 +76,9 @@ object Ndef {
 }
 
 /**
- * The NFC Forum Type 4 tag a reader expects to find, emulated in software.
- *
- * A reader always does the same four things: pick the NDEF application, read the
- * capability container to learn the sizes, pick the NDEF file, then read it —
- * usually in several chunks, because a reader decides its own chunk size. Every
- * command it did not ask for gets a refusal, never an invented answer.
+ * The NFC Forum Type 4 tag a reader expects, emulated in software. A reader always does the
+ * same four things: pick the NDEF application, read the capability container for the sizes,
+ * pick the NDEF file, read it in chunks of its own choosing. Anything else gets a refusal, never an invented answer.
  */
 class Type4Tag(message: ByteArray) {
 
@@ -159,10 +144,7 @@ class Type4Tag(message: ByteArray) {
         val SW_WRONG_PARAMS = byteArrayOf(0x6A, 0x86.toByte())
         val SW_WRONG_LENGTH = byteArrayOf(0x67, 0x00)
 
-        /**
-         * The capability container: fifteen bytes telling the reader the version,
-         * how much it may ask for at a time, and that the NDEF file is read-only.
-         */
+        /** The capability container: fifteen bytes with the version, how much may be asked at a time, and that the NDEF file is read-only. */
         val CAPABILITY_CONTAINER = byteArrayOf(
             0x00, 0x0F,                                     // this structure is 15 bytes
             0x20,                                           // mapping version 2.0
@@ -181,10 +163,8 @@ class Type4Tag(message: ByteArray) {
 data class PayRequest(val recipient: String, val amount: Double?, val mint: String?, val message: String?, val label: String?)
 
 /**
- * Reading `solana:<address>?amount=…&message=…`.
- *
- * The payer's phone trusts none of this: it fills in a form, and the transaction
- * that results is simulated and shown like any other before anyone signs.
+ * Reading `solana:<address>?amount=…&message=…`. The payer's phone trusts none of it: it fills
+ * a form, and the resulting transaction is simulated and shown like any other before signing.
  */
 object SolanaPay {
     /** The path of the web page that carries a request to phones without a wallet. */

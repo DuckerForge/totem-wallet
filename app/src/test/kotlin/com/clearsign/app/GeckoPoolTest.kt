@@ -5,20 +5,16 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Quale pool si guarda, con i numeri veri del 20 settembre 2026.
- *
- * Le cifre sono quelle che GeckoTerminal dava quel giorno per EDEL e per SOL.
- * Le tengo scritte perche' la regola vecchia - la piu' profonda - non sbagliava
- * in modo rumoroso: sceglieva una pool ferma da maggio, disegnava un grafico
- * plausibile a un terzo del prezzo e apriva il link su quella. Un errore che
- * somiglia a una risposta e' quello che serve un test per non farlo tornare.
+ * Which pool gets read, with the real numbers of 20 Sep 2026 for EDEL and SOL from
+ * GeckoTerminal. Kept because the old rule, the deepest pool, did not fail loudly: it picked a
+ * pool idle since May, drew a plausible chart at a third of the price and opened the link on it. An error that looks like an answer is what a test is for.
  */
 class GeckoPoolTest {
     private fun pool(id: String, liq: Double, vol: Double) =
         Gecko.Pool(id = id, dex = null, liquidityUsd = liq.takeIf { it > 0 }, volume24Usd = vol.takeIf { it > 0 }, buys24 = null, sells24 = null, fdvUsd = null)
 
     @Test fun `la pool piu' profonda ma ferma non vince`() {
-        // EDEL: la piu' profonda ha zero scambi in un giorno.
+        // EDEL: the deepest one has zero trades in a day.
         val pools = listOf(
             pool("Fg2LFE", 127_092.61, 14_341.86),
             pool("41S2du", 5_490.94, 247.16),
@@ -30,8 +26,7 @@ class GeckoPoolTest {
     }
 
     @Test fun `una pool vuota con molto volume e' due portafogli che si palleggiano`() {
-        // Un cinquantesimo della profondita' massima e' il pavimento: sotto,
-        // il volume non e' un mercato.
+        // One fiftieth of the maximum depth is the floor: below it, volume is not a market.
         val pools = listOf(
             pool("vera", 100_000.0, 5_000.0),
             pool("guscio", 500.0, 900_000.0),

@@ -5,20 +5,16 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Il cricchetto della scala tipografica.
- *
- * `HaloType` ha sette ruoli. Ogni `fontSize = 12.5.sp` scritto a mano e' una
- * dimensione in piu' che nessuno ha deciso. Questo test conta quelle a mano
- * nei sorgenti dell'app e fallisce se il numero sale: si puo' solo scendere,
- * e il tetto si abbassa a ogni pagina rimessa in ordine.
+ * The type-scale ratchet. `HaloType` has seven roles; every hand-written `fontSize = 12.5.sp`
+ * is one more size nobody decided. This counts them in the app sources and fails if the number rises: it can only go down.
  */
 class TypeScaleRatchetTest {
-    /** Il tetto di oggi. Abbassarlo quando si toglie, mai alzarlo. */
+    /** Today's ceiling. Lower it when one is removed, never raise it. */
     private val ceiling = 649
 
     @Test fun `le dimensioni scritte a mano non crescono`() {
-        // I test girano con la cartella di lavoro sul modulo `app`: si cerca
-        // `src/main/kotlin/com/clearsign/app` da qui in su, e anche sotto `app/`.
+        // Tests run with the working directory on the `app` module: look for
+        // `src/main/kotlin/com/clearsign/app` from here up, and under `app/` too.
         val src = generateSequence(File(".").absoluteFile) { it.parentFile }
             .flatMap { sequenceOf(File(it, "src/main/kotlin/com/clearsign/app"), File(it, "app/src/main/kotlin/com/clearsign/app")) }
             .first { it.isDirectory }

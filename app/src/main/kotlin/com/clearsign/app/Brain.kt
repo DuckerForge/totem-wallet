@@ -287,7 +287,7 @@ object Brain {
             if (italian) {
                 "Puoi spendere solo dalla paghetta (${fmtSol(p.perTxLamports, 4)} SOL per operazione, ${fmtSol(p.dailyLamports, 4)} SOL al giorno, già spesi oggi ${fmtSol(h.spentLast24hLamports, 4)} SOL). Sotto ${fmtSol(p.askAboveLamports, 4)} SOL firma da sola; sopra, chiede alla persona.\n"
             } else {
-                "You may only spend from the envelope (${fmtSol(p.perTxLamports, 4)} SOL per move, ${fmtSol(p.dailyLamports, 4)} SOL a day, ${fmtSol(h.spentLast24hLamports, 4)} SOL spent today). Below ${fmtSol(p.askAboveLamports, 4)} SOL it signs on its own; above that it asks.\n"
+                "You may only spend from the budget (${fmtSol(p.perTxLamports, 4)} SOL per move, ${fmtSol(p.dailyLamports, 4)} SOL a day, ${fmtSol(h.spentLast24hLamports, 4)} SOL spent today). Below ${fmtSol(p.askAboveLamports, 4)} SOL it signs on its own; above that it asks.\n"
             },
         )
         val whom = p.allowedDestinations.mapNotNull { a -> contacts[a]?.let { "$it ($a)" } }

@@ -84,7 +84,7 @@ internal fun ChainPickerSheet(
                     placeholder = { Text(stringResource(R.string.chain_pick_search), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted) },
                     leadingIcon = { HaloIcon(HIcon.SEARCH, Halo.muted, 18.dp) },
                     trailingIcon = {
-                        if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+                        if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.a11y_clear_search)) }
                     },
                     textStyle = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Halo.ink),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),

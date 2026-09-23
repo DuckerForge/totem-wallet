@@ -118,7 +118,7 @@ internal fun ReceiveSheet(address: String, label: String?, onTap: () -> Unit = {
                 Box(
                     Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
-                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.close)) }
             }
             // Nothing is open until you ask for it. Three ways to hand over the same
             // request, and the fields only appear inside the one you pick.

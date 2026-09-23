@@ -218,7 +218,7 @@ fun HaloTile(width: Dp, onClick: () -> Unit, content: @Composable ColumnScope.()
 
 /** Un'icona in un bottone tondo: aggiorna, chiudi, condividi. Gira se [spinning]. */
 @Composable
-fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = false, size: Dp = 34.dp, onClick: () -> Unit) {
+fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = false, size: Dp = 34.dp, description: String? = null, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val spin = remember { Animatable(0f) }
     LaunchedEffect(spinning) {
@@ -229,7 +229,7 @@ fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = f
         Modifier.size(size).tappable(src, rs(Radius.pill), fill = Halo.card, border = Halo.stroke, down = 0.92f, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        HaloIcon(icon, tint, 16.dp, Modifier.graphicsLayer { rotationZ = spin.value })
+        HaloIcon(icon, tint, 16.dp, Modifier.graphicsLayer { rotationZ = spin.value }, description = description)
     }
 }
 

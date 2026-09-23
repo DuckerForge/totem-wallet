@@ -1211,7 +1211,7 @@ private fun DappStoreCard(store: StoreInfo) {
             Box(
                 Modifier.size(26.dp).clip(rs(999)).background(Halo.cardSoft).haloBorder(rs(999)).clickable { open = !open },
                 contentAlignment = Alignment.Center,
-            ) { HaloIcon(HIcon.INFO, if (open) Halo.cyan else Halo.muted, 14.dp) }
+            ) { HaloIcon(HIcon.INFO, if (open) Halo.cyan else Halo.muted, 14.dp, description = stringResource(R.string.a11y_details)) }
         }
         if (!open) return@Column
         Row(Modifier.fillMaxWidth().clickable { openListing() }, verticalAlignment = Alignment.CenterVertically) {
@@ -1647,7 +1647,7 @@ internal fun StatsCard(s: TxStats) {
                 Modifier.fillMaxWidth().clickable { open = !open },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("STATS", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
+                Text(stringResource(R.string.stats_hdr), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Halo.cyan)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     if (open) stringResource(R.string.tech_details)
@@ -2308,7 +2308,15 @@ private fun ErrorScreen(message: String) {
 
 // ---- formatting ---------------------------------------------------------------------
 
-/** "0.5", "1 234.56", "0.000005": no trailing zeros, thin-space thousands, never scientific. */
+/**
+ * "0.5", "1 234.56", "0.000005": no trailing zeros, thin-space thousands, never scientific.
+ *
+ * ROOT on purpose, twice over. On a screen that is about to move money, "1.234" must not
+ * be readable as both a thousand and as one-point-two-three-four, so the thousands get a
+ * thin space and the decimal point stays a point, in every language. And the same text
+ * goes verbatim into the attested statement the hardware key signs, so a proof made on an
+ * Italian phone has to match one made on an English one. Do not make this follow the locale.
+ */
 internal fun fmtNumber(d: BalanceDelta): String {
     val v = abs(d.uiAmount)
     val s = String.format(Locale.ROOT, "%,.${minOf(d.decimals, 6)}f", v)

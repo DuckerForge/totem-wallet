@@ -577,7 +577,7 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
             Box(
                 Modifier.size(36.dp).clip(rs(18)).background(Halo.cardSoft).haloBorder(rs(18), living = false).clickable { onBack() },
                 contentAlignment = Alignment.Center,
-            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp) }
+            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp, description = stringResource(R.string.back)) }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.crowd_sheet), style = HaloType.screen, color = Halo.ink)

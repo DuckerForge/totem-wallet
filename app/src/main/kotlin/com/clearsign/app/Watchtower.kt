@@ -72,7 +72,7 @@ class WatchWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
 
             when {
                 flagged -> Watchtower.notify(ctx, ctx.getString(R.string.watch_flag_title), ctx.getString(R.string.watch_flag_body))
-                unlimited != null -> Watchtower.notify(ctx, ctx.getString(R.string.watch_appr_title), ctx.getString(R.string.watch_appr_body, unlimited.count))
+                unlimited != null -> Watchtower.notify(ctx, ctx.getString(R.string.watch_appr_title), ctx.resources.getQuantityString(R.plurals.watch_appr_body, unlimited.count, unlimited.count))
             }
         }
         // The agent envelope: take the winnings home when they reach the threshold.

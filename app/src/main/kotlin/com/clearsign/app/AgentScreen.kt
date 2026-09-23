@@ -449,7 +449,7 @@ private fun LastBudget(refresh: Int) {
             StatRow(stringResource(R.string.env_last_back), fmtSol(c.backLamports + c.harvestedLamports, 4) + " SOL")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.env_last_moves, c.buys, c.sells, dur), style = HaloType.small, color = Halo.muted, modifier = Modifier.weight(1f))
-                RoundIconButton(HIcon.SHARE, tint = Halo.cyan) {
+                RoundIconButton(HIcon.SHARE, tint = Halo.cyan, description = stringResource(R.string.share)) {
                 PnlCard.share(
                     ctx, PnlCard.Face(
                         ctx.getString(R.string.env_last_title), ctx.getString(R.string.env_last_moves, c.buys, c.sells, dur), c.resultPct,
@@ -524,7 +524,7 @@ private fun FollowsSection(refresh: Int) {
                     Box(
                         Modifier.size(34.dp).clip(rs(999)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) },
                         contentAlignment = Alignment.Center,
-                    ) { HaloIcon(HIcon.STAR_FILLED, Halo.amber, 17.dp) }
+                    ) { HaloIcon(HIcon.STAR_FILLED, Halo.amber, 17.dp, description = stringResource(R.string.a11y_unfollow)) }
                 }
             }
             Text(stringResource(R.string.agent_copy_how), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)

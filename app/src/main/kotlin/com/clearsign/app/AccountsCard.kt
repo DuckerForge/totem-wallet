@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -80,7 +81,11 @@ internal fun AccountsCard(signer: SeedVaultSigner, owner: String?) {
                     owner == null -> stringResource(R.string.home_accounts_sub)
                     loading && accounts == null -> stringResource(R.string.deleg_loading)
                     delegated.isEmpty() && empties.isEmpty() -> stringResource(R.string.deleg_clean)
-                    else -> stringResource(R.string.deleg_count, delegated.size, empties.size)
+                    // Solo i lati che contano qualcosa: «0 deleghe · 3 account vuoti» era un numero in piu' da leggere.
+                    else -> listOfNotNull(
+                        delegated.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.deleg_delegations_n, it, it) },
+                        empties.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.deleg_empties_n, it, it) },
+                    ).joinToString(" · ")
                 },
                 HIcon.KEY,
             )
@@ -198,7 +203,7 @@ internal fun HygieneSheet(action: HygieneAction, signer: SeedVaultSigner, owner:
             hold = stringResource(R.string.hold_revoke); icon = HIcon.KEY; tint = Halo.amber; refund = null
         }
         is HygieneAction.Close -> {
-            title = stringResource(R.string.sheet_close_title); what = stringResource(R.string.sheet_close_what, action.accounts.size)
+            title = stringResource(R.string.sheet_close_title); what = pluralStringResource(R.plurals.sheet_close_what, action.accounts.size, action.accounts.size)
             hold = stringResource(R.string.hold_close); icon = HIcon.TRASH; tint = Halo.cyan; refund = action.accounts.sumOf { it.lamports }
         }
         is HygieneAction.Burn -> {
@@ -323,7 +328,7 @@ private fun hygienePlan(ctx: android.content.Context, action: HygieneAction, own
         }
         is HygieneAction.Close -> {
             action.accounts.map { a -> WalletTx.tokenCloseAccount(Base58.decode(a.pubkey), ownerKey, ownerKey, WalletTx.tokenProgramFor(a.program)) } to
-                HygienePlan("close", emptyList(), listOf("+" + fmtSol(refund ?: 0L, 5) + " SOL"), null, ctx.getString(R.string.wa_log_close, action.accounts.size))
+                HygienePlan("close", emptyList(), listOf("+" + fmtSol(refund ?: 0L, 5) + " SOL"), null, ctx.resources.getQuantityString(R.plurals.wa_log_close, action.accounts.size, action.accounts.size))
         }
         is HygieneAction.Burn -> {
             val mintKey = Base58.decode(action.holding.mint)

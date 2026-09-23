@@ -262,7 +262,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                     Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999))
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
-                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.close)) }
             }
 
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

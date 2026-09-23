@@ -564,7 +564,7 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
             // Un giro vinto e' una carta da mostrare, come la paghetta chiusa.
             if (won) {
                 Spacer(Modifier.width(8.dp))
-                RoundIconButton(HIcon.SHARE, tint = Halo.mint) {
+                RoundIconButton(HIcon.SHARE, tint = Halo.mint, description = stringResource(R.string.share)) {
                     PnlCard.share(ctx, PnlCard.Face("ORE · " + title, how, null, outcome, ctx.getString(R.string.pnl_card_foot)), "ore-" + last.id + ".png")
                 }
             }

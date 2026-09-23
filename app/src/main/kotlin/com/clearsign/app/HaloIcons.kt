@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -52,8 +54,11 @@ enum class HIcon {
 }
 
 @Composable
-fun HaloIcon(icon: HIcon, tint: Color, size: Dp = 20.dp, modifier: Modifier = Modifier, strokeScale: Float = 1f) {
-    Canvas(modifier.size(size)) {
+fun HaloIcon(icon: HIcon, tint: Color, size: Dp = 20.dp, modifier: Modifier = Modifier, strokeScale: Float = 1f, description: String? = null) {
+    // A Canvas says nothing to TalkBack. An icon that is the whole button (close, back, the
+    // star) gets a [description]; one next to its own text stays silent, the text is read.
+    val m = if (description != null) modifier.semantics { contentDescription = description } else modifier
+    Canvas(m.size(size)) {
         val u = this.size.minDimension / 24f
         val g = G(this, u, tint, 1.9f * u * strokeScale * Halo.palette.iconStroke)
         g.draw(icon)

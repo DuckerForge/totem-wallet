@@ -44,7 +44,7 @@
     <string name="bar_messages_n">%1$d messages · no funds</string>
     <string name="bar_no_funds">moves no funds</string>
     <string name="pick_title">Choose the wallet to connect</string>
-    <string name="pick_sub">The balance helps you recognise the right one.</string>
+    <string name="pick_sub">The balance helps you recognize the right one.</string>
     <string name="assets_with_tokens">%1$s · %2$d tokens</string>
     <string name="requests_one">Requests one signature.</string>
     <string name="requests_many">Requests %1$d signatures.</string>
@@ -107,7 +107,7 @@
     <string name="contact_name">Contact name</string>
     <string name="save_contact">Save as trusted contact</string>
     <string name="intel_title">On-chain reputation</string>
-    <string name="analyzing">analysing…</string>
+    <string name="analyzing">analyzing…</string>
     <string name="intel_brand_new_note">Brand-new wallet, no on-chain history at all. That is the classic scam-address tell: proceed only if you know what it is.</string>
     <string name="intel_tx">Transactions</string>
     <string name="intel_activity">Activity</string>
@@ -131,7 +131,7 @@
     <string name="kind_token_account">token account</string>
     <string name="kind_program">program (smart contract)</string>
     <string name="kind_pda">program account (PDA)</string>
-    <string name="kind_empty">never initialised</string>
+    <string name="kind_empty">never initialized</string>
     <string name="kind_unknown">unknown</string>
     <string name="done_hw_title">Signed by the Seeker\'s Seed Vault</string>
     <string name="done_hw_sub">Key in a hardware secure enclave, never exposed to software.</string>
@@ -168,7 +168,7 @@
     <string name="log_count_many">%1$d signatures</string>
     <string name="log_empty_note">The receipts you approve show up here: dApp, amounts, recipient and an explorer link.</string>
     <string name="home_contacts_hdr">TRUSTED CONTACTS</string>
-    <string name="contacts_empty_note">Save a recipient from a receipt (tap the node → “Save as trusted contact”). Contacts enable the trusted badge and the anti-poisoning defence.</string>
+    <string name="contacts_empty_note">Save a recipient from a receipt (tap the node → “Save as trusted contact”). Contacts enable the trusted badge and the anti-poisoning defense.</string>
     <string name="home_demo_hdr">OFFLINE DEMO</string>
     <string name="home_demo_sub">5 scenarios, no dApp needed</string>
     <string name="log_kind_login">" · sign-in"</string>
@@ -199,13 +199,13 @@
     <string name="err_low_power">The dApp cannot connect (battery saver?). Turn off battery saver and retry from the dApp.</string>
     <string name="unknown_dapp">unknown dApp</string>
     <string name="w_connecting_sv">Connecting to the Seed Vault…</string>
-    <string name="w_authorizing">Authorising…</string>
+    <string name="w_authorizing">Authorizing…</string>
     <string name="w_waiting_dapp">Waiting for the dApp…</string>
     <string name="err_connect_cancelled">Connection cancelled.</string>
     <string name="w_signing_login">Signing the sign-in in the Seed Vault…</string>
     <string name="err_login_cancelled">Sign-in cancelled.</string>
-    <string name="w_analyzing">Analysing the transaction…</string>
-    <string name="w_analyzing_n">Analysing %1$d transactions…</string>
+    <string name="w_analyzing">Analyzing the transaction…</string>
+    <string name="w_analyzing_n">Analyzing %1$d transactions…</string>
     <string name="w_drift">Anti-tampering check…</string>
     <string name="err_blocked">Signature blocked: %1$s</string>
     <string name="w_signing">Signing in the Seed Vault…</string>
@@ -227,10 +227,10 @@
     <string name="sv_unavailable">Seed Vault not available on this device.</string>
     <string name="sv_accounts_failed">Could not fetch the accounts.</string>
     <string name="account_n">Account %1$d</string>
-    <string name="sv_auth_failed">Seed Vault authorisation cancelled or failed.</string>
+    <string name="sv_auth_failed">Seed Vault authorization cancelled or failed.</string>
     <string name="sv_sign_refused">Signature refused by the Seed Vault (code %1$d).</string>
     <string name="sv_msg_refused">Message signature refused (code %1$d).</string>
-    <string name="sv_account_missing">The authorised account (%1$s) is not in this Seed Vault.</string>
+    <string name="sv_account_missing">The authorized account (%1$s) is not in this Seed Vault.</string>
     <string name="sv_not_connected">Seed Vault not connected.</string>
     <string name="sv_no_account">No account selected.</string>
     <!-- Themes -->
@@ -278,7 +278,14 @@
     <string name="deleg_scanning">Reading token accounts</string>
     <string name="deleg_clean">All clean</string>
     <string name="deleg_none">No active delegations, no empty accounts.</string>
-    <string name="deleg_count">%1$d delegation(s) · %2$d empty account(s)</string>
+    <plurals name="deleg_delegations_n">
+        <item quantity="one">%1$d delegation</item>
+        <item quantity="other">%1$d delegations</item>
+    </plurals>
+    <plurals name="deleg_empties_n">
+        <item quantity="one">%1$d empty account</item>
+        <item quantity="other">%1$d empty accounts</item>
+    </plurals>
     <string name="deleg_row_title">%1$s · a delegate can spend</string>
     <string name="deleg_unlimited">unlimited</string>
     <string name="deleg_amount">up to %1$s</string>
@@ -291,14 +298,20 @@
     <string name="sheet_revoke_title">Revoke delegation</string>
     <string name="sheet_revoke_what">The %1$s delegate loses permission to spend from your account.</string>
     <string name="sheet_close_title">Close empty account</string>
-    <string name="sheet_close_what">%1$d empty account(s) closed; the rent returns to your wallet.</string>
+    <plurals name="sheet_close_what">
+        <item quantity="one">%1$d empty account closed; the rent returns to your wallet.</item>
+        <item quantity="other">%1$d empty accounts closed; the rent returns to your wallet.</item>
+    </plurals>
     <string name="sheet_refund">You get back</string>
     <string name="hold_revoke">Hold to revoke</string>
     <string name="hold_close">Hold to close</string>
     <string name="sheet_done_revoke">Delegation revoked.</string>
     <string name="sheet_done_close">Closed. Rent refunded to your wallet.</string>
     <string name="wa_log_revoke">Revoke %1$s delegate</string>
-    <string name="wa_log_close">Close %1$d empty account(s)</string>
+    <plurals name="wa_log_close">
+        <item quantity="one">Close %1$d empty account</item>
+        <item quantity="other">Close %1$d empty accounts</item>
+    </plurals>
     <string name="send_title">Send</string>
     <string name="send_sub">SOL or tokens, with the Velum receipt</string>
     <string name="send_review_sub">Check the receipt, then hold to sign</string>
@@ -320,7 +333,7 @@
     <string name="send_available">Available: %1$s</string>
     <string name="send_hold">Hold to send</string>
     <string name="send_done">Sent. It will confirm in a few seconds.</string>
-    <string name="send_blocked">Blocked: this transfer carries a DANGER risk.</string>
+    <string name="send_blocked">Blocked: severe risk on this transaction.</string>
     <string name="back">Back</string>
     <string name="receive_title">Receive</string>
     <string name="receive_note">Your Seed Vault address</string>
@@ -423,7 +436,7 @@
     <string name="pdf_tags">Tags</string>
     <string name="pdf_attested">ATTESTED — ES256 signature by this app\'s hardware key over the statement below</string>
     <string name="pdf_not_attested">not attested</string>
-    <string name="pdf_footer">clearsign · page %1$d</string>
+    <string name="pdf_footer">velum · page %1$d</string>
     <string name="pdf_totals">Totals</string>
     <string name="pdf_fiat_total">Total in %1$s (priced entries)</string>
     <string name="pdf_more_legs">+%1$d more legs</string>
@@ -549,7 +562,7 @@
     <string name="ore_pick_squares">Tap the squares below</string>
     <string name="ore_total">%1$d squares at %2$s SOL make %3$s SOL.</string>
     <string name="ore_first_fee">Plus 10,000 lamports the first time.</string>
-    <string name="ore_wager_note">You never win other miners\' SOL. A losing square keeps about 11% of yours, the winning one 1%. The prize is the ORE, split among whoever is on the winning square.</string>
+    <string name="ore_wager_note" formatted="false">You never win other miners\' SOL. A losing square keeps about 11% of yours, the winning one 1%. The prize is the ORE, split among whoever is on the winning square.</string>
     <string name="ore_best_label">Emptiest squares now:</string>
     <string name="ore_outlook">Expected: %1$s ORE (≈ %2$s SOL). Expected cost: %3$s SOL, %4$s%% of the stake.</string>
     <string name="ore_outlook_nopx">Expected: %1$s ORE. Expected cost: %2$s SOL, %3$s%% of the stake.</string>
@@ -637,12 +650,27 @@
     <string name="health_weak">Needs attention</string>
     <string name="health_risky">At risk</string>
     <string name="health_clean">No live approvals, nothing to reclaim.</string>
-    <string name="health_issues">%1$d thing(s) to fix</string>
+    <plurals name="health_issues">
+        <item quantity="one">%1$d thing to fix</item>
+        <item quantity="other">%1$d things to fix</item>
+    </plurals>
     <string name="health_fix_hint">Fix these in “Delegations &amp; accounts” below. One signature.</string>
-    <string name="health_unlimited">%1$d unlimited approval(s) — %2$s can drain those tokens</string>
-    <string name="health_limited">%1$d approval(s) a delegate can still spend</string>
-    <string name="health_dust">%1$d empty account(s). Reclaim the rent.</string>
-    <string name="health_frozen">%1$d frozen account(s): %2$s</string>
+    <plurals name="health_unlimited">
+        <item quantity="one">%1$d unlimited approval — %2$s can drain those tokens</item>
+        <item quantity="other">%1$d unlimited approvals — %2$s can drain those tokens</item>
+    </plurals>
+    <plurals name="health_limited">
+        <item quantity="one">%1$d approval a delegate can still spend</item>
+        <item quantity="other">%1$d approvals a delegate can still spend</item>
+    </plurals>
+    <plurals name="health_dust">
+        <item quantity="one">%1$d empty account. Reclaim the rent.</item>
+        <item quantity="other">%1$d empty accounts. Reclaim the rent.</item>
+    </plurals>
+    <plurals name="health_frozen">
+        <item quantity="one">%1$d frozen account: %2$s</item>
+        <item quantity="other">%1$d frozen accounts: %2$s</item>
+    </plurals>
     <string name="health_frozen_why">Only whoever issued the coin can thaw them. There is nothing you can do, and they cannot even be closed to reclaim the rent.</string>
     <string name="trace_run">Deep scan this address</string>
     <string name="trace_pro">Deep activity scan — a Velum Pro feature</string>
@@ -694,7 +722,10 @@
     <string name="watch_flag_title">Velum · address flagged</string>
     <string name="watch_flag_body">An address you have paid was flagged on the blocklist. Open Velum to review.</string>
     <string name="watch_appr_title">Velum · approvals to review</string>
-    <string name="watch_appr_body">%1$d unlimited approval(s) are live on your wallet. Tap to revoke them.</string>
+    <plurals name="watch_appr_body">
+        <item quantity="one">%1$d unlimited approval is live on your wallet. Tap to revoke it.</item>
+        <item quantity="other">%1$d unlimited approvals are live on your wallet. Tap to revoke them.</item>
+    </plurals>
     <string name="hero_show_all">Show all (%1$d)</string>
     <string name="hero_show_less">Show less</string>
     <string name="hero_others">%1$d other assets (NFTs and unknown tokens)</string>
@@ -758,7 +789,7 @@
     <string name="theme_skr">Seeker</string>
     <string name="theme_custom">Custom</string>
     <string name="editor_title">Theme editor</string>
-    <string name="editor_sub">Your colours, text size and effects — live.</string>
+    <string name="editor_sub">Your colors, text size and effects — live.</string>
     <string name="editor_accent">Accent (primary)</string>
     <string name="editor_accent2">Secondary</string>
     <string name="editor_ground">Background</string>
@@ -829,7 +860,7 @@
     <string name="agent_tab_none">Connect the Seed Vault from the Wallet tab first.</string>
     <string name="agent_tab_recent">AGENT SIGNATURES</string>
     <string name="agent_tab_empty">Nothing signed for an agent yet.</string>
-    <string name="agent_tab_setup">Setup instructions are in docs/SETUP-AGENT.md: local with Claude Code, or as a URL connector for Claude, ChatGPT and Grok.</string>
+    <string name="agent_tab_setup">The bridge runs on your computer, locally with Claude Code or as a URL connector for Claude, ChatGPT and Grok. Tap “Link an agent on your computer” for the command.</string>
     <string name="agent_state_title">Your main account is untouchable</string>
     <string name="agent_state_body">Nothing an agent does can reach the Seed Vault account. It spends from its budget and from nothing else, and the moment you close the budget its power ends. Above the limits you set, it has to ask you and you sign with your fingerprint.</string>
     <string name="agent_stat_signed">signed for an agent</string>
@@ -943,7 +974,7 @@
     <string name="rules_state_off">Off</string>
     <string name="rules_state_off_sub">It buys and sells nothing. The money stays where it is.</string>
     <string name="rules_moves">With these numbers the agent can make %1$d moves a day of %2$s each.</string>
-    <string name="rules_moves_few">Careful: with a slice of %1$s and this daily cap the agent gets **%2$d** moves a day. From the second one it would want your signature, and on its own it cannot have it, so it stops. Raise the daily cap or lower the slice.</string>
+    <string name="rules_moves_few">Careful: with a slice of %1$s and this daily cap the agent gets %2$d moves a day. From the second one it would want your signature, and on its own it cannot have it, so it stops. Raise the daily cap or lower the slice.</string>
     <string name="rules_unsaved">Not saved yet: it applies when you press Save below.</string>
     <string name="agent_rules_body">What the agent may sign without you. Everything is checked against the simulation, never against what the agent says.</string>
     <string name="agent_per_tx">Per move</string>
@@ -1092,7 +1123,7 @@
     <string name="swap_pick_to">Receive</string>
     <!-- settings groups -->
     <string name="set_g_look">Look</string>
-    <string name="set_g_look_sub">Themes, colours, old-TV effect</string>
+    <string name="set_g_look_sub">Themes, colors, old-TV effect</string>
     <string name="set_g_agent">Agent</string>
     <string name="set_g_agent_sub">Agent Gate, chat model, web check before buying</string>
     <string name="set_g_wallet">Wallet and safety</string>
@@ -1227,7 +1258,7 @@
     <string name="shadow_rows">%1$d followed</string>
     <string name="shadow_trades">%1$d closed, %2$d in profit</string>
     <string name="shadow_not_yet">%1$d closed trades out of %2$d. Below that the difference is noise, so I am not suggesting anything.</string>
-    <string name="shadow_switch">The \"%1$s\" rule would have made %2$s SOL instead of %3$s, over %4$d trades. Switch to it?</string>
+    <string name="shadow_switch">The “%1$s” rule would have made %2$s SOL instead of %3$s, over %4$d trades. Switch to it?</string>
     <string name="shadow_apply">Change the rule</string>
     <string name="shadow_walls_cost">The blocks cost you %2$s SOL across %1$d coins left alone.</string>
     <string name="shadow_walls_saved">The blocks saved you %2$s SOL across %1$d coins left alone.</string>
@@ -1306,7 +1337,7 @@
     <string name="lock_title">Velum</string>
     <string name="lock_sub">Your fingerprint to open the wallet.</string>
     <string name="lock_open">Unlock</string>
-    <string name="lock_failed">Not recognised. Try again.</string>
+    <string name="lock_failed">Not recognized. Try again.</string>
     <string name="door_src_app">app</string>
     <string name="door_src_site">site</string>
     <string name="door_src_agent">agent</string>
@@ -1728,7 +1759,7 @@
     <string name="bridge_open_failed">RocketX did not open the order. Try again.</string>
     <string name="bridge_memo">This route needs a memo, which Send cannot write yet. Pick another amount to get a different route.</string>
     <string name="bridge_memo_line">Bridge to %1$s via %2$s (RocketX)</string>
-    <string name="bridge_truth">The order gives a deposit address; the money goes there with the ordinary Send, receipt and fingerprint included. RocketX asks nobody who they are and an exchange route breaks the on-chain thread, but it is not a mixer and not anonymity. Fees 0.2 to 0.4%.</string>
+    <string name="bridge_truth" formatted="false">The order gives a deposit address; the money goes there with the ordinary Send, receipt and fingerprint included. RocketX asks nobody who they are and an exchange route breaks the on-chain thread, but it is not a mixer and not anonymity. Fees 0.2 to 0.4%.</string>
     <string name="bridge_past">Bridges opened</string>
     <string name="bridge_status">Status</string>
     <string name="bridge_status_none">No answer yet</string>
@@ -1834,7 +1865,7 @@
     <string name="eyes_you">You: %1$s</string>
     <string name="first_title">The first minute</string>
     <string name="first_1">Make a budget: money set apart from your wallet, 0.15 SOL or more so every buy clears the 5 $ Jupiter needs to guard it on chain.</string>
-    <string name="first_2">Press Start. It looks for a coin every six minutes with the gates of the winning bots plus Rugcheck, buys a slice, sells at +30% or −15%.</string>
+    <string name="first_2" formatted="false">Press Start. It looks for a coin every six minutes with the gates of the winning bots plus Rugcheck, buys a slice, sells at +30% or −15%.</string>
     <string name="first_3">Open Watch it work: the charts, its reasoning typed out, a voice if you want one. Close it and take everything back whenever you like.</string>
     <string name="first_note">It never sees your seed. Above its limits it asks for your fingerprint. What you put in is what you can lose: start small.</string>
 <string name="agent_channel_quiet">How the coins are doing</string>
@@ -1894,7 +1925,7 @@
     <string name="bridge_memo_missing">This route needs a memo and the order did not carry one. Without it the deposit arrives and is credited to nobody.</string>
     <string name="bridge_worse">The route moved: the quote said %1$s, the order gives %2$s, %3$s%% less. Press again to accept it, or change route.</string>
     <string name="hold_col_who">HOW MANY HOLD IT</string>
-    <string name="hold_col_each">% · $ TYPICAL</string>
+    <string name="hold_col_each" formatted="false">% · $ TYPICAL</string>
     <string name="send_wanted_missing">The request asks for %1$s, which this wallet does not hold.</string>
     <string name="send_blocked_drain">Blocked: this sends almost the whole balance to an address this phone has never seen. If it is your own account, save it as a contact and try again.</string>
     <string name="send_save_contact">Save as a contact</string>
@@ -1951,4 +1982,12 @@
     <string name="send_private">Send privately</string>
     <string name="send_private_sub">The chain no longer shows a line between the two addresses. Takes a few minutes.</string>
     <string name="send_private_switch">Switches to SOL.</string>
+    <string name="stats_hdr">STATS</string>
+    <string name="detail_package">package</string>
+    <string name="a11y_clear_search">Clear the search</string>
+    <string name="a11y_remove">Remove</string>
+    <string name="a11y_follow">Follow</string>
+    <string name="a11y_unfollow">Stop following</string>
+    <string name="a11y_details">Details</string>
+    <string name="a11y_refresh">Refresh</string>
 </resources>

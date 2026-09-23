@@ -467,7 +467,7 @@ internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -
             Modifier.size(34.dp).clip(rs(Radius.pill)).background(Halo.card).haloBorder(rs(Radius.pill), living = false)
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
-        ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+        ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.close)) }
     }
 }
 

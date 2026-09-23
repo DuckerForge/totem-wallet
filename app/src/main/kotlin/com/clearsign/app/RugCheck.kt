@@ -68,7 +68,7 @@ object RugCheck {
 
         val why = when {
             rugged -> if (italian) "già svuotata (rug)" else "already rugged"
-            danger != null -> danger.optString("name").ifBlank { "danger" }
+            danger != null -> danger.optString("name").ifBlank { "danger" }.let { if (italian) italianRiskName(it) else it }
             copycat != null -> if (italian) "copia di una moneta verificata" else "copy of a verified token"
             score >= SCORE_STOP -> if (italian) "punteggio di rischio $score su 100" else "risk score $score of 100"
             lp != null && lp < LP_LOCKED_MIN_PCT && (liquidity ?: 0.0) < LIQUIDITY_DEEP_USD ->
@@ -78,11 +78,38 @@ object RugCheck {
         return if (why != null) Verdict.Stop(why) else Verdict.Ok(score.coerceAtLeast(0), lp)
     }
 
+    /**
+     * Rugcheck names its risks in English and the name lands inside an Italian sentence
+     * («Rugcheck ferma BONK: Low Liquidity»). The names it uses often read in Italian;
+     * anything else stays as it came, which is still better than guessing.
+     */
+    private val italianRiskNames = mapOf(
+        "freeze authority still enabled" to "autorità di freeze ancora attiva",
+        "mint authority still enabled" to "autorità di mint ancora attiva",
+        "mutable metadata" to "metadati modificabili",
+        "low liquidity" to "poca liquidità",
+        "low amount of lp providers" to "pochi fornitori di liquidità",
+        "large amount of lp unlocked" to "gran parte della LP non bloccata",
+        "top 10 holders high ownership" to "i primi 10 detentori hanno troppo",
+        "single holder ownership" to "un solo detentore ha quasi tutto",
+        "high holder concentration" to "detentori troppo concentrati",
+        "high ownership" to "proprietà troppo concentrata",
+        "copycat token" to "copia di una moneta verificata",
+        "symbol mismatch" to "simbolo non corrispondente",
+        "name mismatch" to "nome non corrispondente",
+        "transfer fee" to "commissione sul trasferimento",
+        "permanent delegate" to "delegato permanente",
+        "creator history of rugged tokens" to "il creatore ha già fatto rug",
+        "rugged" to "già svuotata (rug)",
+        "danger" to "pericolo",
+    )
+    internal fun italianRiskName(name: String): String = italianRiskNames[name.trim().lowercase()] ?: name
+
     private fun get(url: String): JSONObject? = try {
         val c = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 6_000; readTimeout = 8_000
             setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "Apex/1.0")
+            setRequestProperty("User-Agent", "Velum/1.0")
         }
         if (c.responseCode in 200..299) JSONObject(c.inputStream.bufferedReader().readText()) else null
     } catch (e: Exception) {

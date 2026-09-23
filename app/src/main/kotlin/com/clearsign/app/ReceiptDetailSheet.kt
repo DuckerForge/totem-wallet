@@ -98,7 +98,7 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                     )
                 }
                 if (e.attestationSig != null) { HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 20.dp); Spacer(Modifier.width(8.dp)) }
-                RoundIconButton(HIcon.CLOSE, onClick = onDismiss)
+                RoundIconButton(HIcon.CLOSE, description = stringResource(R.string.close), onClick = onDismiss)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (e.hasValue) Column { SignReceiptBody(receipt, e.cluster) }
@@ -120,7 +120,7 @@ internal fun ReceiptDetailSheet(entry: LedgerEntry, onDismiss: () -> Unit) {
                                 SmallChip("Solscan", HIcon.EXTERNAL, Halo.cyan) { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(solscanTxUrl(sig, e.cluster)))) } }
                             }
                         }
-                        e.pkg?.let { StatRow("package", it) }
+                        e.pkg?.let { StatRow(stringResource(R.string.detail_package), it) }
                     }
                 }
 

@@ -114,7 +114,7 @@ internal fun TokenPicker(
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onClose() }, contentAlignment = Alignment.Center) {
-                HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp)
+                HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 18.dp, description = stringResource(R.string.back))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -128,7 +128,7 @@ internal fun TokenPicker(
             placeholder = { Text(stringResource(R.string.tok_search), fontFamily = Inter, fontSize = 13.sp, color = Halo.muted) },
             leadingIcon = { HaloIcon(HIcon.SEARCH, Halo.muted, 18.dp) },
             trailingIcon = {
-                if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+                if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.a11y_clear_search)) }
             },
             textStyle = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Halo.ink),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),

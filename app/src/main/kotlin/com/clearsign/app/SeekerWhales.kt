@@ -301,9 +301,12 @@ private fun amt(v: Double): String = when {
 
 private fun pct(v: Double): String = if (v >= 10) String.format("%.0f", v) else String.format("%.1f", v)
 
-/** Thousands separated, no decimals: at these sizes cents are noise. */
-private fun money(v: Long): String =
-    "$" + v.toString().reversed().chunked(3).joinToString(".").reversed()
+/**
+ * Thousands separated, no decimals: at these sizes cents are noise. The separator
+ * is the reader's, not ours: a hand-rolled dot wrote 1.234.567 to an English reader
+ * too, and a negative number came out with the minus chopped into a group.
+ */
+private fun money(v: Long): String = String.format("$%,d", v)
 
 private fun fmt(v: Double): String = when {
     v >= 1000 -> String.format("%,.0f", v)

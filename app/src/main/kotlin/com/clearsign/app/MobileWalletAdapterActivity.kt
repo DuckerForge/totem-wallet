@@ -249,6 +249,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
         )
     }
 
+    /** ROOT, and it must stay ROOT: this text goes verbatim into the signed statement. */
     private fun fmtDelta(d: BalanceDelta): String =
         String.format(Locale.ROOT, "%.${minOf(d.decimals, 6)}f", kotlin.math.abs(d.uiAmount)).trimEnd('0').trimEnd('.') + " " + d.symbol
 

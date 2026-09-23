@@ -107,7 +107,7 @@ internal fun PaperReceipt(r: Receipt, dests: List<NodeDest>, danger: Boolean, ba
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(stringResource(R.string.paper_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Halo.ink, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            Text("ClearSign · " + stringResource(R.string.tagline), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.app_name) + " · " + stringResource(R.string.tagline), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             DashedRule()
             // amounts
             Text(stringResource(R.string.pay).uppercase(), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 10.5.sp, color = Halo.muted)

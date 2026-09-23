@@ -55,7 +55,7 @@ internal fun DefiSheet(d: DefiPosition, currency: String, onDismiss: () -> Unit)
                     Text(title, style = HaloType.title, color = Halo.ink)
                     Text(d.sub, style = HaloType.small, color = Halo.muted)
                 }
-                RoundIconButton(HIcon.CLOSE, onClick = onDismiss)
+                RoundIconButton(HIcon.CLOSE, description = stringResource(R.string.close), onClick = onDismiss)
             }
             Column(Modifier.padding(horizontal = Space.xl), verticalArrangement = Arrangement.spacedBy(Space.md)) {
                 SoftPanel {

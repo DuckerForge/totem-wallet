@@ -40,6 +40,13 @@ class RugCheckTest {
         assertEquals(RugCheck.Verdict.Stop("already rugged"), RugCheck.judge(summary(5, 99.0), full(true, 1.0), false))
     }
 
+    @Test fun dangerNameReadsItalian() {
+        val v = RugCheck.judge(summary(10, 99.0, "Freeze Authority still enabled" to "danger"), null, italian = true)
+        assertEquals(RugCheck.Verdict.Stop("autorità di freeze ancora attiva"), v)
+        // A name we do not know stays as Rugcheck wrote it: better English than a guess.
+        assertEquals("Some New Risk", RugCheck.italianRiskName("Some New Risk"))
+    }
+
     @Test fun highScoreStops() {
         assertTrue(RugCheck.judge(summary(75, 99.0), full(false, 1_000_000.0), false) is RugCheck.Verdict.Stop)
     }

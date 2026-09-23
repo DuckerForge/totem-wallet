@@ -82,7 +82,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 Box(
                     Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
-                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+                ) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.close)) }
             }
 
             if (link != null) {

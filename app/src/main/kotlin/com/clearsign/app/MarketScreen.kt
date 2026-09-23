@@ -160,7 +160,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         item {
             Box(Modifier.padding(top = 14.dp, bottom = 10.dp)) {
                 PageHeader(stringResource(R.string.tab_market), stringResource(R.string.market_sub), HIcon.STAR_FILLED, tint = Halo.amber) {
-                    RoundIconButton(HIcon.REFRESH, spinning = loading) { refresh++ }
+                    RoundIconButton(HIcon.REFRESH, spinning = loading, description = stringResource(R.string.a11y_refresh)) { refresh++ }
                 }
             }
         }
@@ -211,7 +211,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 placeholder = { Text(stringResource(R.string.market_search), style = HaloType.small, color = Halo.muted) },
                 leadingIcon = { HaloIcon(HIcon.SEARCH, Halo.muted, 18.dp) },
                 trailingIcon = {
-                    if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp) }
+                    if (query.isNotEmpty()) Box(Modifier.clip(rs(999)).clickable { query = "" }.padding(6.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 16.dp, description = stringResource(R.string.a11y_clear_search)) }
                 },
                 textStyle = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Halo.ink),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -395,7 +395,7 @@ private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
             if (removable) {
                 Spacer(Modifier.width(6.dp))
                 Box(Modifier.size(26.dp).clip(rs(999)).clickable { picked = picked.filter { it.id != t.id } }, contentAlignment = Alignment.Center) {
-                    HaloIcon(HIcon.CLOSE, Halo.muted, 13.dp)
+                    HaloIcon(HIcon.CLOSE, Halo.muted, 13.dp, description = stringResource(R.string.a11y_remove))
                 }
             }
         }
@@ -502,7 +502,7 @@ private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, o
         }
         Spacer(Modifier.width(4.dp))
         Box(Modifier.size(34.dp).clip(rs(999)).clickable(onClick = onStar), contentAlignment = Alignment.Center) {
-            HaloIcon(if (followed) HIcon.STAR_FILLED else HIcon.STAR, if (followed) Halo.amber else Halo.muted, 17.dp)
+            HaloIcon(if (followed) HIcon.STAR_FILLED else HIcon.STAR, if (followed) Halo.amber else Halo.muted, 17.dp, description = stringResource(if (followed) R.string.a11y_unfollow else R.string.a11y_follow))
         }
     }
 }

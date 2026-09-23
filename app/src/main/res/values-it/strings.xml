@@ -84,7 +84,7 @@
     <string name="stat_version">Versione</string>
     <string name="stat_instructions">Istruzioni</string>
     <string name="stat_accounts">Account</string>
-    <string name="stat_accounts_fmt">%1$d · %2$d scriv. · %3$d firma</string>
+    <string name="stat_accounts_fmt">%1$d · %2$d scriv. · %3$d firmatari</string>
     <string name="stat_destinations">Destinazioni</string>
     <string name="stat_priority_price">Prezzo priorità</string>
     <string name="stat_fee_base">Fee base</string>
@@ -187,7 +187,7 @@
     <string name="sc_safe_b">1.5 SOL a un contatto fidato</string>
     <string name="sc_drainer_t">Wallet drainer</string>
     <string name="sc_drainer_b">Segnalato malevolo dallo scanner</string>
-    <string name="sc_poison_t">Indirizzo civetta</string>
+    <string name="sc_poison_t">Indirizzo sosia</string>
     <string name="sc_poison_b">Address-poisoning: estremi uguali, indirizzo diverso</string>
     <string name="sc_approve_t">Approvazione illimitata</string>
     <string name="sc_approve_b">Delega di spesa senza limiti</string>
@@ -251,7 +251,7 @@
     <string name="theme_unlock_price">Prezzo</string>
     <string name="theme_unlock_balance">I tuoi SKR</string>
     <string name="theme_unlock_fee">Commissione di rete</string>
-    <string name="theme_unlock_signer">Firma</string>
+    <string name="theme_unlock_signer">Firmato da</string>
     <string name="theme_unlock_hold">Tieni premuto per pagare %1$d SKR</string>
     <string name="theme_unlock_checking">Leggo il tuo saldo SKR</string>
     <string name="theme_unlock_no_skr">In questo wallet non ci sono SKR. I temi premium si pagano in SKR.</string>
@@ -278,7 +278,14 @@
     <string name="deleg_scanning">Leggo i token account</string>
     <string name="deleg_clean">Tutto pulito</string>
     <string name="deleg_none">Nessuna delega attiva, nessun account vuoto.</string>
-    <string name="deleg_count">%1$d deleghe · %2$d account vuoti</string>
+    <plurals name="deleg_delegations_n">
+        <item quantity="one">%1$d delega</item>
+        <item quantity="other">%1$d deleghe</item>
+    </plurals>
+    <plurals name="deleg_empties_n">
+        <item quantity="one">%1$d account vuoto</item>
+        <item quantity="other">%1$d account vuoti</item>
+    </plurals>
     <string name="deleg_row_title">%1$s · un delegato può spendere</string>
     <string name="deleg_unlimited">illimitata</string>
     <string name="deleg_amount">fino a %1$s</string>
@@ -291,14 +298,20 @@
     <string name="sheet_revoke_title">Revoca delega</string>
     <string name="sheet_revoke_what">Il delegato %1$s perde il permesso di spendere dal tuo account.</string>
     <string name="sheet_close_title">Chiudi account vuoto</string>
-    <string name="sheet_close_what">%1$d account vuoti chiusi; il rent torna nel tuo wallet.</string>
+    <plurals name="sheet_close_what">
+        <item quantity="one">%1$d account vuoto chiuso; il rent torna nel tuo wallet.</item>
+        <item quantity="other">%1$d account vuoti chiusi; il rent torna nel tuo wallet.</item>
+    </plurals>
     <string name="sheet_refund">Ti torna</string>
     <string name="hold_revoke">Tieni premuto per revocare</string>
     <string name="hold_close">Tieni premuto per chiudere</string>
     <string name="sheet_done_revoke">Delega revocata.</string>
     <string name="sheet_done_close">Chiuso. Rent restituito al wallet.</string>
     <string name="wa_log_revoke">Revoca delegato %1$s</string>
-    <string name="wa_log_close">Chiudi %1$d account vuoti</string>
+    <plurals name="wa_log_close">
+        <item quantity="one">Chiudi %1$d account vuoto</item>
+        <item quantity="other">Chiudi %1$d account vuoti</item>
+    </plurals>
     <string name="send_title">Invia</string>
     <string name="send_sub">SOL o token, con la ricevuta Velum</string>
     <string name="send_review_sub">Controlla la ricevuta, poi tieni premuto per firmare</string>
@@ -315,12 +328,12 @@
     <string name="send_analyzing">Simulo e costruisco la ricevuta…</string>
     <string name="send_invalid_amount">Inserisci un importo valido.</string>
     <string name="send_self">È il tuo stesso indirizzo.</string>
-    <string name="send_not_wallet">Quell\'indirizzo non è un portafoglio. È un programma o un conto token, e i soldi mandati lì si perdono.</string>
+    <string name="send_not_wallet">Quell\'indirizzo non è un wallet. È un programma o un token account, e i soldi mandati lì si perdono.</string>
     <string name="send_insufficient">%1$s insufficienti.</string>
     <string name="send_available">Disponibili: %1$s</string>
     <string name="send_hold">Tieni premuto per inviare</string>
     <string name="send_done">Inviata. Si conferma in pochi secondi.</string>
-    <string name="send_blocked">Bloccato: questo trasferimento ha un rischio DANGER.</string>
+    <string name="send_blocked">Bloccato: rischio grave su questa transazione.</string>
     <string name="back">Indietro</string>
     <string name="receive_title">Ricevi</string>
     <string name="receive_note">Il tuo indirizzo del Seed Vault</string>
@@ -423,7 +436,7 @@
     <string name="pdf_tags">Tag</string>
     <string name="pdf_attested">ATTESTATO — firma ES256 della chiave hardware di questa app sulla dichiarazione qui sotto</string>
     <string name="pdf_not_attested">non attestato</string>
-    <string name="pdf_footer">clearsign · pagina %1$d</string>
+    <string name="pdf_footer">velum · pagina %1$d</string>
     <string name="pdf_totals">Totali</string>
     <string name="pdf_fiat_total">Totale in %1$s (voci con prezzo)</string>
     <string name="pdf_more_legs">+%1$d altri movimenti</string>
@@ -549,7 +562,7 @@
     <string name="ore_pick_squares">Tocca le caselle qui sotto</string>
     <string name="ore_total">%1$d caselle a %2$s SOL fanno %3$s SOL.</string>
     <string name="ore_first_fee">Più 10.000 lamport la prima volta.</string>
-    <string name="ore_wager_note">Non vinci mai il SOL degli altri. Una casella perdente trattiene circa l\'11% del tuo, quella vincente l\'1%. Il premio è l\'ORE, diviso fra chi sta sulla casella vincente.</string>
+    <string name="ore_wager_note" formatted="false">Non vinci mai il SOL degli altri. Una casella perdente trattiene circa l\'11% del tuo, quella vincente l\'1%. Il premio è l\'ORE, diviso fra chi sta sulla casella vincente.</string>
     <string name="ore_best_label">Le caselle più libere adesso:</string>
     <string name="ore_outlook">Atteso: %1$s ORE (≈ %2$s SOL). Costo atteso: %3$s SOL, il %4$s%% della puntata.</string>
     <string name="ore_outlook_nopx">Atteso: %1$s ORE. Costo atteso: %2$s SOL, il %3$s%% della puntata.</string>
@@ -637,12 +650,27 @@
     <string name="health_weak">Da sistemare</string>
     <string name="health_risky">A rischio</string>
     <string name="health_clean">Nessuna approvazione attiva, niente da recuperare.</string>
-    <string name="health_issues">%1$d cosa/e da sistemare</string>
-    <string name="health_fix_hint">Correggi in “Deleghe &amp; account” qui sotto. Una firma sola.</string>
-    <string name="health_unlimited">%1$d approvazione/i illimitata/e — %2$s può drenare quei token</string>
-    <string name="health_limited">%1$d approvazione/i che un delegato può ancora spendere</string>
-    <string name="health_dust">%1$d account vuoti. Recupera il rent.</string>
-    <string name="health_frozen">%1$d account congelati: %2$s</string>
+    <plurals name="health_issues">
+        <item quantity="one">%1$d cosa da sistemare</item>
+        <item quantity="other">%1$d cose da sistemare</item>
+    </plurals>
+    <string name="health_fix_hint">Correggi in «Deleghe e account» qui sotto. Una firma sola.</string>
+    <plurals name="health_unlimited">
+        <item quantity="one">%1$d approvazione illimitata — %2$s può drenare quei token</item>
+        <item quantity="other">%1$d approvazioni illimitate — %2$s può drenare quei token</item>
+    </plurals>
+    <plurals name="health_limited">
+        <item quantity="one">%1$d approvazione che un delegato può ancora spendere</item>
+        <item quantity="other">%1$d approvazioni che un delegato può ancora spendere</item>
+    </plurals>
+    <plurals name="health_dust">
+        <item quantity="one">%1$d account vuoto. Recupera il rent.</item>
+        <item quantity="other">%1$d account vuoti. Recupera il rent.</item>
+    </plurals>
+    <plurals name="health_frozen">
+        <item quantity="one">%1$d account congelato: %2$s</item>
+        <item quantity="other">%1$d account congelati: %2$s</item>
+    </plurals>
     <string name="health_frozen_why">Può sbloccarli solo chi ha emesso la moneta. Tu non puoi farci niente, e non si possono nemmeno chiudere per recuperare il rent.</string>
     <string name="trace_run">Scansiona a fondo questo indirizzo</string>
     <string name="trace_pro">Scan profondo attività — funzione Velum Pro</string>
@@ -678,9 +706,9 @@
     <string name="swapfees_note" formatted="false">Crea i token account del wallet fee sui mint principali così la fee dello 0,5% arriva sempre. Idempotente.</string>
     <string name="swapfees_btn">Attiva le fee swap</string>
     <string name="swapfees_done">Account per le fee swap pronti.</string>
-    <string name="swapfees_pending">Mancano %1$d conti, fra le monete che segui e quelle che hai. Aprirli costa circa %2$s SOL di affitto, che resta tuo.</string>
-    <string name="swapfees_all_set">Tutti i conti ci sono. Le tue monete pagano la commissione.</string>
-    <string name="swapfees_nothing">Non manca nessun conto.</string>
+    <string name="swapfees_pending">Mancano %1$d account, fra le monete che segui e quelle che hai. Aprirli costa circa %2$s SOL di rent, che resta tuo.</string>
+    <string name="swapfees_all_set">Tutti gli account ci sono. Le tue monete pagano la commissione.</string>
+    <string name="swapfees_nothing">Non manca nessun account.</string>
     <string name="swapfees_log">Attiva account fee swap</string>
     <string name="watch_channel">Avvisi Watchtower</string>
         <string name="watch_nobody">Non segui ancora nessuno. Metti la stella su un portafoglio nella diretta.</string>
@@ -694,7 +722,10 @@
     <string name="watch_flag_title">Velum · indirizzo segnalato</string>
     <string name="watch_flag_body">Un indirizzo che hai pagato è finito nella blocklist. Apri Velum per controllare.</string>
     <string name="watch_appr_title">Velum · approvazioni da rivedere</string>
-    <string name="watch_appr_body">%1$d approvazione/i illimitata/e attive sul tuo wallet. Tocca per revocarle.</string>
+    <plurals name="watch_appr_body">
+        <item quantity="one">%1$d approvazione illimitata attiva sul tuo wallet. Tocca per revocarla.</item>
+        <item quantity="other">%1$d approvazioni illimitate attive sul tuo wallet. Tocca per revocarle.</item>
+    </plurals>
     <string name="hero_show_all">Mostra tutti (%1$d)</string>
     <string name="hero_show_less">Mostra meno</string>
     <string name="hero_others">%1$d altri asset (NFT e token sconosciuti)</string>
@@ -821,7 +852,7 @@
     <string name="gate_card_note">Un agente sul computer mostra un QR; lo inquadri e Velum confronta ciò che l\'agente DICHIARA con ciò che la transazione FA davvero, poi approvi con la biometria. La chiave non lascia mai il Seed Vault.</string>
     <string name="gate_scan">Inquadra una richiesta agente</string>
     <string name="gate_not_a_request">Quel QR non è una richiesta Agent Gate.</string>
-    <string name="tab_agent">Agent</string>
+    <string name="tab_agent">Agente</string>
     <string name="agent_tab_title">Agent Gate</string>
     <string name="agent_tab_sub">Il tuo agente, la sua paghetta, e cosa può fare senza di te.</string>
     <string name="agent_tab_how">Un agente sul tuo computer prepara una transazione e dichiara cosa fa. Tu inquadri qui il suo QR: Velum simula i byte veri e blocca la firma se la dichiarazione non corrisponde. La chiave non lascia mai il Seed Vault.</string>
@@ -829,7 +860,7 @@
     <string name="agent_tab_none">Collega prima il Seed Vault dalla linguetta Portafoglio.</string>
     <string name="agent_tab_recent">FIRME PER AGENTI</string>
     <string name="agent_tab_empty">Non hai ancora firmato niente per un agente.</string>
-    <string name="agent_tab_setup">Le istruzioni sono in docs/SETUP-AGENT.md: in locale con Claude Code, oppure come connettore via URL per Claude, ChatGPT e Grok.</string>
+    <string name="agent_tab_setup">Il ponte gira sul tuo computer, in locale con Claude Code oppure come connettore via URL per Claude, ChatGPT e Grok. Tocca «Collega un agente sul computer» per il comando.</string>
     <string name="agent_state_title">Il tuo conto principale è intoccabile</string>
     <string name="agent_state_body">Niente di quello che fa l\'agente può arrivare al conto del Seed Vault. Spende dalla paghetta e da nient\'altro, e nel momento in cui chiudi la paghetta gli togli tutto. Sopra i limiti che hai messo deve chiedere a te, e firmi con l\'impronta.</string>
     <string name="agent_stat_signed">firmate per agenti</string>
@@ -943,7 +974,7 @@
     <string name="rules_state_off">Spento</string>
     <string name="rules_state_off_sub">Non compra e non vende niente. I soldi restano dove sono.</string>
     <string name="rules_moves">Con questi numeri l\'agente può fare %1$d mosse al giorno da %2$s l\'una.</string>
-    <string name="rules_moves_few">Attenzione: con una fetta da %1$s e questo tetto giornaliero l\'agente fa **%2$d** mosse al giorno. Dalla seconda in poi vorrebbe la tua firma, e da solo non può averla: si ferma. Alza il tetto giornaliero o abbassa la fetta.</string>
+    <string name="rules_moves_few">Attenzione: con una fetta da %1$s e questo tetto giornaliero l\'agente fa %2$d mosse al giorno. Dalla seconda in poi vorrebbe la tua firma, e da solo non può averla: si ferma. Alza il tetto giornaliero o abbassa la fetta.</string>
     <string name="rules_unsaved">Da salvare: vale quando tocchi Salva qui sotto.</string>
     <string name="agent_rules_body">Cosa l\'agente può firmare senza di te. Tutto è controllato sulla simulazione, mai su quello che dice l\'agente.</string>
     <string name="agent_per_tx">Per operazione</string>
@@ -1227,7 +1258,7 @@
     <string name="shadow_rows">%1$d seguite</string>
     <string name="shadow_trades">%1$d chiuse, %2$d in utile</string>
     <string name="shadow_not_yet">%1$d operazioni chiuse su %2$d. Sotto quella soglia la differenza è rumore e non ti propongo niente.</string>
-    <string name="shadow_switch">La regola \"%1$s\" avrebbe reso %2$s SOL invece di %3$s, su %4$d operazioni. Passo a quella?</string>
+    <string name="shadow_switch">La regola «%1$s» avrebbe reso %2$s SOL invece di %3$s, su %4$d operazioni. Passo a quella?</string>
     <string name="shadow_apply">Cambia regola</string>
     <string name="shadow_walls_cost">I blocchi ti sono costati %2$s SOL su %1$d monete lasciate perdere.</string>
     <string name="shadow_walls_saved">I blocchi ti hanno risparmiato %2$s SOL su %1$d monete lasciate perdere.</string>
@@ -1297,7 +1328,7 @@
     <string name="trader_web_stop">Lasciata perdere %1$s. Sul web si legge: %2$s</string>
     <string name="trader_daily_full">Fermo: dei %1$s SOL al giorno ne restano %2$s, e la mossa più piccola che sa fare ne vuole di più. Il contatore si libera alle %3$s, oppure alzi il tetto nelle Regole dell\'agente.</string>
     <string name="trader_per_tx_full">Fermo: la fetta da %1$s SOL supera il tetto per operazione di %2$s. Abbassa la fetta o alza il tetto.</string>
-    <string name="trader_above_silent">Fermo: %1$s SOL supera la soglia silenziosa di %2$s, quindi vuole la tua firma e da sola non può averla.</string>
+    <string name="trader_above_silent">Fermo: %1$s SOL supera la soglia silenziosa di %2$s, quindi vuole la tua firma e da solo non può averla.</string>
     <string name="trader_asked_why">Fermo su %1$s. Il collare voleva la tua firma: %2$s</string>
     <string name="trace_bad_rate">%1$s costa il %2$d%% solo per entrarci, lascio perdere</string>
     <string name="trace_no_sim">non riesco a simulare %1$s adesso, riprovo dopo</string>
@@ -1388,7 +1419,7 @@
     <string name="feed_show_more">Mostra altri %1$d</string>
     <string name="feed_waiting">Sto aspettando il primo acquisto.</string>
     <string name="feed_they_put">Lui ci ha messo %1$s SOL.</string>
-    <string name="feed_they_sold">Lui ne ha tirati fuori %1$s SOL.</string>
+    <string name="feed_they_sold">Ne ha tirati fuori %1$s SOL.</string>
     <string name="feed_sell_note">Qualcuno si sta togliendo da questa. Guarda prima di entrarci dietro.</string>
     <string name="feed_cannot_quote">Non riesco a dare un prezzo a questa moneta adesso.</string>
     <string name="feed_balance">Hai %1$s SOL.</string>
@@ -1412,7 +1443,7 @@
     <string name="feed_fee">Commissione</string>
     <string name="feed_risk">Rischi</string>
     <string name="feed_risk_none">nessuno trovato</string>
-    <string name="feed_since">%1$s da quando è entrato lui, %2$s fa</string>
+    <string name="feed_since">%1$s da quando è entrato, %2$s fa</string>
     <string name="wp_holds">Cosa tiene adesso</string>
     <string name="wp_holds_failed">Non riesco a leggere questo portafoglio adesso.</string>
     <string name="wp_holds_none">Niente che valga un dollaro nei conti token.</string>
@@ -1436,14 +1467,14 @@
     <string name="who_focus">Sono i più attivi del censimento. Insieme tengono 101.821 SOL.</string>
         <string name="feed_meta_sell">%1$s · ha tirato fuori %2$s SOL · %3$s</string>
 <string name="feed_meta2">%1$s · ha speso %2$s SOL · %3$s</string>
-    <string name="span_minutes">5 ore</string>
-    <string name="span_hours">2 giorni</string>
-    <string name="span_days">3 mesi</string>
+    <string name="span_minutes">5H</string>
+    <string name="span_hours">2G</string>
+    <string name="span_days">3M</string>
     <string name="chart_none">Questa moneta non ha ancora uno storico prezzi.</string>
     <string name="chart_change">%1$s in %2$s</string>
-    <string name="span_week">7 giorni</string>
-    <string name="span_month">30 giorni</string>
-    <string name="span_year">1 anno</string>
+    <string name="span_week">7G</string>
+    <string name="span_month">30G</string>
+    <string name="span_year">1A</string>
     <string name="chart_src_pool">pool</string>
     <string name="chart_src_market">mercato</string>
     <string name="chart_ohlc">Ap %1$s · Max %2$s · Min %3$s · Ch %4$s</string>
@@ -1728,7 +1759,7 @@
     <string name="bridge_open_failed">RocketX non ha aperto l\'ordine. Riprova.</string>
     <string name="bridge_memo">Questa rotta vuole un memo, che Invia non sa ancora scrivere. Cambia importo per avere un\'altra rotta.</string>
     <string name="bridge_memo_line">Ponte verso %1$s via %2$s (RocketX)</string>
-    <string name="bridge_truth">L\'ordine dà un indirizzo di deposito; i soldi ci vanno con il normale Invia, scontrino e impronta compresi. RocketX non chiede chi sei e una rotta via exchange spezza il filo sulla catena, ma non è un mixer e non è anonimato. Commissioni dallo 0,2 allo 0,4%.</string>
+    <string name="bridge_truth" formatted="false">L\'ordine dà un indirizzo di deposito; i soldi ci vanno con il normale Invia, scontrino e impronta compresi. RocketX non chiede chi sei e una rotta via exchange spezza il filo sulla catena, ma non è un mixer e non è anonimato. Commissioni dallo 0,2 allo 0,4%.</string>
     <string name="bridge_past">Ponti aperti</string>
     <string name="bridge_status">Stato</string>
     <string name="bridge_status_none">Ancora nessuna risposta</string>
@@ -1834,7 +1865,7 @@
     <string name="eyes_you">Tu: %1$s</string>
     <string name="first_title">Il primo minuto</string>
     <string name="first_1">Fai una paghetta: soldi separati dal tuo wallet, da 0,15 SOL in su, così ogni acquisto supera i 5 $ che Jupiter chiede per fargli la guardia sulla catena.</string>
-    <string name="first_2">Premi Avvia. Cerca una moneta ogni sei minuti con i cancelli dei bot che vincono più Rugcheck, compra una fetta, vende a +30% o −15%.</string>
+    <string name="first_2" formatted="false">Premi Avvia. Cerca una moneta ogni sei minuti con i cancelli dei bot che vincono più Rugcheck, compra una fetta, vende a +30% o −15%.</string>
     <string name="first_3">Apri Guardalo lavorare: i grafici, i suoi ragionamenti battuti, una voce se la vuoi. Chiudi e riprendi tutto quando vuoi.</string>
     <string name="first_note">La tua seed non la vede mai. Sopra i suoi limiti chiede l\'impronta. Quello che ci metti è quello che puoi perdere: parti piccolo.</string>
 <string name="agent_channel_quiet">Come vanno le monete</string>
@@ -1872,29 +1903,29 @@
     <string name="chart_ago">%1$s fa</string>
     <string name="feed_no_chart">Nessun grafico adesso. Tocca per riprovare.</string>
     <string name="gift_see_receipt">Vedi lo scontrino, poi paga</string>
-    <string name="env_review_hint_swap">Questo e quello che firmi. Tieni premuto, poi l\'impronta.</string>
+    <string name="env_review_hint_swap">Questo è quello che firmi. Tieni premuto, poi l\'impronta.</string>
     <string name="feed_chart_wait">Sto cercando il grafico…</string>
     <string name="trust_my_budget">la tua paghetta</string>
     <string name="trust_my_wallet">il tuo portafoglio</string>
     <string name="follow_copy_both">copio acquisti e vendite</string>
     <string name="follow_copy_buys">copio i suoi acquisti</string>
     <string name="trader_no_onchain_why">Niente ordine su Jupiter (%1$s). Non è andato storto niente e la moneta sta bene: vuol solo dire che l\'obiettivo e lo stop li guarda il ciclo, dentro l\'app. Finché è aperta sono guardati, se la chiudi non li guarda nessuno.</string>
-    <string name="eyes_full">pieno %1$d/%2$d · non cerca finche\' non chiude una</string>
+    <string name="eyes_full">pieno %1$d/%2$d · non cerca finché non chiude una</string>
     <string name="night_worked_recent">L\'agente ha lavorato.</string>
     <string name="agent_slice">Quanto del tetto ci mette</string>
     <string name="trace_fee_ok">%1$s trattiene il %2$d%%, dentro il %3$d%% che accetti</string>
     <string name="agent_fee_max">Commissione della moneta</string>
-    <string name="rules_cap_is_budget">Questo e\' tutta la paghetta: %1$s. Per andare piu\' in alto, mettine dentro altri.</string>
-    <string name="rules_daily_on_sub">%1$s al giorno. Quello che ha gia\' speso oggi si toglie da qui.</string>
-    <string name="rules_daily_off_sub">Nessun tetto al giorno. L\'unico tetto e\' la paghetta: %1$s.</string>
-    <string name="rules_daily_used">Oggi ne ha spesi %1$s su %2$s. Il tetto non puo\' superare la paghetta: piu\' di quello che hai non puo\' uscire.</string>
-    <string name="rules_daily_roundtrip">Una moneta comprata e rivenduta qui non conta: non e\' uscito niente, ha solo cambiato forma.</string>
-    <string name="bridge_dest_wrong">Questo non e un indirizzo %1$s. Mandati lo stesso, i soldi vanno in un posto che non e tuo e non tornano.</string>
+    <string name="rules_cap_is_budget">Questo è tutta la paghetta: %1$s. Per andare più in alto, mettine dentro altri.</string>
+    <string name="rules_daily_on_sub">%1$s al giorno. Quello che ha già speso oggi si toglie da qui.</string>
+    <string name="rules_daily_off_sub">Nessun tetto al giorno. L\'unico tetto è la paghetta: %1$s.</string>
+    <string name="rules_daily_used">Oggi ne ha spesi %1$s su %2$s. Il tetto non può superare la paghetta: più di quello che hai non può uscire.</string>
+    <string name="rules_daily_roundtrip">Una moneta comprata e rivenduta qui non conta: non è uscito niente, ha solo cambiato forma.</string>
+    <string name="bridge_dest_wrong">Questo non è un indirizzo %1$s. Se li mandi lo stesso, i soldi vanno in un posto che non è tuo e non tornano.</string>
     <string name="bridge_dest_unknown">Il formato degli indirizzi di questa catena non lo conosciamo, quindi non possiamo controllarlo. Rileggilo due volte.</string>
-    <string name="bridge_memo_missing">Questa rotta pretende un memo e l ordine non ne ha portato uno. Senza, il deposito arriva e non viene accreditato a nessuno.</string>
-    <string name="bridge_worse">La rotta si e mossa: il preventivo diceva %1$s, l ordine da %2$s, il %3$s%% in meno. Premi di nuovo per accettarlo, o cambia rotta.</string>
+    <string name="bridge_memo_missing">Questa rotta pretende un memo e l\'ordine non ne ha portato uno. Senza, il deposito arriva e non viene accreditato a nessuno.</string>
+    <string name="bridge_worse">La rotta si è mossa: il preventivo diceva %1$s, l\'ordine dà %2$s, il %3$s%% in meno. Premi di nuovo per accettarlo, o cambia rotta.</string>
     <string name="hold_col_who">QUANTI LA TENGONO</string>
-    <string name="hold_col_each">% · $ TIPICO</string>
+    <string name="hold_col_each" formatted="false">% · $ TIPICO</string>
     <string name="send_wanted_missing">La richiesta chiede %1$s, che non hai in questo portafoglio.</string>
     <string name="send_blocked_drain">Bloccato: manda via quasi tutto il saldo a un indirizzo che questo telefono non ha mai visto. Se è un tuo conto, salvalo fra i contatti e riprova.</string>
     <string name="send_save_contact">Salva fra i contatti</string>
@@ -1951,4 +1982,12 @@
     <string name="send_private">Manda privato</string>
     <string name="send_private_sub">La catena non mostra più una riga fra i due indirizzi. Ci mette qualche minuto.</string>
     <string name="send_private_switch">Passa a SOL.</string>
+    <string name="stats_hdr">DATI</string>
+    <string name="detail_package">pacchetto</string>
+    <string name="a11y_clear_search">Svuota la ricerca</string>
+    <string name="a11y_remove">Togli</string>
+    <string name="a11y_follow">Segui</string>
+    <string name="a11y_unfollow">Smetti di seguire</string>
+    <string name="a11y_details">Dettagli</string>
+    <string name="a11y_refresh">Aggiorna</string>
 </resources>

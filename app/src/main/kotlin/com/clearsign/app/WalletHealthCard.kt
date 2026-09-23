@@ -31,6 +31,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -69,7 +70,7 @@ internal fun WalletHealthCard(owner: String?, refreshKey: Int = 0) {
                         fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink,
                     )
                     if (h != null) Text(
-                        if (h.isClean) stringResource(R.string.health_clean) else stringResource(R.string.health_issues, h.issues.sumOf { it.count }),
+                        if (h.isClean) stringResource(R.string.health_clean) else h.issues.sumOf { it.count }.let { n -> pluralStringResource(R.plurals.health_issues, n, n) },
                         fontFamily = Inter, fontSize = 12.sp, color = if (h.isClean) Halo.mint else color,
                     )
                 }
@@ -125,8 +126,8 @@ private fun colorFor(k: HealthIssue.Kind) = when (k) {
     HealthIssue.Kind.DUST_ACCOUNTS -> Halo.cyan; HealthIssue.Kind.FROZEN -> Halo.muted
 }
 private fun textFor(ctx: android.content.Context, i: HealthIssue): String = when (i.kind) {
-    HealthIssue.Kind.UNLIMITED_APPROVAL -> ctx.getString(R.string.health_unlimited, i.count, i.detail)
-    HealthIssue.Kind.LIMITED_APPROVAL -> ctx.getString(R.string.health_limited, i.count)
-    HealthIssue.Kind.DUST_ACCOUNTS -> ctx.getString(R.string.health_dust, i.count)
-    HealthIssue.Kind.FROZEN -> ctx.getString(R.string.health_frozen, i.count, i.detail)
+    HealthIssue.Kind.UNLIMITED_APPROVAL -> ctx.resources.getQuantityString(R.plurals.health_unlimited, i.count, i.count, i.detail)
+    HealthIssue.Kind.LIMITED_APPROVAL -> ctx.resources.getQuantityString(R.plurals.health_limited, i.count, i.count)
+    HealthIssue.Kind.DUST_ACCOUNTS -> ctx.resources.getQuantityString(R.plurals.health_dust, i.count, i.count)
+    HealthIssue.Kind.FROZEN -> ctx.resources.getQuantityString(R.plurals.health_frozen, i.count, i.count, i.detail)
 }

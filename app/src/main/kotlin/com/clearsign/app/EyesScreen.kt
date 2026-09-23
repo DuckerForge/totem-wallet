@@ -225,7 +225,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                     )
                     if (cfg.on && looked > 0L) Countdown(looked, hunted, open.size, cfg.maxPositions)
                 }
-                Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp) }
+                Box(Modifier.clip(rs(999)).clickable { onClose() }.padding(8.dp)) { HaloIcon(HIcon.CLOSE, Halo.muted, 18.dp, description = stringResource(R.string.close)) }
             }
             busy?.let { Working(it) }
             said?.let { Banner(it, Halo.amber, HIcon.INFO) }

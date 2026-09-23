@@ -72,7 +72,7 @@ object Localization {
         RiskFlag.AGENT_INTENT_OK to "Agent %s declares: %s — consistent with the simulation.",
         RiskFlag.BRAND_NEW_RECIPIENT to "The recipient has no on-chain history at all (brand-new wallet).",
         RiskFlag.FEE_EXCESSIVE to "Pays %s× the network's current priority fee (%s SOL extra) — the dApp set a far higher price than needed.",
-        RiskFlag.EXTRA_SIGNERS to "Needs %s more signature(s) besides yours (e.g. %s): it only goes through once someone else also signs.",
+        RiskFlag.EXTRA_SIGNERS to "Signatures needed besides yours: %s (e.g. %s). It only goes through once someone else also signs.",
         RiskFlag.WAGER to "Puts %s SOL on the ORE grid. It is a wager: the SOL can go to the other squares.",
         RiskFlag.WAGER_FOR_OTHER to "Pays %s SOL of ORE squares for another wallet, %s, not for you.",
     )
@@ -97,14 +97,41 @@ object Localization {
         RiskFlag.AGENT_INTENT_OK to "L'agente %s dichiara: %s — coerente con la simulazione.",
         RiskFlag.BRAND_NEW_RECIPIENT to "Il destinatario non ha alcuno storico on-chain (wallet nuovo di zecca).",
         RiskFlag.FEE_EXCESSIVE to "Paga %s× la commissione di priorità attuale della rete (%s SOL in più): la dApp ha impostato un prezzo molto più alto del necessario.",
-        RiskFlag.EXTRA_SIGNERS to "Richiede %s firma/e oltre alla tua (es. %s): si completa solo se firma anche qualcun altro.",
+        RiskFlag.EXTRA_SIGNERS to "Firme richieste oltre alla tua: %s (es. %s). Si completa solo se firma anche qualcun altro.",
         RiskFlag.WAGER to "Mette %s SOL sulla griglia di ORE. È una scommessa: il SOL può andare alle altre caselle.",
         RiskFlag.WAGER_FOR_OTHER to "Paga %s SOL di caselle ORE per un altro portafoglio, %s, non per te.",
     )
 
+    private val riskEs = mapOf(
+        RiskFlag.SIMULATION_FAILED to "No se pudo simular la transacción: no firmo a ciegas.",
+        RiskFlag.SIMULATION_UNAVAILABLE to "La red no respondió a la simulación: no firmo a ciegas.",
+        RiskFlag.BLOCKED_MALICIOUS to "Marcada como maliciosa por el análisis de seguridad.",
+        RiskFlag.SANCTIONED to "El destinatario está en una lista de sanciones: %s",
+        RiskFlag.UNLIMITED_APPROVAL to "Concede autoridad de gasto ILIMITADA sobre tus tokens.",
+        RiskFlag.LIMITED_APPROVAL to "Permite a un delegado gastar tus tokens en tu nombre.",
+        RiskFlag.AUTHORITY_CHANGE to "Cambia el propietario o la autoridad de una cuenta o de un mint.",
+        RiskFlag.ACCOUNT_CLOSE to "Cierra una cuenta y envía el rent a una dirección nueva.",
+        RiskFlag.LOOKALIKE_ADDRESS to "El destinatario se parece a %s pero es una dirección distinta (posible address-poisoning).",
+        RiskFlag.NEW_UNKNOWN_RECIPIENT to "Primera vez que envías a esta dirección.",
+        RiskFlag.STATE_DRIFT to "El estado on-chain cambió después de la vista previa: el resultado ya no coincide con lo que viste.",
+        RiskFlag.COMMUNITY_FLAGGED to "La comunidad marcó esta dirección como estafa.",
+        RiskFlag.DRAINS_BALANCE to "Saca el %s%% de tu saldo en %s.",
+        RiskFlag.WALLET_OWNER_CHANGE to "Cede la propiedad de TU WALLET a un programa: podría quedarse con todo.",
+        RiskFlag.DURABLE_NONCE to "Transacción con durable nonce: la firma nunca caduca y puede enviarse en cualquier momento.",
+        RiskFlag.FOREIGN_FEE_PAYER to "La comisión la paga otro (%s): típico de los kits drainer \"gasless\".",
+        RiskFlag.AGENT_INTENT_MISMATCH to "El agente declaró «%s», pero la transacción en realidad: %s.",
+        RiskFlag.AGENT_INTENT_OK to "El agente %s declara: %s — coherente con la simulación.",
+        RiskFlag.BRAND_NEW_RECIPIENT to "El destinatario no tiene ningún historial on-chain (wallet recién creada).",
+        RiskFlag.FEE_EXCESSIVE to "Paga %s× la comisión de prioridad actual de la red (%s SOL de más): la dApp fijó un precio mucho más alto de lo necesario.",
+        RiskFlag.EXTRA_SIGNERS to "Firmas necesarias además de la tuya: %s (p. ej. %s). Solo se completa si también firma otra persona.",
+        RiskFlag.WAGER to "Pone %s SOL en la cuadrícula de ORE. Es una apuesta: el SOL puede ir a las otras casillas.",
+        RiskFlag.WAGER_FOR_OTHER to "Paga %s SOL de casillas de ORE para otra wallet, %s, no para ti.",
+    )
+
     /** Localized explanation for a risk; unknown locales read English. */
     fun riskDetail(flag: RiskFlag, locale: String = "en", vararg args: Any): String {
-        val tpl = (if (locale == "it") riskIt else riskEn)[flag] ?: riskEn[flag] ?: flag.name
+        val table = when (locale) { "it" -> riskIt; "es" -> riskEs; else -> riskEn }
+        val tpl = table[flag] ?: riskEn[flag] ?: flag.name
         return if (args.isEmpty()) tpl else String.format(java.util.Locale.ROOT, tpl, *args)
     }
 

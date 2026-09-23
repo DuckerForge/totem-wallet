@@ -128,7 +128,7 @@ internal fun ChatScreen(onClose: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(rs(12)).background(Halo.cardSoft).clickable { onClose() },
                 contentAlignment = Alignment.Center,
-            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp) }
+            ) { HaloIcon(HIcon.CHEVRON_LEFT, Halo.ink, 20.dp, description = stringResource(R.string.back)) }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.chat_title), style = HaloType.screen, color = Halo.ink)

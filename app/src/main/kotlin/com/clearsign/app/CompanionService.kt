@@ -31,13 +31,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The floating companion: the wallet as a bubble over every other app. Closed, a sphere
- * with two alternating faces (the agent's coin, the budget); open, the panel with the
- * chart, the two numbers that count and the two buttons that decide. Dragged, it stays
- * put across restarts. Learned on the phone: Hide next to Open killed the service, now it
- * sits under the gear and the service stays alive; the position was not saved; the panel
- * was titled "APEX". Classic Views, not Compose: an overlay has no Activity to host a
- * Composition, and the always-on surface must not be the fragile part.
+ * The floating companion: the wallet as a bubble over every other app. Closed, a sphere with
+ * two alternating faces (the agent's coin, the budget); open, the panel with the chart, the two
+ * numbers that count and the two buttons that decide. Learned on the phone: Hide next to Open
+ * killed the service, now it sits under the gear; the position was not saved; the panel was
+ * titled "APEX". Classic Views, not Compose: an overlay has no Activity to host a Composition.
  */
 class CompanionService : Service() {
 

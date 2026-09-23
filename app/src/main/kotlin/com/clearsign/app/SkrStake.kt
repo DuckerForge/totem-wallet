@@ -6,11 +6,9 @@ import java.nio.ByteOrder
 
 /**
  * SKR staked with the Seeker Guardians. "Claim and stake" puts the airdrop straight into the
- * staking program, so the token list cannot see it. One UserStake account per wallet (169
- * bytes: wallet at 41, guardian pool at 73, shares as u128 at 105) and one config account
- * with the share price (u128 at 137, scaled by 1e9). Staked SKR = shares × price / 1e9.
- * Layout from the read-only indexer `skr-ecosystem-eyes`, checked 15 Sep 2026 against the
- * vault: all shares give 4.98 billion SKR, the vault holds 5.01.
+ * staking program, so the token list cannot see it. One UserStake account per wallet (169 bytes:
+ * wallet at 41, guardian pool at 73, shares as u128 at 105) and one config account with the share
+ * price (u128 at 137, scaled by 1e9). Staked SKR = shares × price / 1e9. Layout from the indexer `skr-ecosystem-eyes`, checked 15 Sep 2026: all shares give 4.98 billion SKR, the vault holds 5.01.
  */
 object SkrStake {
     const val PROGRAM = "SKRskrmtL83pcL4YqLWt6iPefDqwXQWHSw9S9vz94BZ"
@@ -34,13 +32,10 @@ object SkrStake {
     }
 
     /**
-     * What staking really pays, measured. Derived from tokenomics (ten percent yearly inflation
-     * to stakers) it gave 21.25% against the 15.40% the Seeker wallet shows: we cannot see how
-     * much of the emission reaches this pool. The share price we can see, and rewards are paid
-     * by it growing, so two readings far enough apart are the yield exactly. Null until there
-     * are two. A week apart, because Solana Mobile deposits rewards every forty-eight hours and
-     * the price steps rather than drifts: a short window sits between steps or straddles one.
-     * Checked on 1.138725049 to 1.139766368 a couple of days apart: near 15.40%, nowhere near 21.25%.
+     * What staking really pays, measured. Derived from tokenomics (ten percent yearly inflation to
+     * stakers) it gave 21.25% against the 15.40% the Seeker wallet shows. The share price we can see,
+     * and rewards are paid by it growing, so two readings far enough apart are the yield exactly;
+     * null until there are two. A week apart, because rewards land every forty-eight hours and the price steps. Checked on 1.138725049 to 1.139766368 two days apart: near 15.40%.
      */
     const val MIN_SAMPLE_MS = 7 * 24 * 3_600_000L
 

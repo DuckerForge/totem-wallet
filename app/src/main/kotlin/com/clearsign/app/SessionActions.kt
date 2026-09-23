@@ -223,12 +223,10 @@ object SessionActions {
     }
 
     /**
-     * Sell everything the budget holds back to SOL, and mean it. The first version
-     * walked the list once and came home having sold one coin: Jupiter rate-limits a
-     * burst of quotes, so every coin after the first was filed as "could not sell". So: a
-     * breath between coins, a second pass, holdings re-read from the chain between passes,
-     * [onProgress] as "n of total". Returns the symbols that would not sell, which is not
-     * always a failure: a coin with no route out cannot be sold by anybody.
+     * Sell everything the budget holds back to SOL, and mean it. The first version walked the list
+     * once and came home having sold one coin: Jupiter rate-limits a burst of quotes, so every coin
+     * after the first was filed as "could not sell". So: a breath between coins, a second pass,
+     * holdings re-read from the chain between passes, [onProgress] as "n of total". Returns the symbols that would not sell; a coin with no route out cannot be sold by anybody.
      */
     suspend fun sellAll(ctx: Context, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<String> =
         EnvelopeLock.withLock { sellAllInner(ctx, onProgress) }

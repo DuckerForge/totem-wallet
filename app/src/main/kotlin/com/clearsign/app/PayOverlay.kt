@@ -22,13 +22,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
 /**
- * The receipt takes the whole screen, always. Every sheet used to grow its receipt at the
- * bottom of its own form, below the fold, and people scroll past what appears under what
- * they were doing: the one screen the product is built on was the easiest to miss. The
- * form decides the numbers; this shows what they do, alone, over everything. Wrap the
- * receipt in a bare `Column`: it carries its own spacing, and this arrangement would double
- * every gap and push the hold below the fold again. Pass the title, the line under it, and
- * what goes below the receipt (hold, progress, error). Back means back to the form.
+ * The receipt takes the whole screen, always. Every sheet used to grow its receipt at the bottom
+ * of its own form, below the fold, and people scroll past what appears under what they were
+ * doing. The form decides the numbers; this shows what they do, alone, over everything. Wrap the
+ * receipt in a bare `Column`: it carries its own spacing, and this arrangement would double every gap. Pass the title, the line under it, and what goes below the receipt. Back means back to the form.
  */
 @Composable
 internal fun PayOverlay(

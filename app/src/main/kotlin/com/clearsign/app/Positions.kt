@@ -230,13 +230,11 @@ object Positions {
     data class Reconciled(val keep: List<Position>, val gone: List<Position>, val changed: Boolean)
 
     /**
-     * Put the book next to the chain and believe the chain. A simulation is a promise about
-     * one moment; since then a budget can close, an order fill, a coin be sold from the chat,
-     * and a stale row is an agent trying to sell what it does not have. [onChain] is raw
-     * units held by [owner], [parkedMints] the coins inside a live Trigger order, [liveByMint]
-     * Jupiter's active orders (null when not asked; a key drops only on Jupiter's word). Four
-     * outcomes: not our budget, ignore; coins on chain, adopt at the chain's amount; no coins
-     * but a live order, parked; neither, off the list with the reason.
+     * Put the book next to the chain and believe the chain. A simulation is a promise about one
+     * moment; since then a budget can close, an order fill, a coin be sold from the chat, and a stale
+     * row is an agent trying to sell what it does not have. [onChain] is raw units held by [owner],
+     * [parkedMints] the coins inside a live Trigger order, [liveByMint] Jupiter's active orders (null
+     * when not asked). Four outcomes: not our budget, ignore; coins on chain, adopt at the chain's amount; no coins but a live order, parked; neither, off the list with the reason.
      */
     fun reconcile(book: List<Position>, owner: String, onChain: Map<String, Long>, parkedMints: Set<String>, liveByMint: Map<String, String>? = null): Reconciled {
         val keep = ArrayList<Position>()

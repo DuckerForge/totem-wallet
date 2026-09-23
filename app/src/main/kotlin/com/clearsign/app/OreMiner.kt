@@ -8,9 +8,7 @@ import org.json.JSONObject
  * ORE for one wallet: what is in play, what can be claimed, and the transactions to do it.
  * Reading is two calls, the owner's Miner and the Board, then the Round the Board says is
  * running, all through `SolanaRpc.call`, so the pool and the cap. Config is read once per
- * process: it only provides the entropy address a Deploy wants among its accounts. The
- * instructions carry the same accounts in the program's order, checked with a real
- * simulation on 22 Sep 2026; `Ore` in core makes the bytes, here only the accounts are set.
+ * process: it only provides the entropy address a Deploy wants. The instructions carry the accounts in the program's order, checked with a real simulation on 22 Sep 2026; `Ore` in core makes the bytes.
  */
 object OreMiner {
     val PROGRAM: ByteArray = Base58.decode(Ore.PROGRAM)

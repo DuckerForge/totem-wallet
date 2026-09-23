@@ -9,11 +9,9 @@ import java.net.URL
 
 /**
  * Buying a little at a time, without the phone. A Recurring order deposits the whole amount
- * with Jupiter today and its keeper swaps one slice per interval; same virtue as
- * [JupiterTrigger] and same discipline, receipt and Seed Vault before anything is signed.
- * Verified keyless 2026-09-15: `createOrder` answers and refuses a round under fifty USDC
- * ("minimum is 50.00 USDC"), quoted back as Jupiter says it. `inAmount` is the whole deposit;
- * each round is `inAmount / numberOfOrders`.
+ * with Jupiter today and its keeper swaps one slice per interval; same virtue as [JupiterTrigger],
+ * same discipline: receipt and Seed Vault before anything is signed. Verified keyless 2026-09-15:
+ * `createOrder` answers and refuses a round under fifty USDC ("minimum is 50.00 USDC"), quoted back as Jupiter says it. `inAmount` is the whole deposit; each round is `inAmount / numberOfOrders`.
  */
 object JupiterRecurring {
     private const val TAG = "Apex-Recurring"

@@ -20,14 +20,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The agent budget: a throwaway wallet the agent may spend from on its own. What holds,
- * said straight. By construction: the agent holds only this key, so it can never move
- * more than what is in the budget, and the Seed Vault account is untouchable. By you: a
- * sweep ends its power at once. Not on chain: "only swaps", "only these destinations",
- * "seven days" are things this app reports on, not things the network refuses; the cap is
- * the security boundary, the rest is bookkeeping. The key is software because the Seed
- * Vault will not sign without a person, but it never leaves the phone: at rest the seed
- * is encrypted with an AES key in the Android Keystore, so a stolen backup cannot spend it.
+ * The agent budget: a throwaway wallet the agent may spend from on its own. By construction the
+ * agent holds only this key, so it can never move more than the budget, and the Seed Vault
+ * account is untouchable; a sweep ends its power at once. Not on chain: "only swaps", "only
+ * these destinations", "seven days" are things this app reports on, not things the network
+ * refuses; the cap is the security boundary. The key is software because the Seed Vault will not sign without a person; at rest the seed is encrypted with an AES key in the Android Keystore.
  */
 object SessionWallet {
     private const val PREFS = "apex_session"
@@ -249,13 +246,10 @@ object SessionWallet {
     fun setMode(ctx: Context, mode: AgentMode) { policy(ctx)?.let { setPolicy(ctx, it.copy(mode = mode)) } }
 
     /**
-     * Every move leaves a row; its cost may be zero. Two rules read this: the daily money cap
-     * sums the lamports, the hourly move cap counts the rows. A round trip spends nothing but
-     * is still a move. Skipping the row entirely let an agent buy and sell without limit,
-     * paying fee and spread each time, a silent way to empty a budget. And a closed round trip
-     * gives the day back what it returned, with a minus sign: marking zero left the cancelled
-     * buy on the counter, so buying and selling once froze a small budget until the next day.
-     * The cap says what may leave the budget in a day, and from a closed round trip nothing left.
+     * Every move leaves a row; its cost may be zero. The daily money cap sums the lamports, the
+     * hourly move cap counts the rows: a round trip spends nothing but is still a move, and skipping
+     * the row let an agent buy and sell without limit, paying fee and spread each time. A closed
+     * round trip gives the day back what it returned, with a minus sign: marking zero left the cancelled buy on the counter and froze a small budget until the next day.
      */
     fun recordSpend(ctx: Context, lamports: Long, at: Long = System.currentTimeMillis()) {
         val a = spendLog(ctx).filter { it.first > at - 86_400_000L } + (at to lamports)

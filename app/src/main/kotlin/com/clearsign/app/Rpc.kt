@@ -7,11 +7,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * The RPC pool inside the app: compiled providers, the prefs where the pool remembers, one
- * semaphore per provider, the cap read from the archive. The semaphore pays most: one
- * receipt analysis fires nine to fifteen calls almost at once, and a free key's ten per
- * second are global across all users, so five simultaneous approvals worldwide saturated
- * every provider with quota to spare. Each provider grants a few slots; whoever finds none
- * within two seconds moves on instead of being told 429.
+ * semaphore per provider, the cap read from the archive. The semaphore pays most: one receipt
+ * analysis fires nine to fifteen calls almost at once, and a free key's ten per second are
+ * global across all users, so five simultaneous approvals worldwide saturated every provider. Each provider grants a few slots; whoever finds none within two seconds moves on instead of getting 429.
  */
 object Rpc {
     private const val TAG = "ClearSign-RPC"

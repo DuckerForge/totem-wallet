@@ -4,12 +4,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * What the Seeker crowd is buying. The Genesis Token is a non-transferable Token-2022 NFT
- * minted once per device, so one token is one phone. A census found 120,520 wallets, median
- * 0.032 SOL, so only the 10,527 above one SOL are worth following. Two rules that cost signal
- * on purpose: only what was bought, never what is held (a holdings ranking returns SEKR,
- * CHAPTER2, HM, PDT, GRUMPY, airdrops nobody chose); and three distinct wallets or it does not
- * exist, because on sixty wallets the top "trend" was one person buying one coin ten times.
+ * What the Seeker crowd is buying. The Genesis Token is a non-transferable Token-2022 NFT minted
+ * once per device, so one token is one phone. A census found 120,520 wallets, median 0.032 SOL,
+ * so only the 10,527 above one SOL are worth following. Two rules that cost signal on purpose:
+ * only what was bought, never what is held (a holdings ranking returns SEKR, CHAPTER2, HM, PDT, GRUMPY, airdrops nobody chose); and three distinct wallets or it does not exist.
  */
 enum class SeekerTier { WHALE, DOLPHIN }
 

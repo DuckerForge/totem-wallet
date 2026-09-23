@@ -537,11 +537,9 @@ private fun Caret() {
 
 /**
  * The start switch, at the bottom, full width. This is the one page that watches a machine
- * work, in monospace and marked lines and a pulsing ring, and the button was a rectangle
- * with a breathing border: an ordinary button in brackets. Now an instrument panel: four
- * corners instead of a closed frame, a light sweeping left to right, wide letters. Corners
- * read as a thing framed, a machine about to start. One color, no glow: if the button
- * shines more than the numbers, the page has lost.
+ * work, and the button was a rectangle with a breathing border, an ordinary button in brackets.
+ * Now an instrument panel: four corners instead of a closed frame, a light sweeping left to
+ * right, wide letters. One color, no glow: if the button shines more than the numbers, the page has lost.
  */
 @Composable
 private fun ArmBar(label: String, onStart: () -> Unit) {
@@ -602,12 +600,10 @@ private data class Bars(
 )
 
 /**
- * What the system bars take and how much screen is left. Inside a `Dialog` the normal
- * tools fail, and all three failures cut the start button in half: `navigationBarsPadding()`
- * is zero in a Dialog; the first hand count was zero too, because `LocalContext` there is a
- * wrapper, not the Activity, and the cast failed silently; and even with right numbers a
- * margin here shifts down without shortening, the column still took the window's full
- * height. So no margins: measure the real window, subtract the bars, hand the column an exact height.
+ * What the system bars take and how much screen is left. Inside a `Dialog` the normal tools
+ * fail, and each failure cut the start button in half: `navigationBarsPadding()` is zero in a
+ * Dialog; `LocalContext` there is a wrapper, not the Activity, so the cast failed silently; and a
+ * margin shifts the column down without shortening it. So no margins: measure the real window, subtract the bars, hand the column an exact height.
  */
 @Composable
 private fun systemBars(): Bars {

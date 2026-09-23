@@ -4,12 +4,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 
 /**
- * What the agent is doing right now, in its own words. The screen said "trading" or
- * "watching the market", both true and neither telling you whether the thing is alive, stuck,
- * or refusing a coin for a reason you wanted to know: a loop that works invisibly looks like
- * one that has died, which cost sixteen hours one morning. So the loop narrates, one short
- * line per step, and the chat renders the last few as a console. In memory only: a window on
- * a running process, not a record, the ledger is the record.
+ * What the agent is doing right now, in its own words. The screen said "trading" or "watching
+ * the market", neither telling you whether the thing is alive, stuck, or refusing a coin for a
+ * reason you wanted to know: a loop that works invisibly looks like one that died, which cost
+ * sixteen hours one morning. So the loop narrates one short line per step, and the chat renders
+ * the last few as a console. In memory only: a window on a running process, the ledger is the record.
  */
 object AgentTrace {
     private const val MAX = 60

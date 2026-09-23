@@ -14,12 +14,10 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * The orders placed on Jupiter from the main account, and the price alerts asked for. Kept on
- * the phone to show them; the truth is on chain and the list is corrected against it. An
- * order is one of three: sell above today's price (take profit), buy below it (limit), or buy
- * a slice at a time (DCA), all on Jupiter, firing with the phone off. None can be a stop loss:
- * that needs Jupiter's keyed API, and the screens say so. An alert signs nothing: a price, a
- * direction, one notification when crossed, then spent.
+ * The orders placed on Jupiter from the main account, and the price alerts. Kept on the phone
+ * to show them; the truth is on chain and the list is corrected against it. Three kinds: sell
+ * above today's price (take profit), buy below it (limit), buy a slice at a time (DCA), all
+ * firing with the phone off. None can be a stop loss, which needs Jupiter's keyed API. An alert signs nothing: a price, a direction, one notification, then spent.
  */
 object Orders {
     private const val PREFS = "apex_orders"

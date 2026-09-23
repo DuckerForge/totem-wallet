@@ -40,13 +40,11 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * The bridges this phone opened, and where to go and look. A bridge is the one thing whose
- * half that counts is not on Solana: what you sign is a deposit to RocketX, what you wait for
- * is an amount on Base or Bitcoin, and Solscan says "confirmed" while nothing has arrived. So
- * each row carries two transactions on two chains, both links from RocketX
- * (`originTransactionUrl`, `destinationTransactionUrl`), and the amount is `actualAmount`,
- * what really arrived. The third door is RocketX support, with the order number copied
- * first: it is the first thing they ask. The status asks itself on open.
+ * The bridges this phone opened, and where to look. A bridge is the one thing whose half that
+ * counts is not on Solana: you sign a deposit to RocketX and wait for an amount on Base or
+ * Bitcoin, while Solscan says "confirmed". So each row carries two transactions on two chains,
+ * both links from RocketX (`originTransactionUrl`, `destinationTransactionUrl`), and the amount
+ * is `actualAmount`. The third door is RocketX support, order number copied first. The status asks itself on open.
  */
 @Composable
 internal fun BridgeHistorySheet(onDismiss: () -> Unit) {

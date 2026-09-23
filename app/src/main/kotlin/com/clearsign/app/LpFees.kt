@@ -7,11 +7,9 @@ import java.nio.ByteOrder
 /**
  * Money already earned and never collected. A position in a concentrated pool on Orca or
  * Raydium earns a cut of every swap crossing its range, and it sits in the position account
- * until somebody presses collect: a balance cannot show it, the position is an NFT with no
- * number on it. No key needed: the position address derives from the NFT's mint the same way
- * on both venues, so one token list plus one getMultipleAccounts finds them all (verified on
- * chain 16 Sep 2026). The amount is the fee checkpointed at the last touch, so the real
- * figure is this or more, and the screen says "at least". Collecting happens on the venue's page.
+ * until somebody presses collect; a balance cannot show it. No key: the position address derives
+ * from the NFT's mint the same way on both venues, so one token list plus one getMultipleAccounts
+ * finds them all (verified 16 Sep 2026). The amount is the fee at the last touch, so the screen says "at least". Collecting happens on the venue's page.
  */
 object LpFees {
     const val ORCA_PROGRAM = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"

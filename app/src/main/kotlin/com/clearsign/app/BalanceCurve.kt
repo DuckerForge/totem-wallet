@@ -6,13 +6,11 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The shape of your money over the last month, faint behind the home actions. Nothing
- * ever wrote down what the wallet was worth yesterday, so this is what the coins you hold
- * today were worth on each of the last thirty days, not what you had: buy something this
- * morning and the month redraws as if you always held it. Right for a shape with no axis,
- * no figures; the header's "+0.3% today" says the same over one day. Each series is scaled
- * so its last point is today's value, so the right edge is the total above it. The largest
- * coins are looked up, the rest ride flat; kept half an hour. Under eight points, nothing.
+ * The shape of your money over the last month, faint behind the home actions. Nothing wrote
+ * down what the wallet was worth yesterday, so this is what the coins you hold today were worth
+ * on each of the last thirty days: buy something this morning and the month redraws as if you
+ * always held it. Right for a shape with no axis and no figures. Each series is scaled so its
+ * last point is today's value; the largest coins are looked up, the rest ride flat; kept half an hour. Under eight points, nothing.
  */
 object BalanceCurve {
     private const val POINTS = 30

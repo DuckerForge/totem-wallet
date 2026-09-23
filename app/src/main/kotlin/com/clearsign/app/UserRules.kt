@@ -8,13 +8,10 @@ import java.io.File
 import java.util.Locale
 
 /**
- * The person's own rules, in their own words, in a file they wrote: coins they never touch,
- * a floor on holders, a rule about age. Plain Markdown, brought in from the phone or typed in
- * the rules sheet, read by whichever model the person pays for. Two readers: the chat gets it
- * as standing instructions, the loop asks one question per coin about to be bought. The rules
- * can only close doors, never open them: caps, destination list and vault are out of reach, a
- * file saying "buy everything" buys nothing more. Same rule as [CoinCheck]: unknown never
- * blocks, only "no" counts.
+ * The person's own rules, in their own words, in a file they wrote: coins they never touch, a
+ * floor on holders, a rule about age. Plain Markdown, read by whichever model the person pays
+ * for; the chat gets it as standing instructions, the loop asks one question per coin about to
+ * be bought. The rules can only close doors: caps, destination list and vault are out of reach, a file saying "buy everything" buys nothing more. As in [CoinCheck], unknown never blocks.
  */
 object UserRules {
     private const val FILE = "agent_rules.md"

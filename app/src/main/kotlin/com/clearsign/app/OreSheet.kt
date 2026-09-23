@@ -54,13 +54,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * ORE, from the wallet: what you can do on top, the grid under it, the numbers at the
- * bottom, so buttons and receipt show without scrolling and the grid sits under the finger
- * when picking squares. The countdown redraws every second from a slot read once and asks the
- * chain nothing; it rereads when the round is over and the pause has passed. Claim and Dig go
- * through preview, receipt and print like everything this wallet sends. A round lasts about
- * fifty seconds and the print takes a few: the Deploy is rebuilt on the current round when
- * held, and only if [SIGN_MARGIN_S] seconds remain (22 Sep: signed at round end, the node refuses).
+ * ORE, from the wallet: what you can do on top, the grid under it, the numbers at the bottom, so
+ * buttons and receipt show without scrolling. The countdown redraws every second from a slot
+ * read once and rereads when the round is over. Claim and Dig go through preview, receipt and
+ * print like everything this wallet sends. A round lasts about fifty seconds and the print takes
+ * a few: the Deploy is rebuilt on the current round when held, and only if [SIGN_MARGIN_S] seconds remain (22 Sep: signed at round end, the node refuses).
  */
 private sealed interface OreState {
     object Idle : OreState

@@ -1,13 +1,11 @@
 package com.clearsign.core
 
 /**
- * ORE, read and written by hand. Today ORE is a grid of 25 squares and one round a minute:
- * put SOL on squares, one wins, whoever is on it splits one ORE, and the SOL comes back minus
- * fees (see [OreOdds]). The program is Steel, not Anchor: no IDL on chain, so the receipt
- * cannot read it and the bytes are written here. Everything in this file was checked on chain
- * on 22 Sep 2026: recomputed PDAs match the fixed accounts, a real Miner reads with these
- * offsets, a Deploy built from these bytes passes simulation. The program is `oreV3…`, not the
- * v2 the sites still list. Pure: keys travel as base58 strings or 32 bytes from an account.
+ * ORE, read and written by hand. ORE today is a grid of 25 squares and one round a minute: put
+ * SOL on squares, one wins, whoever is on it splits one ORE, the SOL comes back minus fees (see
+ * [OreOdds]). The program is Steel, not Anchor: no IDL on chain, so the bytes are written here.
+ * Everything in this file was checked on chain on 22 Sep 2026: recomputed PDAs match the fixed
+ * accounts, a real Miner reads with these offsets, a Deploy built here passes simulation. The program is `oreV3…`, not the v2 the sites list. Pure: keys as base58 strings or 32 bytes.
  */
 object Ore {
     const val PROGRAM = "oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"

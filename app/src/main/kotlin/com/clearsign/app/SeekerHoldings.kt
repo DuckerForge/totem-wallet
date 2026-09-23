@@ -47,13 +47,10 @@ import kotlin.math.sqrt
 
 /**
  * What a hundred and twenty thousand Seekers hold. The picture exists for one fact: of the
- * thirty-four things this crowd holds most, seven are worth nothing (SEKR, CHAPTER2, PDT,
- * NAMI came with the phone) and lie dim along the floor. That is why the crowd feature
- * counts purchases, never holdings. Numbers from a random sample of the census, measured.
- * Typical, not average: the mean said 487 $ of USDC where the person in the middle has ten,
- * dragged by a few hundred large wallets, so the median is shown. The mean keeps one job,
- * deciding whether a coin is worth nothing: SI, PLANK and MPLX sit at a median of zero with
- * a mean above it, dust in most hands but not worthless.
+ * thirty-four things this crowd holds most, seven are worth nothing (SEKR, CHAPTER2, PDT, NAMI
+ * came with the phone), which is why the crowd feature counts purchases, never holdings. Numbers
+ * from a random sample of the census. Typical, not average: the mean said 487 $ of USDC where the
+ * person in the middle has ten, so the median is shown; the mean only decides whether a coin is worth nothing (SI, PLANK, MPLX: median zero, mean above it).
  */
 private class SeekerHolding(val symbol: String, val pct: Double, val usdPer: Double, val avg: Double)
 

@@ -48,13 +48,11 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * The coin, drawn properly. The sheet carried the same eighty-pixel line the swap button
- * has, right for "am I buying into a crash" and wrong for "what is this coin doing": a line
- * hides the range inside each bar, where the violence is. Here: candles with wicks, volume
- * under them, the scale down the side, a crosshair under the finger. Two sources by what the
- * coin is: on Solana, the busiest GeckoTerminal pool (what DexTools and DexScreener read);
- * elsewhere CoinGecko OHLC, since Bitcoin has no Solana pool. Timeframes are named after
- * the range covered, never a candle size. When neither has anything, nothing is drawn.
+ * The coin, drawn properly. The sheet carried the swap button's eighty-pixel line, right for
+ * "am I buying into a crash" and wrong for "what is this coin doing": a line hides the range
+ * inside each bar. Here candles with wicks, volume, the scale, a crosshair under the finger.
+ * Two sources: on Solana the busiest GeckoTerminal pool (what DexTools and DexScreener read),
+ * elsewhere CoinGecko OHLC. Timeframes are named after the range covered, never a candle size. Nothing to draw, nothing drawn.
  */
 @Composable
 internal fun CoinChart(coin: Market.Coin, mint: String?) {

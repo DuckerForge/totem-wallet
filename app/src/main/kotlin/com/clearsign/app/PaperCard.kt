@@ -44,13 +44,10 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
     val closed = yours?.closed ?: 0
 
     /**
-     * The row that was missing: do nothing. The shadow book compared exit rules with each other
-     * and never with the obvious thing, not buying, so the question was always "which rule loses
-     * least", never "was moving worth it". It costs zero here because the book is measured in
-     * SOL: holding SOL sits exactly at zero. Not a real engine rule on purpose: as
-     * `Fixed(HOLD, 0, 0)` in `ExitRule.all()`, `step` guards both thresholds with `> 0` so the
-     * row would stay open forever, and `netLamports` would still subtract two fees plus rent,
-     * declaring a 0.00205 SOL loss for doing nothing.
+     * The row that was missing: do nothing. The shadow book compared exit rules with each other and
+     * never with not buying, so the question was "which rule loses least", never "was moving worth
+     * it". Holding SOL sits at exactly zero because the book is measured in SOL. Not an engine rule:
+     * as `Fixed(HOLD, 0, 0)`, `step` guards both thresholds with `> 0` so the row would stay open forever, and `netLamports` would charge two fees plus rent for doing nothing.
      */
     val doNothing = Paper.Stat(rule = HOLD, closed = closed, wins = 0, netLamports = 0L)
     val table = (stats + doNothing).sortedByDescending { it.netLamports }

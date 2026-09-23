@@ -6,52 +6,21 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The shape of your money over the last month, faint behind the home actions.
- *
- * ## What it is, said exactly
- *
- * Nothing in this app has ever written down what the wallet was worth yesterday,
- * so a real history does not exist and cannot be invented. What does exist is the
- * price of every coin you hold, going back months. So this is **what the coins
- * you hold today were worth on each of the last thirty days** — not what you had
- * on those days. Buy something this morning and the whole month redraws as if
- * you had always held it.
- *
- * That is a different question from "how did I do", and it would be the wrong
- * number to put next to a percentage. It is the right one for this: a shape
- * under the buttons, no axis, no figures, no label. And it is the same statement
- * the header already makes — "+0.3% today" is this, over one day, on the coins
- * you hold now.
- *
- * ## Anchored to the truth at the right-hand edge
- *
- * Each coin's series is scaled so its last point equals what that coin is worth
- * right now, in your currency. Two things fall out of that: no exchange rate has
- * to be applied to a chart that came back in dollars, and the right end of the
- * curve is the total on the screen above it rather than an approximation of it.
- *
- * ## What it costs
- *
- * At most six coins are looked up, the largest ones, and together they are
- * almost always the whole picture; everything else is carried flat at today's
- * value, which is exactly right for a stablecoin and near enough for dust. The
- * prices come from the same free source the coin charts use, with its own cache,
- * and the finished curve is kept for half an hour. So opening the wallet twenty
- * times in an afternoon costs nothing after the first.
- *
- * Fewer than eight usable points and it draws nothing. A line through three
- * points is a guess wearing the clothes of a measurement.
+ * The shape of your money over the last month, faint behind the home actions. Nothing
+ * ever wrote down what the wallet was worth yesterday, so this is what the coins you hold
+ * today were worth on each of the last thirty days, not what you had: buy something this
+ * morning and the month redraws as if you always held it. Right for a shape with no axis,
+ * no figures; the header's "+0.3% today" says the same over one day. Each series is scaled
+ * so its last point is today's value, so the right edge is the total above it. The largest
+ * coins are looked up, the rest ride flat; kept half an hour. Under eight points, nothing.
  */
 object BalanceCurve {
     private const val POINTS = 30
     private const val MIN_POINTS = 8
     /**
-     * Three coins, not six.
-     *
-     * Every coin costs two requests to a source that starts refusing after five
-     * in a row, and the ones a person actually opened have to win that argument.
-     * The largest three are almost the whole curve anyway; what is left rides
-     * flat, which is what we honestly know about it.
+     * Three coins, not six. Each costs two requests to a source that refuses after five in a
+     * row, and the charts a person opened must win that argument. The largest three are almost
+     * the whole curve; the rest rides flat, which is what we honestly know about it.
      */
     private const val TRACK_MAX = 3
     private const val TTL_MS = 30 * 60_000L
@@ -61,14 +30,11 @@ object BalanceCurve {
     private val cache = ConcurrentHashMap<String, Pair<Long, List<Double>>>()
 
     /**
-     * Quando l'app e' partita, e perche' importa.
-     *
-     * Calcolare la curva da zero costa sei richieste a una fonte che rifiuta
-     * dopo cinque ravvicinate e resta offesa per decine di secondi. Farlo
-     * all'avvio vuol dire farlo esattamente mentre la persona apre le righe e
-     * guarda i grafici, e quello che vedeva era il suo grafico che non arrivava
-     * perche' lo sfondo si era mangiato tutto. Se la curva e' gia' scritta
-     * compare subito; se va calcolata, aspetta che il primo minuto sia passato.
+     * When the app started, and why it matters. Computing the curve from scratch costs six
+     * requests to a source that refuses after five close together and stays sore for tens of
+     * seconds; doing it at start meant doing it while the person opens rows and looks at
+     * charts, and their chart never arrived. Already written, it shows at once; if it must be
+     * computed, it waits out the first minute.
      */
     private val bornAt = System.currentTimeMillis()
     private const val QUIET_MS = 60_000L
@@ -77,29 +43,20 @@ object BalanceCurve {
         val key = owner + "|" + view.currency
         val now = System.currentTimeMillis()
         cache[key]?.let { (at, v) -> if (now - at < TTL_MS) return@withContext v }
-        // Written down, so it is on screen the instant the app opens.
-        //
-        // It lived in memory only, and memory dies with the process: every cold
-        // start paid thirteen requests and four seconds of pauses before the
-        // shape appeared, so the first thing you saw in the morning was the one
-        // morning it was missing. Six hours is old enough for a thirty-day
-        // shape, and the whole thing is scaled onto today's total before it is
-        // drawn, so the right-hand edge is never stale even when the curve is.
+        // Written down, so it is on screen the instant the app opens. In memory only, every cold
+        // start paid thirteen requests and four seconds of pauses, and the first thing seen in
+        // the morning was the one morning it was missing. Six hours is fresh enough for a
+        // thirty-day shape, and it is scaled onto today's total before drawing.
         read(ctx, key, now)?.let { stored ->
             val anchored = anchor(stored, view.total)
             cache[key] = now to anchored
             return@withContext anchored
         }
 
-        // Everything that is yours and has a price, coins and DeFi together.
-        //
-        // The DeFi positions were being left out, and on a wallet where most of
-        // the money is staked that is not a detail: nine tenths of the total sat
-        // flat while a hundred dollars of coins drew the whole shape. A stake has
-        // no mint of its own, only the name of what is staked, so it is matched
-        // to a coin you also hold by that name. Staked SKR and SKR in the wallet
-        // are then one line to look up instead of two, which also spends one
-        // request instead of two.
+        // Everything that is yours and has a price, coins and DeFi together. Leaving the DeFi out
+        // on a mostly staked wallet had nine tenths of the total flat while a hundred dollars of
+        // coins drew the shape. A stake has no mint, only the name of what is staked, so it is
+        // matched to a coin held by that name: one lookup instead of two.
         val waited = System.currentTimeMillis() - bornAt
         if (waited < QUIET_MS) kotlinx.coroutines.delay(QUIET_MS - waited)
 

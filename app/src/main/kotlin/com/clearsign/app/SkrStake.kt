@@ -5,18 +5,12 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * SKR staked with the Seeker Guardians.
- *
- * "Claim and stake" on the Seed Vault Wallet puts the airdrop straight into
- * the staking program, so those SKR never touch the wallet's token account
- * and the token list cannot see them. The program keeps one UserStake account
- * per wallet (169 bytes: the wallet at byte 41, the guardian pool at 73, the
- * shares as a u128 at 105) and one config account with the share price (a
- * u128 at byte 137, scaled by a billion). Staked SKR = shares × price / 1e9.
- *
- * Layout and constants from the open read-only indexer `skr-ecosystem-eyes`,
- * and checked on the 15th of September 2026 against the vault: the formula
- * over all shares gives 4.98 billion SKR, the vault holds 5.01.
+ * SKR staked with the Seeker Guardians. "Claim and stake" puts the airdrop straight into the
+ * staking program, so the token list cannot see it. One UserStake account per wallet (169
+ * bytes: wallet at 41, guardian pool at 73, shares as u128 at 105) and one config account
+ * with the share price (u128 at 137, scaled by 1e9). Staked SKR = shares × price / 1e9.
+ * Layout from the read-only indexer `skr-ecosystem-eyes`, checked 15 Sep 2026 against the
+ * vault: all shares give 4.98 billion SKR, the vault holds 5.01.
  */
 object SkrStake {
     const val PROGRAM = "SKRskrmtL83pcL4YqLWt6iPefDqwXQWHSw9S9vz94BZ"
@@ -33,37 +27,20 @@ object SkrStake {
         val totalStakedRaw: Long,
         /** What one share is worth now. Rewards arrive by this number going up. */
         val sharePrice: Double = 0.0,
-        /** Il conto di stake sulla catena, per il link. Vuoto quando non lo si sa. */
+        /** The stake account on chain, for the link. Empty when unknown. */
         val account: String = "",
     ) {
         val ui: Double get() = rawSkr / 1e6
     }
 
     /**
-     * What staking really pays, measured rather than assumed.
-     *
-     * This used to be derived from the published tokenomics: ten percent yearly
-     * inflation, all of it to stakers, spread over what is staked. That gave
-     * 21.25% against the 15.40% the Seeker wallet itself shows for the same
-     * stake, so the app was promising a third more than the chain pays. The
-     * assumption was the problem, not the arithmetic: we cannot see from here
-     * how much of the emission reaches this pool.
-     *
-     * What we can see is the share price. Rewards are paid by that number
-     * growing, so two readings far enough apart are the yield, exactly, with
-     * nothing assumed. Null until there are two: a number we cannot stand behind
-     * is worse than no number on a screen about somebody's money.
-     *
-     * A week between readings, and the reason is the payout rhythm: Solana
-     * Mobile deposits the rewards into the vault **every forty-eight hours**, so
-     * the share price does not drift upward, it steps. A window of a few hours
-     * either sits between two steps and reports nothing earned, or straddles one
-     * and reports two days of rewards as if they were hours. Over a week the
-     * three or four steps inside it average out.
-     *
-     * Checked against two real readings a couple of days apart: 1.138725049 to
-     * 1.139766368, which annualises near the 15.40% the Seeker wallet shows, and
-     * nowhere near the 21.25% the old formula claimed.
+     * What staking really pays, measured. Derived from tokenomics (ten percent yearly inflation
+     * to stakers) it gave 21.25% against the 15.40% the Seeker wallet shows: we cannot see how
+     * much of the emission reaches this pool. The share price we can see, and rewards are paid
+     * by it growing, so two readings far enough apart are the yield exactly. Null until there
+     * are two. A week apart, because Solana Mobile deposits rewards every forty-eight hours and
+     * the price steps rather than drifts: a short window sits between steps or straddles one.
+     * Checked on 1.138725049 to 1.139766368 a couple of days apart: near 15.40%, nowhere near 21.25%.
      */
     const val MIN_SAMPLE_MS = 7 * 24 * 3_600_000L
 
@@ -96,11 +73,7 @@ object SkrStake {
         )
     }
 
-    /**
-     * The share price, remembered, so the yield can be measured instead of
-     * guessed. One reading kept per device: the oldest one is the most useful,
-     * because a longer span is a steadier rate.
-     */
+    /** The share price, remembered, so the yield is measured, not guessed. One reading per device, the oldest: a longer span is a steadier rate. */
     fun observedAprPct(ctx: android.content.Context, price: Double, now: Long = System.currentTimeMillis()): Double? {
         if (price <= 0.0) return null
         val p = ctx.getSharedPreferences("skr_yield", android.content.Context.MODE_PRIVATE)

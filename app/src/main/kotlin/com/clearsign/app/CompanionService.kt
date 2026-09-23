@@ -31,28 +31,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The floating companion: the wallet as a bubble that lives over every other app.
- *
- * Chiusa e' una sfera con due facce che si alternano: la moneta che l'agente ha
- * in mano con quanto sta facendo, e la paghetta con quanto e' diventata. Aperta
- * e' il pannello: la stessa moneta con l'obiettivo e lo stop disegnati, i due
- * numeri che contano (quanto ci hai messo, quanto c'e' adesso) e i due tasti che
- * decidono. Trascinata **resta dove l'hai lasciata**, anche dopo un riavvio del
- * servizio.
- *
- * Tre cose imparate sul telefono e messe qui dentro:
- *
- *  * "Nascondi" stava in prima fila accanto ad "Apri" e si premeva per sbaglio,
- *    e siccome spegneva il servizio la bolla tornava solo riaprendo l'app.
- *    Adesso sta sotto la rotellina, e nascosta il servizio **resta vivo**: si
- *    torna dal tasto sulla notifica, che e' sempre li';
- *  * la posizione non si salvava, quindi bastava cambiare un'impostazione
- *    qualsiasi per ritrovarsela in alto a sinistra;
- *  * il pannello si intitolava "APEX", un nome morto da due nomi fa.
- *
- * Deliberately built from classic Views rather than Compose: an overlay window
- * has no Activity lifecycle to host a Composition, and a wallet's always-on
- * surface must never be the fragile part.
+ * The floating companion: the wallet as a bubble over every other app. Closed, a sphere
+ * with two alternating faces (the agent's coin, the budget); open, the panel with the
+ * chart, the two numbers that count and the two buttons that decide. Dragged, it stays
+ * put across restarts. Learned on the phone: Hide next to Open killed the service, now it
+ * sits under the gear and the service stays alive; the position was not saved; the panel
+ * was titled "APEX". Classic Views, not Compose: an overlay has no Activity to host a
+ * Composition, and the always-on surface must not be the fragile part.
  */
 class CompanionService : Service() {
 
@@ -88,7 +73,7 @@ class CompanionService : Service() {
     private var flip = false
     private var last: Shot = Shot()
 
-    /** Tutto quello che le due facce e il pannello sanno in questo momento. */
+    /** Everything the two faces and the panel know right now. */
     private data class Shot(
         val health: HealthWidgetData.Snapshot? = null,
         val trading: Boolean = false,
@@ -141,13 +126,9 @@ class CompanionService : Service() {
     // ---- nascosta, ma viva -------------------------------------------------
 
     /**
-     * Via dallo schermo, non dalla memoria.
-     *
-     * Nascondere faceva `stopSelf()`: il servizio moriva, e per riavere la bolla
-     * bisognava aprire l'app e trovare l'interruttore. Ma una cosa che si
-     * nasconde con un dito deve tornare con un dito, e il posto dove sta gia'
-     * quel dito e' la notifica del servizio, che Android ci obbliga comunque a
-     * tenere accesa.
+     * Off the screen, not out of memory. Hiding did `stopSelf()`, and the bubble came back
+     * only by finding the switch in the app. What hides with a finger must return with a
+     * finger, and that finger is already on the service notification Android makes us keep.
      */
     private fun hide() {
         if (hidden) return
@@ -296,41 +277,30 @@ class CompanionService : Service() {
         putLine = put; nowLine = now; nowPct = nowP; agentLine = agent; healthLine = health; moneyBox = money
         sellButton = sell; stopButton = stop
 
-        // Viva per conto sua: ogni minuto i numeri si ridisegnano.
-        //
-        // Il battito resta di un minuto perche' la parte che si muove davvero e'
-        // il valore di quello che teniamo in mano, e quello lo chiede a Jupiter,
-        // non alla catena. Quello che **non** si chiede piu' a ogni battito e' il
-        // saldo: vedi [chainEvery]. Una bolla accesa chiedeva il saldo 1.440
-        // volte al giorno, piu' di un agente che lavora, per un numero che
-        // cambia solo quando l'agente compra o vende.
+        // Alive on its own: every minute the numbers redraw. The beat stays a minute because
+        // what really moves is the value of what we hold, asked of Jupiter, not the chain. The
+        // balance is no longer asked every beat, see [chainEvery]: a bubble asked it 1,440 times
+        // a day, more than a working agent, for a number that changes only on a buy or a sale.
         ticker?.cancel()
         ticker = scope.launch { while (true) { kotlinx.coroutines.delay(60_000); refresh() } }
         startSpinner()
     }
 
     /**
-     * Ogni quanto si disturba la catena per il saldo. Il battito e' un minuto.
-     *
-     * Era cinque minuti, cioe' 288 letture al giorno per bolla, e a diecimila
-     * bolle sono tre milioni al giorno su chiavi che ne danno otto al mese in
-     * tutto. Il numero cambia solo quando l'agente compra o vende, e chi lo
-     * muove ridisegna lo schermo da se': mezz'ora non perde niente.
+     * How often the chain is bothered for the balance; the beat is one minute. It was five
+     * minutes, 288 reads a day per bubble, three million a day at ten thousand bubbles on keys
+     * that give eight a month in all. The number changes only on a buy or a sale, and whoever
+     * moves it redraws the screen anyway: half an hour loses nothing.
      */
     private val chainEvery = 30 * 60_000L
     private var freeAt = 0L
     private var freeCached: Long? = null
 
     /**
-     * Il SOL libero della paghetta, chiesto alla catena al massimo ogni cinque
-     * minuti.
-     *
-     * Fra una lettura e l'altra si ridisegna l'ultimo numero saputo, che e'
-     * ancora vero: il saldo di una paghetta cambia solo quando l'agente compra o
-     * vende, e quando succede chi ha mosso i soldi aggiorna comunque lo schermo.
-     * Una lettura fallita non cancella quella di prima, per la stessa ragione
-     * scritta in HealthWidgetData.refresh: un nodo che non risponde non e' un
-     * borsello vuoto.
+     * The budget's free SOL, asked of the chain at most every [chainEvery]. Between reads the
+     * last known number is redrawn, and it is still true: a budget's balance moves only when
+     * the agent buys or sells, and whoever moved it updates the screen. A failed read keeps the
+     * previous one, for the reason in HealthWidgetData.refresh: a silent node is not an empty wallet.
      */
     private suspend fun freeLamports(pubkey: String): Long? {
         val now = System.currentTimeMillis()
@@ -341,12 +311,9 @@ class CompanionService : Service() {
     }
 
     /**
-     * Le due facce a turno, senza chiedere niente alla rete.
-     *
-     * Gira ogni quattro secondi ma **non ricarica**: ridisegna la stessa
-     * fotografia con l'altra faccia. I dati li porta il giro da sessanta
-     * secondi. Una bolla che interroga la rete ogni quattro secondi sarebbe una
-     * bolla che ti scarica il telefono per farti vedere lo stesso numero.
+     * The two faces in turn, asking the network nothing. Turns every four seconds but does
+     * not reload: it redraws the same snapshot with the other face; the sixty-second tick
+     * brings the data. A bubble polling every four seconds would drain the phone to show the same number.
      */
     private fun startSpinner() {
         spinner?.cancel()
@@ -386,7 +353,7 @@ class CompanionService : Service() {
         setOnClickListener { onClick() }
     }
 
-    /** Una voce della rotellina: tutta la riga, una sotto l'altra. */
+    /** One gear-menu entry: the whole row, stacked. */
     private fun wide(label: String, tint: Int, onClick: () -> Unit) = TextView(this).apply {
         text = label
         setTextColor(tint); textSize = 12.5f
@@ -405,13 +372,9 @@ class CompanionService : Service() {
     private enum class Glyph { GEAR, CLOSE, BACK }
 
     /**
-     * I tre segni, disegnati a mano.
-     *
-     * Nel resto dell'app le icone sono un set disegnato a mano e non si usano
-     * ne' emoji ne' icone di sistema. Qui siamo fuori da Compose e quel set non
-     * si puo' chiamare, quindi si disegnano con le stesse due righe di Canvas
-     * invece di infilare un carattere tipografico che cambia faccia su ogni
-     * telefono.
+     * The three glyphs, drawn by hand. The rest of the app uses its own icon set, never emoji
+     * or system icons; outside Compose that set cannot be called, so the same two Canvas lines
+     * draw them, rather than a typographic character that changes face on every phone.
      */
     private fun glyph(kind: Glyph, tint: Int, onClick: () -> Unit) = ImageView(this).apply {
         val px = dp(22f)
@@ -475,7 +438,7 @@ class CompanionService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (moved) {
-                        // Dove l'hai lasciata se lo ricorda, anche se il servizio riparte.
+                        // It remembers where you left it, even after the service restarts.
                         CompanionPrefs.setSpot(this@CompanionService, lp.x, lp.y)
                     } else if (System.currentTimeMillis() - downAt < 400) {
                         if (expanded) collapse() else expand()
@@ -494,9 +457,9 @@ class CompanionService : Service() {
         mainBox?.visibility = View.VISIBLE
         bubble?.visibility = View.GONE
         panel?.visibility = View.VISIBLE
-        // Il pannello e' largo dieci volte la bolla: se la bolla sta a destra o
-        // in basso, aperto uscirebbe dallo schermo. L'ancora si sposta quel
-        // tanto che basta per restare dentro, e quando si richiude torna dov'era.
+        // The panel is ten times the bubble's width: docked right or low, open it would
+        // leave the screen. The anchor shifts just enough to stay inside, and returns
+        // when it closes.
         params?.let { lp ->
             val m = resources.displayMetrics
             val w = dp(PANEL_DP)
@@ -542,12 +505,9 @@ class CompanionService : Service() {
     // ---- i due tasti che decidono -----------------------------------------
 
     /**
-     * Vendere da qui e' vendere da dentro l'app.
-     *
-     * Passa dalla stessa porta della notifica e della riga in-app:
-     * `SessionActions.sellSaid`, cioe' il collare. Sotto la soglia silenziosa
-     * firma da sola, sopra apre lo scontrino e chiede l'impronta. La bolla non
-     * decide niente: chiede.
+     * Selling from here is selling from inside the app: the same door as the notification and
+     * the in-app row, `SessionActions.sellSaid`, the collar. Below the silent threshold it
+     * signs alone, above it opens the receipt and asks for the print. The bubble decides nothing.
      */
     private fun sellNow() {
         val pos = last.pos ?: return
@@ -561,12 +521,9 @@ class CompanionService : Service() {
     }
 
     /**
-     * The one button: stop when it runs, start when it does not.
-     *
-     * It used to stop in both cases. The label said Start when the loop was
-     * off, and the tap underneath wrote «stopped from the notification» as the
-     * loop's last word, on a loop that had not been started. When starting is
-     * not possible the reason is the loop's own, said here, not a generic note.
+     * The one button: stop when it runs, start when it does not. It used to stop in both
+     * cases, writing "stopped from the notification" as the last word of a loop never started.
+     * When starting is impossible the reason is the loop's own, said here.
      */
     private fun toggleAgent() {
         val ctx = this
@@ -601,8 +558,8 @@ class CompanionService : Service() {
                 if (HealthWidgetData.isStale(ctx)) runCatching { HealthWidgetData.refresh(ctx, updateWidgets = false) }
                 HealthWidgetData.load(ctx)
             }
-            // La paghetta: quanto ci hai messo, e quanto vale adesso fra SOL
-            // libero e monete in mano. Stesso conto della scheda Agente.
+            // The budget: what you put in, and what it is worth now between free SOL and
+            // coins in hand. Same arithmetic as the Agent card.
             val s = SessionWallet.current(ctx)
             var funded = 0L; var total: Long? = null; var diff: Long? = null; var posValue: Long? = null
             if (s != null) {
@@ -638,12 +595,12 @@ class CompanionService : Service() {
 
     private suspend fun quote(pos: Positions.Position): Long? = SessionActions.quoteValue(this, pos)
 
-    /** La faccia da sola: quella che cambia ogni quattro secondi. */
+    /** The face alone: the one that changes every four seconds. */
     private fun paintFace() {
         val chosen = CompanionPrefs.face(this)
         val face = if (chosen != CompanionPrefs.Face.ROTATE) chosen else {
-            // A turno la moneta e la paghetta. Senza niente di aperto la moneta
-            // non ha niente da dire, e al suo posto va il pallino dell'agente.
+            // The coin and the budget in turn. With nothing open the coin has nothing to
+            // say, and the agent's dot takes its place.
             if (flip || last.pos == null) CompanionPrefs.Face.BUDGET else CompanionPrefs.Face.COIN
         }
         val sym = last.pos?.symbol ?: last.coinSymbol
@@ -732,13 +689,10 @@ class CompanionService : Service() {
     // ---- foreground notification ------------------------------------------
 
     /**
-     * The notification a foreground service must have, made as small as Android
-     * allows: a channel at the lowest importance, so no sound, no icon in the
-     * status bar and a collapsed line at the bottom of the shade; secret on the
-     * lock screen; deferred, so it appears only once the bubble has been up a
-     * while; and its one line carries the numbers the bubble shows, so it reads
-     * as a status and not as a nag. On Android 14 and later it can be swiped
-     * away too, and the bubble stays.
+     * The notification a foreground service must have, as small as Android allows: lowest
+     * importance (no sound, no status-bar icon, a collapsed line at the bottom of the shade),
+     * secret on the lock screen, deferred until the bubble has been up a while, and its one
+     * line carries the bubble's numbers, a status rather than a nag. Swipeable on Android 14+.
      */
     private fun notification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
@@ -764,7 +718,7 @@ class CompanionService : Service() {
             .setShowWhen(false)
             .setVisibility(Notification.VISIBILITY_SECRET)
         if (android.os.Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
-        // Nascosta si torna da qui, che e' dove sta gia' il dito.
+        // Hidden, you come back from here, where the finger already is.
         if (hidden) {
             b.addAction(Notification.Action.Builder(null, getString(R.string.comp_show), pi(ACTION_SHOW, 2)).build())
         } else {

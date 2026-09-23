@@ -46,32 +46,14 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * What a hundred and twenty thousand Seekers are holding.
- *
- * The picture exists to make one fact impossible to miss: of the thirty-four
- * things this crowd holds most, seven are worth nothing at all. SEKR, CHAPTER2,
- * PDT, NAMI and the rest came with the phone, everybody has them, and they are
- * worth zero dollars. They lie along the floor here, dim, exactly where they
- * belong. The handful that hold real money float above it.
- *
- * That is why the crowd feature counts purchases and never holdings. A holdings
- * leaderboard for this crowd is a leaderboard of free things.
- *
- * Numbers from a random sample of the census, measured, not estimated.
- *
- * ## Typical, not average
- *
- * The dollars used to be the average, and the average was a lie about these
- * people. For USDC it says four hundred and eighty seven dollars; the person in
- * the middle has ten. Fifty times out. A few hundred large wallets drag the mean
- * somewhere no real holder stands, and this crowd is mostly small wallets, so
- * the mean described nobody in it.
- *
- * So the number shown is the median, the typical holder. The mean is kept for
- * one job only: deciding whether a coin is worth nothing. Those are two
- * different questions and they used to share one field. A median of zero means
- * most holders have dust, which is not the same as the coin being worthless:
- * SI, PLANK and MPLX all sit at a median of zero with a mean above it.
+ * What a hundred and twenty thousand Seekers hold. The picture exists for one fact: of the
+ * thirty-four things this crowd holds most, seven are worth nothing (SEKR, CHAPTER2, PDT,
+ * NAMI came with the phone) and lie dim along the floor. That is why the crowd feature
+ * counts purchases, never holdings. Numbers from a random sample of the census, measured.
+ * Typical, not average: the mean said 487 $ of USDC where the person in the middle has ten,
+ * dragged by a few hundred large wallets, so the median is shown. The mean keeps one job,
+ * deciding whether a coin is worth nothing: SI, PLANK and MPLX sit at a median of zero with
+ * a mean above it, dust in most hands but not worthless.
  */
 private class SeekerHolding(val symbol: String, val pct: Double, val usdPer: Double, val avg: Double)
 
@@ -120,13 +102,9 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
         HoldingsField(rows, animate)
         Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
         Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
-        // Said out loud, because otherwise the dollars read as wrong. Ten
-        // dollars of USDC looks like a rounding error next to a crowd of a
-        // hundred and twenty thousand, and the reader's next thought is that
-        // the number is broken. It is not: the mean is four hundred and
-        // eighty seven and it describes nobody. The widest held coin makes
-        // the point, and it is read from the file, so it stays true when the
-        // census is run again.
+        // Said out loud, or the dollars read as wrong: ten dollars of USDC next to a crowd of a
+        // hundred and twenty thousand looks like a rounding error. The mean is 487 and describes
+        // nobody. Read from the file, so it stays true when the census runs again.
         rows.firstOrNull { it.avg >= 1 && it.avg > it.usdPer * 3 }?.let { h ->
             Text(
                 stringResource(R.string.hold_typical, h.symbol, dollars(h.usdPer), dollars(h.avg)),
@@ -137,10 +115,8 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
             stringResource(R.string.hold_note, free, rows.size, sample),
             fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
         )
-        // The half of this crowd that looks asleep. Their SKR are not in
-        // the wallet at all: they are inside the staking program, earning.
-        // A census that reads token accounts cannot see them, so it calls
-        // these people empty. They are not.
+        // The half of this crowd that looks asleep: their SKR sit inside the staking program,
+        // earning, where a census of token accounts cannot see them. They are not empty.
         census.staked?.let { st ->
             Box(Modifier.fillMaxWidth().height(1.dp).background(Halo.stroke))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -170,20 +146,11 @@ private fun Legend(dot: Color, text: String) {
 }
 
 /**
- * What they hold, as bars.
- *
- * It was a field of bubbles, floating higher the more one holder's share was
- * worth, with the free things in a dim row along the floor. Pretty, and not
- * readable: at fifteen bubbles the labels sat on each other (USDC over SKR,
- * PUMP over JitoSOL over PENGU) and "higher means worth more" needed a legend
- * to explain the legend. A bar is a thing a person reads without being taught:
- * longer is more people, the number on the right is the money. The free things
- * keep their own row underneath, dim, so the point survives: most of what this
- * crowd holds came with the phone and is worth nothing.
- *
- * Each bar grows into place, one after another, the first time the card is
- * seen. Once, on arrival: motion here says "this is being drawn for you", and
- * a bar that kept growing would say the number was changing.
+ * What they hold, as bars. It was a field of bubbles, pretty and unreadable: at fifteen the
+ * labels sat on each other and "higher means worth more" needed a legend for the legend. A
+ * bar reads untaught: longer is more people, the number on the right is the money. The free
+ * things keep their dim row underneath. Each bar grows into place once, on arrival: a bar
+ * that kept growing would say the number was changing.
  */
 @Composable
 private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
@@ -209,8 +176,8 @@ private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
             // thrown away when it scrolls past the top, and without the flag every
             // bar would crawl out of zero again on the way back.
             val grow = if (animate) rememberReveal(key = h.symbol, durationMs = 600 + i * 70) else 1f
-            // Cinque dollari, non cinquanta. La soglia era tarata sulla media, e con
-                // il tipico non la passava piu' nessuno: erano tutte dello stesso colore.
+            // Five dollars, not fifty. The threshold was tuned on the mean, and with the
+            // median nobody passed it: every bar was the same color.
                 val tint = if (h.usdPer >= 5) Halo.mint else Halo.cyan
             Row(
                 Modifier.fillMaxWidth().then(if (animate) Modifier.staggeredEntrance(i, key = h.symbol) else Modifier),

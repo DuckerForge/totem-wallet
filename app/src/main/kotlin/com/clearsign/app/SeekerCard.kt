@@ -60,16 +60,9 @@ import kotlin.math.abs
 import kotlin.math.sin
 
 /**
- * What the Seeker crowd is buying.
- *
- * The picture says the thing the numbers cannot: one phone on the left, and a
- * braid of coins leaving it. Ribbon thickness is how many different wallets
- * bought, never how many purchases — a single trader buying ten times draws no
- * thicker a line than a single trader buying once, because he is still one
- * person.
- *
- * Gold means whales were in it. Everything here is the crowd of people holding
- * the same phone you are holding.
+ * What the Seeker crowd is buying: one phone on the left and a braid of coins leaving
+ * it. Ribbon thickness is how many different wallets bought, never how many purchases:
+ * one trader buying ten times is still one person. Gold means whales were in it.
  */
 private const val LANES = 5
 
@@ -85,15 +78,11 @@ internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
     var last by remember { mutableStateOf(0L) }
     var looking by remember { mutableStateOf(false) }
 
-    // The published ranking comes down from the page, which is the only thing on
-    // screen that talks to the network. This card used to fetch it here and keep
-    // it, while the live feed above read the cached file: same source, two ages,
-    // and the feed was the one that looked broken.
-    //
-    // Without a published feed the card still sweeps for itself. WorkManager may
-    // defer a job for a long time, and a card that is empty because nobody ran the
-    // scan is indistinguishable from a card that is empty because nothing is
-    // happening. One of those is a fact and the other is a bug.
+    // The published ranking comes down from the page, the only thing on screen that talks
+    // to the network; this card used to fetch its own while the feed above read the cached
+    // file, and the feed looked broken. Without a published feed the card still sweeps:
+    // WorkManager can defer a job for hours, and "empty because nobody ran the scan" must
+    // not look like "empty because nothing is happening".
     LaunchedEffect(feed) {
         withContext(Dispatchers.IO) {
             followed = SeekerScan.roster(ctx).size
@@ -136,13 +125,9 @@ internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
                     color = if (looking) Halo.cyan else Halo.muted, style = Tabular,
                 )
             }
-            // What the rows are counted over, before the rows.
-            //
-            // The header used to say "10,527 wallets" right above numbers like
-            // "14 different wallets", and the two are not on the same scale: the
-            // first is the roster, the second is what the scanner actually
-            // managed to watch buy something that day, which is a hundred or so.
-            // Putting the roster next to the rows made every row look broken.
+            // What the rows are counted over, before the rows. "10,527 wallets" right above "14
+            // different wallets" put the roster next to what the scanner actually watched that day,
+            // a hundred or so, and every row looked broken.
             Text(
                 stringResource(R.string.crowd_basis, followed),
                 fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
@@ -171,11 +156,8 @@ internal fun SeekerCard(feed: SeekerFeed.Feed?, onOpen: () -> Unit) {
                     stringResource(R.string.crowd_note),
                     fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, lineHeight = 15.sp,
                 )
-                // The bias, admitted on the card that carries it. Whales are
-                // re-read every ten minutes and the rest every hour and twenty,
-                // so a whale's purchase is far likelier to be caught than
-                // anybody else's, and the whale count on each row is partly a
-                // fact about our own scanning and not only about the crowd.
+                // The bias, admitted on the card that carries it: whales are re-read every ten minutes
+                // and the rest every hour and twenty, so a whale's purchase is far likelier to be caught.
                 Text(
                     stringResource(R.string.crowd_bias),
                     fontFamily = Inter, fontSize = 11.sp, color = Halo.amber, lineHeight = 15.sp,
@@ -211,9 +193,8 @@ private fun CrowdRow(r: CrowdRank, onOpen: () -> Unit) {
 }
 
 /**
- * The braid. One phone, and a ribbon per coin whose width is the number of
- * distinct buyers. The flow animates along the ribbon so it reads as movement
- * rather than as a diagram of something already finished.
+ * The braid: one phone, a ribbon per coin as wide as its distinct buyers. The flow
+ * moves along the ribbon so it reads as movement, not as a finished diagram.
  */
 @Composable
 private fun SeekerFlow(ranks: List<CrowdRank>) {
@@ -313,20 +294,14 @@ private fun fmtSol(v: Double): String = when {
 }
 
 /*
- * The Seeker crowd, its own page.
- *
- * A page rather than a sheet on purpose: this is something to read for a minute,
- * not a control to poke and dismiss. Three questions in order — what are they
- * buying right now, who are the big ones, and what does the whole hundred and
- * twenty thousand actually hold.
+ * The Seeker crowd, its own page, not a sheet: something to read for a minute. Three
+ * questions in order: what are they buying now, who are the big ones, what does the
+ * whole hundred and twenty thousand hold.
  */
 /**
- * Who we watch and when we last looked, on one line under the title.
- *
- * The full card said the same thing over four lines and a divider, and those
- * four lines were the reason the switch bar started life below the fold. The
- * count still counts up on arrival, because a number that lands says measured
- * and a number that is simply there says typed, and the sweep clock still ticks.
+ * Who we watch and when we last looked, one line under the title. The full card said
+ * it over four lines and pushed the switch bar below the fold. The count still counts
+ * up on arrival: a number that lands says measured, one simply there says typed.
  */
 @Composable
 private fun WhoLine(feed: SeekerFeed.Feed?) {
@@ -368,12 +343,8 @@ private fun WhoLine(feed: SeekerFeed.Feed?) {
 private const val PERIOD_MS = 4 * 60_000L
 
 /**
- * The clock, drawn.
- *
- * It was a line of monospace saying "aggiornato 1m 12s fa · prossimo fra 2m 48s",
- * which is accurate and looks like a log file. A ring that empties says the same
- * thing without being read, and the words underneath it shrink to what the ring
- * cannot say.
+ * The clock, drawn. A monospace line saying "updated 1m 12s ago · next in 2m 48s" is
+ * accurate and looks like a log file. A ring that empties says it without being read.
  */
 @Composable
 private fun SweepClock(at: Long, now: Long) {
@@ -409,8 +380,8 @@ private fun SweepClock(at: Long, now: Long) {
                 )
             }
         }
-        // Le cifre e basta. C'era scritto "prossimo giro fra", e in ritardo
-        // "sto guardando": due frasi per dire quello che l'anello gia' mostra.
+        // The figures alone. "Next look in" and, when late, "looking": two sentences
+        // for what the ring already shows.
         if (!overdue) {
             Spacer(Modifier.width(5.dp))
             Text(mmss(left / 1000L), style = HaloType.mono.copy(fontSize = 10.5.sp), color = tint)
@@ -427,11 +398,8 @@ private fun thousands(v: Int): String =
     v.toString().reversed().chunked(3).joinToString(".").reversed()
 
 /*
- * The three things the page holds besides the live feed.
- *
- * The live feed is not one of them on purpose: it is the reason to open Scout,
- * so it sits above the bar and never hides behind a tap. What was three more
- * screens of scrolling is now three words.
+ * The three sections besides the live feed. The feed is not one of them on purpose: it
+ * is the reason to open Scout, so it sits above the bar and never hides behind a tap.
  */
 /** One line, said plainly, where a card would otherwise have disappeared. */
 @Composable
@@ -442,19 +410,15 @@ internal fun NothingHere(text: String) {
 private enum class ScoutTab { LIVE, BUYING, HOLDING, WHALES, FOLLOWED }
 
 /**
- * The switch, in the app's own language rather than Material's.
- *
- * Each word wears the colour of the card it opens, so the lit chip and the
- * heading underneath it agree without anybody reading either. It paints its own
- * ground because it sticks to the top of the list: without it the rows would
- * show through while they slide past.
+ * The switch, in the app's own language rather than Material's. Each word wears the
+ * color of the card it opens, so the lit chip and the heading agree. It paints its own
+ * ground because it sticks to the top of the list.
  */
 @Composable
 private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Unit) {
     val ctx = LocalContext.current
-    // Un binario solo, e la voce scelta e' una pastiglia in rilievo che ci
-    // scorre sopra: era una fila di cinque chip col bordo, cioe' cinque
-    // bottoni, e a colpo d'occhio non si vedeva quale fosse acceso.
+    // One track, and the chosen word is a raised pill sliding over it: five bordered
+    // chips were five buttons, and which one was lit did not show at a glance.
     val tabs = buildList {
         add(Triple(ScoutTab.LIVE, R.string.crowd_tab_live, Halo.cyan))
         add(Triple(ScoutTab.BUYING, R.string.crowd_tab_buying, Halo.mint))
@@ -487,21 +451,12 @@ private fun ScoutTabs(selected: ScoutTab, follows: Int, onPick: (ScoutTab) -> Un
 @Composable
 internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: String? = null, onBuy: (String) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
-    // One reader for the whole page.
-    //
-    // Three cards used to decide separately whether to talk to the network: the
-    // live feed read only the cached file, the ranking underneath did the download
-    // and kept the answer, and the clock fetched only once a sweep was already
-    // late. The feed was therefore as old as the last time some other card had
-    // happened to write the file, which on a phone opened in the morning was
-    // hours. Now the page polls once a minute while it is on screen and hands the
-    // same answer to all three, so a purchase that lands on chain appears without
-    // leaving the page and coming back.
-    //
-    // A minute against a scanner that publishes every four is deliberate: the file
-    // is six kilobytes, the poll is served from the local copy unless it has aged
-    // past [SeekerFeed.FRESH_MS], and the names it warms are already cached after
-    // the first pass.
+    // One reader for the whole page. Three cards used to decide separately whether to talk
+    // to the network, and the feed was as old as the last time another card happened to
+    // write the file, hours on a phone opened in the morning. The page polls once a minute
+    // while on screen and hands one answer to all three. A minute against a scanner that
+    // publishes every four is fine: six kilobytes, served from the local copy until it ages
+    // past [SeekerFeed.FRESH_MS].
     var feed by remember { mutableStateOf<SeekerFeed.Feed?>(null) }
     // Null while the first read is still running: waiting and quiet are not the
     // same fact and the card says them differently.
@@ -511,15 +466,10 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
     // every bar and every feed row replays its arrival each time it comes back.
     val played = remember { mutableSetOf<String>() }
     var feedOpen by rememberSaveable { mutableStateOf(false) }
-    // Nothing is drawn until we know what the service has to say.
-    //
-    // It used to draw the moment the phone's own scan had anything, which is
-    // three or four rows, and then the service answered and the list was rebuilt
-    // from a different set of purchases. Every row was new, so every row played
-    // its entrance again, and what that looks like is the page throwing away
-    // what it had just shown you and starting over. Waiting one beat for the
-    // cached file, which is a disk read, means the first thing drawn is already
-    // the whole picture.
+    // Nothing is drawn until the service has spoken. Drawing the phone's own three rows
+    // first and then rebuilding from the service replayed every entrance: the page threw
+    // away what it had just shown. Waiting one beat for the cached file, a disk read, means
+    // the first thing drawn is the whole picture.
     var asked by remember { mutableStateOf(false) }
     LaunchedEffect(feed, asked) {
         if (!asked) return@LaunchedEffect
@@ -553,23 +503,14 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
         WalletPage(addr, events.orEmpty().filter { it.wallet == addr }.sortedBy { it.at }) { person = null }
     }
 
-    // The live tab dropped its card and its title months ago, for a reason it
-    // wrote down: as its own tab the frame is a box drawn around the whole
-    // screen and the title repeats the word already lit in the bar above it.
-    // Everything on the bar is its own tab now, so the same is true of all of
-    // them: the census, the ranking and the whales each sat in a card inside a
-    // padded page inside a screen, three frames deep, and the picture that is
-    // the point of them was squeezed into what was left.
+    // No card and no title on any tab: as its own tab the frame is a box around the whole
+    // screen and the title repeats the word already lit in the bar. The census, the ranking
+    // and the whales each sat three frames deep with the picture squeezed into what was left.
     val pad = Modifier.padding(horizontal = 14.dp)
 
-    // Nothing scrolls to make the bar work.
-    //
-    // It used to be pinned inside the scrolling list, under the live feed, which
-    // put it near the bottom edge with the section it names entirely off screen:
-    // you pressed a word and the only thing that changed was the word. Pulling
-    // the page to it afterwards fixed the visibility and bought a jump, which is
-    // worse. So the bar simply lives at the top, above everything it controls,
-    // and the section under it gets the rest of the screen and its own scroll.
+    // Nothing scrolls to make the bar work. Pinned inside the list under the feed, it sat
+    // near the bottom with the section it names off screen: you pressed a word and only the
+    // word changed. So the bar lives at the top and the section under it gets its own scroll.
     Column(
         Modifier.fillMaxSize().background(Halo.ground).statusBarsPadding().navigationBarsPadding(),
     ) {
@@ -596,11 +537,8 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
         ) {
             Box(pad) {
                 when (tab) {
-                    // The ranking rides on top of the stream rather than living in
-                    // a tab of its own. They answer the same question at two
-                    // speeds, what is being bought right now and what has been
-                    // bought all day, and on separate tabs each looked thin while
-                    // the other left half the screen empty.
+                    // The ranking rides on top of the stream rather than in a tab of its own: same question
+                    // at two speeds, and on separate tabs each looked thin with half the screen empty.
                     ScoutTab.LIVE -> CrowdFeed(
                         events, feedOpen, { feedOpen = !feedOpen }, played,
                         onWallet = { person = it }, owner = owner, signer = signer, openMint = openMint, onBuy = onBuy,
@@ -616,12 +554,9 @@ internal fun CrowdPage(owner: String?, signer: SeedVaultSigner?, openMint: Strin
 }
 
 /**
- * The wallets you follow, where somebody can actually find them.
- *
- * The list existed, inside the agent page, behind an open budget: with no
- * budget the star did something invisible and said nothing about it. It belongs
- * next to the feed where the star lives, and it says what the star does, which
- * nowhere in the app did before.
+ * The wallets you follow, where somebody can find them. The list lived inside the agent
+ * page behind an open budget, so with no budget the star did something invisible. It
+ * belongs next to the feed where the star lives, and it says what the star does.
  */
 @Composable
 private fun FollowedList(follows: List<String>, events: List<CrowdBuy>?, onOpen: (String) -> Unit) {

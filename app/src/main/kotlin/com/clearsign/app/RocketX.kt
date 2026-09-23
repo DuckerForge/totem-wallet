@@ -10,22 +10,12 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * RocketX: the bridge. One API over 200 chains, DEX routes and exchange
- * routes, no account for the person using it. Verified on the 16th of
- * September 2026 with the partner key: SOL to ETH quotes from Relay, NEAR
- * Intents, RocketX's own pool and ChangeNow; USDC Solana to USDC Arbitrum
- * with zero fee on Relay.
- *
- * How a bridge from Solana works here: a quote picks a route; `/swap` opens
- * the order and answers with a **deposit address**; the SOL or USDC go there
- * with the ordinary Send, receipt and fingerprint included, labelled as the
- * bridge; `/status` follows the order by the chain signature. Routes that
- * need a memo are skipped: our Send does not write one, and a deposit
- * without its memo is money in limbo.
- *
- * Privacy, said straight: RocketX asks nobody who they are, and an exchange
- * route breaks the on‑chain thread between what went in and what came out.
- * It is not a mixer and it is not anonymity; it is one less form.
+ * RocketX, the bridge: one API over 200 chains, DEX and exchange routes, no account.
+ * Verified 16 Sep 2026 with the partner key. A quote picks a route, `/swap` opens the
+ * order and answers with a deposit address, the money goes there through the ordinary
+ * Send (receipt, fingerprint), `/status` follows it. Routes needing a memo are skipped,
+ * Send writes none. Privacy: no identity asked and the on-chain thread breaks at the
+ * exchange; not a mixer, not anonymity, one less form.
  */
 object RocketX {
     private const val TAG = "Apex-RocketX"
@@ -33,19 +23,10 @@ object RocketX {
     private const val KEY = BuildConfig.ROCKETX_KEY
 
     /**
-     * Con la chiave si va diretti, senza si passa dal servizio.
-     *
-     * La chiave dentro l'APK chiunque la estrae: spende la quota di qualcun
-     * altro o se la fa revocare. Tenendola sul servizio il telefono non ne ha
-     * bisogno.
-     *
-     * **Lo scambio, detto per intero.** Il servizio finisce in mezzo alla
-     * risposta che contiene l'indirizzo di deposito, quindi entra nella lista di
-     * chi potrebbe sostituirlo, lista che prima conteneva solo RocketX. E'
-     * infrastruttura nostra, ma e' una superficie sui soldi al posto di una sulla
-     * quota. Per questo la scelta e' una riga in `local.properties` e non una
-     * decisione presa qui: c'e' la chiave, si va diretti; non c'e', si passa di
-     * la'.
+     * With the key we go direct, without it through the service. A key inside the APK is
+     * anyone's to extract and spend or get revoked. The trade, said whole: the service then
+     * sits in the middle of the answer that carries the deposit address, a surface on the
+     * money instead of one on the quota. So the choice is a line in `local.properties`.
      */
     private val viaWorker: String? get() =
         BuildConfig.CROWD_URL.takeIf { KEY.isBlank() && it.isNotBlank() }?.trimEnd('/')
@@ -57,43 +38,30 @@ object RocketX {
 
     data class Network(
         val id: String, val name: String, val chainId: String, val native: String,
-        /** Dove si va a vedere una cosa su quella catena. Lo dice RocketX, catena per catena. */
+        /** Where to look something up on that chain. RocketX says it, chain by chain. */
         val explorer: String = "",
-        /** Il nome corto e stabile che manda RocketX: ETHEREUM, BASE, AVAXC. Vedi [POPULAR]. */
+        /** The short, stable name RocketX sends: ETHEREUM, BASE, AVAXC. See [POPULAR]. */
         val short: String = "",
     )
 
     /**
-     * Le otto che si usano, in quest'ordine. Tutte le altre stanno dietro la ricerca.
-     *
-     * L'ordine di RocketX e' il suo, e mette terza una catena che nessuno qui
-     * userebbe mai. Duecento pastiglie tutte insieme non sono una scelta, sono
-     * un muro: si scorre col pollice e si seleziona quello che capita. Ogni
-     * ponte serio (Relay, Jumper, Li.Fi) fa la stessa cosa, e la fa per questo:
-     * una manciata di catene vere davanti, e una ricerca per il resto.
-     *
-     * Si aggancia allo `shorthand`, non all'id: e' il nome corto e leggibile che
-     * manda RocketX. E soprattutto **se uno di questi sparisce non sparisce la
-     * catena**: esce solo dalla prima fila e resta trovabile cercandola. E' la
-     * differenza con la lista di prima, dove un id morto cancellava la catena
-     * dallo schermo senza dire niente.
+     * The eight in use, in this order; everything else sits behind the search. RocketX's own
+     * order puts a chain nobody here would use third, and two hundred pills are a wall, not a
+     * choice. Hooked on the readable `shorthand`, not the id, and if one disappears the chain
+     * only leaves the front row: the old id list silently dropped chains from the screen.
      */
     val POPULAR = listOf("ETHEREUM", "BASE", "ARBITRUM", "BNB", "POLYGON", "OPTIMISM", "AVAXC", "BITCOIN")
 
-    /** Le prime, nell'ordine di [POPULAR]: quelle che ci sono davvero, e basta. */
+    /** The front row, in [POPULAR] order: only the ones that actually exist. */
     fun popular(all: List<Network>): List<Network> {
         val byShort = all.associateBy { it.short.uppercase() }
         return POPULAR.mapNotNull { byShort[it] }
     }
 
     /**
-     * Il patto, una volta fatto.
-     *
-     * Quando `/swap` risponde, i numeri non sono piu' negoziabili: quell'ordine
-     * aspetta **quella** cifra a **quell'indirizzo** di deposito, e in cambio
-     * manda **quella** cifra all'indirizzo dall'altra parte. Da li' in poi lo
-     * schermo non deve piu' chiedere niente, deve solo dire cosa e' stato
-     * pattuito e farlo firmare.
+     * The deal, once struck. When `/swap` answers the numbers are no longer negotiable: that
+     * order waits for that amount at that deposit address and sends that amount to the other
+     * side. From here the screen only says what was agreed and has it signed.
      */
     data class Deal(
         val requestId: String,
@@ -107,15 +75,12 @@ object RocketX {
         val explorer: String,
     )
 
-    /** Dove si guarda un ordine quando qualcosa non torna. */
+    /** Where to look at an order when something does not add up. */
     const val ORDERS_URL = "https://app.rocketx.exchange/transaction-history"
 
     /**
-     * Il link a un indirizzo sull'esploratore della sua catena.
-     *
-     * Vale anche per chi tiene tutto dietro il cancelletto, tipo Tronscan, che
-     * lo porta gia' nel suo url di base: "https://tronscan.org/#/" diventa
-     * "https://tronscan.org/#/address/T…" senza un caso a parte.
+     * The explorer link for an address on its chain. Works for the ones behind a hash too,
+     * like Tronscan: "https://tronscan.org/#/" becomes ".../#/address/T…" with no special case.
      */
     fun explorerAddress(explorer: String, address: String): String? =
         explorer.takeIf { it.isNotBlank() && address.isNotBlank() }
@@ -126,53 +91,30 @@ object RocketX {
         val fromAmount: Double, val toAmount: Double, val feeUsd: Double, val gasUsd: Double, val minutes: Int?,
         val fromId: Int, val toId: Int, val allowed: Boolean, val priceImpact: Double?,
         /**
-         * Commissione piu' gas, nella moneta che mandi. Dichiarate da loro.
-         *
-         * Non sono tutto quello che paghi: su un SOL, queste due valgono 0,0079
-         * e quello che arriva e' 0,0102 sotto. La differenza e' il cambio di
-         * andata e ritorno dentro la rotta, che non compare in nessun campo e
-         * si vede solo sottraendo. Per questo lo schermo mostra la sottrazione
-         * e mette queste due sotto, come dettaglio.
+         * Fee plus gas in the coin you send, as they declare it. Not all you pay: on one SOL these
+         * two are 0.0079 and what arrives is 0.0102 short; the rest is the round-trip exchange
+         * inside the route, seen only by subtracting. So the screen shows the subtraction and
+         * these two underneath, as detail.
          */
         val feeCoin: Double?,
-        /** Il prezzo della moneta, implicito nella stessa risposta: la fee in dollari diviso la fee in moneta. */
+        /** The coin's price, implicit in the same answer: the fee in dollars over the fee in coin. */
         val usdPerUnit: Double?,
     )
     data class Order(val requestId: String, val txId: Long, val depositAddress: String?, val memo: String?, val toAmount: Double, val exchange: String)
 
     /**
-     * I preventivi, e il motivo di quelli che mancano.
-     *
-     * Una rotta rifiutata torna dentro `quotes` come tutte le altre, ma senza
-     * `toAmount` e senza `isTxnAllowed`, con la ragione scritta in `err`:
-     * "Min. Amount: 0.462745 SOL". Si buttava via insieme alla rotta, e sullo
-     * schermo restava "nessuna rotta, prova un altro importo" — vero e inutile,
-     * perche' la cifra giusta da provare era gia' nella risposta.
-     *
-     * Conta soprattutto sull'invio privato: li' le rotte sono tutte private e
-     * hanno tutte lo stesso minimo, quindi sotto quella cifra la pagina si
-     * svuota per intero. Su un ponte normale il minimo tocca una rotta sola e
-     * le altre rispondono lo stesso, ed e' giusto che non se ne parli.
-     *
-     * [minAmount] e' il piu' basso fra i minimi rifiutati: e' quello che
-     * sblocca la prima rotta, non quello che le sblocca tutte. Vale solo
-     * quando non e' rimasto niente di usabile: se una rotta qualsiasi accetta,
-     * un minimo non c'e', e dirlo sarebbe falso.
-     *
-     * [minUsd] e' lo stesso numero in dollari, ed e' la parte che sta ferma.
-     * Misurato il 20 settembre 2026: le rotte private chiedono 50 $ tondi, in
-     * SOL come in USDC, riconvertiti al prezzo del momento. Per questo la cifra
-     * in SOL balla di continuo (0,462217, poi 0,462745, poi 0,462002) e per
-     * questo non e' scritta da nessuna parte qui dentro: fra un'ora e' un'altra.
+     * The quotes, and why the missing ones are missing. A refused route comes back in
+     * `quotes` without `toAmount`, with the reason in `err` ("Min. Amount: 0.462745 SOL").
+     * It used to be dropped and the screen said "no route, try another amount".
+     * [minAmount] is the lowest refused minimum, valid only when nothing usable is left.
+     * [minUsd] stands still: measured 20 Sep 2026, private routes want a round 50 $ in SOL
+     * as in USDC, so the SOL figure changes by the hour and is written nowhere here.
      */
     data class Quotes(val list: List<Quote>, val minAmount: Double?, val minUsd: Double?)
 
     /**
-     * Una cifra volutamente ridicola, per farsi dire di no e leggere il minimo.
-     *
-     * E' l'unico modo di sapere il minimo **prima** che qualcuno provi a
-     * mandare: il numero non sta in nessun elenco, lo dice solo un preventivo
-     * rifiutato. Un millesimo di SOL e' sotto la soglia di chiunque.
+     * A deliberately silly amount, to be told no and read the minimum: the number is in no
+     * list, only a refused quote says it. A thousandth of a SOL is under anybody's floor.
      */
     const val PROBE = 0.001
 
@@ -180,17 +122,10 @@ object RocketX {
     private val MIN_NUM = Regex("([0-9]+(?:\\.[0-9]+)?)")
 
     /**
-     * I numeri della rotta privata, per chi non ha ancora aperto il ponte.
-     *
-     * Il cartellino sul Manda diceva "costa l'1 o 2%", scritto a mano molto
-     * tempo fa, e non diceva che sotto i cinquanta dollari non parte niente.
-     * Due cose inventate al posto di due numeri che l'API regala: quanto costa
-     * davvero questa cifra su questa rotta, e qual e' il minimo adesso.
-     *
-     * Una chiamata sola quando la cifra va bene. Due solo quando viene
-     * rifiutata, perche' allora la seconda serve a sapere di quanto.
-     *
-     * Blocking: chiamare su IO. [fromToken] null e' SOL, altrimenti il mint.
+     * The private route's numbers, before the bridge is opened. The Send tag said "costs
+     * 1 or 2%", written by hand long ago, and not that nothing moves under fifty dollars.
+     * One call when the amount is fine, two when refused (the second says by how much).
+     * Blocking, IO. [fromToken] null is SOL, else the mint.
      */
     data class Privately(
         val minAmount: Double?,
@@ -202,14 +137,10 @@ object RocketX {
     )
 
     /**
-     * Il minimo di ieri, per non lasciare la riga vuota mentre arriva quello di oggi.
-     *
-     * Saperlo costa due chiamate in fila, la lista delle catene e il preventivo
-     * rifiutato, e in quei tre secondi il cartellino non diceva niente: uno lo
-     * guarda, non ci trova un numero, e va avanti. Il pavimento in dollari pero'
-     * non si muove — cinquanta, misurati per dieci minuti di fila — quindi
-     * l'ultimo visto e' quasi sempre ancora quello giusto. Si scrive subito e si
-     * corregge da solo un istante dopo.
+     * Yesterday's minimum, so the line is not empty while today's arrives. Knowing it costs
+     * two calls and three seconds, and a line that arrives after you stopped looking never
+     * arrived. The dollar floor does not move (fifty, measured ten minutes straight), so the
+     * last seen is almost always right; written at once, corrected a moment later.
      */
     private fun floorPrefs(ctx: Context) = ctx.getSharedPreferences("apex_rocketx", Context.MODE_PRIVATE)
 
@@ -225,15 +156,10 @@ object RocketX {
     }
 
     fun privately(fromToken: String?, amount: Double?): Privately? {
-        // Senza passare da [home].
-        //
-        // Serviva a leggere un id che vale "solana" ed e' gia' scritto a mano
-        // come catena di partenza in ogni chiamata di questo file. In cambio
-        // costava il caricamento delle catene: centosettanta kilobyte e
-        // duecento voci da ricucire sul telefono, prima di poter chiedere la
-        // cosa sola che serve. Il cartellino sul Manda restava muto per tutto
-        // quel tempo, e una riga che arriva dopo che hai smesso di guardarla
-        // non e' arrivata.
+        // Without going through [home]. It only read an id that is "solana" and is already
+        // hard-coded as the source chain in every call here, at the price of loading the
+        // chains: 170 KB and two hundred entries before asking the one thing needed, while
+        // the Send tag stayed mute.
         if (amount != null && amount > 0) {
             val q = quote(fromToken, "solana", fromToken, "solana", amount)
             val best = q.list.firstOrNull { it.walletLess }
@@ -249,31 +175,18 @@ object RocketX {
     }
 
     /**
-     * L'indirizzo ha la forma giusta per quella catena?
-     *
-     * Null vuol dire che non lo sappiamo, e non sapere non e' un no: bloccare
-     * una catena di cui non conosciamo il formato vorrebbe dire rompere il ponte
-     * ogni volta che RocketX ne aggiunge una. Ma dove il formato lo conosciamo,
-     * e non torna, si blocca.
-     *
-     * Perche' e' l'unico posto dell'app dove un errore di incollaggio manda via
-     * i soldi senza che niente lo dica. Ovunque altro un indirizzo sbagliato e'
-     * un indirizzo sbagliato su Solana, e lo scontrino lo mostra prima della
-     * firma; qui l'indirizzo che conta e' su un'altra catena, il deposito va a
-     * RocketX, e quello che si vede firmare non e' la destinazione finale.
-     * Incollare un indirizzo Solana mentre si fa il ponte verso Arbitrum passava
-     * senza una parola.
+     * Does the address fit that chain? Null means we do not know, and not knowing is not a
+     * no: blocking an unknown format would break the bridge every time RocketX adds a chain.
+     * Where the format is known and does not match, block. This is the one place a paste
+     * error sends money away silently: the deposit goes to RocketX, what you sign is not the
+     * final destination, and a Solana address pasted while bridging to Arbitrum went through.
      */
     fun addressFits(network: Network, address: String): Boolean? {
         val a = address.trim()
         if (a.isEmpty()) return null
-        // Prima la moneta nativa, poi il chainId numerico.
-        //
-        // L'ordine conta. Se RocketX desse un chainId numerico anche a Bitcoin o
-        // a Tron, e non ho potuto verificarlo dal vivo, guardare prima il numero
-        // avrebbe applicato la regola EVM a un indirizzo bitcoin e rifiutato
-        // ogni indirizzo valido: la falla opposta a quella che si vuole chiudere.
-        // La moneta nativa non lascia dubbi.
+        // Native coin first, numeric chainId second. If RocketX gave Bitcoin or Tron a numeric
+        // chainId too (not verified live), checking the number first would apply the EVM rule
+        // to a bitcoin address and refuse every valid one. The native coin leaves no doubt.
         when (network.native.uppercase()) {
             "BTC" -> return Regex("^(bc1[0-9ac-hj-np-z]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$").matches(a)
             "TRX" -> return Regex("^T[1-9A-HJ-NP-Za-km-z]{33}$").matches(a)
@@ -281,13 +194,10 @@ object RocketX {
             "TON" -> return Regex("^([A-Za-z0-9_-]{48}|-?\\d+:[0-9a-fA-F]{64})$").matches(a)
             "SOL" -> return Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$").matches(a)
         }
-        // Le catene EVM hanno tutte lo stesso formato di indirizzo, e RocketX le
-        // identifica con un chainId **esadecimale**: "0x1", "0xA4B1", "0x38".
-        // Verificato dal vivo il 17/09. La prima versione di questa regola
-        // cercava un numero decimale, non lo trovava mai, e il controllo sulle
-        // sei catene che contano di piu' non scattava: ogni indirizzo passava come
-        // "formato sconosciuto". Un controllo che non scatta mai e' peggio di
-        // nessun controllo, perche' sembra esserci.
+        // EVM chains share one address format and RocketX identifies them with a hexadecimal
+        // chainId ("0x1", "0xA4B1", "0x38"), verified live 17 Sep. The first version looked
+        // for a decimal, never found it, and the check on the six chains that matter never
+        // fired. A check that never fires is worse than none, because it seems to be there.
         val cid = network.chainId.trim()
         val evm = (cid.startsWith("0x", ignoreCase = true) && cid.drop(2).toLongOrNull(16) != null) || cid.toLongOrNull() != null
         if (evm) return Regex("^0x[0-9a-fA-F]{40}$").matches(a)
@@ -298,20 +208,11 @@ object RocketX {
     @Volatile private var homeNet: Network? = null
 
     /**
-     * Le catene, nell'ordine che dice RocketX.
-     *
-     * C'era una lista di undici id scritti a mano qui dentro, e tre non
-     * esistevano piu' (`avalanche` adesso e' `avaxc-mainnet`, `sui` e'
-     * `Sui Mainnet`, `ton` e' `TON`). Un id che non risponde non da' errore:
-     * `byId[it]` torna null e quella catena semplicemente **non appare**. Di
-     * undici ne restavano otto, e nessuno aveva modo di accorgersene guardando
-     * lo schermo. Una lista scritta a mano di roba che vive su un server altrui
-     * marcisce da sola e in silenzio.
-     *
-     * RocketX ne manda duecento e le manda **gia' ordinate** (`sort_order`:
-     * Bitcoin, Ethereum, Solana, Sui, Base, TON, BNB, Arbitrum…), dicendo quali
-     * sono accese. Quindi niente lista: si prendono tutte quelle accese, tolta
-     * Solana che e' la sponda da cui si parte, nel loro ordine.
+     * The chains, in RocketX's order. A hand-written list of eleven ids had three dead ones
+     * (`avalanche` is now `avaxc-mainnet`, `sui` is `Sui Mainnet`, `ton` is `TON`), and a
+     * dead id gives no error: the chain simply does not appear. RocketX sends two hundred,
+     * already sorted (`sort_order`) and flagged enabled: take all the enabled ones minus
+     * Solana, the shore we leave from.
      */
     fun networks(): List<Network> {
         networks.takeIf { it.isNotEmpty() }?.let { return it }
@@ -327,10 +228,8 @@ object RocketX {
                 n.optString("block_explorer_url"), n.optString("shorthand"),
             )
         }.sortedBy { it.first }.map { it.second }
-        // Solana esce dall'elenco delle destinazioni — e' la sponda da cui si
-        // parte — ma si tiene da parte: l'invio privato ha Solana da tutte e
-        // due le parti, e gli serve il suo esploratore e il suo formato di
-        // indirizzo come a qualsiasi altra catena.
+        // Solana leaves the destination list (it is the shore we leave from) but is kept aside:
+        // the private send has Solana on both sides and needs its explorer and address format.
         homeNet = parsed.firstOrNull { it.id.equals("solana", true) }
         networks = parsed.filterNot { it.id.equals("solana", true) }
         return networks
@@ -361,8 +260,8 @@ object RocketX {
         val q = "fromToken=${fromToken ?: "null"}&fromNetwork=${enc(fromNetwork)}&toToken=${toToken ?: "null"}&toNetwork=${enc(toNetwork)}&amount=$amount&slippage=$slippage"
         val o = get(endpoint("/quotation?$q")) ?: return Quotes(emptyList(), null, null)
         val arr = o.optJSONArray("quotes") ?: return Quotes(emptyList(), null, null)
-        // Il minimo di chi ha detto di no, col prezzo che ha usato per calcolarlo,
-        // prima che le rotte rifiutate spariscano dall'elenco.
+        // The minimum of whoever said no, with the price it used to compute it, before
+        // the refused routes leave the list.
         val refused = (0 until arr.length()).mapNotNull { i ->
             val x = arr.optJSONObject(i) ?: return@mapNotNull null
             val why = x.optString("err").takeIf { it.isNotBlank() && it != "null" } ?: return@mapNotNull null
@@ -385,29 +284,23 @@ object RocketX {
                     x.optDouble("platformFeeInSourceToken").takeIf { !it.isNaN() && it > 0 },
                     x.optDouble("networkFeeInSourceToken").takeIf { !it.isNaN() && it > 0 },
                 ).takeIf { it.isNotEmpty() }?.sum(),
-                // Un preventivo accettato non porta il prezzo della moneta, ma
-                // porta la stessa commissione scritta due volte, in moneta e in
-                // dollari: il rapporto fra le due e' il prezzo, e arriva senza
-                // chiedere niente a nessuno.
+                // An accepted quote carries no coin price, but it carries the same fee twice, in coin
+                // and in dollars: their ratio is the price, free.
                 usdPerUnit = x.optDouble("platformFeeInSourceToken").takeIf { !it.isNaN() && it > 0 }
                     ?.let { pf -> x.optDouble("platformFeeUsd").takeIf { !it.isNaN() && it > 0 }?.div(pf) },
             )
         }.filter { it.allowed && it.toAmount > 0 }.sortedByDescending { it.toAmount }
-        // Un minimo si dichiara solo se ha fermato tutto: con una rotta viva
-        // dietro, la cifra e' il capriccio di un exchange e non una soglia.
+        // A minimum is declared only if it stopped everything: with a live route behind
+        // it, the figure is one exchange's whim, not a threshold.
         if (list.isNotEmpty() || refused == null) return Quotes(list, null, null)
         return Quotes(list, refused.first, refused.second?.times(refused.first))
     }
 
-    /** Open the order. What comes back for a deposit route is the address to pay. */
     /**
-     * Apre l'ordine.
-     *
-     * L'indirizzo di rimborso si manda **esplicito**. Prima non si mandava
-     * affatto e si sperava che RocketX usasse `userAddress`: su una rotta
-     * qualsiasi e' una scommessa piccola, ma le rotte private dichiarano
-     * `isRefundAddressRequired: true`, e li' la scommessa e' su dove tornano i
-     * soldi quando lo scambio non riesce. Torna dove sono partiti.
+     * Open the order; for a deposit route the answer is the address to pay. The refund
+     * address is sent explicitly: private routes declare `isRefundAddressRequired: true`,
+     * and there the bet is on where the money returns when the exchange fails. It goes
+     * back where it came from.
      */
     fun swap(fromId: Int, toId: Int, userAddress: String, destinationAddress: String, amount: Double, slippage: Double = 1.0): Order? {
         val body = JSONObject().put("fromTokenId", fromId).put("toTokenId", toId).put("userAddress", userAddress)
@@ -425,18 +318,11 @@ object RocketX {
     }
 
     /**
-     * Come e' finita, e **dove andare a vedere**.
-     *
-     * Di questa risposta si leggeva una parola sola, `status`, e "success" da
-     * solo non e' una prova di niente: dice che RocketX e' contento, non che i
-     * soldi sono arrivati. Dentro c'e' molto di piu', ed e' tutto gia' pronto:
-     * `destinationTransactionUrl` e' la transazione **sull'altra catena**, cioe'
-     * l'unica pagina al mondo che dimostra l'arrivo, e `actualAmount` e' quanto
-     * e' arrivato davvero, che non e' quello che diceva il preventivo.
-     *
-     * I due link li costruisce RocketX, non noi: un elenco di esploratori
-     * scritto a mano qui dentro invecchierebbe come e' invecchiato quello delle
-     * catene. Misurato il 18/09/2026 su un ponte vero, SOL verso ETH su Base.
+     * How it ended, and where to go and look. Only `status` was read, and "success" alone
+     * proves nothing: RocketX is happy, not the money arrived. `destinationTransactionUrl`
+     * is the transaction on the other chain, the one page that proves arrival, and
+     * `actualAmount` is what really arrived. RocketX builds the links, not us: a hand-written
+     * explorer list would rot like the chain list did. Measured 18 Sep 2026, SOL to ETH on Base.
      */
     data class Status(
         val state: String,
@@ -447,7 +333,7 @@ object RocketX {
         val destUrl: String?,
         val destAddress: String,
     ) {
-        /** Finita, in bene o in male: non c'e' piu' niente da aspettare. */
+        /** Over, for better or worse: nothing left to wait for. */
         val done: Boolean get() = state.equals("success", true) || state.equals("failed", true) || state.equals("refunded", true)
         val good: Boolean get() = state.equals("success", true)
     }
@@ -468,11 +354,9 @@ object RocketX {
     // ---- bridges this phone opened, so their status can be asked later -------
 
     /**
-     * Un ponte che questo telefono ha aperto.
-     *
-     * Tiene anche **dove** i soldi dovevano arrivare e **quanti**, che prima non
-     * si salvavano: senza quelli la cronologia sapeva dire solo "SOL verso Base"
-     * e non c'era modo, dopo, di andare a guardare se erano arrivati davvero.
+     * A bridge this phone opened. It also keeps where the money was meant to land and how
+     * much, which were not saved before: the history could only say "SOL to Base" with no
+     * way to check afterwards whether it arrived.
      */
     data class Bridge(
         val requestId: String, val signature: String, val from: String, val to: String, val toNetwork: String,
@@ -523,7 +407,7 @@ object RocketX {
     private fun open(url: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {
         connectTimeout = 8_000; readTimeout = 25_000
         setRequestProperty("Accept", "application/json")
-        // Sul servizio la chiave la mette il servizio: qui non ce n'e' una.
+        // Through the service the service adds the key: there is none here.
         if (KEY.isNotBlank()) setRequestProperty("x-api-key", KEY)
     }
 

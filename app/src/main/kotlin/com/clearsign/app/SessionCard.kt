@@ -60,11 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * The agent, on one card: which pocket it holds, what it may do on its own,
- * whether it is linked, and the two switches that matter — pause and take it
- * all back. Everything the collar decides shows up here and in the ledger.
- */
+/** A collar mode as a chip: lit in its tint when selected, muted otherwise. */
 @Composable
 internal fun ModeChip(label: String, on: Boolean, tint: Color, modifier: Modifier, onClick: () -> Unit) =
     HaloChip(label, tint = if (on) tint else Halo.muted, selected = on, modifier = modifier, fillWidth = true, onClick = onClick)
@@ -127,11 +123,9 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
             SliderRow(stringResource(R.string.trader_slots), slots.toInt().toString(), slots, 1f..5f, Halo.cyan, steps = 3) { slots = it }
             Text(stringResource(R.string.env_slots_note), style = HaloType.small, color = Halo.muted)
 
-            // The two ceilings of the collar follow from these two numbers, and
-            // are said, not asked: one buy is the budget split by the coins,
-            // and a day can spend the whole budget. Four sliders in real SOL
-            // were honest and nobody could read them. The ceilings stay in the
-            // rules, for the person who wants to move them.
+            // The collar's two ceilings follow from these two numbers and are said, not asked:
+            // one buy is the budget split by the coins, a day can spend the whole budget. Four
+            // sliders in real SOL were honest and nobody could read them; the rules still have them.
             val perTxV = (cap / slots.toInt().coerceIn(1, 5)).coerceIn(cap / 50f, cap)
             val dailyV = cap
             SizingNote((cap * 1e9).toLong(), (perTxV * 1e9).toLong(), (perTxV * 1e9).toLong(), TraderLoop.config(ctx).slicePercent, slots.toInt())
@@ -174,10 +168,9 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
         }
     }
 
-    // The receipt, in a window of its own over the sheet: what you are about to
-    // sign, the hold, then the print. A receipt under the sliders was a receipt
-    // people scrolled past, or never found. This was the first place that got it
-    // right; PayOverlay is that same window, lifted out for everywhere else.
+    // The receipt in a window of its own over the sheet: what you sign, the hold, the
+    // print. Under the sliders it was scrolled past or never found; PayOverlay is this
+    // window lifted out for everywhere else.
     review?.let { r ->
         PayOverlay(
             title = stringResource(R.string.env_pay_title, "%.3f".format(cap)),
@@ -218,22 +211,16 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
 }
 
 /**
- * Is it working, and is anything wrong. In one line, without tapping anything.
- *
- * Four states and they are mutually exclusive, so the colour alone carries it:
- * stopped, paused by you, working, or working and stuck on something. The last
- * one is the reason this exists: a loop that turned itself off at three in the
- * morning used to look exactly like a loop that was running fine.
+ * Is it working, and is anything wrong, in one line. Four exclusive states, so color
+ * alone carries it: stopped, paused by you, working, working and stuck. The last one is
+ * why this exists: a loop that turned itself off at 3 a.m. looked exactly like one running.
  */
 @Composable
 internal fun AgentPulse(refresh: Int) {
     val ctx = LocalContext.current
-    // The loop stops itself, in a service, while this card is on screen. Without
-    // a heartbeat the card kept saying "working, looking for a coin" in green for
-    // as long as you left the tab open, with the sentence explaining why it had
-    // stopped printed directly underneath. Three seconds of reading preferences
-    // costs nothing; the balance and the quotes stay on [refresh], which is the
-    // expensive half.
+    // The loop stops itself in a service while this card is on screen. Without a heartbeat
+    // the card said "working" in green with the reason it had stopped printed underneath.
+    // Reading preferences every three seconds costs nothing; balance and quotes stay on [refresh].
     var beat by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(3_000); beat++ } }
 
@@ -283,15 +270,10 @@ internal fun AgentPulse(refresh: Int) {
 }
 
 /**
- * One holding, and the two things a person may want to do with it.
- *
- * It used to be a dead line: a symbol and what it cost. That was fine while the
- * loop was the only thing that could ever sell, and it was exactly wrong the
- * night the loop could not. A position nobody can act on is a position you watch
- * fail, so the reason for the last failure is printed here and the sale is one
- * tap away. The tap builds its own quote at the moment it is pressed, and it
- * goes through the same collar the loop goes through, with you in front of the
- * phone to answer anything it asks.
+ * One holding and the two things a person may do with it. It was a dead line, a symbol
+ * and its cost, exactly wrong the night the loop could not sell. The last failure's
+ * reason is printed here and the sale is one tap away, quoted when pressed and judged by
+ * the same collar, with you there to answer.
  */
 @Composable
 internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: () -> Unit) {
@@ -309,16 +291,10 @@ internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: ()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(pos.symbol, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
-            // The on-chain exit is the one that survives the app dying, so it is
-            // worth a mark of its own rather than a footnote. Parked means the
-            // coins are inside that order and not in the wallet.
-            // Who is watching this, said on the row. Three answers and no fourth,
-            // and the third one is the one that matters: an on-chain order fires
-            // with the app dead, the loop fires only while it runs, and when
-            // neither is there **nobody is watching**, in either direction. The
-            // row used to show the first two and stay silent about the third, so
-            // a position left unguarded by a loop that stopped itself looked
-            // exactly like a healthy one.
+            // Who is watching this, said on the row. Three answers: an on-chain order fires with
+            // the app dead, the loop only while it runs, and when neither is there nobody is
+            // watching, in either direction. The row used to stay silent about the third, so an
+            // unguarded position looked healthy. Parked means the coins sit inside the order.
             val watching = remember(refresh) { TraderLoop.config(ctx).on }
             if (pos.parked) {
                 Text(stringResource(R.string.trader_parked_tag).uppercase(), style = HaloType.label, color = Halo.amber)
@@ -367,17 +343,10 @@ internal fun PositionRow(pos: Positions.Position, refresh: Int = 0, onChange: ()
 }
 
 /**
- * What to do with the coins before the key disappears.
- *
- * Closing a budget erases the only copy of its key. Any coin still inside is
- * then unreachable for good, and "close it and take everything back" had been
- * taking back only the SOL. So the coins are named, and there are two ways out
- * and no third: sell them for SOL, or move them to the account you keep.
- *
- * Both are offered rather than one chosen, because they are not the same
- * decision. Selling is faster and gives you one number back; moving keeps the
- * coin, which matters when the reason you are closing is that you do not trust
- * this budget rather than that you are done with the coin.
+ * What to do with the coins before the key disappears. Closing erases the only copy of
+ * the key, and "take everything back" took back only the SOL. Two ways out and no third:
+ * sell for SOL, or move to the account you keep. Both offered, because they differ:
+ * selling is faster, moving keeps the coin when the budget is what you distrust.
  */
 @Composable
 internal fun ClosingCoinsSheet(
@@ -414,12 +383,9 @@ internal fun ClosingCoinsSheet(
 }
 
 /**
- * Putting more money into a budget that already exists.
- *
- * Until now the only way to add to one was to close it and open another, which
- * meant the single button under a running budget was the one that ends it. This
- * is the same signed transfer the creation sheet makes, so it goes through the
- * Seed Vault and your fingerprint like any other payment out of the vault.
+ * Putting more into a budget that exists. The only way used to be closing and reopening,
+ * so the one button under a running budget was the one that ends it. Same signed
+ * transfer as the creation sheet: Seed Vault and fingerprint like any payment.
  */
 @Composable
 internal fun TopUpSheet(owner: String, signer: SeedVaultSigner, session: SessionWallet.Session, onDone: () -> Unit, onDismiss: () -> Unit) {
@@ -519,9 +485,9 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
     val cap = session.capLamports.coerceAtLeast(1L).toFloat()
     var perTx by remember { mutableFloatStateOf((policy.perTxLamports / cap).coerceIn(0.01f, 1f)) }
     var daily by remember { mutableFloatStateOf((policy.dailyLamports / cap).coerceIn(0.01f, 1f)) }
-    // Il tetto giornaliero e' una fetta della paghetta, quindi al massimo vale
-    // tutta la paghetta. Al massimo il cursore e' finito, e un cursore finito
-    // sembra rotto: "spento" e' lo stesso stato, ma detto.
+    // The daily cap is a slice of the budget, so at most it is the whole budget. At
+    // the maximum the slider is done, and a done slider looks broken: "off" is the
+    // same state, said.
     var dailyOn by remember { mutableStateOf(policy.dailyLamports < session.capLamports) }
     var askAbove by remember { mutableFloatStateOf((policy.askAboveLamports / cap).coerceIn(0f, 1f)) }
     var perHour by remember { mutableFloatStateOf(policy.maxTxPerHour.toFloat()) }
@@ -541,16 +507,10 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
 
     fun sol(f: Float) = fmtSol((f * cap).toLong(), 4) + " SOL"
 
-    // Il tetto del giorno in lamport, uno solo per tutto il foglio.
-    //
-    // A cursore spento e' la paghetta **esatta**, non `cap`, che e' un Float: da
-    // qualche milione di lamport in su un Float perde gli ultimi, e arrotondando
-    // per difetto la riapertura rileggeva come "acceso al cento per cento" una
-    // regola che era stata spenta. Stesso comportamento, etichetta bugiarda.
-    //
-    // Ed e' anche il numero che leggono le righe qui sotto: prima usavano il
-    // cursore anche a tetto spento, cioe' dicevano quanto restava di un tetto
-    // che non c'era.
+    // The daily cap in lamports, one for the whole sheet. Slider off, it is the exact
+    // budget, not `cap`, a Float that loses the last lamports and, rounding down, reread a
+    // rule that was off as "on at 100%". The rows below read this too: they used the slider
+    // even with the cap off, saying what was left of a cap that was not there.
     val dailyCap = if (dailyOn) (daily * cap).toLong() else session.capLamports
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
@@ -605,12 +565,9 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
 
             Text(stringResource(R.string.agent_rules_body), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted, lineHeight = 18.sp)
 
-            // Ogni cursore dice anche che fetta della paghetta e', e dove finisce.
-            //
-            // Erano quattro numeri in SOL su una paghetta da diciassette dollari:
-            // senza un riferimento non si capisce ne' quanto sia tanto, ne'
-            // perche' il cursore si fermi. Si ferma all'intero della paghetta, e
-            // adesso e' scritto: piu' di quello che hai non puo' uscire.
+            // Each slider also says what slice of the budget it is and where it ends. Four SOL
+            // numbers on a seventeen-dollar budget said neither how much that is nor why the
+            // slider stops: it stops at the whole budget, and now that is written.
             SliderRow(
                 stringResource(R.string.agent_per_tx),
                 sol(perTx) + "  ·  " + (perTx * 100).toInt() + "%",
@@ -641,8 +598,8 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                     daily, 0.01f..1f, Halo.mint,
                 ) { daily = it }
             }
-            // Quanto della giornata e' gia' andato, e la regola che spiega perche'
-            // spesso e' meno di quanto sembra.
+            // How much of the day is gone, and the rule that explains why it is often less
+            // than it seems.
             run {
                 val spent = remember { runCatching { SessionWallet.history(ctx).spentLast24hLamports }.getOrDefault(0L) }
                 Text(
@@ -650,17 +607,10 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                     style = HaloType.small, color = if (spent >= dailyCap) Halo.amber else Halo.muted, lineHeight = 16.sp,
                 )
             }
-            // Un cursore che non va piu' a destra e' un vicolo cieco finche' non
-            // dice dove finisce la strada e come si va oltre.
-            //
-            // Il tetto e' la paghetta, e ogni cursore qui e' una fetta di quella:
-            // arrivato al cento per cento non c'e' niente a destra da prendere.
-            // Il modo di alzarlo non sta in questo foglio, sta nel mettere altri
-            // soldi dentro la paghetta, che e' un'altra pagina e un'altra firma.
-            // Scritto in piccolo sotto i cursori non bastava: era una frase fra
-            // le altre, e chi guarda un cursore fermo cerca il cursore, non il
-            // paragrafo. Adesso compare solo quando serve, dice il numero, e
-            // porta dove si fa.
+            // A slider that goes no further right is a dead end until it says where the road ends
+            // and how to go on. The cap is the budget and each slider is a slice of it; raising it
+            // means putting more into the budget, another page and another signature. Small print
+            // under the sliders was not enough: whoever looks at a stuck slider looks at the slider.
             if (perTx >= 0.995f || (dailyOn && daily >= 0.995f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
@@ -671,13 +621,12 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 }
                 Text(stringResource(R.string.rules_daily_roundtrip), style = HaloType.small, color = Halo.mint, lineHeight = 16.sp)
             }
-            // The arithmetic nobody does in their head, said out loud before it
-            // bites. A daily cap of 0.047 with a slice of 0.031 is one move a day
-            // and a half; the second one asks for a signature the agent cannot
-            // get on its own, and the loop stops. That happened today.
+            // The arithmetic nobody does in their head, said before it bites: a daily cap of 0.047
+            // with a slice of 0.031 is one move and a half a day, and the second asks for a signature
+            // the agent cannot get. That happened today.
             run {
                 val slicePart = minOf(perTx, askAbove.takeIf { it > 0f } ?: perTx) * (trade.slicePercent / 100f)
-                // A tetto spento la fetta della giornata e' la paghetta intera.
+                // Cap off, the day's slice is the whole budget.
                 val dailyPart = if (dailyOn) daily else 1f
                 val moves = if (slicePart > 0f) (dailyPart / slicePart).toInt() else 0
                 if (trade.on) {
@@ -691,14 +640,10 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
                 }
             }
 
-            // Quanto ne mette in una mossa, che non e' il tetto.
-            //
-            // Il tetto per operazione dice quanto **puo'** mettere; questo dice
-            // quanto **ne mette**. Erano la stessa cosa sullo schermo perche'
-            // questa manopola esisteva solo nel motore, ferma all'ottanta per
-            // cento, e con un posto solo l'ottanta per cento di tutta la paghetta
-            // sembra tutta la paghetta. Chi vuole rischiare meta' di quello che
-            // gli e' concesso adesso puo' dirlo senza stringere il collare.
+            // How much it puts in a move, which is not the cap. The cap says what it may put; this
+            // says what it puts. They read the same because this knob lived only in the engine at
+            // eighty percent, and with one slot that looks like the whole budget. Now half of what
+            // is allowed can be risked without tightening the collar.
             SliderRow(
                 stringResource(R.string.agent_slice), trade.slicePercent.toString() + "%",
                 trade.slicePercent / 100f, 0.1f..1f, Halo.mint, steps = 17,
@@ -719,10 +664,9 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
             ModeChip(stringResource(R.string.agent_any_mint), anyMint, Halo.mint, Modifier.fillMaxWidth()) { anyMint = !anyMint }
             Text(stringResource(R.string.agent_any_mint_note), style = HaloType.small, color = Halo.muted)
 
-            // The person's own rules. What we ship is one way to trade; somebody
-            // with years of their own has better ones, and a file they already
-            // wrote for another tool should work here without retyping. They can
-            // only forbid, and the note says so before anybody expects otherwise.
+            // The person's own rules. Ours is one way to trade; somebody with years of their own has
+            // better ones, and a file written for another tool should work here. They can only
+            // forbid, and the note says so up front.
             Text(stringResource(R.string.rules_yours), style = HaloType.label, color = Halo.muted)
             Text(stringResource(R.string.rules_yours_note), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
             val pickRules = androidx.activity.compose.rememberLauncherForActivityResult(

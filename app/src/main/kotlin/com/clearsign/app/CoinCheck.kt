@@ -11,31 +11,11 @@ import java.net.URL
 
 /**
  * The last question before the money moves: does the internet know something the
- * numbers do not?
- *
- * Everything else the agent checks is arithmetic on market data — liquidity,
- * holders, authorities, the shape of the last hour. All of it is blind to the
- * things people write down: a team that rugged a previous coin, an exploit two
- * hours old, a "token" that is a scam with a Twitter account. That is the one
- * capability worth taking from the assistants that have a web tool.
- *
- * Three deliberate constraints:
- *
- *  * **One coin, once — for everybody.** This runs on the single coin the agent
- *    has already decided to buy, after the gates and after
- *    [com.clearsign.core.assessToken], never across candidates. A search costs a
- *    cent plus the tokens its results add to the prompt; asking it about every
- *    candidate of every round would cost more per day than the budget holds.
- *    And the answer does not depend on who is asking, so it is not asked twice:
- *    the verdict goes into the shared archive and the next phone reads it. A
- *    thousand people running this loop pay for a coin **twice**, not a thousand
- *    times. See [Shared].
- *  * **It can only say no.** A positive answer changes nothing about the trade;
- *    the only power this has is to stop one.
- *  * **Unknown never blocks.** No key, no network, no answer, a model that is not
- *    Anthropic: all of those return [Verdict.Unknown] and the trade proceeds on
- *    the numbers, exactly as it did before this file existed. The same rule as
- *    [Jupiter.sellableBack] and [JupiterTrigger.live].
+ * numbers do not (a team that rugged before, an exploit two hours old). Three rules.
+ * One coin, once, for everybody: it runs on the coin already chosen, after the gates,
+ * and the verdict goes to the shared archive ([Shared]), so a thousand phones pay twice,
+ * not a thousand times. It can only say no. Unknown never blocks: no key, no network,
+ * no answer, a non-Anthropic model all mean [Verdict.Unknown] and the numbers decide.
  */
 object CoinCheck {
     private const val TAG = "Apex-CoinCheck"
@@ -47,35 +27,13 @@ object CoinCheck {
     }
 
     /**
-     * Il verdetto degli altri, e perché un «no» e un «sì» non pesano uguale.
-     *
-     * La domanda a cui questo file risponde non dipende da chi la fa: se una
-     * moneta è una truffa, lo è per tutti. Quindi la risposta sta in archivio
-     * (`/clearsign/coin/<mint>`), i telefoni la leggono senza chiave e senza
-     * svegliare nessun servizio, e chi non trova niente paga la ricerca e la
-     * lascia lì per i prossimi.
-     *
-     * **Il chiodo.** Quelle righe le scrivono dei telefoni, cioè della gente, e
-     * un APK modificato ci scrive quello che vuole. Le due bugie possibili non
-     * costano uguale:
-     *
-     *  * «STOP su una moneta buona» fa saltare un acquisto a tutti. È una
-     *    scocciatura, e si ripaga con un'altra moneta, che ce ne sono mille.
-     *  * «pulita su una truffa» fa comprare la truffa a tutti. Questa costa
-     *    soldi veri.
-     *
-     * Per questo uno STOP vale da chiunque e subito, e un «pulita» vale solo
-     * quando lo dicono [MIN_CLEAN] installazioni diverse. Il mondo paga due
-     * ricerche per moneta invece di mille, e per spegnere l'ultima rete a
-     * qualcun altro bisogna arrivare primo su quel mint con due installazioni.
-     * E anche riuscendoci non si fa comprare niente: si toglie un controllo, e
-     * sotto restano tutti gli altri cancelli, che girano sul telefono.
-     *
-     * **Chi firma.** Non il portafoglio. Scrivere «la paghetta X ha appena
-     * controllato il mint Y» in un archivio pubblico è dire al mondo che quella
-     * paghetta sta per comprare quella moneta, qualche secondo prima che lo
-     * faccia. Serve solo poter distinguere due installazioni, non sapere quali:
-     * quindi un numero a caso, fatto una volta e tenuto sul telefono.
+     * Everybody's verdict, and why a no and a yes weigh differently. The question does not
+     * depend on who asks, so the answer sits in the archive (`/clearsign/coin/<mint>`), read
+     * without a key. Phones write those rows and a modified APK writes what it wants: a false
+     * STOP costs one purchase, a false "clean" buys the scam for everyone. So a STOP counts
+     * from anyone at once, a "clean" only from [MIN_CLEAN] installs, and even then it removes
+     * one check while the other gates run on the phone. Signed by a random per-install id,
+     * never the wallet: "budget X checked mint Y" in public would announce the buy.
      */
     object Shared {
         private const val PREFS = "apex_coincheck"
@@ -83,13 +41,13 @@ object CoinCheck {
         /** Quante installazioni diverse servono per credere a un «pulita». */
         const val MIN_CLEAN = 2
 
-        /** Un «pulita» invecchia in fretta: una moneta può marcire dopo. */
+        /** A "clean" ages fast: a coin can rot later. */
         const val CLEAN_TTL_MS = 6L * 3600_000
 
-        /** Una truffa resta una truffa. */
+        /** A scam stays a scam. */
         const val STOP_TTL_MS = 7L * 24 * 3600_000
 
-        /** Cosa dice l'archivio, prima di spendere una ricerca. */
+        /** What the archive says, before spending a search. */
         sealed class Say {
             data class Stop(val reason: String) : Say()
             object Clean : Say()
@@ -98,12 +56,9 @@ object CoinCheck {
         }
 
         /**
-         * La riga dell'archivio, letta. Pura, così un test le può passare quello
-         * che il database contiene davvero.
-         *
-         * Forma: `{"v": {"<id>": {"s": 0|1, "w": "motivo", "at": 123}}}`, dove
-         * `s` è 1 per uno stop. Tutto ciò che non si legge vale come niente: una
-         * riga rotta non è un verdetto.
+         * The archive row, read. Pure, so a test can hand it what the database really holds.
+         * Shape: `{"v": {"<id>": {"s": 0|1, "w": "reason", "at": 123}}}`, `s` 1 for a stop.
+         * Anything unreadable counts as nothing: a broken row is not a verdict.
          */
         fun read(row: JSONObject?, now: Long): Say {
             val v = row?.optJSONObject("v") ?: return Say.Ask
@@ -122,7 +77,7 @@ object CoinCheck {
             return if (clean >= MIN_CLEAN) Say.Clean else Say.Ask
         }
 
-        /** Il numero che distingue questa installazione, e non dice chi è. */
+        /** The number that tells this install apart, and says nothing about who it is. */
         fun id(ctx: Context): String {
             val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             p.getString("id", null)?.let { return it }
@@ -132,22 +87,16 @@ object CoinCheck {
         }
 
         /**
-         * Quanto tiene una risposta dell'archivio prima di richiederla.
-         *
-         * Senza questo, una moneta che resta in cima alla lista si rilegge a ogni
-         * caccia: cinque letture ogni sei minuti, milleduecento al giorno per
-         * telefono. Sono duecento byte l'una e sembrano niente finche' non le
-         * moltiplichi per diecimila persone, e allora sono due giga al giorno di
-         * traffico su un archivio che ne da' dieci al mese. Il verdetto degli
-         * altri non cambia ogni sei minuti: mezz'ora e' gia' piu' fresco di
-         * quanto serva.
+         * How long an archive answer holds before asking again. Without it a coin at the top of
+         * the list was reread every hunt: 1,200 reads a day per phone, two gigabytes a day at
+         * ten thousand people on an archive that gives ten a month. Half an hour is fresher than needed.
          */
         private const val MEM_TTL_MS = 30L * 60_000
-        /** Un «non lo sa nessuno» si ricontrolla prima: qualcuno sta per scriverlo. */
+        /** A "nobody knows" is rechecked sooner: somebody is about to write it. */
         private const val MEM_ASK_TTL_MS = 5L * 60_000
         private val mem = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Say>>()
 
-        /** Quello che l'archivio dice di [mint], ricordando la risposta. */
+        /** What the archive says about [mint], remembering the answer. */
         fun say(mint: String, now: Long = System.currentTimeMillis()): Say {
             mem[mint]?.let { (at, said) ->
                 val ttl = if (said is Say.Ask) MEM_ASK_TTL_MS else MEM_TTL_MS
@@ -161,7 +110,7 @@ object CoinCheck {
         /** Dopo aver pubblicato il proprio verdetto, la memoria e' vecchia. */
         internal fun forget(mint: String) { mem.remove(mint) }
 
-        /** L'archivio si legge senza chiave e senza svegliare il worker. */
+        /** The archive is read without a key and without waking the worker. */
         fun fetch(mint: String): JSONObject? {
             val base = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() } ?: return null
             return runCatching {
@@ -175,9 +124,9 @@ object CoinCheck {
         }
 
         /**
-         * Lasciare il verdetto per i prossimi. Passa dal worker, perché la chiave
-         * che scrive sull'archivio sta là dentro e nell'APK non ci deve finire.
-         * Se non va a buon fine non succede niente: il prossimo pagherà la sua.
+         * Leave the verdict for the next ones, through the worker: the key that writes to the
+         * archive lives there and must not end up in the APK. If it fails nothing happens; the
+         * next phone pays its own search.
          */
         fun publish(ctx: Context, mint: String, stop: Boolean, why: String) {
             forget(mint)
@@ -196,19 +145,15 @@ object CoinCheck {
     }
 
     /**
-     * Ask the model, with web search, whether there is public reason not to buy
-     * [symbol] ([mint]).
-     *
-     * The answer format is one word then a reason, which is cheap to parse and
-     * hard to get wrong. Anything unparseable is Unknown, not Ok: a verdict we
-     * could not read is not a verdict.
+     * Ask the model, with web search, whether there is public reason not to buy [symbol]
+     * ([mint]). One word then a reason: cheap to parse, hard to get wrong. Unparseable is
+     * Unknown, not Ok: a verdict we could not read is not a verdict.
      */
     suspend fun verdict(ctx: Context, symbol: String, mint: String): Verdict = withContext(Dispatchers.IO) {
         if (!Settings.webCheck.value) return@withContext Verdict.Unknown
 
-        // Prima la risposta degli altri. Non costa niente, non sveglia nessun
-        // servizio, e vale anche per chi non ha nessuna chiave: senza questo, un
-        // telefono senza chiave non aveva questa rete per niente. Vedi [Shared].
+        // Everybody's answer first: free, wakes no service, and works for whoever has no
+        // key; without it a keyless phone had none of this net. See [Shared].
         when (val said = Shared.say(mint)) {
             is Shared.Say.Stop -> {
                 Log.i(TAG, "$symbol: stop dall'archivio")
@@ -243,10 +188,8 @@ object CoinCheck {
             .put(
                 "tools",
                 JSONArray().put(
-                    // The basic variant: the configured model may be older than the
-                    // family that supports dynamic filtering, and the basic one is
-                    // accepted everywhere. Two searches is enough for "is this coin
-                    // known to be a scam" and is the cost ceiling per purchase.
+                    // The basic variant: the configured model may predate dynamic filtering, and the basic
+                    // one is accepted everywhere. Two searches answer "is this coin a known scam" and cap the cost.
                     JSONObject().put("type", "web_search_20250305").put("name", "web_search").put("max_uses", 2),
                 ),
             )
@@ -267,8 +210,8 @@ object CoinCheck {
         }.trim()
         Log.i(TAG, "$symbol: $searches searches, answer starts '" + text.take(24) + "'")
 
-        // Pagata una volta, lasciata a tutti. Un verdetto che non si è potuto
-        // leggere non si pubblica: non è un verdetto.
+        // Paid once, left for everyone. A verdict that could not be read is not
+        // published: it is not a verdict.
         return@withContext when {
             text.startsWith("STOP", true) -> {
                 val why = text.removePrefix("STOP").removePrefix("stop").trim().trim('—', '-', ':', ' ').ifBlank { symbol }

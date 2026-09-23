@@ -72,10 +72,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Home: the wallet's own screen (a dApp never opens this — MWA routes to
- * [MobileWalletAdapterActivity]). Shows the Seed Vault accounts, the local
- * "registro firme", the trusted contacts, and keeps the offline demo scenarios
- * at the bottom for a quick pitch without a dApp.
+ * Home: the wallet's own screen (a dApp never opens this, MWA routes to
+ * [MobileWalletAdapterActivity]). Accounts, ledger, contacts, and the offline demo
+ * scenarios at the bottom for a pitch without a dApp.
  */
 class MainActivity : ComponentActivity() {
 
@@ -94,19 +93,16 @@ class MainActivity : ComponentActivity() {
     }
 
     /*
-     * Reader mode: while Apex is in front, holding it against a tag or another
-     * phone reads the request straight into the send form. It is only a read —
-     * nothing is signed, and the ordinary receipt still has to be approved.
+     * Reader mode: while Velum is in front, holding it against a tag or another phone reads
+     * the request into the send form. Only a read; the ordinary receipt still has to be approved.
      */
     /** The sticker writer borrows the radio; this is how it gives it back. */
     internal fun resumeReader() = startReaderMode()
 
     private fun startReaderMode() {
-        // Reading and pretending to be a tag are the same radio, and reader mode
-        // wins: with it on, this phone polls for tags and emulates nothing. So
-        // while the tap screen is armed we must stay out of the way, or the other
-        // phone finds no card to read — which is exactly what "the tap does
-        // nothing" looked like.
+        // Reading and pretending to be a tag share one radio, and reader mode wins: with it on,
+        // this phone polls and emulates nothing. While the tap screen is armed we stay out of
+        // the way, or the other phone finds no card, which is what "the tap does nothing" was.
         if (TapService.armed.value) return
         val nfc = android.nfc.NfcAdapter.getDefaultAdapter(this) ?: return
         nfc.enableReaderMode(
@@ -203,13 +199,9 @@ class MainActivity : ComponentActivity() {
         Themes.load(this)
         Settings.load(this)
         Pro.load(this)
-        // Hand the radio back and forth as the tap screen arms and disarms.
-        //
-        // Started here and not in onResume. `lifecycleScope` lives until the
-        // activity is destroyed and `repeatOnLifecycle` never returns, so one
-        // started on every resume left a new permanent collector behind each
-        // time: after ten trips to the home screen, ten coroutines racing to
-        // turn the NFC reader on and off at every change.
+        // Hand the radio back and forth as the tap screen arms and disarms. Started here, not in
+        // onResume: `lifecycleScope` lives until destroy and `repeatOnLifecycle` never returns,
+        // so one per resume left a permanent collector each time, ten after ten trips home.
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
                 TapService.armed.collect { emitting -> if (emitting) stopReaderMode() else startReaderMode() }
@@ -220,13 +212,10 @@ class MainActivity : ComponentActivity() {
         signer = SeedVaultSigner(this, bridge)
         enableEdgeToEdge()
         setContent { ScaledText { HomeScreen(signer) } }
-        // Quello che questo telefono ha gia' imparato sulle monete: nomi, decimali,
-        // icone. Non cambiano mai, e senza questo si richiedevano tutti a ogni avvio.
-        // Ma si legge **dopo il primo fotogramma** e su IO: erano due file JSON
-        // letti sul thread principale prima di `setContent`, e lo splash restava
-        // nero per tutto il tempo che ci mettevano, sempre di piu' col passare dei mesi.
-        // One image loader for every logo in the app, with a memory cache so a
-        // coin seen on one page is not fetched again on the next.
+        // What this phone already learned about coins: names, decimals, icons. They never
+        // change, and without this all were fetched again on every start. Read after the first
+        // frame and on IO: two JSON files on the main thread before `setContent` kept the splash
+        // black, longer every month. One image loader for every logo, with a memory cache.
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(this)
                 .memoryCache { coil.memory.MemoryCache.Builder(this).maxSizePercent(0.08).build() }
@@ -282,7 +271,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showMore by remember { mutableStateOf(false) }
         var showBridge by remember { mutableStateOf(false) }
         var bridgeMemo by remember { mutableStateOf<String?>(null) }
-        // Il patto gia' fatto con RocketX, che viaggia col pagamento fino alla firma.
+        // The deal already struck with RocketX, traveling with the payment up to the signature.
         var bridgeDeal by remember { mutableStateOf<RocketX.Deal?>(null) }
         var showBridgeHistory by remember { mutableStateOf(false) }
         // L'invio privato entra dal Manda ma gira nel ponte: qui si porta dietro
@@ -307,9 +296,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
         val scanHome = rememberAgentScan { scanError = it }
         val walletScroll = rememberScrollState()
         val density = androidx.compose.ui.platform.LocalDensity.current
-        // Uno stato, non un numero: chi lo legge lo fa dentro `graphicsLayer` o
-        // `layout`, cosi' lo scorrimento muove i livelli e non ricompone la pagina.
-        // Letto qui come Float, `HomeScreen` intera si ricomponeva a ogni fotogramma.
+        // A state, not a number: readers use it inside `graphicsLayer` or `layout`, so
+        // scrolling moves layers and does not recompose the page. Read here as a Float,
+        // the whole `HomeScreen` recomposed every frame.
         val collapse = remember {
             derivedStateOf { (walletScroll.value / with(density) { 180.dp.toPx() }).coerceIn(0f, 1f) }
         }
@@ -318,13 +307,10 @@ fun HomeScreen(signer: SeedVaultSigner) {
         LaunchedEffect(request) { if (request != null) showSend = true }
         LaunchedEffect(Unit) { contacts = Contacts.allowlist(ctx); Exports.clean(ctx) }
         /**
-         * Unlock: what the door does when this phone has been here before.
-         *
-         * The fingerprint every time you come back, the way Jupiter does it. The
-         * address is already remembered, so nothing needs the vault to *show* a
-         * balance; what the print buys is that the person holding the phone is
-         * you. Signing later calls `ensureAccount`, which authorises the vault
-         * properly at the moment something is actually signed.
+         * Unlock: what the door does when this phone has been here before. The fingerprint
+         * every time, the way Jupiter does it; the address is remembered, so the print only buys
+         * that the person holding the phone is you. Signing later calls `ensureAccount`, which
+         * authorizes the vault when something is actually signed.
          */
         suspend fun unlock(saved: String): Boolean {
             val act = ctx as? android.app.Activity ?: return false
@@ -344,7 +330,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
         androidx.compose.runtime.DisposableEffect(lifecycle) {
             val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
-                // Lo scan e la condivisione sono nostri: non si esce, non si richiude.
+                // Scan and share are ours: no leaving, no relocking.
                 if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP && !Door.consumeHold()) accounts = emptyList()
             }
             lifecycle.addObserver(obs)
@@ -378,12 +364,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
         ) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    // With no wallet there is nothing on any of the four tabs, and
-                    // the old screen said so with a small card and two thirds of an
-                    // empty page under it. One door, the whole screen, and the tab
-                    // bar stays away until there is something behind it.
-                    // A door that opens, not a cut: the scene fades and grows a
-                    // touch as the wallet comes up under it.
+                    // With no wallet there is nothing on any tab, and the old screen said so with a small
+                    // card over two thirds of empty page. One door, the whole screen, no tab bar until there
+                    // is something behind it. It opens rather than cuts: the scene fades and grows a touch.
                     androidx.compose.animation.AnimatedContent(
                         targetState = accounts.isEmpty(),
                         transitionSpec = {
@@ -402,10 +385,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                 if (!ok) status = ctx.getString(R.string.lock_failed)
                             }
                         }
-                        // A phone that has been here before asks for the print
-                        // the moment the door appears, once. The button under
-                        // the scene is the retry, for a print that failed or a
-                        // prompt that was dismissed.
+                        // A phone that has been here before asks for the print the moment the door appears,
+                        // once. The button is the retry, for a failed print or a dismissed prompt.
                         LaunchedEffect(saved) { if (saved != null && !busy) ask() }
                         ConnectDoor(busy, status, returning = saved != null) {
                             if (saved == null) connect() else ask()
@@ -608,9 +589,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
 
 
 /**
- * Wallet health, delegations, trusted contacts and the offline demo. They used to
- * stack under the portfolio on the Wallet tab; they live in Settings now so the
- * home stays a wallet (balance, actions, holdings) and not a dashboard.
+ * Wallet health, delegations, contacts and the offline demo. They stacked under the
+ * portfolio; they live in Settings now so the home stays a wallet, not a dashboard.
  */
 @Composable
 private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map<String, String>, onSend: (String) -> Unit) {
@@ -662,12 +642,9 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
 }
 
 /**
- * The door, when there is no wallet yet.
- *
- * It used to be a card at the top of the Wallet tab with two thirds of an empty
- * page under it and four tabs at the bottom that all led nowhere. Nothing in
- * this app works without a key, so until there is one there is one screen and
- * one thing to do on it.
+ * The door, when there is no wallet yet. It was a card at the top of the Wallet tab with
+ * an empty page under it and four tabs leading nowhere. Nothing works without a key, so
+ * until there is one there is one screen and one thing to do.
  */
 @Composable
 private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onConnect: () -> Unit) {
@@ -675,12 +652,9 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
         Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // High on the page on purpose: the fingerprint sheet comes up over the
-        // bottom half, and the mark and the sentence have to stay readable behind
-        // it. Centred, they would have been the part the sheet covers.
-        // The name alone, high on the page. The launcher art was here too and it
-        // was the wrong hero: a light square in the middle of a dark screen,
-        // pulling the eye away from the thing worth watching underneath.
+        // High on the page on purpose: the fingerprint sheet covers the bottom half, and the
+        // mark and the sentence must stay readable behind it. The name alone: the launcher art
+        // was a light square on a dark screen, pulling the eye from what is worth watching.
         Spacer(Modifier.weight(0.08f))
         // The one orchestrated moment in the app: the name comes up out of the
         // dark like a light being switched on above it. Once, on arrival, and
@@ -704,16 +678,13 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
                 letterSpacing = 3.sp,
             )
         }
-        // The name and nothing else. The sentence that used to sit under it
-        // explained the scene, and a scene that needs explaining is a worse
-        // scene. What is out there arrives, asks, and the liar breaks on the
-        // glass: that is the whole pitch, and it is drawn.
+        // The name and nothing else. The sentence under it explained the scene, and a scene that
+        // needs explaining is a worse scene. What is out there arrives, asks, and the liar breaks
+        // on the glass: the whole pitch, drawn.
         Spacer(Modifier.height(8.dp))
-        // Shown, not told: everything out there comes to this one phone and asks,
-        // and the request that lies is stopped at the glass. It is the one thing
-        // this app is for, and a paragraph saying the same would be skimmed. The
-        // scene takes the whole middle of the screen: the planet's limb sits
-        // just above the button, the phone holds station in the centre.
+        // Shown, not told: everything comes to this one phone and asks, and the request that
+        // lies stops at the glass. The scene takes the whole middle: planet's limb above the
+        // button, the phone holding station in the center.
         GateDemo(Modifier.weight(1f).heightIn(min = 220.dp), opening = busy)
         Spacer(Modifier.height(12.dp))
         PrimaryButton(
@@ -736,8 +707,8 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
 private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>, onSelect: (Tab) -> Unit) {
     val ctx = LocalContext.current
     Row(
-        // Solo la riga in alto: un bordo su quattro lati faceva della barra una
-        // scheda, e una barra non e' una scheda.
+        // Only the top line: a border on four sides made the bar a card, and a bar is
+        // not a card.
         Modifier.fillMaxWidth().background(Halo.card)
             .drawBehind { drawLine(Halo.stroke, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }
             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -773,17 +744,15 @@ private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>,
                     else -> Halo.muted
                 }
                 HaloIcon(icon, tint, 22.dp)
-                // Scrolling down hands the screen back to the content: the labels
-                // fade and the bar closes up. Coming back up brings them out again.
-                // Sempre composta: si schiaccia in layout e sfuma in graphicsLayer,
-                // cosi' la barra si chiude senza ricomporre niente.
+                // Scrolling down hands the screen to the content: labels fade and the bar closes up.
+                // Always composed: squeezed in layout and faded in graphicsLayer, so the bar closes
+                // without recomposing anything.
                 Text(
                     stringResource(label), style = HaloType.label,
                     color = if (active) Halo.mint else Halo.muted,
                     modifier = Modifier
-                        // Si chiude solo sul Wallet, che e' l'unica tab che scorre la
-                        // barra: sulle altre le etichette restano, e tornando al
-                        // Wallet il suo scorrimento e' quello di prima.
+                        // Collapses only on Wallet, the one tab that scrolls the bar: on the
+                        // others the labels stay, and back on Wallet the scroll is where it was.
                         .layout { measurable, constraints ->
                             val p = measurable.measure(constraints)
                             val c = if (tab == Tab.WALLET) collapse.value else 0f
@@ -808,9 +777,9 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
     var scanError by remember { mutableStateOf<String?>(null) }
     val ownScan = rememberAgentScan { scanError = it }
     val scan = onScan ?: ownScan
-    // La stessa intestazione delle altre tab. Il segno vero al posto della
-    // tessera con l'icona, e quando il numero grande e' scorso via la riga
-    // sotto il titolo lo riprende, cosi' la cifra che conta non esce mai.
+    // The same header as the other tabs. The real mark instead of the icon tile, and
+    // when the big number has scrolled away the line under the title picks it up,
+    // so the figure that counts never leaves.
     PageHeader(
         title = stringResource(R.string.app_name),
         sub = headline,

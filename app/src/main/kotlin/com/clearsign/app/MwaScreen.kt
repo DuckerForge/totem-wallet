@@ -117,17 +117,10 @@ import kotlin.math.hypot
 import kotlin.math.sin
 
 /**
- * In che lingua parla l'app, non in che lingua parla il telefono.
- *
- * Chiedeva `Locale.getDefault()`, cioe' il sistema. Android pero' lascia
- * scegliere la lingua **per singola app**, e allora le due si separano: schermi
- * in inglese perche' le risorse rispondono in inglese, e in mezzo una riga
- * italiana dello scontrino perche' il motore aveva chiesto al sistema. Vista dal
- * vivo: "L'agente ha dichiarato..." dentro un'app tutta inglese.
- *
- * `getAdjustedDefault` e' la lista che Android usa davvero per risolvere le
- * risorse, sistemata con la scelta per app davanti. La stessa che decide le
- * scritte decide anche le frasi dello scontrino.
+ * The language the app speaks, not the one the phone speaks. Android lets a
+ * language be chosen per app; `Locale.getDefault()` is the system's, and the
+ * receipt once said "L'agente ha dichiarato..." inside an all-English app.
+ * `getAdjustedDefault` is the list Android resolves resources with, app choice first.
  */
 fun deviceLocaleTag(): String {
     val l = androidx.core.os.LocaleListCompat.getAdjustedDefault()[0] ?: Locale.getDefault()
@@ -157,8 +150,8 @@ internal val HaloScheme get() = darkColorScheme(
 /** Material scheme + per-theme letter-spacing, applied once at each screen root. */
 @Composable
 fun HaloRoot(content: @Composable () -> Unit) {
-    // Una fase sola per tutti i bordi vivi, mossa a fotogramma solo sulle
-    // palette che li hanno. I bordi la leggono in draw: vedi `haloBorder`.
+    // One phase for every living border, advanced per frame only on palettes
+    // that have them. Borders read it in draw: see `haloBorder`.
     val living = Halo.palette.livingStroke
     androidx.compose.runtime.LaunchedEffect(living) {
         if (!living) return@LaunchedEffect
@@ -177,14 +170,9 @@ fun HaloRoot(content: @Composable () -> Unit) {
 @Composable
 fun MwaScreen(ui: MwaUi) {
     HaloRoot {
-        // Un errore non e' un pericolo, e vanno tenuti separati.
-        //
-        // Qui dentro `Error` faceva scattare tutto l'apparato dell'allarme:
-        // schermo rosso, "Rischio rilevato" sotto il nome, e la vibrazione di
-        // avvertimento. Per una dApp che non si e' connessa. Non e' successo
-        // niente di pericoloso: e' solo non successo niente. Gridare al lupo su
-        // un non evento e' il modo piu' rapido di insegnare a qualcuno a
-        // ignorare il rosso il giorno che il lupo c'e' davvero.
+        // An error is not a danger. `Error` used to fire the whole alarm (red screen,
+        // "Risk detected", the warning buzz) for a dApp that simply never connected.
+        // Crying wolf over a non-event teaches people to ignore the red on the day it counts.
         val problem = ui is MwaUi.Error
         val danger = (ui is MwaUi.SignRequest && ui.receipts.any { it.blocksApproval }) ||
             (ui is MwaUi.SignInRequest && ui.domainMismatch)
@@ -240,9 +228,8 @@ fun MwaScreen(ui: MwaUi) {
 }
 
 /**
- * Fixed bottom bar: the one thing the user must see without scrolling. For a
- * sign request it is the amount and the hold-to-sign gesture; for a blocked
- * one, the block notice; for the others, the approve/decline pair.
+ * Fixed bottom bar, the one thing seen without scrolling: amount and hold-to-sign
+ * for a sign request, the block notice for a blocked one, approve/decline otherwise.
  */
 @Composable
 private fun ActionBar(ui: MwaUi) {
@@ -437,11 +424,9 @@ private fun DappHero(dApp: DappId, subtitle: String) {
 // ---- building blocks --------------------------------------------------------
 
 /**
- * The hairline around a card.
- *
- * Normally a flat colour. On a theme that asks for it, the same hairline becomes
- * Solana's purple and green sliding along the edge — one gradient translated by
- * exactly its own width per cycle, so it flows without ever showing a seam.
+ * The hairline around a card. Flat normally; on a theme that asks, Solana's purple
+ * and green slide along the edge, one gradient shifted by its own width per cycle,
+ * so it flows with no seam.
  */
 
 @Composable
@@ -452,10 +437,8 @@ internal fun GlassCard(content: @Composable () -> Unit) {
             .clip(rs(22))
             .background(Halo.card)
             .haloBorder(rs(22))
-            // 16 and not 20. The screen already keeps its own margin outside this
-            // card, so every line of text was starting 40dp in from the edge on a
-            // phone that is 411dp wide — a tenth of the screen on each side, spent
-            // on nothing, and it reads as cramped rather than as roomy.
+            // 16, not 20: the screen keeps its own margin outside the card, and text was
+            // starting 40dp in on a 411dp phone. A tenth of the screen per side, spent on nothing.
             .padding(16.dp),
     ) { content() }
 }
@@ -526,12 +509,8 @@ internal fun GhostButton(
     tint: Color = Halo.muted,
     fillWidth: Boolean = true,
     /**
-     * Quarantotto di suo, cinquantaquattro quando sta accanto a un pieno.
-     *
-     * I due tipi di bottone hanno altezze diverse di proposito: uno pieno pesa
-     * di piu' anche fisicamente. Messi fianco a fianco nella stessa riga pero'
-     * quella differenza non legge come gerarchia, legge come sbaglio, e in quella
-     * riga sono due cose che si fanno allo stesso modo.
+     * 48 on its own, 54 next to a filled button. The two kinds differ in height on
+     * purpose, but side by side in one row the difference reads as a mistake.
      */
     height: androidx.compose.ui.unit.Dp = 48.dp,
     onClick: () -> Unit,
@@ -549,10 +528,7 @@ internal fun GhostButton(
     }
 }
 
-/**
- * Hardware-wallet gesture: hold for ~0.9 s to confirm. A tap does nothing —
- * no accidental signatures — and the fill shows the commitment building up.
- */
+/** Hardware-wallet gesture: hold about 0.9 s to confirm. A tap does nothing, and the fill shows the commitment building. */
 @Composable
 internal fun HoldToConfirm(label: String, enabled: Boolean = true, onConfirm: () -> Unit) {
     val shape = rs(16)
@@ -620,12 +596,7 @@ internal fun Avatar(pubkey: String, size: androidx.compose.ui.unit.Dp) {
     ) { Text(pubkey.take(2), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.34f).sp, color = Halo.ground.copy(alpha = 0.85f)) }
 }
 
-/**
- * Amount with a lighter unit: "0.5 SOL" reads as a number, not a code.
- *
- * The same one-line rule holds for a number that comes from a quote rather than
- * from a balance delta.
- */
+/** Amount with a lighter unit: "0.5 SOL" reads as a number, not a code. Same rule for a quoted number. */
 @Composable
 private fun FitAmount(number: String, symbol: String, size: androidx.compose.ui.unit.TextUnit, color: Color, weight: FontWeight) {
     var actual by remember(number, symbol) { mutableStateOf(size) }
@@ -649,12 +620,8 @@ internal fun AmountText(
     weight: FontWeight = FontWeight.Bold,
     countUp: Boolean = false,
     /**
-     * Shrink until it fits on one line.
-     *
-     * An amount is not a sentence and must never wrap: "−0.303824 SOL" broken
-     * after the fifth decimal put a lonely "4 SOL" on the next line, which reads
-     * as a second number. Where the room is fixed and the number is not, the type
-     * gives way, not the value.
+     * Shrink until it fits one line. An amount must never wrap: "−0.303824 SOL" broke
+     * after the fifth decimal and left "4 SOL" on the next line, a second number.
      */
     fit: Boolean = false,
 ) {
@@ -866,12 +833,9 @@ private fun SignPrompt(ui: MwaUi.SignRequest) {
     // Bundle of >1 tx: show the aggregate first, then a per-tx selector, so the
     // user reviews every transaction — not just the first — before approving all.
     if (ui.count > 1) {
-        // Everything a bundle needs to say, said once each. It used to open with a
-        // banner ("this request signs 3 transactions at once"), then a card with
-        // the total, then the chips, then "Transaction 1 of 3" — four ways of
-        // saying three, before a single amount appeared. The chips are the
-        // browser, the fixed bar below is the total, and the only fact neither of
-        // them carries is the fee across all three, which rides with the hint.
+        // Everything a bundle needs to say, once. It used to say "three" four ways (banner,
+        // total card, chips, "Transaction 1 of 3") before any amount. The chips browse, the
+        // fixed bar totals, and the fee across all three rides with the hint.
         TxSelector(receipts, selIdx, viewed.toSet()) { sel = it; if (it !in viewed) viewed.add(it) }
         Spacer(Modifier.height(6.dp))
         val allSeen = viewed.size >= receipts.size
@@ -917,13 +881,10 @@ private fun BlockedNotice(text: String) {
 }
 
 /**
- * The two legs of a swap as the *quote* knows them.
- *
- * Only for drawing, and only when the simulation could not tell us: a route that
- * fails on chain returns a receipt with no legs at all, and the screen then had
- * nothing to show but "no funds transferred" over an empty picture. What you
- * were trying to do is still worth drawing. What will actually happen is the
- * risks' job, and they sit right underneath.
+ * The two legs of a swap as the quote knows them. Only for drawing, and only when
+ * the simulation could not tell: a route that fails on chain returns a receipt with
+ * no legs, and the screen showed "no funds transferred" over nothing. What you tried
+ * is still worth drawing; what will happen is the risks' job, right underneath.
  */
 internal data class SwapPair(
     val outMint: String, val outSymbol: String, val outUi: String,
@@ -937,24 +898,15 @@ internal fun SignReceiptBody(
     cluster: String?,
     pair: SwapPair? = null,
     /**
-     * The plain version, for a screen that has already explained the trade.
-     *
-     * The swap sheet grades the coin on the form and names the route in its
-     * summary, so repeating both here is the same sentence twice. It also drops
-     * the parts written for somebody debugging a transaction: the decoded program
-     * calls, and percentages of a total that does not mean anything in a swap
-     * (the pool receives more SOL than you paid, because the route passes through
-     * it more than once, and "129% of the total" is not a fact anybody can use).
+     * The plain version, for a screen that already explained the trade: no coin grade,
+     * no route, no decoded calls, and no percentages of a total that means nothing in a
+     * swap (the pool receives more SOL than you paid, the route passes twice).
      */
     plain: Boolean = false,
     /**
-     * Draw the headline amount at the top.
-     *
-     * Off where the screen has already said the number: PayOverlay carries a
-     * title and a line of its own above this, and under them "YOU PAY −0.005005"
-     * landed on top of the same amount drawn again in the map and again in the
-     * summary. Three times on one page is not emphasis, it is noise, and the eye
-     * stops trusting which one is the real one.
+     * Draw the headline amount. Off where the screen already said the number: PayOverlay
+     * had "YOU PAY −0.005005" three times on one page, and the eye stops trusting which
+     * one is real.
      */
     hero: Boolean = true,
 ) {
@@ -974,14 +926,10 @@ internal fun SignReceiptBody(
         )
     }
 
-    // An exchange is not a payment: the coin leaves and another one comes back to
-    // the same wallet. That round trip is the thing worth looking at, so for a
-    // swap the map *is* the headline instead of a picture half a screen below it.
-    //
-    // "A different coin comes back" is the whole test. It used to also demand that
-    // the receiving account already existed, which is false for every first
-    // purchase of a coin: that account is created by this very transaction, and
-    // so the one leg that mattered was the one being filtered out.
+    // An exchange is not a payment: the coin leaves and another comes back to the same
+    // wallet, so for a swap the map is the headline. "A different coin comes back" is
+    // the whole test. Demanding that the receiving account already exist filtered out
+    // every first purchase: that account is created by this very transaction.
     val outLeg = r.outflows.firstOrNull { it.rawAmount < 0 }
     val back = r.inflows.firstOrNull { it.rawAmount > 0 && it.mint != outLeg?.mint }
     val isSwap = (outLeg != null && back != null) || pair != null
@@ -989,11 +937,8 @@ internal fun SignReceiptBody(
     val backCoin = rememberCoinBitmap(back?.mint ?: pair?.inMint)
     val backSymbol = back?.symbol ?: pair?.inSymbol.orEmpty()
 
-    // What the entrance animations key on. Not the receipt: a refreshed quote is
-    // a new Receipt object every fifteen seconds, and keying on it replayed the
-    // whole screen each time — cards sliding in, the map fading from nothing —
-    // while you were reading it. The trade is the same trade; only the numbers
-    // moved.
+    // What the entrance animations key on. Not the receipt: a refreshed quote is a new
+    // object every fifteen seconds and replayed the whole screen while you read it.
     val animKey = pair?.let { it.outMint + it.inMint }
         ?: (r.outflows.firstOrNull()?.mint.orEmpty() + (r.primaryRecipient ?: ""))
 
@@ -1022,11 +967,9 @@ internal fun SignReceiptBody(
         )
     }
 
-    // What is arriving, judged on its own. Right under the amount, because a coin
-    // that cannot be sold back is a reason to stop and belongs above the fold
-    // just as much as a risk in the transaction itself. On a swap the risks go
-    // first: the headline is now a picture, and the reason to stop must be the
-    // first words under it.
+    // What is arriving, judged on its own, right under the amount: a coin that cannot
+    // be sold back is a reason to stop and belongs above the fold. On a swap the risks
+    // come first, under the picture.
     if (!isSwap && !plain) {
         Spacer(Modifier.height(12.dp))
         IncomingCoinCard(r, null)
@@ -1075,10 +1018,8 @@ internal fun SignReceiptBody(
         dests.firstOrNull { it.address != null }?.let { sheetAddr = it }
     }
 
-    // "CALLS · decoded from the program's published IDL · jupiter · route" is a
-    // good answer to a question a normal person never asks. It stays where the
-    // transaction came from somewhere else and needs auditing; on our own swap,
-    // where the screen above already says what happens, it is noise.
+    // "CALLS · decoded from the IDL · jupiter · route" answers a question a normal
+    // person never asks. It stays for a transaction from elsewhere; on our own swap it is noise.
     if (r.calls.isNotEmpty() && !plain) {
         Spacer(Modifier.height(12.dp))
         CallsCard(r.calls)
@@ -1161,10 +1102,9 @@ private fun StatTile(modifier: Modifier, icon: HIcon, value: String, label: Stri
 }
 
 /**
- * The "who is this app" card: its real logo, a verified/sideload badge, and a
- * grid of stats (rating, reviews, version, install age, publisher). Everything is
- * either from the phone (package info, tamper-proof) or the free Seeker Tracker
- * catalog. Tap opens the app's dApp Store listing.
+ * The "who is this app" card: real logo, verified/sideload badge, stats grid. All
+ * from the phone (package info) or the free Seeker Tracker catalog. Tap opens the
+ * dApp Store listing.
  */
 @Composable
 private fun DappStoreCard(store: StoreInfo) {
@@ -1243,9 +1183,9 @@ private fun DappStoreCard(store: StoreInfo) {
 }
 
 /**
- * For a request that named itself (an agent through the Agent Gate): what we could
- * verify, and a plain warning that the name above is only a claim. An app can call
- * itself anything; it cannot fake the package Android reports or how the link arrived.
+ * For a request that named itself (Agent Gate): what we could verify, and a plain
+ * warning that the name is a claim. An app cannot fake the package Android reports
+ * or how the link arrived.
  */
 @Composable
 private fun AgentOrigin(dApp: DappId) {
@@ -1312,10 +1252,8 @@ internal fun RisksCard(risks: List<Risk>) {
             Spacer(Modifier.weight(1f))
             Text("${risks.size}", fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = col)
         }
-        // Six alerts at once used to draw six alerts at once, and the card grew
-        // until the amount, the map and the button were all below the fold. The
-        // ones that stop you stay visible; the tail is one tap away. Risks arrive
-        // sorted by severity, so "the first three" is "the three worst".
+        // Six alerts once drew six alerts and pushed the amount, the map and the button below
+        // the fold. The three worst stay (risks arrive sorted), the tail is one tap away.
         var all by remember(risks) { mutableStateOf(false) }
         val keep = if (all) risks else risks.take(3)
         keep.forEach { RiskRow(it) }
@@ -1477,16 +1415,10 @@ internal fun SplitBreakdown(dests: List<NodeDest>, plain: Boolean = false, onTap
 }
 
 /**
- * The swap headline: the round trip, with the two numbers under it.
- *
- * The map used to sit below the amounts, the incoming coin card and the risks,
- * which in the swap sheet put it under the fold: you had to scroll to find the
- * one picture that explains what you are about to do. Here it is the first thing
- * on the screen and the amounts hang off it, so the shape and the numbers are
- * read in one glance.
- *
- * The receiving node is relabelled with the symbol of the coin coming back. A
- * shortened pool address under a USDC logo tells nobody anything.
+ * The swap headline: the round trip, with the two numbers under it. The map used to
+ * sit under the fold; here it is first and the amounts hang off it. The receiving
+ * node is relabeled with the coin coming back: a shortened pool address under a
+ * USDC logo tells nobody anything.
  */
 @Composable
 private fun SwapFlowHero(
@@ -1501,10 +1433,9 @@ private fun SwapFlowHero(
 ) {
     val accent = if (danger) Halo.red else Halo.mint
     val labelled = remember(dests, backSymbol, pair) {
-        // The route's own name is "Jupiter pool · PancakeSwap · Meteora DLMM",
-        // which is true, useless under a circle, and three times wider than the
-        // canvas. Under the node goes the coin you are getting; the route is in
-        // the details card, where there is room to read it.
+        // The route's own name ("Jupiter pool · PancakeSwap · Meteora DLMM") is true, useless
+        // under a circle, and three times wider than the canvas. The coin goes here, the
+        // route in the details card.
         val i = dests.indexOfFirst { !it.isFee }
         when {
             i >= 0 -> dests.mapIndexed { k, d -> if (k == i) d.copy(label = backSymbol) else d }
@@ -1610,11 +1541,8 @@ private fun ReceiptDetails(r: Receipt, recipientLabel: String, showRecipient: Bo
                 Spacer(Modifier.weight(1f))
                 Text(fmtSol(r.feeLamports, 6) + " SOL", fontFamily = Inter, fontSize = 14.sp, color = Halo.ink, style = Tabular)
             }
-            // The technical numbers used to hang off a small circle floating
-            // under the card, which was one more thing on the screen and looked
-            // like a stray. They live behind this row now: same tap, nothing
-            // floating, and the numbers are still one tap away when something
-            // looks wrong.
+            // The technical numbers used to hang off a small floating circle that looked like a
+            // stray. They live behind this row: same tap, nothing floating.
             var stats by remember(r) { mutableStateOf(false) }
             Row(
                 Modifier.fillMaxWidth().then(if (r.stats != null) Modifier.clickable { stats = !stats } else Modifier),
@@ -1976,16 +1904,10 @@ private fun kindText(k: SolanaRpc.WalletIntel.Kind): String = stringResource(
 )
 
 /**
- * The coin's logo as something a Canvas can draw.
- *
- * Loaded through the image loader directly rather than with a painter:
- * `rememberAsyncImagePainter` only starts its request when something draws it,
- * and nothing draws this one, so the painter sat empty forever and the logo
- * never arrived.
- *
- * Null until it loads, and null forever for a coin with no icon, which is why
- * the map keeps working without it: the logo is an improvement on the dot, not
- * a requirement for it.
+ * The coin's logo as something a Canvas can draw. Loaded through the image loader,
+ * not a painter: `rememberAsyncImagePainter` only starts when something draws it,
+ * and nothing does, so the logo never arrived. Null until loaded, null forever for
+ * a coin with no icon; the map works without it.
  */
 @Composable
 internal fun rememberCoinBitmap(mint: String?): ImageBitmap? {
@@ -2015,17 +1937,10 @@ internal fun rememberCoinBitmap(mint: String?): ImageBitmap? {
 // ---- node map (all geometry in dp → px, so it looks the same on every density) ----
 
 /**
- * Where the money goes, and — for a swap — where it comes back from.
- *
- * One direction was right for a payment and half a story for an exchange. In a
- * swap the coin leaves, the route turns it into another coin, and that other
- * coin lands back in the same wallet it left. Drawing only the outbound leg made
- * a swap look like giving money away.
- *
- * [backCoin] is what turns it into a circuit: pass the logo of the coin that
- * arrives and the map grows a second arc under the first, running the other way,
- * carrying that logo home. Pass null and nothing changes at all, which is what a
- * plain send wants.
+ * Where the money goes and, for a swap, where it comes back from. One direction
+ * made a swap look like giving money away. Pass [backCoin] and the map grows a
+ * second arc running the other way, carrying that logo home; null changes nothing,
+ * which is what a plain send wants.
  */
 @Composable
 internal fun NodeMap(
@@ -2038,10 +1953,8 @@ internal fun NodeMap(
     val ctx = LocalContext.current
     val density = LocalDensity.current
     val sora = remember { runCatching { ResourcesCompat.getFont(ctx, R.font.sora) }.getOrNull() ?: Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
-    // The flow used to stop after twenty seconds to save frames, and a receipt you
-    // were still reading turned into a frozen picture: money that had stopped
-    // moving. It runs for as long as the receipt is on screen, and stops when the
-    // composable leaves, which is the only moment it costs nothing to stop.
+    // The flow used to stop after twenty seconds and a receipt you were still reading
+    // froze: money that stopped moving. It runs while the receipt is on screen.
     val flow = rememberInfiniteTransition(label = "flow")
     val t by flow.animateFloat(0f, 1f, infiniteRepeatable(tween(2000, easing = LinearEasing)), label = "t")
     val pulse by flow.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "p")
@@ -2054,10 +1967,8 @@ internal fun NodeMap(
     val labelPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; typeface = sora } }
     val amtPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.RIGHT; typeface = sora } }
     val youLabel = stringResource(R.string.you)
-    // Three, and then a count. A route can fan out to six accounts and the canvas
-    // cannot: at five the circles touch and the names print on top of each other,
-    // which turns the one picture meant to be counted into a smear. The full list
-    // is right underneath, in words, where length costs nothing.
+    // Three, then a count. At five circles the names print on top of each other and the
+    // picture meant to be counted becomes a smear. The full list is underneath, in words.
     val extra = (dests.size - 3).coerceAtLeast(0)
     val shown = if (extra > 0) {
         dests.take(3) + NodeDest(
@@ -2068,10 +1979,8 @@ internal fun NodeMap(
         dests
     }
     val n = shown.size.coerceAtLeast(1)
-    // The one wire that carries the trade. Rent for a new account and a fee are
-    // real destinations but they are not where your coin goes, and giving all of
-    // them a coin logo put four glowing discs on the canvas that read as four
-    // more accounts appearing and disappearing.
+    // The one wire that carries the trade. Rent and fees are real destinations but not
+    // where your coin goes; four glowing discs read as four accounts appearing.
     val mainWire = shown.indexOfFirst { !it.isFee && !it.isNewAccount }
         .takeIf { it >= 0 } ?: shown.indexOfFirst { !it.isFee }.coerceAtLeast(0)
     val backFrom = if (backCoin == null) -1 else mainWire
@@ -2125,10 +2034,8 @@ internal fun NodeMap(
                     drawWireParticle(Offset(px, py), Halo.cyan, backCoin, coinSize, alpha, dp)
                 }
             }
-            // Amount sits just left of its node, so five edges never pile up mid-canvas.
-            // An em dash is what [heroLine] returns when there is no amount to
-            // show. On a wire, between two circles, it reads as a thing rather
-            // than as an absence, so nothing is drawn instead.
+            // Amount just left of its node, so five edges never pile up mid-canvas. The em dash
+            // [heroLine] returns for "no amount" reads as a thing on a wire, so nothing is drawn.
             val amount = d.amountText.takeIf { it.isNotBlank() && it.trim() != "—" && it.trim() != "-" }
             if (amount != null) {
                 amtPaint.color = d.color.copy(alpha = alpha).toArgb(); amtPaint.textSize = dp(if (n > 3) 11f else 13f)
@@ -2143,17 +2050,10 @@ internal fun NodeMap(
 }
 
 /**
- * Something crossing a wire. Never something standing on one.
- *
- * This is the line between decoration and a lie. A node on this map is a real
- * destination and can be counted; a particle is the money moving. They used to
- * be drawn the same way — a disc, a halo, a ring around it — so a person reading
- * the picture counted two accounts one second and six the next and asked, fairly,
- * which one was true.
- *
- * So the moving things lost the halo and the ring. What is left is a small
- * bright mark, and on one wire the coin's own face, small enough that it never
- * reads as a coin parked somewhere.
+ * Something crossing a wire, never something standing on one. A node is a real
+ * destination and can be counted; a particle is the money moving. Drawn alike,
+ * people counted two accounts one second and six the next. So the moving things
+ * lost the halo and the ring: a small bright mark, or the coin's face, kept small.
  */
 private fun DrawScope.drawWireParticle(at: Offset, color: Color, coin: ImageBitmap?, size: Float, alpha: Float, dp: (Float) -> Float) {
     if (coin == null) {
@@ -2310,12 +2210,10 @@ private fun ErrorScreen(message: String) {
 
 /**
  * "0.5", "1 234.56", "0.000005": no trailing zeros, thin-space thousands, never scientific.
- *
- * ROOT on purpose, twice over. On a screen that is about to move money, "1.234" must not
- * be readable as both a thousand and as one-point-two-three-four, so the thousands get a
- * thin space and the decimal point stays a point, in every language. And the same text
- * goes verbatim into the attested statement the hardware key signs, so a proof made on an
- * Italian phone has to match one made on an English one. Do not make this follow the locale.
+ * ROOT on purpose: on a signing screen "1.234" must not read as both a thousand and
+ * one-point-two, so the point stays a point in every language. The same text goes
+ * into the attested statement, so an Italian and an English phone must sign the same
+ * bytes. Do not make this follow the locale.
  */
 internal fun fmtNumber(d: BalanceDelta): String {
     val v = abs(d.uiAmount)

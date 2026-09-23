@@ -47,30 +47,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /*
- * The buys as they happen, one line each, like a room people are talking in.
- *
- * The ranking above answers "what is the crowd doing"; this answers "who just did
- * what", and it is the half people actually watch. It also fills the silence:
- * a coin needs three separate buyers before the ranking will name it, which is
- * the right bar for a claim about a crowd and a miserable bar for a live feed.
- *
- * Each line carries the same button the coin would get anywhere else in the app,
- * and it opens the ordinary swap sheet — the receipt, the collar and the hold to
- * sign all still happen. Nothing here buys anything by itself.
- *
- * [feed] arrives from the page rather than being fetched here. It used to read the
- * cached file and nothing else, while the ranking card underneath did the actual
- * download and kept it to itself: the ranking was current and the live feed showed
- * whatever was last written to disk, which on a phone opened in the morning meant
- * a "live" feed seven hours behind. One reader at the top, everybody reads it.
+ * The buys as they happen, one line each, like a room people talk in. The ranking says
+ * what the crowd is doing; this says who just did what, and it fills the silence, since
+ * a coin needs three buyers before the ranking names it. Each line carries the ordinary
+ * swap sheet: receipt, collar, hold to sign. Nothing here buys by itself. [feed] comes
+ * from the page: reading the cached file here once showed a "live" feed seven hours old.
  */
 /**
- * The two sources merged, read off the main thread.
- *
- * This used to live inside the card. Inside a lazy list that was a trap: the
- * card is thrown away when it scrolls past the top, so scrolling back re-ran
- * the whole thing, network warm included. The page reads it once now and hands
- * the answer down.
+ * The two sources merged, off the main thread. It lived inside the card, and inside a
+ * lazy list that re-ran the whole thing, network warm included, on every scroll back.
  */
 internal suspend fun crowdEvents(ctx: Context, feed: SeekerFeed.Feed?): List<CrowdBuy> =
     withContext(Dispatchers.IO) {
@@ -112,13 +97,9 @@ internal fun CrowdFeed(
         }
     }
 
-    // The same wallet round-tripping the same coin is one line, not four.
-    //
-    // A bot that buys and sells USDe every few minutes filled the whole screen
-    // with itself: four rows, one wallet, one coin, the same five SOL going back
-    // and forth. What a reader wants from that is "this wallet is churning this
-    // coin", once. So the newest move per wallet and coin survives and the rest
-    // fold into it, with a count when there were several.
+    // The same wallet round-tripping the same coin is one line, not four: a bot churning
+    // USDe every few minutes filled the screen with itself. The newest move per wallet and
+    // coin survives, the rest fold into it with a count.
     val rows = remember(events) {
         events.orEmpty()
             .groupBy { it.wallet to it.mint }
@@ -132,12 +113,8 @@ internal fun CrowdFeed(
     var openRow by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(openMint) { openMint?.let { openRow = it } }
 
-    // No card around it and no title above it.
-    //
-    // Both were right when this was one panel among four on a scrolling page.
-    // As its own tab the frame is a box drawn around the whole screen and the
-    // title repeats the word already lit in the bar above it, while the rows
-    // themselves were squeezed into a third of the height.
+    // No card around it and no title above it: as its own tab the frame boxed the whole
+    // screen, the title repeated the lit word in the bar, and the rows had a third of the height.
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         run {
             // The list says something whatever happens. Vanishing read as broken, and it
@@ -151,10 +128,8 @@ internal fun CrowdFeed(
                 Text(stringResource(R.string.feed_empty), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 16.sp)
                 return@Column
             }
-            // Each row slides in once and once only. The entrance is keyed on the
-            // purchase, and the page remembers which ones have already played, so
-            // scrolling the card away and back does not replay the cascade. A buy
-            // that lands while you are looking still slides in on its own.
+            // Each row slides in once. The entrance is keyed on the purchase and the page remembers
+            // which have played, so scrolling away and back does not replay the cascade.
             rows.forEachIndexed { i, moves ->
                 val e = moves.last()
                 val id = "feed:" + e.wallet + e.at
@@ -256,15 +231,10 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
                 color = if (e.sell) Halo.red.copy(alpha = 0.8f) else if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted,
                 style = Tabular, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            // The round trip, when we watched both ends of it.
-            //
-            // "Took out 10.28 SOL" is half a sentence: it says what came out and
-            // nothing about whether that was good. If the same wallet's buy is
-            // also in this window then we saw what went in, and the two numbers
-            // together are the only thing anybody actually wants to know. It is
-            // written only when we have both sides ourselves; a position opened
-            // before the window is one we cannot price, and guessing at it would
-            // be worse than staying quiet.
+            // The round trip, when we watched both ends. "Took out 10.28 SOL" is half a sentence; if
+            // the same wallet's buy is in this window the two numbers together are what anyone wants
+            // to know. Written only with both sides: guessing at a position opened before the window
+            // would be worse than staying quiet.
             val paid = moves.filter { !it.sell }.sumOf { it.solSpent }
             val took = moves.filter { it.sell }.sumOf { it.solSpent }
             val times = moves.size
@@ -303,15 +273,9 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
             contentAlignment = Alignment.Center,
         ) { HaloIcon(if (followed) HIcon.STAR_FILLED else HIcon.STAR, if (followed) Halo.amber else Halo.muted, 15.dp) }
         Spacer(Modifier.width(6.dp))
-        // The word and the colour have to agree, or the list reads as broken.
-        //
-        // Both buttons used to be mint, and mint in this app means go. So a row
-        // saying "sold" carried a green button saying "Look" right next to a row
-        // saying "bought" with a green button saying "Buy", and two identical
-        // pills with different words on them look like a bug rather than a
-        // choice. It is a choice: buying what somebody has just sold is not a
-        // thing to offer in one tap. Now only a buy is green. A sale gets a
-        // quiet button, and the eye sorts the two apart before reading either.
+        // The word and the color must agree. Both buttons were mint, and mint here means go: a
+        // "sold" row with a green "Look" next to a "bought" row with a green "Buy" looked like a
+        // bug. Buying what somebody just sold is not a one-tap offer, so only a buy is green.
         val go = !open && !e.sell
         val pill = if (go) Halo.mint else Halo.muted
         Box(
@@ -328,11 +292,7 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
     }
 }
 
-/**
- * The wallet's size, small enough to live inside a 38dp circle. Thousands become
- * "8k": inside a badge the exact figure is unreadable and the order of magnitude
- * is the whole message.
- */
+/** The wallet's size inside a 38dp circle: thousands become "8k", the order of magnitude is the whole message. */
 private fun compact(v: Double): String = when {
     v >= 1000 -> String.format("%.0fk", v / 1000)
     v >= 100 -> String.format("%.0f", v)
@@ -355,22 +315,11 @@ private fun ago(at: Long, now: Long): String {
 
 
 /**
- * The second before the crowd arrives.
- *
- * It was a line of grey text saying it was looking, which is the truthful and
- * completely forgettable version. Then it was a radar, which was the wrong
- * instrument: a radar sweeps a circle, and this page is a list that fills from
- * the top down.
- *
- * So it is a tube instead. Scanlines across a dark screen, and a bar rolling
- * down it the way an old set rolls when the picture has not locked yet, with
- * the bright edge at the bottom where the beam is. The app already owns this
- * look: the terminal receipt and the CRT switch in settings come from the same
- * place, so the wait belongs to the product instead of visiting it.
- *
- * Drawn, not loaded. No image, no file, nothing added to the APK. And nothing
- * in it is shaped like a number, because there is no data yet: that is the
- * whole point of the moment, and the screen should not pretend otherwise.
+ * The second before the crowd arrives. Grey text saying "looking" was truthful and
+ * forgettable; a radar was the wrong instrument, this page fills from the top down. So a
+ * tube: scanlines and a bar rolling down like an old set before the picture locks, the
+ * look the terminal receipt and the CRT switch already own. Drawn, not loaded, and
+ * nothing in it shaped like a number, because there is no data yet.
  */
 @Composable
 private fun ScouterWait() {

@@ -22,31 +22,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
 /**
- * The receipt takes the whole screen, always.
- *
- * Every sheet in this app used to grow its receipt at the bottom of its own
- * form: fill in the amount, and what you were about to sign appeared under the
- * fields, below the warnings, below the fold. To read it you scrolled, and what
- * people do with a thing that appears below what they were already doing is
- * scroll past it. The one screen the whole product is built on was the easiest
- * one in it to miss.
- *
- * So it stops being part of the form. The form is where you decide the numbers;
- * this is where you are shown what those numbers do, on its own, over
- * everything, with nothing above it to have been reading a second ago. The
- * pattern was already right in one place, the budget card, and the comment
- * there said why. This is that, lifted out so every sheet gets it.
- *
- * Wrap the receipt in a bare `Column` when you pass it in. It carries its own
- * spacing between its parts, and dropping it straight into this one's arrangement
- * adds that gap again to every piece of it: the page comes out airy and twice as
- * long as it needs to be, and the hold ends up below the fold again, which is the
- * problem this was built to fix.
- *
- * Give it the title, the one line under it, and whatever the sheet wants below
- * the receipt: the hold, what it is doing, what went wrong. The way out is
- * always here, at the bottom, and back means back to the form rather than out
- * of the flow.
+ * The receipt takes the whole screen, always. Every sheet used to grow its receipt at the
+ * bottom of its own form, below the fold, and people scroll past what appears under what
+ * they were doing: the one screen the product is built on was the easiest to miss. The
+ * form decides the numbers; this shows what they do, alone, over everything. Wrap the
+ * receipt in a bare `Column`: it carries its own spacing, and this arrangement would double
+ * every gap and push the hold below the fold again. Pass the title, the line under it, and
+ * what goes below the receipt (hold, progress, error). Back means back to the form.
  */
 @Composable
 internal fun PayOverlay(

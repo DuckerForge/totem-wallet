@@ -7,19 +7,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * What the agent is currently holding, and what it paid.
- *
- * Nothing in the app remembered this before. [AnalyticsEngine] works out a FIFO
- * profit and loss from the ledger, but it does it **in euros**, and the euro
- * snapshot is written by `FiatRates.fillAsync` on a process-lifetime scope with
- * nobody waiting for it. A trade signed inside a short-lived worker can reach
- * the ledger with no price attached, and a position with no cost is a position
- * no stop-loss can protect.
- *
- * So this store keeps its own copy, and keeps the cost **in lamports**. SOL is
- * what we paid with and what we will sell back into, so the comparison the loop
- * actually makes needs no exchange rate, no network call, and nothing that can
- * arrive late.
+ * What the agent holds and what it paid, in lamports. [AnalyticsEngine] works out a
+ * FIFO P&L from the ledger in euros, and the euro snapshot can arrive late or not at
+ * all for a trade signed inside a short-lived worker; a position with no cost is one no
+ * stop-loss can protect. SOL is what we paid with and sell back into, so this needs no
+ * exchange rate and no network call.
  */
 object Positions {
     private const val PREFS = "apex_positions"
@@ -28,10 +20,8 @@ object Positions {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /**
-     * One holding the loop is watching.
-     *
-     * [units] is in whole tokens, not raw: the raw amount depends on decimals we
-     * would have to carry everywhere, and the sell side needs whole units anyway.
+     * One holding the loop watches. [units] is whole tokens, not raw: raw depends on
+     * decimals we would have to carry everywhere, and the sell side needs whole units.
      */
     @androidx.compose.runtime.Immutable
     data class Position(
@@ -40,15 +30,11 @@ object Positions {
         val decimals: Int,
         val units: Double,
         /**
-         * The budget that bought it.
-         *
-         * Without this the book outlived the key. A budget was closed with coins
-         * inside, a new one was made, and its first tick tried to sell 1214
-         * LEVERCAT that the new key had never held: the simulation moved nothing,
-         * the collar read that as the agent lying, and the loop repeated the same
-         * refusal eighty-four times over sixteen hours without buying anything
-         * either, because a position with an exit due stops the tick before the
-         * hunt. A holding belongs to the key that can sign for it.
+         * The budget that bought it. Without this the book outlived the key: a budget was
+         * closed with coins inside, a new one made, and its first tick tried to sell 1214
+         * LEVERCAT the new key never held. The collar read the empty simulation as lying and
+         * the loop repeated the refusal eighty-four times over sixteen hours, buying nothing
+         * either. A holding belongs to the key that can sign for it.
          */
         val owner: String = "",
         /** What left the budget to buy it, fees included. The denominator of every exit. */
@@ -63,9 +49,8 @@ object Positions {
         /** Set once the loop has sold it, so a slow confirmation cannot sell twice. */
         val closing: Boolean = false,
         /**
-         * The coins are inside a Trigger order on chain, not in the wallet.
-         * Jupiter escrows them when the order is placed, so the loop must take
-         * the order back before it can sell anything itself.
+         * The coins sit in a Trigger order on chain, not in the wallet: Jupiter escrows them,
+         * so the loop must take the order back before it can sell anything itself.
          */
         val parked: Boolean = false,
         /** Sales attempted and failed in a row. Reset by any sale that lands. */
@@ -75,20 +60,15 @@ object Positions {
         val lastError: String? = null,
     ) {
         /**
-         * When it is worth trying again.
-         *
-         * Three tries at the normal pace, then a doubling wait up to six hours.
-         * A coin that cannot be sold is usually a coin that cannot be sold for a
-         * while, and retrying it every ninety seconds only buries the reason.
+         * When it is worth trying again: three tries at the normal pace, then a doubling wait up
+         * to six hours. A coin that cannot be sold usually stays so for a while, and retrying
+         * every ninety seconds only buries the reason.
          */
         val readyAt: Long get() = if (fails < 3) 0L else lastTryAt + retryDelay(fails)
         /** Price per whole token, in lamports. Null when the position is empty. */
         val entryLamports: Double? get() = if (units > 0) costLamports / units else null
 
-        /**
-         * What to do at [nowLamports] per token: 1 to sell, 0 to hold, null when
-         * we cannot tell. Never a guess: an unknown price holds.
-         */
+        /** What to do at [nowLamports] per token: 1 sell, 0 hold, null when we cannot tell. An unknown price holds, never a guess. */
         fun verdict(nowLamports: Double?): Exit? {
             val entry = entryLamports ?: return null
             if (nowLamports == null || nowLamports <= 0 || entry <= 0) return null
@@ -118,10 +98,9 @@ object Positions {
     private fun ownerNow(ctx: Context): String? = SessionWallet.current(ctx)?.pubkey
 
     /**
-     * A row is this agent's business when the budget that bought it is the budget
-     * that exists now. A row written before positions carried an owner has no
-     * claim either way, so it is shown and left for [reconcile] to adopt or drop
-     * against the chain.
+     * A row is this agent's business when the budget that bought it is the one that exists
+     * now. A row from before positions carried an owner has no claim either way: shown, and
+     * left for [reconcile] to adopt or drop against the chain.
      */
     private fun mine(p: Position, owner: String?) = p.owner.isEmpty() || p.owner == owner
 
@@ -140,10 +119,9 @@ object Positions {
     }
 
     /**
-     * Record a buy. Adding to a mint we already hold merges the two into one
-     * average, rather than keeping two lots: the loop sells a whole holding at
-     * once, so two lots with two entry prices would only be a way to disagree
-     * with ourselves about what we paid.
+     * Record a buy. Adding to a mint we already hold merges into one average rather than
+     * two lots: the loop sells a whole holding at once, so two entry prices would only be a
+     * way to disagree with ourselves about what we paid.
      */
     fun add(ctx: Context, p: Position) {
         val list = stored(ctx).toMutableList()
@@ -183,18 +161,12 @@ object Positions {
 
     fun setTrigger(ctx: Context, mint: String, order: String?) = edit(ctx, mint) { it.copy(triggerOrder = order) }
 
-    /*
-     * Write down that a sale did not happen, and why. Returns how many times in a
-     * row this one has failed, so the caller can say something once instead of
-     * every ninety seconds.
-     */
     /**
-     * Say something about a position without calling it a failed sale.
-     *
-     * [noteFailure] bumps the retry counter and pushes the row into the slow
-     * lane, which is right for a sale that did not work and wrong for "Jupiter
-     * will not take an order this small". That one is a fact about the position
-     * that the person has to be able to read, and nothing to retry.
+     * Say something about a position without calling it a failed sale. [noteFailure] bumps
+     * the retry counter and pushes the row into the slow lane, right for a sale that did not
+     * work and wrong for "Jupiter will not take an order this small", which is a fact to
+     * read, not something to retry. [noteFailure] returns the run of failures, so the caller
+     * can speak once instead of every ninety seconds.
      */
     fun note(ctx: Context, mint: String, why: String?) = edit(ctx, mint) { it.copy(lastError = why) }
 
@@ -207,12 +179,9 @@ object Positions {
     fun clear(ctx: Context) = prefs(ctx).edit().remove(KEY).apply()
 
     /**
-     * Read a buy out of the receipt that was just signed.
-     *
-     * The receipt is the honest source: it is what the simulation said would
-     * really happen, not what the model claimed it was doing. A swap that paid
-     * SOL for exactly one other token is a buy; anything else is not something
-     * this store can describe, and is left alone.
+     * Read a buy out of the receipt just signed. The receipt is what the simulation said
+     * would happen, not what the model claimed. A swap that paid SOL for exactly one other
+     * token is a buy; anything else this store cannot describe, and leaves alone.
      */
     fun fromReceipt(receipt: Receipt, owner: String, takeProfitPct: Int, stopLossPct: Int, at: Long = System.currentTimeMillis()): Position? {
         fun isSol(m: String) = m == NATIVE_SOL_MINT || m == com.clearsign.core.AgentPolicy.WSOL
@@ -232,13 +201,10 @@ object Positions {
     }
 
     /**
-     * Keep the book in step with what actually happened on chain.
-     *
-     * Called for every move the collar signed, whoever proposed it. A buy opens
-     * or grows a position; a sale of something we hold shrinks it, and closes it
-     * when the holding is gone. Doing it here rather than in the loop means a
-     * coin sold by hand from the chat does not leave a ghost position behind for
-     * the stop-loss to keep watching.
+     * Keep the book in step with the chain, for every move the collar signed whoever
+     * proposed it: a buy opens or grows a position, a sale shrinks or closes it. Done here
+     * rather than in the loop, so a coin sold by hand from the chat leaves no ghost for the
+     * stop-loss to watch.
      */
     fun applyReceipt(ctx: Context, receipt: Receipt, owner: String, takeProfitPct: Int, stopLossPct: Int) {
         fromReceipt(receipt, owner, takeProfitPct, stopLossPct)?.let { add(ctx, it); return }
@@ -264,28 +230,13 @@ object Positions {
     data class Reconciled(val keep: List<Position>, val gone: List<Position>, val changed: Boolean)
 
     /**
-     * Put the book next to the chain and believe the chain.
-     *
-     * The book is written from simulations, and a simulation is a promise about
-     * one moment. Between then and now a budget can be closed, an order can fill,
-     * a coin can be sold from the chat or moved by hand. Everything the loop does
-     * afterwards is priced off this list, so a row that is no longer true is not a
-     * cosmetic problem: it is an agent trying to sell something it does not have,
-     * failing, and blocking every other thing it was going to do that minute.
-     *
-     * [onChain] is raw units per mint held by [owner], [parkedMints] are the coins
-     * sitting in a live Trigger order, which have left the wallet without being
-     * sold. [liveByMint] is what Jupiter lists as active, coin to order key, or
-     * null when Jupiter was not asked: an order key is only dropped when Jupiter
-     * says the order is gone, never on a guess, and a parked row that lost its
-     * key takes the one Jupiter has. Four outcomes and no fifth:
-     *
-     *  * a row from another budget is not this agent's business, at all;
-     *  * coins on chain: the row is adopted, and the amount is taken from the
-     *    chain rather than from what we remember;
-     *  * no coins but a live order: parked, not lost, and not sellable until the
-     *    order is taken back;
-     *  * no coins and no order: it is not there. Off the list, with the reason.
+     * Put the book next to the chain and believe the chain. A simulation is a promise about
+     * one moment; since then a budget can close, an order fill, a coin be sold from the chat,
+     * and a stale row is an agent trying to sell what it does not have. [onChain] is raw
+     * units held by [owner], [parkedMints] the coins inside a live Trigger order, [liveByMint]
+     * Jupiter's active orders (null when not asked; a key drops only on Jupiter's word). Four
+     * outcomes: not our budget, ignore; coins on chain, adopt at the chain's amount; no coins
+     * but a live order, parked; neither, off the list with the reason.
      */
     fun reconcile(book: List<Position>, owner: String, onChain: Map<String, Long>, parkedMints: Set<String>, liveByMint: Map<String, String>? = null): Reconciled {
         val keep = ArrayList<Position>()
@@ -295,16 +246,13 @@ object Positions {
             val raw = onChain[p.mint] ?: 0L
             if (raw > 0L) {
                 val held = raw / Math.pow(10.0, p.decimals.toDouble())
-                // Never grow a position from a balance: a bigger holding with the
-                // same cost reads as a lower entry price, which would sell a coin
-                // at a target it never reached. Only shrink, and take the cost
-                // down with it so the entry price stays what we actually paid.
+                // Never grow a position from a balance: more units at the same cost reads as a lower
+                // entry and would sell at a target never reached. Only shrink, cost down with it.
                 val units = minOf(p.units, held)
                 val shrunk = units < p.units * 0.999
-                // The coins are in the wallet, so no order is holding them. But
-                // the key only goes once Jupiter confirms the order is not there:
-                // a cancel that was accepted and never landed left the coins in
-                // escrow and the row without a key, and nothing could reach it.
+                // The coins are in the wallet, so no order holds them. The key goes only once Jupiter
+                // confirms the order is gone: an accepted cancel that never landed once left coins in
+                // escrow and the row keyless, unreachable.
                 val stale = liveByMint != null && p.triggerOrder != null && p.triggerOrder !in liveByMint.values
                 val fixed = p.copy(
                     owner = owner, parked = false,

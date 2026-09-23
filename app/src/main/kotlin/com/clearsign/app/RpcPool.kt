@@ -3,54 +3,37 @@ package com.clearsign.app
 import org.json.JSONObject
 
 /**
- * Il pool dei nodi RPC: chi chiedere, in che ordine, e cosa imparare da ogni
- * risposta.
- *
- * Le chiavi gratuite sono poche e sono di tutti: una quota al mese per chiave,
- * globale su ogni installazione, e un limite al secondo che morde molto prima
- * della quota. Un telefono non ha modo di sapere quanto resta sulla chiave,
- * quindi qui non si contano crediti per decidere. Si fanno tre cose che un
- * telefono puo' fare da solo:
- *
- *  * **spargere.** Ogni installazione ordina i fornitori a caso, pesati sulla
- *    quota, con un seme suo: mille telefoni non martellano lo stesso nodo in
- *    fila finche' non cade, si dividono.
- *  * **imparare.** Un `-32099` o un 4xx su un metodo scrive che quel fornitore
- *    quel metodo non lo fa, e non glielo si chiede piu'. La tabella dichiarata
- *    e' solo il seme: un piano gratuito cambia senza avvisare.
- *  * **distinguere freddo da finito.** Un 429 passeggero raffredda per minuti.
- *    Un 402, o un 429 che non passa piu', e' un mese esaurito: senza carta
- *    collegata e' un rifiuto fino al primo del mese, e ritentarlo ogni cinque
- *    minuti sarebbe ottomila chiamate buttate.
- *
- * E un tetto giornaliero per telefono sulle chiavi condivise, che chi lo
- * supera non rompe niente: rallenta la caccia, mai le uscite. Il tetto lo
- * puo' cambiare l'archivio, cosi' si stringe o si allarga senza spedire un APK.
- *
- * Puro: niente Android, niente rete, l'orologio passato da fuori. Cosi' si
- * prova sulla JVM.
+ * The RPC node pool: whom to ask, in what order, what to learn from each answer. Free keys
+ * are few and shared, with a monthly quota across every install and a per-second limit
+ * that bites first, and a phone cannot know what is left, so it does three things it can
+ * do alone. Spread: each install orders providers at random, weighted by quota, with its
+ * own seed, so a thousand phones do not hammer one node until it falls. Learn: a `-32099`
+ * or a 4xx on a method marks that provider as not doing it. Tell cold from spent: a passing
+ * 429 cools for minutes, a 402 or a 429 that stays is a spent month, refused until the 1st.
+ * Plus a daily per-phone cap on shared keys that slows the hunt, never the exits, and that
+ * the archive can change without an APK. Pure: no Android, no network, clock from outside.
  */
 class RpcPool(
     providers: List<Provider>,
-    /** Un numero a caso fatto una volta per installazione. Mai il portafoglio. */
+    /** A random number made once per install. Never the wallet. */
     private val seed: Long,
     private val store: Store = NoStore,
 ) {
-    /** Un fornitore: nome, indirizzo, e quello che puo' fare. L'indirizzo non si stampa mai. */
+    /** A provider: name, URL, and what it can do. The URL is never printed. */
     data class Provider(
         val name: String,
         val url: String,
-        /** Quante richieste al secondo concede la chiave, per tutto il mondo. */
+        /** Requests per second the key allows, for the whole world. */
         val perSecond: Int,
         /** Quanto spesso va scelto rispetto agli altri: proporzionale alla quota mensile. */
         val weight: Int,
-        /** Serve le API DAS (`getAsset*`), che sono di Helius e basta. */
+        /** Serves the DAS API (`getAsset*`), which is Helius only. */
         val das: Boolean = false,
         /** Accetta `sendTransaction` da noi: un gratuito su nodi pubblici no. */
         val sends: Boolean = true,
-        /** Ultima spiaggia: si prova solo dopo tutti gli altri. Nessuna chiave, nessuna quota nostra. */
+        /** Last resort: tried only after all the others. No key, no quota of ours. */
         val lastResort: Boolean = false,
-        /** Metodi che si sa gia' che non fa. */
+        /** Methods it is already known not to do. */
         val unsupported: Set<String> = emptySet(),
     )
 
@@ -65,12 +48,12 @@ class RpcPool(
         override fun put(key: String, value: String?) {}
     }
 
-    /** Cosa ha risposto un nodo, ridotto a quello che cambia una decisione. */
+    /** What a node answered, reduced to what changes a decision. */
     enum class Outcome { OK, REFUSED, RATE_LIMITED, EXHAUSTED, UNSUPPORTED, FORBIDDEN, SERVER, TRANSPORT }
 
     enum class State { OK, COLD, EXHAUSTED }
 
-    /** Una riga della diagnostica. Il nome, mai l'indirizzo. */
+    /** One diagnostics row. The name, never the URL. */
     data class Line(val name: String, val state: State, val calls: Long, val failures: Long, val lastError: String?, val unsupported: Set<String>)
 
     private class Health(declared: Set<String>) {
@@ -93,10 +76,9 @@ class RpcPool(
     // ---- l'ordine -------------------------------------------------------------
 
     /**
-     * In che ordine chiedere [method], adesso. Il nodo proprio, se c'e', viene
-     * prima di tutto: e' la scelta di chi lo ha scritto. Poi i fornitori con
-     * chiave, sani e capaci, in ordine casuale pesato e stabile per questa
-     * installazione. In coda le ultime spiagge.
+     * In what order to ask [method], now. The own node first if there is one, the writer's
+     * choice; then keyed providers, healthy and capable, in a weighted random order stable for
+     * this install; the last resorts at the end.
      */
     fun lanes(method: String, now: Long, own: Provider? = null): List<Provider> {
         val das = method.startsWith("getAsset")
@@ -108,10 +90,9 @@ class RpcPool(
     }
 
     /**
-     * Una permutazione casuale pesata, sempre la stessa per lo stesso seme:
-     * ogni fornitore pesca un numero dal suo peso e si ordina per quello. Chi
-     * pesa di piu' esce prima piu' spesso, su tante installazioni; su una sola
-     * l'ordine e' fisso, cosi' un telefono che si riavvia non cambia fila.
+     * A weighted random permutation, always the same for the same seed: each provider draws a
+     * number from its weight and sorts by it. Heavier ones come first more often across
+     * installs; on one install the order is fixed, so a rebooted phone keeps its queue.
      */
     private fun weighted(list: List<Provider>): List<Provider> =
         list.sortedBy { p ->
@@ -120,9 +101,9 @@ class RpcPool(
         }
 
     /**
-     * Un numero fra zero e uno da seme e nome, ben mescolato: `java.util.Random`
-     * dava lo stesso primo numero a semi vicini, e mille telefoni sceglievano
-     * tutti lo stesso fornitore. Questo e' splitmix64.
+     * A number between zero and one from seed and name, well mixed: `java.util.Random` gave
+     * the same first number to nearby seeds, and a thousand phones all picked one provider.
+     * This is splitmix64.
      */
     private fun uniform(seed: Long, name: String): Double {
         var z = seed + name.hashCode().toLong() * -7046029254386353131L
@@ -144,9 +125,8 @@ class RpcPool(
     // ---- imparare ----------------------------------------------------------------
 
     /**
-     * Cosa fare della risposta di [name] a [method]. Un OK scalda, un rifiuto
-     * deterministico non dice niente del nodo, e tutto il resto lo raffredda
-     * per un tempo che dipende da cosa e' successo.
+     * What to make of [name]'s answer to [method]: an OK warms it, a deterministic refusal says
+     * nothing about the node, everything else cools it for a time that depends on what happened.
      */
     fun onOutcome(name: String, method: String, outcome: Outcome, now: Long, detail: String? = null) {
         val h = health[name] ?: return
@@ -158,7 +138,7 @@ class RpcPool(
                 h.failures++; h.lastError = detail ?: "429"
                 h.rateStreak++
                 h.coldUntil = now + (COLD_RATE_MS * h.rateStreak).coerceAtMost(COLD_RATE_MAX_MS)
-                // Un 429 che non passa piu' e' un mese finito, non un secondo affollato.
+                // A 429 that no longer passes is a spent month, not a crowded second.
                 if (h.rateStreak >= RATE_STREAK_EXHAUSTED) exhaust(name, h, now)
             }
             Outcome.EXHAUSTED -> { h.failures++; h.lastError = detail ?: "402"; exhaust(name, h, now) }
@@ -185,11 +165,7 @@ class RpcPool(
 
     // ---- il tetto del giorno ---------------------------------------------------
 
-    /**
-     * Quante chiamate sulle chiavi condivise questo telefono ha fatto oggi. Le
-     * ultime spiagge e il nodo proprio non si contano: non consumano niente di
-     * nostro.
-     */
+    /** How many calls on shared keys this phone made today. Last resorts and the own node do not count: they spend nothing of ours. */
     @Volatile private var day: Long = -1L
     @Volatile private var used: Int = 0
 
@@ -225,14 +201,13 @@ class RpcPool(
         const val COLD_FORBIDDEN_MS = 6 * 3600_000L
         const val RATE_STREAK_EXHAUSTED = 6
         /**
-         * Chiamate al giorno sulle chiavi condivise, per telefono, se l'archivio
-         * non dice altro. Un portafoglio guardato ne fa un centinaio, un agente
-         * a caccia tutto il giorno sui seicento: a questo tetto l'agente senza
-         * nodo proprio caccia per gran parte della giornata e poi guarda e basta.
+         * Calls per day on shared keys, per phone, unless the archive says otherwise. A watched
+         * wallet makes about a hundred, an agent hunting all day about six hundred: at this cap
+         * an agent without its own node hunts most of the day, then only watches.
          */
         const val DEFAULT_CAP = 600
 
-        /** L'ultimo istante del mese, UTC: quando una chiave esaurita torna a vivere. */
+        /** The last instant of the month, UTC: when a spent key comes back to life. */
         fun monthEnd(now: Long): Long {
             val c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
             c.timeInMillis = now
@@ -242,10 +217,7 @@ class RpcPool(
             return c.timeInMillis
         }
 
-        /**
-         * La tabella di verita': da un codice HTTP (null = trasporto caduto) e da
-         * un errore JSON-RPC (null = nessuno) a quello che cambia una decisione.
-         */
+        /** The truth table: from an HTTP code (null = fallen transport) and a JSON-RPC error (null = none) to what changes a decision. */
         fun classify(httpCode: Int?, error: JSONObject?): Outcome {
             if (httpCode == null) return Outcome.TRANSPORT
             if (httpCode !in 200..299) return when {

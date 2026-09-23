@@ -37,16 +37,11 @@ import org.json.JSONObject
 import kotlin.math.pow
 
 /**
- * The richest wallets holding this same phone.
- *
- * Measured, not guessed: every Seeker Genesis Token on chain, resolved to its
- * wallet, then priced. 1,252 of the 120,520 hold ten SOL or more, and between
- * them they hold fifteen million dollars. The top one holds two.
- *
- * Addresses and nothing else. This says what the crowd is worth, never who
- * anybody is, and the value shown is a census snapshot rather than a live feed:
- * refreshing sixty balances every time somebody opens a card is other people's
- * money spent on decoration.
+ * The richest wallets holding this same phone. Measured, not guessed: every Seeker Genesis
+ * Token on chain, resolved to its wallet, then priced. 1,252 of the 120,520 hold ten SOL or
+ * more, fifteen million dollars between them, the top one two. Addresses and nothing else:
+ * what the crowd is worth, never who anybody is, and a census snapshot rather than a live
+ * feed, since refreshing sixty balances per card open is other people's money on decoration.
  */
 private class Whale(val address: String, val usd: Long, val sol: Double)
 
@@ -86,10 +81,8 @@ internal fun SeekerWhalesCard(limit: Int = 8) {
             stringResource(R.string.whales_total, money(total)),
             fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp,
         )
-        // One open at a time: two expanded rows is a list that has stopped
-        // being a ranking.
-        // Survives the switch to another Scout tab: reopening a whale you
-        // had already opened should not cost the same three calls again.
+        // One open at a time: two expanded rows stop being a ranking. Survives a switch to another
+        // Scout tab, so reopening a whale does not cost the same three calls again.
         var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
         rows.take(limit).forEachIndexed { i, w ->
             WhaleRow(i + 1, w, open == w.address) { open = if (open == w.address) null else w.address }
@@ -103,33 +96,14 @@ internal class Held(val mint: String, val symbol: String, val amount: Double, va
 /* The three that hold the money, and how many things were left out for having no price. */
 internal class Holdings(val top: List<Held>, val unpriced: Int)
 
-/*
- * What one wallet actually holds, read when somebody asks and not before.
- *
- * The census stores a total in dollars and nothing else, so the fourth whale read
- * "$245,846 · 13 SOL" and left out the only interesting part: nine tenths of it is
- * one memecoin. Finding that out meant leaving for Solscan.
- *
- * **Only what somebody quotes.** The unpriced tail is not a shy version of the
- * same thing, it is where the counterfeits live: this wallet holds three separate
- * mints that the registry calls "USDC", and two of them are fakes with no price
- * and a couple of dollars of liquidity. Listed by name they would have read as
- * three USDC holdings. A coin nobody quotes also answers nothing about where a
- * whale's money is, which is the only question this card asks.
- *
- * On the scanner's key, never the agent's, and never for all sixty at once: the
- * card still refuses to reprice a list nobody is looking at.
- */
 /**
- * What one wallet is holding right now, priced, read by the service and shared.
- *
- * It used to be read by the phone, with the scanner key compiled into the APK.
- * Two mistakes in one: the quota was spent by users one at a time, and the key
- * travelled inside the application where anybody can pull it out. The crowd scan
- * has not made that mistake for months and this is the same shape: one reads,
- * everybody gets the same answer, and a thousand people opening the same whale
- * is one read. The phone falls back to its own key only when no service is
- * configured, which is a build for one person.
+ * What one wallet holds right now, priced, read by the service and shared. The census
+ * stores a dollar total, so the fourth whale read "$245,846 · 13 SOL" and hid that nine
+ * tenths of it was one memecoin. Only what somebody quotes: the unpriced tail is where the
+ * counterfeits live (three mints called "USDC", two fakes), and a coin nobody quotes says
+ * nothing about where the money is. Read by the service, not the phone: the scanner key
+ * used to ship in the APK and the quota was spent one user at a time. The phone's own key
+ * is the fallback only when no service is configured, a build for one person.
  */
 internal fun holdingsOf(address: String, take: Int = 3): Holdings? {
     shared(address, take)?.let { return it }
@@ -302,9 +276,8 @@ private fun amt(v: Double): String = when {
 private fun pct(v: Double): String = if (v >= 10) String.format("%.0f", v) else String.format("%.1f", v)
 
 /**
- * Thousands separated, no decimals: at these sizes cents are noise. The separator
- * is the reader's, not ours: a hand-rolled dot wrote 1.234.567 to an English reader
- * too, and a negative number came out with the minus chopped into a group.
+ * Thousands separated, no decimals: cents are noise here. The separator is the reader's,
+ * not ours: a hand-rolled dot wrote 1.234.567 to English readers and chopped a minus sign.
  */
 private fun money(v: Long): String = String.format("$%,d", v)
 
@@ -318,17 +291,11 @@ private fun fmt(v: Double): String = when {
 private val heldMemo = java.util.concurrent.ConcurrentHashMap<String, Holdings>()
 
 /**
- * The service's answer, already priced. Null when there is no service or it did not answer.
- *
- * Two doors, and the cheap one first. The archive is a plain file on a shared
- * store, readable by anybody, with no key and no worker woken up: whoever opened
- * this wallet before today left the answer there for everyone. Only when the
- * archive has nothing, or has something half a day old, do we knock on the
- * service, which reads the chain and refills the archive for the next person.
- *
- * That ordering is the whole point. A cache only pays when people arrive
- * together, and they do not: half of them open the app in the morning and half
- * at night. An archive does not care what time it is.
+ * The service's answer, priced; null with no service or no answer. Two doors, the cheap one
+ * first: the archive is a plain file on a shared store, no key, no worker woken, left there
+ * by whoever opened this wallet before. Only when it has nothing, or something half a day
+ * old, do we knock on the service, which reads the chain and refills the archive. A cache
+ * pays only when people arrive together, and they do not; an archive does not care what time it is.
  */
 private fun shared(address: String, take: Int): Holdings? {
     val stored = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() }?.let { base ->

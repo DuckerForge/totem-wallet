@@ -12,35 +12,14 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The take-profit that does not need us.
- *
- * A Trigger order is a limit sell recorded on chain: sell this many tokens for
- * at least this much SOL. Jupiter's keeper fills it when the price gets there,
- * not the phone. That is the whole reason it is worth the extra code — it is
- * the only exit in Apex that survives the app being killed, the battery dying
- * and the phone being off for a week.
- *
- * What it cannot do is the other direction. Trigger v1 sells *above* a price;
- * a stop-loss sells *below* one, and that needs the v2 OCO endpoint, which is
- * not on the keyless host (`/trigger/v2/createOrder` answers 404). So the stop
- * stays in [TraderLoop], where it only works while the loop runs, and that
- * difference is stated wherever a person can see it rather than smoothed over.
- *
- * Every order is **simulated and checked before it is signed**, by
- * [checkItOnlySellsThis]. The collar cannot judge one of these — moving tokens
- * into Jupiter's escrow looks like paying a stranger, so it would refuse them
- * all — and an order placed while nobody is watching is the worst possible
- * place to sign bytes a remote server handed us unexamined.
- *
- * No API key: verified against the free host. Two quirks worth knowing before
- * changing anything here:
- *
- *  * Jupiter refuses an order worth less than about five dollars. We do not
- *    guess that threshold locally, we let the API say so and fall back.
- *  * We deliberately take **no platform fee** on these. Adding one means
- *    passing a referral-program PDA as `feeAccount`, and a plain token account
- *    there fails on chain with `ConstraintTokenOwner` — a trap already paid for
- *    once in MEGAGEN, and not worth re-paying for a cut of an automatic exit.
+ * The take-profit that does not need us: a Trigger order is a limit sell on chain that
+ * Jupiter's keeper fills, the only exit that survives the app killed and the phone off.
+ * Not the other direction: a stop needs the v2 OCO endpoint, which the keyless host does
+ * not have (`/trigger/v2/createOrder` answers 404), so the stop stays in [TraderLoop] and
+ * that difference is said wherever a person can see it. Every order is simulated and
+ * checked by [checkItOnlySellsThis] before signing, since the collar would refuse them all.
+ * Quirks: under about five dollars Jupiter refuses, we let the API say so; no platform fee,
+ * a plain token account as `feeAccount` fails with `ConstraintTokenOwner` (paid once, MEGAGEN).
  */
 object JupiterTrigger {
     private const val TAG = "Apex-Trigger"
@@ -56,23 +35,12 @@ object JupiterTrigger {
     }
 
     /**
-     * Place a sell at [targetLamports] for the whole of [position].
-     *
-     * The target is the position's own take-profit rule, priced: what it cost
-     * plus the percentage the person asked for. So the on-chain order says the
-     * same thing the loop would have said, and whichever gets there first wins.
-     */
-    /**
-     * Mai sul filo principale.
-     *
-     * Era bloccante e veniva chiamata anche da li', dove Android vieta la rete:
-     * l'eccezione che tira in quel caso non ha messaggio, quindi nel registro si
-     * leggeva "POST /createOrder failed: null" e sembrava che fosse Jupiter a
-     * rifiutare. Non era Jupiter. Visto il 17/09: un ordine da quattordici
-     * dollari, ben sopra il minimo, mai arrivato in catena, e la stessa chiamata
-     * con gli stessi numeri fatta da fuori tornava un ordine valido al primo
-     * colpo. Il messaggio nullo era l'indizio, e il thread nel registro la prova:
-     * pid e tid uguali.
+     * Place a sell at the position's own take-profit price for the whole of [position], so the
+     * on-chain order says what the loop would have said and whichever gets there first wins.
+     * Never on the main thread: it was blocking and called from there, where Android forbids
+     * the network with a message-less exception, so the log read "POST /createOrder failed:
+     * null" and looked like Jupiter refusing (17 Sep: a fourteen-dollar order never landed,
+     * the same call from outside worked at once; same pid and tid in the log was the proof).
      */
     suspend fun placeTakeProfit(ctx: Context, maker: String, position: Positions.Position): Placed = withContext(Dispatchers.IO) {
         placeBlocking(ctx, maker, position)
@@ -89,10 +57,8 @@ object JupiterTrigger {
             Build.TooSmall -> return Placed.TooSmall
             is Build.Failed -> return Placed.Failed(b.reason)
         }
-        // These bytes were built by somebody else's server, and the key that is
-        // about to sign them holds real money. Apex does not sign anything it has
-        // not looked at, and an automatic order placed while nobody is watching is
-        // the last place to make an exception.
+        // These bytes were built by somebody else's server and the key about to sign them holds
+        // real money. Nothing is signed unlooked at, least of all an automatic order with nobody watching.
         checkItOnlySellsThis(ctx, built.unsigned, maker, position)?.let { return Placed.Failed(it) }
 
         val sig = SessionWallet.sign(ctx, SolanaTx.messageBytes(built.unsigned)) ?: return Placed.Failed("could not sign")
@@ -114,13 +80,10 @@ object JupiterTrigger {
     }
 
     /**
-     * Ask Jupiter for the order: sell [makingRaw] of [inputMint] for at least
-     * [takingRaw] of [outputMint]. Two shapes of the same call: a take-profit is
-     * "sell this coin for at least this much SOL", a limit buy is "sell this much
-     * SOL for at least this many coins". Nothing is signed here; the bytes come
-     * back for whoever holds the key, the budget or the Seed Vault, to look at
-     * first. The person gets the ordinary receipt; the loop gets
-     * [checkItOnlySellsThis].
+     * Ask Jupiter for the order: sell [makingRaw] of [inputMint] for at least [takingRaw] of
+     * [outputMint]. A take-profit and a limit buy are the same call in two shapes. Nothing is
+     * signed here: the bytes come back for whoever holds the key to look at first, the person
+     * through the ordinary receipt, the loop through [checkItOnlySellsThis].
      */
     fun build(maker: String, inputMint: String, outputMint: String, makingRaw: Long, takingRaw: Long, expiresInDays: Int = 30): Build {
         val body = JSONObject()
@@ -168,31 +131,12 @@ object JupiterTrigger {
         post("/execute", JSONObject().put("requestId", built.requestId).put("signedTransaction", Base64.encodeToString(signed, Base64.NO_WRAP)))
 
     /**
-     * Simulate the order before signing it, and refuse anything that is not the
-     * trade we asked for.
-     *
-     * The collar cannot judge this one: putting tokens into Jupiter's escrow
-     * looks exactly like sending them to a stranger, so [AgentBroker] would
-     * refuse every order. This is the narrower check that replaces it, and it is
-     * deliberately strict — one mint may leave, no more of it than we hold, and
-     * no SOL beyond the fee. A simulation we cannot get is a refusal, not a
-     * shrug: the whole point of the order is that nobody will be watching it.
-     */
-    /**
-     * Anche l'annullamento e' un mucchio di byte scritti dal server di qualcun
-     * altro, e questa chiave tiene soldi veri.
-     *
-     * Il gemello qui sotto controlla l'ordine prima di firmarlo, e il suo
-     * commento dice che quest'app non firma niente che non abbia guardato.
-     * L'annullamento pero' non passava da nessun controllo: si chiedeva a
-     * Jupiter una transazione e la si firmava alla cieca, dal ciclo, senza
-     * nessuno davanti al telefono. Trovato facendo l'audit.
-     *
-     * Un annullamento vero restituisce quello che era in deposito e non manda
-     * niente a nessuno: qui dentro nulla puo' uscire dalla paghetta tranne la
-     * commissione di rete. Se la simulazione non si puo' fare, non si firma:
-     * "non ho potuto guardare" e "ho guardato ed e' a posto" non sono la stessa
-     * cosa, e su una chiave che spende non si confondono.
+     * Two checks that replace the collar, which cannot judge these (escrow looks like paying a
+     * stranger). [checkItOnlySellsThis], below: one mint may leave, no more than we hold, no
+     * SOL beyond the fee, and a simulation we cannot get is a refusal, since nobody will be
+     * watching the order. This one, for the cancel: it used to be signed blind from the loop,
+     * found in an audit. A real cancel returns the escrow and sends nothing; nothing may leave
+     * the budget but the network fee. "Could not look" is not "looked and it is fine".
      */
     private suspend fun checkItOnlyCancels(ctx: Context, tx: ByteArray, maker: String): String? {
         val a = runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, maker, null, requireSim = true) }.getOrNull()
@@ -225,13 +169,10 @@ object JupiterTrigger {
     data class Live(val orders: Set<String>, val mints: Set<String>, val byMint: Map<String, String> = emptyMap())
 
     /**
-     * What is live on chain for [user], or **null when Jupiter could not be asked**.
-     *
-     * Null and empty are not the same thing here, and the difference is worth a
-     * position. Empty means the coins really are not in an order, so a holding
-     * the wallet does not have is a holding that is gone. Null means we do not
-     * know, and dropping a position on a failed network call would throw away the
-     * price we paid for it and the stop that was watching it.
+     * What is live on chain for [user], or null when Jupiter could not be asked. Null and
+     * empty differ by a position: empty means the coins really are in no order, so a holding
+     * the wallet lacks is gone; null means we do not know, and dropping a position on a failed
+     * call throws away its cost and the stop watching it.
      */
     fun live(user: String): Live? {
         val o = get("/getTriggerOrders?user=$user&orderStatus=active") ?: return null
@@ -253,10 +194,7 @@ object JupiterTrigger {
         return Live(orders, mints, byMint)
     }
 
-    /**
-     * Take an order back, so a position sold by the loop does not leave an order
-     * on chain trying to sell tokens the budget no longer has.
-     */
+    /** Take an order back, so a position the loop sold leaves no order on chain trying to sell tokens the budget no longer has. */
     suspend fun cancel(ctx: Context, maker: String, order: String): Boolean = withContext(Dispatchers.IO) {
         cancelBlocking(ctx, maker, order)
     }
@@ -271,17 +209,7 @@ object JupiterTrigger {
 
     // ---- wire ----------------------------------------------------------------
 
-    /**
-     * Sul filo dell'IO, sempre.
-     *
-     * Era bloccante e veniva chiamata anche dal filo principale, dove Android
-     * vieta la rete: l'eccezione che tira in quel caso non ha messaggio, quindi
-     * nel registro si leggeva "POST /createOrder failed: null" e sembrava che
-     * fosse Jupiter a rifiutare. Non era Jupiter. Visto il 17/09: un ordine da
-     * quattordici dollari, ben sopra il minimo, mai arrivato in catena, e la
-     * stessa chiamata con gli stessi numeri fatta da fuori tornava un ordine
-     * valido al primo colpo.
-     */
+    /** On the IO thread, always: see [placeTakeProfit] for the main-thread failure that looked like Jupiter refusing. */
     private fun post(path: String, body: JSONObject): JSONObject? = HOSTS.firstNotNullOfOrNull { host ->
         try {
             val c = (URL(host + path).openConnection() as HttpURLConnection).apply {

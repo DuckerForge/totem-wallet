@@ -1,17 +1,10 @@
 package com.clearsign.core
 
 /**
- * What a failed simulation actually means, in words.
- *
- * The node answers with things like `{"InstructionError":[6,{"Custom":6025}]}`,
- * and that was going straight onto the screen as the reason not to sign. It is
- * the right information in the wrong language: nobody can act on it, so it reads
- * as "something broke" and the next thing a person does is press the button
- * anyway.
- *
- * Every line here ends with what to do, because a failure you can retry and a
- * failure you cannot are the same sentence otherwise. The raw code is kept in
- * brackets: it is what makes a bug report useful.
+ * What a failed simulation means, in words. The node answers `{"InstructionError":[6,
+ * {"Custom":6025}]}` and that went straight on screen: the right information in the wrong
+ * language, read as "something broke", and the next thing a person does is press the button
+ * anyway. Every line ends with what to do, and the raw code stays in brackets for bug reports.
  */
 object SimError {
 

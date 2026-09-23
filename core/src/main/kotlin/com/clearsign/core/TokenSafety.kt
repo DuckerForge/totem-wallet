@@ -1,21 +1,11 @@
 package com.clearsign.core
 
 /**
- * How dangerous is the coin itself?
- *
- * The receipt answers "what does this transaction do"; this answers the other
- * half of a swap — "what am I buying". A perfectly honest transaction can still
- * hand you a token whose creator can freeze it, mint infinite supply, or that
- * nobody will buy back.
- *
- * The scoring is ported from the gates in the MEGAGEN app (same author, same
- * phone), reduced to the facts Jupiter's token registry already returns, so it
- * costs no extra network call. Two rules from there are kept deliberately:
- *
- *  * a fatal vector is a **ceiling**, not a penalty — no amount of "healthy"
- *    liquidity or holders can lift a token whose owner can freeze your balance;
- *  * unknown is **not** dangerous. Missing data lands mid-scale and warns; it
- *    never blocks, because a brand-new honest token would look identical.
+ * How dangerous is the coin itself? The receipt says what the transaction does; this says
+ * what you are buying: an honest transaction can hand you a token whose creator can freeze
+ * it, mint infinite supply, or that nobody buys back. Scoring ported from the MEGAGEN gates,
+ * reduced to what Jupiter's registry already returns, no extra call. Two rules kept: a fatal
+ * vector is a ceiling, not a penalty, no liquidity lifts a freezable token; and unknown is not dangerous, missing data lands mid-scale and warns, never blocks.
  */
 enum class SafetyBand { GOOD, MID, BAD }
 
@@ -26,10 +16,8 @@ enum class SafetyFlag {
     /** The creator can still freeze your balance where it sits. */
     CAN_FREEZE,
     /**
-     * The same powers, on a coin Jupiter verified: USDC and USDT are mintable and
-     * freezable *by design*, because an issuer stands behind them. Worth saying
-     * out loud — most people do not know Circle can freeze their stablecoin — but
-     * it is a disclosed property, not a scam signal.
+     * The same powers on a coin Jupiter verified: USDC and USDT are mintable and freezable by
+     * design, an issuer stands behind them. Worth saying, most people do not know Circle can freeze their stablecoin, but disclosed, not a scam signal.
      */
     ISSUER_CONTROLLED,
     /** The creator can still mint more of it, diluting what you hold. */
@@ -49,13 +37,9 @@ enum class SafetyFlag {
     /** Not on Jupiter's verified list. */
     UNVERIFIED,
     /**
-     * Someone can take this token out of your wallet whenever they like.
-     *
-     * The Token-2022 permanent delegate. On an anonymous coin it is the whole
-     * scam in one field, and no second wallet protects you from it: the coin is
-     * burned wherever it sits. On a verified issuer's token it is how a
-     * regulated stablecoin is supposed to work, which is why this is graded the
-     * same way freeze and mint are.
+     * Someone can take this token out of your wallet whenever they like: the Token-2022
+     * permanent delegate. On an anonymous coin it is the whole scam in one field and no second
+     * wallet protects you; on a verified issuer's token it is how a regulated stablecoin works, so it is graded like freeze and mint.
      */
     SEIZABLE,
     /** A program of the creator's choosing runs on every transfer, and can block sells. */
@@ -86,11 +70,7 @@ data class TokenFacts(
     val liquidityUsd: Double = 0.0,
     /** A real quote back to SOL succeeded. Null when we did not ask. */
     val sellable: Boolean? = null,
-    /**
-     * What the mint account itself says it can do, read from the chain. The
-     * registry cannot tell us this: it reports "Token-2022" and stops, and the
-     * powers that empty a wallet after the purchase all live in here.
-     */
+    /** What the mint account itself says it can do, read from the chain. The registry reports "Token-2022" and stops; the powers that empty a wallet after the purchase live here. */
     val ext: MintExtensions = MintExtensions.NONE,
 )
 
@@ -118,10 +98,8 @@ fun assessToken(f: TokenFacts): TokenSafety {
     }
 
     if (f.sellable == false) cap(6, SafetyFlag.NO_WAY_OUT)
-    // The very same on-chain fact means two different things. On an anonymous coin
-    // a live authority is the classic rug; on a verified one it is how a
-    // centrally-issued token works, and calling USDC dangerous would only teach
-    // people to ignore the warning that matters.
+    // The same on-chain fact means two things: on an anonymous coin a live authority is the
+    // classic rug, on a verified one it is how a centrally-issued token works, and calling USDC dangerous teaches people to ignore the warning that matters.
     if (f.verified && (f.canFreeze || f.canMint)) {
         cap(72, SafetyFlag.ISSUER_CONTROLLED)
     } else {

@@ -1,10 +1,8 @@
 package com.clearsign.core
 
 /*
- * The device/network boundary. The pure engine above depends only on these
- * interfaces; the Android/Seeker app provides the real implementations
- * (Seed Vault, Mobile Wallet Adapter, Helius RPC, Blockaid). Keeping them as
- * ports is what lets the whole safety brain be unit-tested off-device.
+ * The device and network boundary. The pure engine depends only on these interfaces; the app
+ * provides the real ones (Seed Vault, MWA, RPC, scanner), which is what lets the safety brain be tested off-device.
  */
 
 /** Simulates a transaction and returns the resulting balance deltas. */
@@ -23,10 +21,7 @@ interface TransactionScanner {
     fun scan(serializedTx: ByteArray, recipients: List<String>): ScanResult
 }
 
-/**
- * The only component allowed to touch private keys. On the Seeker this is backed
- * by the Seed Vault TEE and gated by biometrics; keys never leave the vault.
- */
+/** The only component allowed to touch private keys. On the Seeker it is the Seed Vault TEE behind biometrics; keys never leave it. */
 interface HardwareSigner {
     fun publicKey(): String
     /** Sign only after ClearSign has approved the receipt. */
@@ -34,9 +29,8 @@ interface HardwareSigner {
 }
 
 /**
- * Orchestrates the safe path: decode → simulate → assess → (user approves) →
- * re-simulate (anti-TOCTOU) → sign. It never signs when a DANGER risk stands or
- * when state drifted between preview and approval.
+ * The safe path: decode, simulate, assess, user approves, re-simulate (anti-TOCTOU), sign.
+ * Never signs while a DANGER risk stands or when state drifted between preview and approval.
  */
 class ClearSignFlow(
     private val decoder: TransactionDecoder,
@@ -72,10 +66,7 @@ class ClearSignFlow(
         data class Refused(val risk: Risk) : SignOutcome
     }
 
-    /**
-     * Step 2: called only after the user tapped OK on [Preview.receipt].
-     * Re-simulates and refuses if anything now blocks approval or state drifted.
-     */
+    /** Step 2, only after the user approved [Preview.receipt]: re-simulates and refuses if anything now blocks approval or state drifted. */
     fun approveAndSign(serializedTx: ByteArray, preview: Preview): SignOutcome {
         if (preview.receipt.blocksApproval) {
             return SignOutcome.Refused(preview.receipt.risks.first { it.severity == Severity.DANGER })

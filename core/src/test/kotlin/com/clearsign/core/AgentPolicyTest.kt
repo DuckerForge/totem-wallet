@@ -80,12 +80,9 @@ class AgentPolicyTest {
     private val closed = policy.copy(allowAnyMint = false)
 
     /**
-     * Spending most of a small budget on a trade is the trade, not a drain.
-     *
-     * The numbers are the ones measured on the phone on 2026-09-15: a 0.08 SOL
-     * budget that had already bought one coin, a slice of 0.033 SOL, and 93% of
-     * the SOL left going into a Jupiter swap. DRAINS_BALANCE fired as DANGER and
-     * the loop switched itself off for the night.
+     * Spending most of a small budget on a trade is the trade, not a drain. Numbers measured on
+     * the phone on 2026-09-15: a 0.08 SOL budget that had bought one coin, a slice of 0.033 SOL,
+     * 93% of the SOL left into a Jupiter swap. DRAINS_BALANCE fired as DANGER and the loop switched itself off for the night.
      */
     @Test fun aSwapThatSpendsMostOfTheBudgetIsNotADrain() {
         val drain = Risk(RiskFlag.DRAINS_BALANCE, Severity.DANGER, "sends out 93% of your SOL balance")
@@ -190,12 +187,9 @@ class AgentPolicyTest {
     }
 
     /**
-     * The trade the agent was stopped on, with the numbers off the phone.
-     *
-     * 0.031225 SOL into the swap, coins worth about the same back, plus two new
-     * accounts at 0.00204 each and the fee. Counting the rent as part of the
-     * exchange turned a 1% trade into an "84%" one and sent the agent to ask for a
-     * fingerprint nobody was there to give.
+     * The trade the agent was stopped on, numbers off the phone: 0.031225 SOL into the swap,
+     * coins worth about the same back, two new accounts at 0.00204 each and the fee. Counting the
+     * rent as part of the exchange turned a 1% trade into an "84%" one and asked for a fingerprint nobody was there to give.
      */
     @Test fun rentIsNotPartOfTheExchange() {
         val rentAcct = "NewAcct1111111111111111111111111111111111111"
@@ -263,21 +257,18 @@ class AgentPolicyTest {
         assertTrue(line.contains("0.25") && line.contains("SOL") && line.contains("8ncU"), line)
     }
 
-    // ---- il giro che torna a casa --------------------------------------------
-    //
-    // Il tetto giornaliero limita quanto puo' andarsene in un giorno. Comprare e
-    // rivendere non manda via niente: lascia il borsello com'era, in una forma
-    // diversa per un po'. Contarlo due volte vuol dire che un agente con una
-    // paghetta piccola fa un giro e poi chiede l'impronta per sempre.
+    // ---- the round trip home --------------------------------------------------
+    // The daily cap limits what can leave in a day. Buying and selling back sends nothing away:
+    // the pocket stays as it was, in another form for a while. Counting it twice means an agent
+    // with a small budget makes one trip and then asks for the print forever.
 
     @Test fun aRealSwapDoesNotSpendTheDay() {
         assertTrue(staysInPocket(swap(0.01, usdc, "USDC", 1.0), policy))
     }
 
     @Test fun aRoundTripStillCountsAsAMove() {
-        // Il giro non spende la giornata, ma e' una mossa: il tetto orario conta
-        // le mosse, non i soldi, e un agente che gira senza toccare nessun
-        // limite paga commissione e spread a ogni giro.
+        // The round trip does not spend the day, but it is a move: the hourly cap counts moves,
+        // not money, and an agent spinning without touching any limit pays fee and spread every turn.
         val full = SpendHistory(spentLast24hLamports = 0L, txLastHour = policy.maxTxPerHour)
         val d = decide(swap(0.01, usdc, "USDC", 1.0), h = full)
         assertTrue(d is Decision.Refuse && d.code == "rate", d.toString())
@@ -288,14 +279,13 @@ class AgentPolicyTest {
     }
 
     @Test fun aSwapWithoutAnAllowedExchangeSpendsTheDay() {
-        // Senza un programma di scambio ammesso non e' uno scambio, ed e' la
-        // stessa condizione che impedisce a un trasferimento travestito di
-        // arrivare fin qui: l'esenzione non si puo' sfruttare.
+        // Without an allowed exchange program it is not an exchange, the same condition that keeps
+        // a disguised transfer from getting here: the exemption cannot be gamed.
         assertFalse(staysInPocket(swap(0.01, usdc, "USDC", 1.0, AgentPolicy.SYSTEM, AgentPolicy.TOKEN), policy))
     }
 
     @Test fun sellingBackIntoSolDoesNotSpendTheDay() {
-        // La vendita: esce una moneta, torna SOL. Stesso borsello, niente perso.
+        // The sale: a coin leaves, SOL comes back. Same pocket, nothing lost.
         val sale = Receipt(
             primaryRecipient = "PoolAuthorityXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", recipientLabel = null, recipientTrust = TrustLevel.NEW,
             outflows = listOf(d(env, usdc, "USDC", 6, -1.0)),
@@ -312,16 +302,13 @@ class AgentPolicyTest {
         assertTrue(d is Decision.Refuse && d.code == "destination", d.toString())
     }
 
-    // ---- la rotta la scegliamo noi -------------------------------------------
-    //
-    // Ultra non passa sempre dallo stesso programma: certe volte la vendita la
-    // riempie un market maker e nella transazione non c'e' nessun aggregatore,
-    // solo dei trasferimenti di token verso un indirizzo che nessuna lista di
-    // destinatari potra' mai contenere. Da byte di un agente questo resta un
-    // trasferimento e si rifiuta. Da una rotta nostra e' una vendita, e va
-    // firmata: e' lo stesso colpo che deve sparare uno stop loss.
+    // ---- we choose the route ----------------------------------------------------
+    // Ultra does not always pass through the same program: sometimes a market maker fills the
+    // sale and there is no aggregator in the transaction, only token transfers to an address no
+    // destination list can ever hold. From an agent's bytes that is a transfer and is refused. From
+    // our own route it is a sale and gets signed: the same shot a stop loss has to fire.
 
-    /** Una vendita riempita da un market maker: niente aggregatore fra i programmi. */
+    /** A sale filled by a market maker: no aggregator among the programs. */
     private val maker = "MakerXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     private val unknownProgram = "RfqProgramXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     private fun rfqSale(solBack: Double, usdcOut: Double = 1.0) = Receipt(
@@ -343,9 +330,8 @@ class AgentPolicyTest {
     }
 
     @Test fun ourRouteDoesNotExcuseATransferWearingASwapsClothes() {
-        // Un pulviscolo di ritorno passa la forma e cade sulla misura: la regola
-        // dieci confronta quanto esce con quanto rientra, ed e' quella che
-        // proteggeva i soldi anche prima.
+        // Dust coming back passes the shape and fails the measure: rule ten compares what leaves
+        // with what returns, and it is what protected the money before too.
         val d = decide(rfqSale(0.000001), ours = true)
         assertTrue(d is Decision.Refuse && d.code == "rate_quality", d.toString())
     }

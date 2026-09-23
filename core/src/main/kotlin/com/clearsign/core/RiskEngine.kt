@@ -3,14 +3,10 @@ package com.clearsign.core
 import kotlin.math.abs
 
 /**
- * Turns decoded instructions + simulation + address trust + an external scan
- * into an ordered list of [Risk]s. This is the safety brain of ClearSign:
- * anything that produces a DANGER risk blocks one-tap approval.
- *
- * Two passes: [assess] judges the *instructions* (what the tx asks for) and
- * [assessEffects] judges the *effects* (what the simulation says will happen),
- * which is how a plain SOL transfer that empties the wallet into a brand-new
- * address stops reading as "no risk".
+ * Decoded instructions, simulation, address trust and an external scan turned into an ordered
+ * list of [Risk]s; a DANGER risk blocks one-tap approval. Two passes: [assess] judges the
+ * instructions, [assessEffects] the simulated effects, which is how a plain SOL transfer
+ * emptying the wallet into a brand-new address stops reading as "no risk".
  */
 class RiskEngine(private val locale: String = "en") {
 
@@ -65,9 +61,8 @@ class RiskEngine(private val locale: String = "en") {
                     // assigning some other fresh account is how PDAs/ATAs get created.
                     if (myWallet != null && ix.subject == myWallet) risks += risk(RiskFlag.WALLET_OWNER_CHANGE, Severity.DANGER)
                 InstructionKind.DURABLE_NONCE -> risks += risk(RiskFlag.DURABLE_NONCE, Severity.WARN)
-                // Una scommessa e' un uso voluto, non un attacco: si dice, non si
-                // blocca. Pagare le caselle di un altro invece e' un altro che
-                // gioca coi tuoi soldi, e quello si blocca.
+                // A wager is intended use, not an attack: said, not blocked. Paying somebody
+                // else's squares is somebody else playing with your money, and that is blocked.
                 InstructionKind.WAGER -> {
                     val sol = Ore.sol(ix.amountRaw ?: 0L)
                     val payee = ix.subject
@@ -91,10 +86,8 @@ class RiskEngine(private val locale: String = "en") {
     }
 
     /**
-     * Judge the simulated effects. Drain = an outflow of at least [DRAIN_SHARE]
-     * of the pre-balance of that asset; it is DANGER when the money goes to an
-     * address you don't know and that has no history, WARN otherwise (moving
-     * everything to your own new wallet is legitimate — save it as a contact).
+     * Judge the simulated effects. A drain is an outflow of at least [DRAIN_SHARE] of that asset's
+     * pre-balance: DANGER when it goes to an unknown address with no history, WARN otherwise (moving everything to your own new wallet is legitimate).
      */
     fun assessEffects(deltas: List<BalanceDelta>, ctx: EffectContext, trust: AddressTrust): List<Risk> {
         val risks = mutableListOf<Risk>()

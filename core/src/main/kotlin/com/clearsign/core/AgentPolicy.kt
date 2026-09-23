@@ -3,14 +3,11 @@ package com.clearsign.core
 import kotlin.math.abs
 
 /**
- * The collar: what an agent may do with its budget on its own.
- *
- * The budget ("paghetta" in Italian) is a separate hot key with a capped balance (the hard boundary:
- * it holds even if the agent's machine is compromised). This policy is the soft
- * boundary on top of it, applied by the wallet on the phone before it signs with
- * that key. It protects against the agent — hallucinated addresses, prompt
- * injection, runaway loops — not against a compromised phone. It is not enforced
- * on chain, and nothing here should make anyone believe it is.
+ * The collar: what an agent may do with its budget on its own. The budget is a separate hot
+ * key with a capped balance, the hard boundary that holds even if the agent's machine is
+ * compromised; this policy is the soft boundary on top, applied by the wallet before it signs
+ * with that key. It protects against the agent (hallucinated addresses, prompt injection,
+ * runaway loops), not against a compromised phone, and it is not enforced on chain.
  */
 enum class AgentMode { OFF, READ_ONLY, AUTONOMOUS, ASK_ALWAYS }
 
@@ -26,15 +23,10 @@ data class AgentPolicy(
     /** Mints the agent may move out AND may acquire. No long tail. */
     val allowedMints: Set<String>,
     /**
-     * Let the agent trade any coin on Solana instead of a fixed short list.
-     *
-     * The short list was a cautious default, and it also meant the agent could
-     * not buy anything at all: six hand-written symbols, of which the collar
-     * allowed two. Opening it changes nothing else — the per-move and daily
-     * caps, the destination list, the rate limit and the untouchable vault all
-     * still apply. A hand-written list of symbols was never what protected the
-     * money; the caps are, and for an unknown coin the question that matters is
-     * whether it can be sold back, which is checked before a proposal gets here.
+     * Let the agent trade any coin instead of a fixed short list. The list was six hand-written
+     * symbols of which the collar allowed two, so the agent could buy nothing. Opening it changes
+     * nothing else: caps, destination list, rate limit and untouchable vault still apply. The
+     * caps protect the money, not a list of symbols; for an unknown coin what matters is whether it can be sold back, checked before a proposal gets here.
      */
     val allowAnyMint: Boolean = false,
     /** Wallets that may receive value: the owner, the budget, the address book. */
@@ -78,11 +70,7 @@ data class AgentPolicy(
 /** What the agent already did, from the wallet's own ledger. */
 data class SpendHistory(val spentLast24hLamports: Long, val txLastHour: Int)
 
-/**
- * The verdict. [code] is the stable machine-readable half — an agent can branch
- * on it without parsing a sentence — and [reason] is the human half, in the
- * user's language.
- */
+/** The verdict. [code] is the stable machine-readable half an agent can branch on; [reason] is the human half, in the user's language. */
 sealed class Decision(val code: String) {
     object Auto : Decision("auto")
     class Ask(code: String, val reason: String) : Decision(code) {
@@ -94,25 +82,12 @@ sealed class Decision(val code: String) {
 }
 
 /**
- * Un giro che torna a casa non ha speso niente.
- *
- * Il tetto giornaliero esiste per limitare **quanto puo' andarsene** in un
- * giorno. Contava invece quanto gira: comprare una moneta e rivenderla lascia il
- * borsello com'era, solo in una forma diversa per un po', eppure mangiava il
- * tetto due volte. Su una paghetta piccola il risultato e' che l'agente fa un
- * giro solo e poi chiede l'impronta a ogni mossa, cioe' smette di essere un
- * agente. Misurato il 17/09: comprato, rivenduto con i soldi tornati indietro, e
- * le due compere successive fermate dal tetto.
- *
- * La condizione e' la stessa che rende uno scambio uno scambio ([isExchange]), ed
- * e' per questo che l'esenzione non si puo' sfruttare: serve che sia tornata
- * indietro una moneta diversa nello stesso borsello. Un trasferimento travestito
- * da scambio non arriva nemmeno qui: lo ferma prima la regola cinque, o la dieci
- * quando la rotta e' nostra.
- *
- * Quello che questo **non** esenta: un trasferimento fuori, una spesa che non
- * torna, e il tetto per singola operazione, che resta intero. Cambia solo la
- * somma della giornata.
+ * A round trip home has spent nothing. The daily cap limits what can leave in a day, but it
+ * counted turnover: buy and sell back left the pocket as it was and ate the cap twice, so on a
+ * small budget the agent made one trip and then asked for the print at every move (measured
+ * 17 Sep). The condition is [isExchange], so it cannot be gamed: a different coin must come
+ * back into the same pocket; a disguised transfer is stopped by rule five, or ten when the
+ * route is ours. Transfers out, spending that does not return and the per-move cap are not exempt.
  */
 fun staysInPocket(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean = false): Boolean {
     if (!isExchange(receipt, policy, routeIsOurs)) return false
@@ -123,33 +98,13 @@ fun staysInPocket(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean = 
 }
 
 /**
- * Uno scambio, e non un pagamento.
- *
- * Due modi di saperlo, e il secondo esiste perche' il primo da' una risposta
- * sbagliata a una vendita vera. Il primo e' il nome del programma: se passa da
- * uno scambio in lista e' uno scambio, e questo vale per dei byte che arrivano
- * da un agente, di cui non si sa niente.
- *
- * Il secondo e' per i byte che **abbiamo chiesto noi**: la rotta la scegliamo
- * qui dentro, il taker e' questa paghetta, e la risposta viene da Jupiter. Ultra
- * pero' non passa sempre dallo stesso programma — a volte la riempie un market
- * maker, e in quel caso nella transazione non c'e' nessun aggregatore, solo dei
- * trasferimenti di token — e allora la regola cinque guardava l'indirizzo che
- * incassa, non lo trovava in nessuna lista (una piscina o un market maker non ci
- * possono stare) e rifiutava. Misurato il 19/09: premuto «vendi ora» su una
- * posizione in guadagno, «non e' fra i destinatari ammessi», e al secondo tocco
- * la stessa vendita e' passata perche' la rotta era cambiata. Una vendita che
- * riesce a tentativi non e' un collare, e' un dado: e' la cosa peggiore che
- * possa capitare a uno stop loss.
- *
- * Quando la rotta e' nostra allora, la forma la **misuriamo**: qualcosa esce e
- * torna indietro una moneta diversa nello stesso borsello. Non e' un buco,
- * perche' cio' che proteggeva davvero i soldi qui non era l'elenco dei
- * programmi: e' la regola dieci, che confronta quanto esce con quanto rientra e
- * rifiuta uno scambio che non restituisce almeno la meta'. Un trasferimento
- * travestito da scambio, con un pulviscolo di un'altra moneta di ritorno, cade
- * la' con un messaggio che dice il perche'. E il resto del collare non si muove
- * di un passo: niente DANGER, il conto principale intoccabile, i tetti, il ritmo.
+ * An exchange, not a payment. An agent's bytes count as one when they pass through a listed
+ * exchange program. Bytes we asked for ourselves (route chosen here, taker is this budget,
+ * answer from Jupiter) are judged by shape instead: Ultra sometimes fills a sale through a
+ * market maker with no aggregator in the transaction, and rule five found the payee in no list
+ * and refused (measured 19 Sep: "sell now" refused, the second tap passed because the route
+ * changed, a die, not a collar). Shape means something out and a different coin back into the
+ * same pocket; rule ten still compares what leaves with what returns, so dust back fails there.
  */
 internal fun isExchange(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Boolean): Boolean {
     val programs = receipt.stats?.programs.orEmpty()
@@ -162,14 +117,10 @@ internal fun isExchange(receipt: Receipt, policy: AgentPolicy, routeIsOurs: Bool
 
 object PolicyEngine {
     /**
-     * Decide what to do with a transaction the agent submitted, given the
-     * *simulated* receipt (never the agent's claim) and the intent check.
-     *
-     * [valueLamports] prices one outflow in SOL-equivalent lamports, or null when
-     * no price is known — an unknown value is never signed silently.
-     *
-     * Rules run in order; the first that fires wins, and a refusal always beats
-     * a question: the user must never be asked to confirm a lie.
+     * Decide what to do with a transaction the agent submitted, from the simulated receipt (never
+     * the agent's claim) and the intent check. [valueLamports] prices one outflow in SOL-equivalent
+     * lamports, null when unknown, and an unknown value is never signed silently. Rules run in
+     * order, the first that fires wins, and a refusal beats a question: never ask a person to confirm a lie.
      */
     fun decide(
         policy: AgentPolicy, receipt: Receipt, guard: Risk, history: SpendHistory,
@@ -179,9 +130,8 @@ object PolicyEngine {
         /** Accounts this transaction can modify, from the decoded message. */
         writableKeys: Set<String> = emptySet(),
         /**
-         * True quando questi byte vengono da una rotta chiesta da noi (Jupiter,
-         * con questa paghetta come taker) e non da un agente. Vedi [isExchange]:
-         * cambia solo come si riconosce uno scambio, non cosa gli e' permesso.
+         * True when these bytes come from a route we asked for (Jupiter, this budget as taker), not
+         * from an agent. See [isExchange]: it changes how an exchange is recognized, not what it may do.
          */
         routeIsOurs: Boolean = false,
     ): Decision {
@@ -199,23 +149,12 @@ object PolicyEngine {
         val outs = receipt.outflows.filter { d -> d.rawAmount < 0 }
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         /**
-         * An exchange where something comes back into this same pocket.
-         *
-         * [RiskFlag.DRAINS_BALANCE] means "this sends out almost everything you
-         * have of one thing", and on a person's wallet that is the shape of a
-         * drainer. On the agent's budget it is the shape of **an ordinary trade**:
-         * the budget is small on purpose and the slice is most of it by design, so
-         * after one purchase the next one always spends nine tenths of the SOL
-         * left. It fired on every coin, refused as DANGER before any other rule
-         * ran, and switched the loop off for the night. Measured on the phone:
-         * "Fermo su SV151. Il collare ha detto no. Fa uscire il 93% del tuo saldo
-         * in SOL", with 0.033 SOL of a 0.036 SOL balance going into a swap.
-         *
-         * Exempting it costs nothing, because a swap that really takes the money
-         * away is caught by rules that *measure* rather than guess: an exchange
-         * must invoke an allowed exchange program (5), and it must give back most
-         * of what it takes (10, `rate_quality`), and it must fit the caps (11).
-         * A transfer wearing a swap's clothes returns nothing, so it is not this.
+         * An exchange where something comes back into this same pocket. [RiskFlag.DRAINS_BALANCE]
+         * means "this sends out almost everything you have of one thing": on a person's wallet the
+         * shape of a drainer, on the budget the shape of an ordinary trade, since the slice is most of
+         * it by design. It fired on every coin as DANGER and switched the loop off for the night
+         * (0.033 of a 0.036 SOL balance into a swap). Exempting it costs nothing: a swap that really
+         * takes the money fails the rules that measure, allowed program (5), most of it back (10), the caps (11).
          */
         val exchangeWithReturn = exchange && outs.isNotEmpty() && ins.isNotEmpty()
 
@@ -224,11 +163,9 @@ object PolicyEngine {
         receipt.risks.firstOrNull { r ->
             r.severity == Severity.DANGER && !(r.flag == RiskFlag.DRAINS_BALANCE && exchangeWithReturn)
         }?.let { r ->
-            // A transaction nobody could simulate is refused like anything else —
-            // this wallet does not sign blind — but under its own name, because
-            // "the network was down" is something to try again, "the node ran it
-            // and it failed" is a bad proposal to skip, and "this moves your
-            // money somewhere else" is neither.
+            // A transaction nobody could simulate is refused like anything else, this wallet does not
+            // sign blind, but under its own name: "the network was down" is something to retry, "the
+            // node ran it and it failed" is a bad proposal to skip, "this moves your money elsewhere" is neither.
             val code = when (r.flag) {
                 RiskFlag.SIMULATION_UNAVAILABLE -> "no_simulation"
                 RiskFlag.SIMULATION_FAILED -> "sim_failed"
@@ -237,10 +174,9 @@ object PolicyEngine {
             return Decision.Refuse(code, r.detail)
         }
 
-        // 3. The vault is out of bounds. The envelope key cannot authorise the vault
-        //    to pay, so a vault that only receives is fine ("send the winnings home").
-        //    Anything else — the vault losing value, or being writable without
-        //    receiving — means this transaction is reaching for the wrong pocket.
+        // 3. The vault is out of bounds. The budget key cannot authorize the vault to pay, so a
+        //    vault that only receives is fine ("send the winnings home"); a vault losing value, or
+        //    writable without receiving, means this transaction reaches for the wrong pocket.
         if (vault != null) {
             val vaultDeltas = receipt.deltas.filter { d -> d.owner == vault }
             if (vaultDeltas.any { d -> d.rawAmount < 0 }) {
@@ -256,28 +192,19 @@ object PolicyEngine {
             return Decision.Refuse("rate", if (it) "ritmo superato: ${policy.maxTxPerHour} operazioni nell'ultima ora" else "rate exceeded: ${policy.maxTxPerHour} transactions in the last hour")
         }
 
-        // 5. An exchange pays a pool, not a wallet, so the destination list only
-        //    governs transfers. A transaction counts as an exchange only when it
-        //    actually invokes an allowed exchange program: a plain transfer
-        //    dressed up with a dust inflow does not qualify.
+        // 5. An exchange pays a pool, not a wallet, so the destination list only governs transfers.
+        //    An exchange must actually invoke an allowed exchange program: a plain transfer dressed
+        //    up with a dust inflow does not qualify.
         if (!exchange) {
             val payees = receipt.distributions.filter { s -> !s.isNewAccount }.map { s -> s.address } +
                 listOfNotNull(receipt.primaryRecipient)
             for (a in payees.distinct()) {
                 if (a in policy.allowedDestinations || a in policy.allowedPrograms) continue
-                // Quando esce qualcosa e torna indietro un'altra moneta, questo
-                // rifiuto e' quasi sempre una rotta, non un destinatario: la
-                // piscina che incassa uno scambio non sta in nessuna lista di
-                // destinatari ne' ci deve stare, e il controllo si sarebbe
-                // saltato se la rotta fosse passata da uno scambio ammesso.
-                //
-                // Il codice del rifiuto resta "destination", perche' e' quello
-                // che protegge dai trasferimenti travestiti da scambio e le prove
-                // lo mettono nero su bianco. Ma il messaggio adesso dice anche
-                // quali programmi ha visto passare, perche' senza quello l'unico
-                // modo di far tornare una vendita sarebbe mettere l'id di un
-                // programma in una lista di sicurezza tirando a indovinare, ed e'
-                // esattamente cio' che questo collare esiste per non fare.
+                // When something leaves and another coin comes back, this refusal is almost always a
+                // route, not a payee: the pool cashing a swap belongs in no destination list. The code
+                // stays "destination", which guards against transfers disguised as swaps and is what the
+                // tests pin down, but the message now names the programs seen: without that the only way
+                // to make a sale pass would be guessing a program id into a safety list.
                 val swapShaped = outs.isNotEmpty() && ins.any { d -> outs.none { o -> o.mint == d.mint } }
                 val seen = if (!swapShaped) "" else programs.filter { p -> p !in AgentPolicy.BASE_PROGRAMS }.take(2).joinToString(", ") { short(it) }
                 val extra = if (seen.isEmpty()) "" else if (it) " (rotta: $seen)" else " (route: $seen)"
@@ -293,15 +220,10 @@ object PolicyEngine {
             return Decision.Ask("asset_in", if (it) "vuole acquistare ${d.symbol}, un token non in lista" else "wants to acquire ${d.symbol}, a token not on the list")
         }
 
-        // 7. A program the collar has never seen.
-        //
-        //    Salta su uno scambio costruito da noi, e per lo stesso motivo della
-        //    regola cinque: Ultra sceglie la rotta al momento, quindi i programmi
-        //    che ci passano non sono prevedibili e metterli in lista si potrebbe
-        //    fare solo tirando a indovinare degli id. Qui la domanda non e' «chi
-        //    ha firmato questo programma», e' «cosa succede ai soldi»: lo dicono
-        //    la regola due sui pericoli, la dieci sul cambio e i tetti. Vedi
-        //    [isExchange].
+        // 7. A program the collar has never seen. Skipped on an exchange we built, for the same
+        //    reason as rule five: Ultra picks the route at the moment, so the programs are not
+        //    predictable and listing them would be guessing ids. The question is not who signed this
+        //    program but what happens to the money: rule two, rule ten and the caps say. See [isExchange].
         if (!(routeIsOurs && exchange)) {
             programs.firstOrNull { p -> p !in policy.allowedPrograms }?.let { p ->
                 return Decision.Ask("program", if (it) "usa un programma non in lista: ${short(p)}" else "uses a program not on the list: ${short(p)}")
@@ -327,16 +249,10 @@ object PolicyEngine {
             }
             val back = ins.sumOf { d -> valueLamports(d) ?: 0L }
 
-            // What actually went *into the exchange*, which is not everything that
-            // left the wallet.
-            //
-            // Buying a coin for the first time also pays the network and the rent
-            // to open the account that will hold it — about 0.002 SOL per account,
-            // money that buys an account and not a coin. Counting it here made a
-            // clean trade look like a bad one: 0.0312 SOL swapped into coins worth
-            // 0.0311 was reported as "sends 0.0359, gets back 0.0303", 84%, and
-            // the agent was sent to ask for a fingerprint over a spread of 1.3%
-            // that did not exist. Measured against the chain, not guessed.
+            // What went into the exchange, which is not everything that left the wallet: a first buy
+            // also pays the fee and about 0.002 SOL of rent per new account. Counting it made a clean
+            // trade look bad: 0.0312 SOL into coins worth 0.0311 read as "sends 0.0359, gets back
+            // 0.0303", 84%, and the agent asked for a fingerprint over a spread that did not exist.
             val rent = receipt.distributions.filter { s -> s.isNewAccount }.sumOf { s -> abs(s.delta.rawAmount) }
             val swapped = (total - rent - receipt.feeLamports).coerceAtLeast(1L)
 
@@ -350,11 +266,9 @@ object PolicyEngine {
                 return Decision.Ask("rate", if (it) "cambio sfavorevole: scambia ${sol(swapped)} SOL e riceve l'equivalente di ${sol(back)} SOL" else "poor rate: swaps ${sol(swapped)} SOL and gets back the equivalent of ${sol(back)} SOL")
             }
         }
-        // 11. The caps bound what the budget can lose. A coming home is the
-        //     opposite of a loss: the coin becomes money again, in the same
-        //     pocket, and nothing can leave through it. Measuring it against the
-        //     per-move cap is what left a position unsellable at exactly the
-        //     moment it had grown enough to be worth selling.
+        // 11. The caps bound what the budget can lose. A coming home is the opposite: the coin
+        //     becomes money again in the same pocket. Measuring it against the per-move cap left a
+        //     position unsellable exactly when it had grown enough to be worth selling.
         if (!unwind) {
             if (total > policy.perTxLamports) {
                 return Decision.Ask("per_tx", if (it) "${sol(total)} SOL supera il tetto per operazione di ${sol(policy.perTxLamports)} SOL" else "${sol(total)} SOL is over the per-transaction cap of ${sol(policy.perTxLamports)} SOL")
@@ -373,25 +287,12 @@ object PolicyEngine {
     }
 
     /**
-     * The agent coming home: a coin the budget holds, swapped back into the money
-     * the budget is kept in.
-     *
-     * Why this deserves a name of its own. Every cap in the collar exists to bound
-     * what the budget can *lose* — per move, per day, and the line above which a
-     * person is asked. A sale loses nothing: the same pocket that held the coin
-     * holds the SOL afterwards, and no address outside the budget can receive
-     * anything through it. Running a sale past the spending caps meant the agent
-     * could buy a coin it was then forbidden to sell, which is the worst shape a
-     * rule can have. It also meant a stop-loss turning into a ninety-second wait
-     * for a fingerprint that nobody was there to give.
-     *
-     * Deliberately narrow: it must be a real exchange ([isExchange]), nothing of
-     * the budget's base money may leave, and everything arriving must be base
-     * money. A swap into another coin is not a coming home, and neither is
-     * a transfer wearing a swap's clothes.
-     *
-     * [receipt] is the *simulated* receipt, whose legs are already only the
-     * budget's own, so this reads what will happen and never what was claimed.
+     * The agent coming home: a coin the budget holds, swapped back into the money the budget is
+     * kept in. Every cap bounds what the budget can lose, and a sale loses nothing: the same pocket
+     * holds the SOL afterwards. Running sales past the caps meant the agent could buy a coin it was
+     * then forbidden to sell, and a stop-loss became a ninety-second wait for a fingerprint nobody
+     * was there to give. Narrow on purpose: a real exchange ([isExchange]), no base money leaving,
+     * only base money arriving. [receipt] is the simulated one, so this reads what will happen.
      */
     fun isUnwind(policy: AgentPolicy, receipt: Receipt, routeIsOurs: Boolean = false): Boolean {
         if (!isExchange(receipt, policy, routeIsOurs)) return false
@@ -418,11 +319,8 @@ object PolicyEngine {
 }
 
 /**
- * The other half of a machine-readable verdict.
- *
- * [IntentGuard.summary] renders what the agent *said*. This renders what the
- * simulation says will actually *happen*, in one line, so a caller can show the
- * two side by side and see for itself whether they agree.
+ * The other half of a machine-readable verdict: [IntentGuard.summary] renders what the agent
+ * said, this renders what the simulation says will happen, one line each, side by side.
  */
 object Effects {
     fun summary(receipt: Receipt, locale: String = "en"): String {

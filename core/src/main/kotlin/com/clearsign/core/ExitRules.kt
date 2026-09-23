@@ -1,18 +1,10 @@
 package com.clearsign.core
 
 /**
- * When to sell, five ways, so the same position can be judged by all of them at
- * once.
- *
- * The point is not to find a magic rule. It is that a target and a stop are two
- * numbers somebody picked, and nobody who picks them knows whether they are the
- * right ones for the coins this scan actually finds. Running every rule over the
- * same positions, at the same moments, answers that with the person's own trades
- * instead of with a blog post — and because the entry is identical across rules,
- * the only thing being compared is the exit.
- *
- * Pure on purpose: price in, verdict out, no clock of its own and no network. The
- * caller supplies "now", which is what makes this testable over a written series.
+ * When to sell, five ways, so one position can be judged by all of them at once. A target
+ * and a stop are two numbers somebody picked; running every rule over the same positions at
+ * the same moments answers whether they were right with the person's own trades, and since
+ * the entry is identical the only thing compared is the exit. Pure: price in, verdict out, the caller supplies "now".
  */
 sealed class ExitRule(val id: String) {
 
@@ -20,9 +12,8 @@ sealed class ExitRule(val id: String) {
     class Fixed(id: String, val takePct: Int, val stopPct: Int) : ExitRule(id)
 
     /**
-     * No target: ride it, and sell when it gives back [dropPct] from the highest
-     * price it reached. The rule that wins when a coin keeps going and a fixed
-     * target would have sold at the first +30%.
+     * No target: ride it, sell when it gives back [dropPct] from its high. The rule that wins
+     * when a coin keeps going and a fixed target would have sold at the first +30%.
      */
     class Trailing(id: String, val dropPct: Int) : ExitRule(id)
 
@@ -36,11 +27,7 @@ sealed class ExitRule(val id: String) {
         const val TRAILING = "trailing"
         const val TIMED = "timed"
 
-        /**
-         * The five, with [yourTake] and [yourStop] being whatever the person has
-         * set right now — so "yours" is always the rule actually running, and the
-         * comparison stays honest when they change it.
-         */
+        /** The five, with [yourTake] and [yourStop] as set right now, so "yours" is always the rule actually running. */
         fun all(yourTake: Int, yourStop: Int): List<ExitRule> = listOf(
             Fixed(YOURS, yourTake, yourStop),
             Fixed(QUICK, 15, 10),
@@ -65,11 +52,8 @@ data class PaperLeg(
 }
 
 /**
- * Advance one leg to [nowLamports] at [now]. Returns the leg, closed if the rule
- * says so.
- *
- * An unknown price never closes anything: the same rule the live loop follows,
- * because a missed quote is not a price of zero.
+ * Advance one leg to [nowLamports] at [now]; returns the leg, closed if the rule says so. An
+ * unknown price never closes anything: a missed quote is not a price of zero.
  */
 fun ExitRule.step(leg: PaperLeg, nowLamports: Double?, now: Long): PaperLeg {
     if (!leg.open) return leg
@@ -97,13 +81,9 @@ fun ExitRule.step(leg: PaperLeg, nowLamports: Double?, now: Long): PaperLeg {
 }
 
 /**
- * What a closed leg actually made, in lamports, **after the costs a real trade
- * would have paid**.
- *
- * Without this the whole exercise is a story. A simulated round trip pays the
- * network twice and, on a coin never held before, the rent to open its account —
- * which on a small slice is most of what the trade has to earn back before it is
- * even. [size] is what the trade would have put in.
+ * What a closed leg made, in lamports, after the costs a real trade pays: the network twice
+ * and, on a coin never held, the rent for its account, which on a small slice is most of what
+ * the trade must earn back. Without this the exercise is a story. [size] is what went in.
  */
 fun PaperLeg.netLamports(size: Long, feeLamports: Long = 5_000L, rentLamports: Long = 2_040_000L, impactPct: Double = 0.0): Long {
     if (open || entryLamports <= 0) return 0L

@@ -221,13 +221,10 @@ class MarketScanTest {
     }
 
     /**
-     * A real one that got through, kept as a test so it cannot get through again.
-     *
-     * DRANK, mint 5GU3VELV…BoKc, as Jupiter had it three days after launch: up
-     * 288% on the day, down 64% over six hours, liquidity down 44% in the same
-     * window. Every fatal check passed — no mint authority, no freeze authority,
-     * 413 holders, top holders under 30% — because nothing about the coin was
-     * wrong. What was wrong was happening to it.
+     * A real one that got through, kept so it cannot again. DRANK, mint 5GU3VELV…BoKc, as Jupiter
+     * had it three days after launch: up 288% on the day, down 64% over six hours, liquidity down
+     * 44% in the same window. Every fatal check passed, no mint or freeze authority, 413 holders,
+     * top holders under 30%: nothing about the coin was wrong, what was wrong was happening to it.
      */
     private fun drank() = Candidate(
         mint = "5GU3VELVxiQVu83AtMvHmQyWPVkhCM721DLPiLnVBoKc", symbol = "DRANK", name = "DRANK",
@@ -274,9 +271,8 @@ class MarketScanTest {
     // ---- beatsBase: conviene comprare, o tenere la base? --------------------
 
     /**
-     * Il caso vero del 18/09/2026: SOL faceva +10,4% e la paghetta perdeva il
-     * 5,1% comprando monete piccole. Una moneta che fa meno della base non e'
-     * un affare, e' lo stesso affare con piu' modi di finire male.
+     * The real case of 18 Sep 2026: SOL did +10.4% and the budget lost 5.1% buying small coins. A
+     * coin doing less than the base is not a deal, it is the same deal with more ways to end badly.
      */
     @Test
     fun aCoinThatLagsTheBaseIsNotWorthBuying() {
@@ -293,7 +289,7 @@ class MarketScanTest {
         assertNull(beatsBase(c, baseChange24hPct = 10.4))
     }
 
-    /** Il margine esiste: pareggiare con la base non basta. */
+    /** The margin exists: matching the base is not enough. */
     @Test
     fun matchingTheBaseIsNotEnough() {
         val c = healthy().copy(s24h = ScanWindow(priceChange = 10.4))
@@ -302,9 +298,8 @@ class MarketScanTest {
     }
 
     /**
-     * La regola della casa, e quella che si rompe per prima quando qualcuno
-     * tocca questo file: **quello che non si sa non blocca mai**. Senza il dato
-     * della base, o senza la finestra a 24 ore della moneta, si passa.
+     * The house rule, and the first to break when somebody touches this file: what is not known
+     * never blocks. Without the base's number, or the coin's 24h window, it passes.
      */
     @Test
     fun missingDataNeverBlocks() {
@@ -314,7 +309,7 @@ class MarketScanTest {
         assertNull(beatsBase(blind, baseChange24hPct = 10.4))
     }
 
-    /** Con la base in rosso, una moneta che scende meno resta comprabile. */
+    /** With the base in the red, a coin falling less stays buyable. */
     @Test
     fun whenTheBaseFallsACoinThatFallsLessStillPasses() {
         val c = healthy().copy(s24h = ScanWindow(priceChange = -1.0))

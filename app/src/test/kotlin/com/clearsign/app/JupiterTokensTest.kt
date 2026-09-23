@@ -86,7 +86,7 @@ class JupiterTokensTest {
         val touched = mapOf("a" to 10L, "b" to 40L, "c" to 30L)
         assertEquals(listOf("b", "c"), JupiterTokens.keepNewest(all, touched, 2).map { it.mint })
         assertEquals(4, JupiterTokens.keepNewest(all, touched, 10).size)
-        // Mai toccata vale zero: e' la prima a uscire.
+        // Never touched counts as zero: it is the first to go.
         assertEquals("d", JupiterTokens.keepNewest(all, touched, 4).last().mint)
     }
 }

@@ -1,14 +1,10 @@
 package com.clearsign.core
 
 /**
- * Keccak-256, quello di Ethereum e di `solana_program::keccak`: stesso
- * permutatore di SHA-3 ma col riempimento `0x01 … 0x80`, quindi il JDK, che
- * ha solo SHA3-256, non serve. Scritto a mano perche' ORE decide con un
- * keccak dell'id del giro quali caselle pagano a uno solo, e quel calcolo
- * si vuole fare sul telefono, prima del giro.
- *
- * Provato sui vettori noti e su trenta giri veri della catena, vedi
- * `OreMaskTest`.
+ * Keccak-256, Ethereum's and `solana_program::keccak`'s: SHA-3's permutation with the
+ * `0x01 … 0x80` padding, so the JDK's SHA3-256 does not do. Hand-written because ORE decides
+ * with a keccak of the round id which squares pay one miner only, and that wants computing on
+ * the phone before the round. Checked against the known vectors and thirty real rounds, see `OreMaskTest`.
  */
 object Keccak {
     private val RC = longArrayOf(
@@ -30,7 +26,7 @@ object Keccak {
     fun hash256(input: ByteArray): ByteArray {
         val rate = 136
         val state = LongArray(25)
-        // Assorbimento, blocco da 136 byte, con il riempimento di Keccak.
+        // Absorb, 136-byte blocks, with Keccak's padding.
         val padded = ByteArray(((input.size / rate) + 1) * rate)
         System.arraycopy(input, 0, padded, 0, input.size)
         padded[input.size] = (padded[input.size].toInt() xor 0x01).toByte()

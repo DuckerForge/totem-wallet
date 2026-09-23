@@ -6,15 +6,11 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 /**
- * A contact handed over by touch.
- *
- * One phone offers its address, a name to show, and a signature over both
- * made with its own attestation key; the other reads it, checks the signature
- * against the key inside, and saves the contact as verified by touch. What the
- * check proves is exactly this: the phone that was physically here declared
- * this address as its own. It does not prove who holds the phone.
- *
- *   apex-contact:<address>?n=<name>&t=<millis>&k=<key b64url>&s=<sig b64url>
+ * A contact handed over by touch. One phone offers its address, a name, and a signature over
+ * both with its attestation key; the other checks the signature against the key inside and
+ * saves the contact as verified by touch. It proves the phone physically here declared this
+ * address as its own, not who holds the phone.
+ * `apex-contact:<address>?n=<name>&t=<millis>&k=<key b64url>&s=<sig b64url>`
  */
 object ContactTap {
     const val SCHEME = "apex-contact:"

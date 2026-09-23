@@ -68,9 +68,8 @@ enum class Scenario(val title: String, val expected: String) {
     GASLESS("🎁 Fee pagate da altri", "WARN: fee payer estraneo, tu firmi il trasferimento"),
     AGENT_HONEST("🤖 Agent Gate · agente onesto", "Un agente AI dichiara un micro-invio; Omni verifica intento vs effetto: coerente ✓ (solo firma)"),
     AGENT_LIAR("🤖 Agent Gate · agente bugiardo", "DANGER: l'agente dichiara uno swap SOL→USDC ma la tx è un invio → bloccato"),
-    // Il caso peggiore in una volta sola: serve a vedere come si impila la
-    // schermata quando gli avvisi non sono uno ma sei, e se l'importo, la mappa
-    // e il pulsante restano raggiungibili.
+    // The worst case at once: how the screen stacks when the warnings are six, not one, and
+    // whether the amount, the map and the button stay reachable.
     ALL_ALARMS("🚨 Tutti gli allarmi insieme", "DANGER: burn + delega illimitata + cambio autorità + fee nascosta + wallet nuovo"),
 }
 
@@ -144,10 +143,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Agent Gate demo: this app plays the "AI agent". It never holds a key — it only
-     * asks Omni (via MWA authorize) which wallet to use, builds a transaction, and
-     * hands it to apex://agent/sign together with a *declared intent*. Apex simulates
-     * the bytes and compares them with the claim. send=0: signature only, no spend.
+     * Agent Gate demo: this app plays the AI agent. It never holds a key: it asks the wallet (via
+     * MWA authorize) which account to use, builds a transaction, and hands it to
+     * apex://agent/sign with a declared intent. The wallet simulates the bytes and compares them with the claim. send=0: signature only.
      */
     private fun runAgent(scenario: Scenario, setStatus: (String) -> Unit) {
         setStatus("${scenario.title}\nAtteso: ${scenario.expected}\n\n1/2 chiedo a Apex quale wallet usare…")
@@ -248,8 +246,7 @@ class MainActivity : ComponentActivity() {
                 Scenario.BURN_ADDRESS -> listOf(
                     SolTxBuilder.systemTransfer(feePayer, INCINERATOR, 1_000L),
                 )
-                // Cinque cose sbagliate nella stessa transazione, ognuna delle
-                // quali da sola basterebbe a fermarla.
+                // Five things wrong in one transaction, any one of which would stop it alone.
                 Scenario.ALL_ALARMS -> listOf(
                     SolTxBuilder.systemTransfer(feePayer, INCINERATOR, 1_000L),
                     SolTxBuilder.systemTransfer(feePayer, FRESH_WALLET, 12_000L),

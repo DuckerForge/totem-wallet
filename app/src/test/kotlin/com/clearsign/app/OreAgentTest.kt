@@ -6,11 +6,11 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Quanto affidare, dai due cursori: la parte pura dell'agente che scava. */
+/** How much to hand over, from the two sliders: the pure part of the digging agent. */
 class OreAgentTest {
     @Test fun `un tetto normale su tre caselle`() {
         val s = assertNotNull(OreAgent.sizing(50_000_000L, 3, 100_000_000L, 200_000_000L))
-        // 50.000.000 / 1440 = 34.722 a giro, meno 7.000 di fee, diviso 3 caselle.
+        // 50,000,000 / 1440 = 34,722 per round, minus 7,000 of fee, split over 3 squares.
         assertEquals(9_240L, s.amountPerSquare)
         assertEquals(3, s.squares)
         assertEquals(3 * 9_240L + 7_000L, s.perRound)
@@ -27,7 +27,7 @@ class OreAgentTest {
     }
 
     @Test fun `troppo poco per un giro`() {
-        // 0,02 SOL al giorno su tre caselle: la fee si mangia quasi tutto, restano 2.296 lamport a casella.
+        // 0.02 SOL a day on three squares: the fee eats almost everything, 2,296 lamports per square remain.
         assertNull(OreAgent.sizing(20_000_000L, 3, 100_000_000L, 200_000_000L))
         assertNull(OreAgent.sizing(50_000_000L, 3, 100_000_000L, 3_100_000L))
     }

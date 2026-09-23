@@ -4,23 +4,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * What the Seeker crowd is buying.
- *
- * The Seeker Genesis Token is a non-transferable Token-2022 NFT minted once per
- * device, so one token is one phone and the holder set can only grow. A census of
- * the group found 120,520 wallets: the median one holds 0.032 SOL, which is why
- * only the 10,527 above one SOL are worth following at all.
- *
- * Two rules keep this honest, and both cost us signal on purpose.
- *
- * **Only what was bought, never what is held.** A holdings ranking of this crowd
- * returns SEKR, CHAPTER2, HM, PDT, GRUMPY: airdrops that shipped with the phone,
- * worth nothing, held by everyone because nobody chose them. Purchases are the
- * only evidence somebody decided.
- *
- * **Three distinct wallets or it does not exist.** On sixty wallets the top
- * "trend" was one person buying one coin ten times. Counting purchases instead of
- * buyers turns a single trader into a crowd, which is the exact lie this is for.
+ * What the Seeker crowd is buying. The Genesis Token is a non-transferable Token-2022 NFT
+ * minted once per device, so one token is one phone. A census found 120,520 wallets, median
+ * 0.032 SOL, so only the 10,527 above one SOL are worth following. Two rules that cost signal
+ * on purpose: only what was bought, never what is held (a holdings ranking returns SEKR,
+ * CHAPTER2, HM, PDT, GRUMPY, airdrops nobody chose); and three distinct wallets or it does not
+ * exist, because on sixty wallets the top "trend" was one person buying one coin ten times.
  */
 enum class SeekerTier { WHALE, DOLPHIN }
 
@@ -64,15 +53,10 @@ sealed class CrowdSignal(val mint: String, val at: Long) {
 
 object SeekerCrowd {
     /**
-     * What the live feed is saying right now, in the order worth acting on.
-     *
-     * Two signals and no third. A wallet the person chose to follow bought
-     * something inside the window: that is the closest this app gets to copy
-     * trading, and it is deliberately one step short of it, because the coin
-     * still has to pass every gate. And two or more different whales bought the
-     * same coin inside the window, which is the crowd noticing something before
-     * the registry's numbers do. Money-mints never signal, and one wallet
-     * buying ten times is still one wallet.
+     * What the live feed says right now, in the order worth acting on. Two signals: a wallet the
+     * person follows bought inside the window (one step short of copy trading, the coin still
+     * meets every gate), and two or more different whales bought the same coin inside the window.
+     * Money-mints never signal, and one wallet buying ten times is still one wallet.
      */
     fun signals(buys: List<CrowdBuy>, follows: Set<String>, now: Long, windowMs: Long = 60 * 60_000L, minWhales: Int = 2): List<CrowdSignal> {
         val fresh = buys.filter { it.at > now - windowMs && it.mint !in MONEY && it.solSpent >= MIN_SPEND_SOL }
@@ -105,23 +89,16 @@ object SeekerCrowd {
     )
 
     /**
-     * Below this, the outflow is explained by the network fee plus the rent for
-     * the account the coin arrives in, and an airdrop claim is indistinguishable
-     * from a purchase. Measured, not guessed: on one real pass over 10,527 wallets,
-     * 13 of 99 apparent buys were under it, and none of them was anybody choosing
-     * anything. Raising it to 0.02 instead erased both genuine crowd signals.
+     * Below this the outflow is explained by the fee plus the rent for the coin's account, and an
+     * airdrop claim looks like a purchase. Measured on one pass over 10,527 wallets: 13 of 99
+     * apparent buys were under it, none of them a choice. 0.02 erased both genuine crowd signals.
      */
     const val MIN_SPEND_SOL = 0.005
 
     /** A whale's pick counts for three, because it is three times harder to fake. */
     private fun weight(t: SeekerTier) = if (t == SeekerTier.WHALE) 3.0 else 1.0
 
-    /**
-     * The ranking, over the last [windowMs] before [now].
-     *
-     * [minWallets] is the floor below which a coin is simply not shown. Three is
-     * not a tuned number, it is the smallest count that cannot be one person.
-     */
+    /** The ranking over the last [windowMs] before [now]. [minWallets] is the floor: three is not tuned, it is the smallest count that cannot be one person. */
     fun rank(
         buys: List<CrowdBuy>,
         now: Long,
@@ -158,12 +135,9 @@ object SeekerCrowd {
     }
 
     /**
-     * How often the scan can run and still fit a monthly credit budget.
-     *
-     * Finding out *who moved* costs one call per hundred wallets, because a swap
-     * always moves the balance if only by the fee. Only the movers then cost a
-     * lookup each. That is the whole reason following ten thousand wallets is
-     * affordable and following them one by one is not.
+     * How often the scan can run within a monthly credit budget. Who moved costs one call per
+     * hundred wallets, since a swap always moves the balance if only by the fee; only the movers
+     * cost a lookup each. That is why following ten thousand wallets is affordable and one by one is not.
      */
     fun passesPerDay(wallets: Int, monthlyCredits: Long, moverRate: Double = 0.03): Int {
         if (wallets <= 0 || monthlyCredits <= 0) return 0
@@ -174,15 +148,9 @@ object SeekerCrowd {
     }
 
     /**
-     * A readable handle for a wallet, derived from the address itself.
-     *
-     * `7rTHtV2tuc…pDRRR bought SNDK` is a string nobody reads twice. A name does
-     * the same job better, and because it comes from the address it is stable
-     * everywhere and invented nowhere: the same wallet is the same name on every
-     * phone, forever, with no directory to keep.
-     *
-     * Two characters of the real address ride along, so a name is never mistaken
-     * for a claim about who somebody is.
+     * A readable handle for a wallet, derived from the address. `7rTHtV2tuc…pDRRR bought SNDK`
+     * is a string nobody reads twice; a name does the job, and coming from the address it is the
+     * same on every phone with no directory. Two characters of the real address ride along, so a name is never mistaken for a claim about who somebody is.
      */
     fun nickname(address: String): String {
         if (address.length < 6) return address

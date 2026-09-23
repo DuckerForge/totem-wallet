@@ -2,10 +2,7 @@ package com.clearsign.core
 
 import kotlin.math.abs
 
-/**
- * What an AI agent (or any automated caller) *claims* a transaction will do.
- * Parsed by the app from the Agent Gate deep link; the core only compares.
- */
+/** What an agent claims a transaction will do. Parsed by the app from the Agent Gate link; the core only compares. */
 data class AgentIntent(
     val action: String,                 // "transfer" | "swap" | "burn" | "other"
     val outMint: String? = null,        // mint address or symbol of what leaves the wallet
@@ -18,13 +15,10 @@ data class AgentIntent(
 )
 
 /**
- * The Agent Gate's brain: compare the declared intent with the *simulated* effect
- * of the transaction. A hallucinating or compromised agent cannot lie past this —
- * the receipt is what the network says will happen, not what the agent says.
- *
- * Returns exactly one risk: [RiskFlag.AGENT_INTENT_OK] (INFO) when the claim holds,
- * or [RiskFlag.AGENT_INTENT_MISMATCH] (DANGER, blocks approval) listing every
- * discrepancy in plain words.
+ * The Agent Gate's brain: the declared intent against the simulated effect. A hallucinating
+ * or compromised agent cannot lie past this, the receipt is what the network says will happen.
+ * Returns one risk: [RiskFlag.AGENT_INTENT_OK] (INFO) when the claim holds, or
+ * [RiskFlag.AGENT_INTENT_MISMATCH] (DANGER, blocks approval) listing every discrepancy.
  */
 object IntentGuard {
     private const val WSOL = "So11111111111111111111111111111111111111112"
@@ -45,22 +39,12 @@ object IntentGuard {
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         val action = intent.action.lowercase()
 
-        // Nothing moved because nothing was simulated.
-        //
-        // This check compares a claim against what the network says will happen.
-        // When the network did not answer there is no "what will happen", and
-        // comparing a claim against an empty list finds every field missing and
-        // reports it as a lie. That is how a dropped connection became "the agent
-        // is not telling the truth", and the loop stopped itself over it. An
-        // unverifiable claim is unverifiable, and saying so is the honest answer.
-        //
-        // Two different silences. When the node ran the transaction and it
-        // failed, the receipt already carries the reason (slippage, funds, a fee
-        // account) and that risk is the honest answer: repeating "did not answer"
-        // on top of it hid the real cause and made the loop retry the same broken
-        // swap every round as if the network had blinked. When the node could not
-        // be asked at all, there is nothing to pass on, and the claim is simply
-        // unverifiable.
+        // Nothing moved because nothing was simulated. Comparing a claim against an empty list
+        // finds every field missing and calls it a lie: that is how a dropped connection became
+        // "the agent is not telling the truth" and stopped the loop. Two silences: when the node ran
+        // it and it failed, the receipt already carries the reason and that is the answer (repeating
+        // "did not answer" hid the cause and made the loop retry the same broken swap); when the
+        // node could not be asked, the claim is simply unverifiable.
         if (outs.isEmpty() && ins.isEmpty()) {
             receipt.risks.firstOrNull { r -> r.flag == RiskFlag.SIMULATION_FAILED }?.let { r ->
                 return Risk(RiskFlag.SIMULATION_FAILED, Severity.DANGER, r.detail)
@@ -84,21 +68,11 @@ object IntentGuard {
             return claimSol && dSol
         }
         /**
-         * How much more SOL than declared may leave before it counts as a lie.
-         *
-         * An agent says "swap 0.031 SOL"; the transaction spends 0.036, and every
-         * lamport of the difference is something the agent could not have known
-         * when it wrote the sentence: the network fee, the priority fee, and the
-         * **rent for the accounts this transaction opens**. Buying a coin you have
-         * never held costs about 0.002 SOL of rent per account, and a swap through
-         * a wrapped-SOL account opens two.
-         *
-         * This used to be a flat 0.003, which is less than two accounts. So every
-         * purchase of a brand new coin was refused as a lie, the loop read that
-         * refusal as "the person said no", and stopped. The numbers now come from
-         * the simulation itself: what the network says the fee will be, and what
-         * it says the new accounts will cost. A transfer to a stranger is still
-         * caught to the lamport, because no new account explains it.
+         * How much more SOL than declared may leave before it counts as a lie. "Swap 0.031 SOL"
+         * spends 0.036: network fee, priority fee, and the rent for the accounts it opens, about
+         * 0.002 SOL each, two for a swap through wrapped SOL. A flat 0.003 refused every purchase of
+         * a new coin as a lie, and the loop read that as "the person said no". The numbers now come
+         * from the simulation itself; a transfer to a stranger is still caught to the lamport.
          */
         fun slackFor(d: BalanceDelta, amount: Double): Double {
             val isSol = d.mint == NATIVE_SOL_MINT || d.mint == WSOL

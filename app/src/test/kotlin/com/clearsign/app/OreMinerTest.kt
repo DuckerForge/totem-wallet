@@ -6,9 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Le transazioni di ORE: i conti giusti nell'ordine giusto, e Riscuoti che
- * mette dentro quello che serve e niente di piu'. L'ordine dei conti e' quello
- * che ha passato la simulazione sulla catena il 22 settembre 2026.
+ * ORE's transactions: the right accounts in the right order, and Claim putting in what is
+ * needed and nothing more. The account order is the one that passed simulation on chain on 22 Sep 2026.
  */
 class OreMinerTest {
     private val owner = Base58.decode("D1nsSnCRwcmjweKNZAfHtApfPBskuALHD7dEKhybzNkj")
@@ -60,7 +59,7 @@ class OreMinerTest {
         assertEquals(Ore.IX_CLAIM_ORE, ixs[1].data[0].toInt())
         assertEquals(11, ixs[1].keys.size)
 
-        // Un giro vecchio non chiuso: prima si chiude, poi si riscuote tutto.
+        // An old round not closed: close first, then claim everything.
         val stale = OreMiner.View(miner(413540L, 413539L, 0L, 0L), board, null, slot = 0L, at = 0L)
         val all = OreMiner.claimInstructions(owner, stale)
         assertEquals(listOf(Ore.IX_CHECKPOINT, Ore.IX_CLAIM_SOL, 1, Ore.IX_CLAIM_ORE), all.map { it.data[0].toInt() })

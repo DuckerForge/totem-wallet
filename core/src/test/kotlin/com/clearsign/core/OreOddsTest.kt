@@ -15,7 +15,7 @@ class OreOddsTest {
     @Test fun `da solo sulla casella riprendo il 99 se vince e l'89 e rotti se perde`() {
         assertEquals(990L, OreOdds.backIfWin(1_000, 1_000))
         assertEquals(891L, OreOdds.backIfLose(1_000, 1_000))
-        // In compagnia il ritorno e' pro quota, con la stessa fee sul totale.
+        // In company the return is pro rata, with the same fee on the total.
         assertEquals(495L, OreOdds.backIfWin(500, 1_000))
     }
 

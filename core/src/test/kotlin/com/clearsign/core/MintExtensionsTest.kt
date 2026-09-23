@@ -6,13 +6,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The TLV walk over a Token-2022 mint.
- *
- * Worth testing byte by byte rather than against a live mint: the whole point of
- * this parser is to be right about a coin nobody has seen before, and the two
- * ways to be wrong are opposite and both expensive. Miss a permanent delegate
- * and the agent buys a coin the creator can burn out of the budget. Invent one
- * and the wallet calls an honest coin a scam.
+ * The TLV walk over a Token-2022 mint, byte by byte rather than against a live mint: the
+ * parser must be right about a coin nobody has seen, and the two ways to be wrong are opposite
+ * and both expensive. Miss a permanent delegate and the agent buys a coin the creator can burn; invent one and an honest coin is called a scam.
  */
 class MintExtensionsTest {
 

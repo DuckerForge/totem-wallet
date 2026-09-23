@@ -8,15 +8,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * ORE letto dai byte veri.
- *
- * I quattro conti in `resources/ore` sono stati scaricati dalla catena il 22
- * settembre 2026: la Board al giro 413544, la Config, quel Round, e il Miner
- * con piu' ORE da riscuotere fra i primi sessanta trovati. Gli offset qui
- * sotto non vengono da un riassunto del sorgente, vengono da quei byte: il
- * primo riassunto diceva 728 byte per il Miner e 56 per la parte admin della
- * Config, ed erano 744 e 72. Un test sui byte veri e' l'unico modo di non
- * ripetere quell'errore in silenzio.
+ * ORE read from the real bytes. The four accounts in `resources/ore` were downloaded from the
+ * chain on 22 Sep 2026: the Board at round 413544, the Config, that Round, and the Miner with
+ * the most ORE to claim among the first sixty found. The offsets below come from those bytes,
+ * not from a summary of the source: the first summary said 728 bytes for the Miner and 56 for
+ * the Config's admin part, and they were 744 and 72.
  */
 class OreTest {
     private fun fixture(name: String): ByteArray =
@@ -45,8 +41,8 @@ class OreTest {
         assertEquals(40L, c.intermissionSlots)
         assertEquals(200L, c.roundSlots)
         assertTrue(c.entropyVar.any { it != 0.toByte() })
-        // Sulla catena il programma dell'entropia scritto in Config e' il System
-        // Program: tutti zeri. Il Deploy simulato con questi due conti passa.
+        // On chain the entropy program written in Config is the System Program: all zeros. The
+        // simulated Deploy with these two accounts passes.
         assertTrue(c.entropyProgram.all { it == 0.toByte() })
     }
 
@@ -58,8 +54,8 @@ class OreTest {
         assertEquals(99_300_000L, r.deployed[0] / 100_000 * 100_000, "la prima casella era 0,0993 SOL")
         assertEquals(87L, r.totalMiners)
         assertTrue(r.topMiner.all { it == 0.toByte() })
-        // Giro in corso: il premio non e' ancora scritto, lo slot hash e' vuoto, e la
-        // casella vincente non c'e'. L'atteso conta l'ORE che verra' coniato.
+        // Round in progress: the prize is not written yet, the slot hash is empty, no winning
+        // square. The outlook counts the ORE that will be minted.
         assertTrue(r.rewards.all { it == 0L }, "rewards si scrive a giro chiuso")
         assertEquals(0L, r.rewardOre)
         assertEquals(Ore.ONE_ORE, r.expectedReward)
@@ -80,7 +76,7 @@ class OreTest {
         assertEquals(1_230_946_682_139L, m.lifetimeRewardsSol)
         assertEquals(25, m.squaresNow.size)
         assertEquals(100_000_000L, m.deployed.sum())
-        // Il suo giro e' vecchio: niente in gioco adesso, e i conti sono gia' chiusi.
+        // Its round is old: nothing in play now, and the accounts are already closed.
         assertEquals(0L, m.inPlay(413544L))
         assertEquals(100_000_000L, m.inPlay(92165L))
         assertFalse(m.needsCheckpoint(413544L))
@@ -156,7 +152,7 @@ class OreTest {
         assertNull(Ore.decode(byteArrayOf(6, 1, 2), emptyList()))
     }
 
-    // ---- lo scontrino -------------------------------------------------------------
+    // ---- the receipt --------------------------------------------------------------
 
     @Test fun `le frasi dello scontrino, in tutte e due le lingue`() {
         val deploy = Ore.decode(Ore.deployData(10_000_000L, Ore.maskOf(listOf(0, 6, 24))), listOf(me, me))!!

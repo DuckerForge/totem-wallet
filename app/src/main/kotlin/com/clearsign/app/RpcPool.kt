@@ -25,7 +25,7 @@ class RpcPool(
         val url: String,
         /** Requests per second the key allows, for the whole world. */
         val perSecond: Int,
-        /** Quanto spesso va scelto rispetto agli altri: proporzionale alla quota mensile. */
+        /** How often it is picked over the others: proportional to the monthly quota. */
         val weight: Int,
         /** Serves the DAS API (`getAsset*`), which is Helius only. */
         val das: Boolean = false,
@@ -37,7 +37,7 @@ class RpcPool(
         val unsupported: Set<String> = emptySet(),
     )
 
-    /** Dove il pool ricorda quello che ha imparato, da un avvio all'altro. */
+    /** Where the pool remembers what it learned, across launches. */
     interface Store {
         fun get(key: String): String?
         fun put(key: String, value: String?)
@@ -163,7 +163,7 @@ class RpcPool(
         Line(p.name, state(p.name, now), h.calls, h.failures, h.lastError, h.unsupported.toSet())
     }
 
-    // ---- il tetto del giorno ---------------------------------------------------
+    // ---- the daily cap ---------------------------------------------------------
 
     /** How many calls on shared keys this phone made today. Last resorts and the own node do not count: they spend nothing of ours. */
     @Volatile private var day: Long = -1L
@@ -189,7 +189,7 @@ class RpcPool(
 
     fun usedToday(now: Long): Int = if (now / DAY_MS == day) used else 0
 
-    /** Sopra il tetto: la caccia si ferma, le uscite no. */
+    /** Over the cap: the hunt stops, the exits do not. */
     fun overBudget(now: Long): Boolean = cap > 0 && usedToday(now) >= cap
 
     companion object {

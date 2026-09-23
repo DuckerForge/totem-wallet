@@ -5,16 +5,9 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 
 /**
- * The agent's voice.
- *
- * Android's own synthesiser: nothing to install, nothing to pay, no network, and
- * no new permission — `RECORD_AUDIO` would be for listening, and we never listen.
- * It speaks in the language the app is set to, not the phone's, so an app forced
- * to Italian does not greet you in English.
- *
- * One engine for the process, started on first use and released when the app
- * goes away. Speaking is best-effort by design: a device with no voice data
- * installed simply stays quiet, and the chat works exactly the same.
+ * The agent's voice: Android's own synthesizer, nothing to install or pay, no network, no new
+ * permission (`RECORD_AUDIO` would be for listening, and we never listen). It speaks the
+ * language the app is set to, not the phone's. One engine per process, best effort: a device with no voice data stays quiet.
  */
 object Voice {
     private var tts: TextToSpeech? = null

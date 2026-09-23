@@ -153,7 +153,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
     val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "swap" -> HIcon.SWAP; "blink" -> HIcon.SPARK; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
-    // La riga apre lo scontrino e lo dice: contenuta, con la pressione, col chevron.
+    // The row opens the receipt and says so: contained, pressable, with the chevron.
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().tappable(src, rs(14), fill = Halo.card, border = if (danger) Halo.red.copy(alpha = 0.5f) else null, onClick = onTap).padding(12.dp),
@@ -253,8 +253,8 @@ internal fun kindLabel(ctx: android.content.Context, k: String): String = when (
 }
 
 /**
- * "Set 2026". The app can be set to a different language from the phone, so the
- * month has to follow the app's choice, not `Locale.getDefault()`.
+ * "Set 2026". The app can be set to another language than the phone, so the month follows
+ * the app's choice, not `Locale.getDefault()`.
  */
 internal fun monthLabel(ym: String): String = runCatching {
     val (y, m) = ym.split("-").map { it.toInt() }
@@ -265,13 +265,9 @@ internal fun monthLabel(ym: String): String = runCatching {
 private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(at))
 
 /**
- * A token amount, with as many decimals as the size of it deserves.
- *
- * It used to be six decimals for everything, with the thousands separator
- * swapped for a space, so eighty thousand SKR read "80 779.072631": a number
- * nobody groups that way, carrying four digits of noise. How much of a coin you
- * hold is not measured to the millionth once you hold thousands of it, and the
- * grouping belongs to the reader's own language.
+ * A token amount, with as many decimals as its size deserves. Six for everything, with the
+ * thousands separator swapped for a space, read "80 779.072631" for eighty thousand SKR: four
+ * digits of noise, grouped as nobody groups. The grouping belongs to the reader's language.
  */
 internal fun fmtUi(v: Double): String {
     val a = kotlin.math.abs(v)
@@ -291,12 +287,9 @@ internal fun fmtFiat(v: Double, cur: String): String =
     else String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
 
 /**
- * The price of one coin, which is not the same kind of number as a total.
- *
- * Two decimals is right for what a holding is worth and useless for what one
- * unit of it costs: most of what the agent buys trades at four zeros after the
- * point, and "0,00 €" is not a price. So the decimals follow the size of the
- * number, down to eight, and the trailing zeros go.
+ * The price of one coin, not the same kind of number as a total. Two decimals fit what a
+ * holding is worth and fail what one unit costs: most of what the agent buys trades at four
+ * zeros after the point, and "0,00 €" is not a price. Decimals follow the size, down to eight.
  */
 internal fun fmtPrice(v: Double, cur: String): String {
     val symbol = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)

@@ -4,10 +4,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 
 /**
- * What the phone itself knows about the dApp that is asking: which package it
- * is, whether it came from the Solana dApp Store, its version, when it was
- * installed and last updated. No network, no way to spoof from a web page —
- * Android tells us who started the activity.
+ * What the phone itself knows about the asking dApp: package, whether it came from the Solana
+ * dApp Store, version, install and update dates. No network, nothing a web page can spoof: Android says who started the activity.
  */
 data class StoreInfo(
     val packageName: String,

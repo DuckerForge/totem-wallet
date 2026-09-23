@@ -3,9 +3,8 @@ package com.clearsign.app
 import android.content.Context
 
 /**
- * Which palette is on, and which premium ones this device has paid for.
- * Unlocks are stored with the SKR payment signature so the purchase is
- * auditable on Solscan from the app itself.
+ * Which palette is on, and which premium ones this device paid for. Unlocks are stored with
+ * the SKR payment signature, so the purchase is auditable on Solscan from the app.
  */
 object Themes {
     private const val PREFS = "clearsign_themes"

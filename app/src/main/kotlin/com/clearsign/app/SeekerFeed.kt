@@ -9,44 +9,27 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The published ranking, read rather than computed.
- *
- * One scanner runs somewhere and writes a few kilobytes; every phone reads it.
- * The alternative — each phone sweeping ten thousand wallets on its own — costs
- * the same credits once per user, which is affordable for one person and
- * impossible for a thousand. Scanning locally stays as the fallback, and is
- * honestly labelled as such.
- *
- * A stale file is still worth showing. A ranking twenty minutes old is a fact;
- * an empty card because the network blinked is not.
+ * The published ranking, read rather than computed: one scanner writes a few kilobytes and
+ * every phone reads it. Each phone sweeping ten thousand wallets costs the same credits once
+ * per user, fine for one person, impossible for a thousand; local scanning stays as the
+ * labeled fallback. A stale file is still worth showing: a ranking twenty minutes old is a
+ * fact, an empty card because the network blinked is not.
  */
 object SeekerFeed {
     private const val TAG = "ClearSign-Seeker"
     private const val CACHE = "seeker_feed.json"
     /**
-     * Two and a half minutes, which is shorter than the scan it follows.
-     *
-     * The service publishes every ten minutes. Holding the cached file for
-     * longer than that would mean a new publish sits unseen for a whole cycle,
-     * and the live feed would look frozen to somebody watching it. Shorter than
-     * the publish interval costs one request and keeps the page honest: what it
-     * shows is never more than a couple of minutes behind what exists.
+     * Two and a half minutes, shorter than the scan it follows: the service publishes every ten,
+     * and holding the cached file longer would leave a new publish unseen for a whole cycle. What
+     * the page shows is never more than a couple of minutes behind what exists.
      */
     private const val FRESH_MS = 150_000L
 
     /**
-     * La stessa lista, per chi non la sta guardando.
-     *
-     * Due e mezzo e' la finestra giusta per una persona davanti allo schermo. Per
-     * il ciclo, che va a caccia ogni sei minuti con l'app chiusa, e' uno spreco:
-     * il servizio pubblica ogni dieci minuti, quindi due letture su tre tornano
-     * la stessa identica cosa. Il segnale della folla per giunta arriva in
-     * ritardo per scelta ("a few minutes late by design"), quindi un quarto d'ora
-     * non gli toglie niente.
-     *
-     * Conta perche' si moltiplica: 240 letture al giorno per telefono diventano
-     * 96, e a diecimila telefoni quella differenza e' un giga e mezzo di traffico
-     * al giorno.
+     * The same list, for whoever is not looking. Two and a half minutes fits a person at the
+     * screen; for the loop, hunting every six minutes with the app closed, two reads in three
+     * return the same thing, and the crowd signal arrives late by design anyway. It multiplies:
+     * 240 reads a day per phone become 96, a gigabyte and a half a day at ten thousand phones.
      */
     const val SLOW_FRESH_MS = 900_000L
 
@@ -65,10 +48,9 @@ object SeekerFeed {
         if (!available) return null
         val f = File(ctx.filesDir, CACHE)
         if (f.exists() && System.currentTimeMillis() - f.lastModified() < freshMs) return cached(ctx)
-        // L'archivio prima, il servizio poi. Sono lo stesso identico corpo: il
-        // worker lo scrive nei due posti a ogni pubblicazione. La differenza e'
-        // chi paga: una lettura dell'archivio non e' un'invocazione del worker,
-        // e il piano gratuito di Cloudflare conta le invocazioni.
+        // The archive first, the service second. Same body: the worker writes both on every publish.
+        // The difference is who pays: an archive read is not a worker invocation, and Cloudflare's
+        // free plan counts invocations.
         val body = archive() ?: get(BuildConfig.CROWD_URL) ?: return cached(ctx)
         // Names before parsing: the feed publishes mints, and a mint on screen is
         // an address nobody reads. One search per fifty, then every row has a name.
@@ -78,7 +60,7 @@ object SeekerFeed {
         return parsed
     }
 
-    /** La classifica come la scrive il worker, dall'archivio, senza chiave. */
+    /** The ranking as the worker writes it, from the archive, no key. */
     private fun archive(): String? {
         val base = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() } ?: return null
         return get(base.trimEnd('/') + "/clearsign/crowd.json")

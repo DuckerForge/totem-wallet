@@ -22,16 +22,10 @@ import kotlinx.coroutines.withContext
 import java.text.DecimalFormat
 
 /**
- * The card that says whether this wallet left money behind on Orca or Raydium.
- *
- * It is quiet by design. Most wallets have never provided liquidity, and for
- * them this is one line saying both venues were checked and there is nothing
- * waiting. When there is something, it says how much, in the pool's own two
- * coins and in money, and sends the person to the venue's page to collect it.
- *
- * It never offers a collect button of its own. Building those instructions
- * would mean carrying two more programs' worth of maths, and a receipt the
- * person could not check is exactly what this app exists to avoid.
+ * The card that says whether this wallet left money behind on Orca or Raydium. Quiet by
+ * design: for most wallets one line saying both were checked and nothing waits; when there is
+ * something, how much, in the pool's two coins and in money, with a link to the venue's page.
+ * No collect button of its own: that would mean two more programs' worth of math, and a receipt the person could not check.
  */
 @Composable
 internal fun ForgottenMoneyCard(owner: String?, refreshKey: Int = 0) {

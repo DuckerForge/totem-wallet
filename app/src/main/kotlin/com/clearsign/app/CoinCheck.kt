@@ -51,7 +51,7 @@ object CoinCheck {
         sealed class Say {
             data class Stop(val reason: String) : Say()
             object Clean : Say()
-            /** Nessuno lo sa ancora, o non abbastanza: tocca a noi. */
+            /** Nobody knows yet, or not enough: up to us. */
             object Ask : Say()
         }
 
@@ -107,7 +107,7 @@ object CoinCheck {
             return said
         }
 
-        /** Dopo aver pubblicato il proprio verdetto, la memoria e' vecchia. */
+        /** After publishing our own verdict, the memory is stale. */
         internal fun forget(mint: String) { mem.remove(mint) }
 
         /** The archive is read without a key and without waking the worker. */

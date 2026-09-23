@@ -5,33 +5,21 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Who is connected to this wallet, and the ability to end it.
- *
- * Mobile Wallet Adapter hands a dApp an **auth token** on the first approval, and
- * that token is meant to let it come back without asking again. The wallet is the
- * half of that bargain which is supposed to remember: the spec says the wallet
- * should reauthorize against a record it holds. This app held no record at all.
- * `onReauthorizeRequest` answered yes to everything, for ever, and there was no
- * screen anywhere that could tell you who would be answered yes to.
- *
- * So this is the record. One row per identity, written when you approve a
- * connection, checked when that identity comes back. Revoking is not cosmetic:
- * the next reauthorize is declined and the dApp has to ask you again, in front of
- * you, like the first time.
- *
- * What is deliberately **not** here: any notion of a standing permission to move
- * money. A connection means "this app may ask". Every signature is still a
- * separate decision with your fingerprint on it. That was already true and this
- * screen must not make anyone believe otherwise.
+ * Who is connected to this wallet, and the ability to end it. MWA hands a dApp an auth token
+ * on first approval so it can return without asking, and the wallet is meant to remember:
+ * this app held no record, `onReauthorizeRequest` said yes to everything forever, and no
+ * screen could say to whom. This is the record, one row per identity, checked when it
+ * returns; revoking declines the next reauthorize and the dApp asks again in front of you.
+ * Deliberately absent: any standing permission to move money. A connection means "this app
+ * may ask"; every signature is still a separate decision with your fingerprint.
  */
 object Connections {
     private const val PREFS = "apex_connections"
     private const val KEY = "list"
 
     /**
-     * [id] is the host when there is one, because that is what a person
-     * recognises and what phishing has to get past. A native app with no URI
-     * falls back to its package, and only then to its own claimed name.
+     * [id] is the host when there is one, what a person recognizes and what phishing must get
+     * past. A native app with no URI falls back to its package, then to its claimed name.
      */
     data class Conn(
         val id: String,
@@ -74,11 +62,9 @@ object Connections {
     }
 
     /**
-     * May this identity come back without asking?
-     *
-     * Unknown is **yes**: an authorization can predate this record, and turning
-     * every old connection into a silent failure is how a security feature gets
-     * blamed for breaking a wallet. Only an explicit revoke says no.
+     * May this identity come back without asking? Unknown is yes: an authorization can predate
+     * this record, and turning every old connection into a silent failure is how a security
+     * feature gets blamed for breaking a wallet. Only an explicit revoke says no.
      */
     fun allowed(ctx: Context, id: String): Boolean = all(ctx).firstOrNull { it.id == id }?.revoked != true
 

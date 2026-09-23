@@ -26,9 +26,9 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
- * The "vintage" surface treatments: a whisper of film grain, optional CRT
- * scanlines, and a soft flash when the theme changes. All of it is one tiled
- * bitmap draw on top of the content — no per-frame allocation, no recomposition.
+ * The vintage surface treatments: a whisper of film grain, optional CRT scanlines, a soft
+ * flash when the theme changes. One tiled bitmap draw over the content: no per-frame
+ * allocation, no recomposition.
  */
 
 private val grainBrush: ShaderBrush by lazy {
@@ -89,19 +89,16 @@ fun Modifier.themeFlash(): Modifier {
 }
 
 /**
- * CRT / old-TV overlay: heavy scanlines, a bright roll bar drifting down, a faint
- * green phosphor tint, a slow tear line and a subtle flicker. Pure overlay draw
- * (no content sampling), so it runs anywhere and costs one rect pass per frame.
+ * CRT / old-TV overlay: heavy scanlines, a bright roll bar drifting down, a faint green
+ * phosphor tint, a slow tear line, a subtle flicker. Pure overlay draw, one rect pass per frame.
  */
 @Composable
 fun Modifier.crt(tint: Color, enabled: Boolean): Modifier {
     if (!enabled) return this
     val density = LocalDensity.current.density
     val lines = remember(density) { scanlineBrush(density) }
-    // One clock for the three effects. Forty-two seconds is a whole number of
-    // rolls (4.2 s), tears (7 s) and flickers (1 s), so each phase is a
-    // multiple of it and the loop is seamless. Read in draw, never in
-    // composition: the root of the app does not recompose for a CRT.
+    // One clock for the three effects. Forty-two seconds is a whole number of rolls (4.2 s),
+    // tears (7 s) and flickers (1 s), so the loop is seamless. Read in draw, never in composition.
     val clock = rememberInfiniteTransition(label = "crt").animateFloat(0f, 1f, infiniteRepeatable(tween(42_000, easing = LinearEasing)), label = "clock")
     return drawWithContent {
         drawContent()
@@ -146,8 +143,8 @@ fun Modifier.haloSurface(): Modifier {
 }
 
 /**
- * Wraps content in the user's chosen global text scale (Settings.textScale) on top
- * of the system font scale, so every sp in the app grows or shrinks together.
+ * Wraps content in the user's global text scale (Settings.textScale) on top of the system
+ * font scale, so every sp grows or shrinks together.
  */
 @androidx.compose.runtime.Composable
 internal fun ScaledText(content: @androidx.compose.runtime.Composable () -> Unit) {

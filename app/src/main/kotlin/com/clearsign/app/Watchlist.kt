@@ -4,17 +4,10 @@ import android.content.Context
 import org.json.JSONArray
 
 /**
- * The coins you follow without owning them.
- *
- * The portfolio can only ever show what the wallet holds, which is the wrong
- * list for deciding what to buy: the coin you are watching is by definition the
- * one you have not bought yet. This is that other list, kept on the phone and
- * nowhere else. It stores mints and nothing more. Names, logos and prices all
- * come from the registry we already ask, so a coin followed today is still
- * correctly labelled after it renames itself tomorrow.
- *
- * Order is the order you added them, newest first, because the last thing you
- * looked up is the thing you are thinking about.
+ * The coins you follow without owning them. The portfolio shows what the wallet holds, the
+ * wrong list for deciding what to buy: the coin you watch is the one not bought yet. Mints
+ * only, kept on the phone; names, logos and prices come from the registry, so a coin renamed
+ * tomorrow is still labeled right. Newest first: the last thing looked up is the one on your mind.
  */
 object Watchlist {
     private const val PREFS = "apex_watchlist"
@@ -24,13 +17,9 @@ object Watchlist {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /**
-     * How much of a coin you hold somewhere this wallet cannot see.
-     *
-     * The portfolio can only count what is in the Seed Vault account. A coin held
-     * on an exchange, in another wallet, or on another chain is invisible to it
-     * and yet it is yours. One number per followed coin, typed once, so the
-     * market screen can say what your position is worth instead of only what the
-     * coin costs.
+     * How much of a coin you hold where this wallet cannot see: an exchange, another wallet,
+     * another chain. One number per followed coin, typed once, so the market screen says what
+     * your position is worth instead of only what the coin costs.
      */
     fun amount(ctx: Context, key: String): Double =
         prefs(ctx).getString("qty_" + key, null)?.toDoubleOrNull() ?: 0.0
@@ -44,15 +33,13 @@ object Watchlist {
     }
 
     /**
-     * Amounts that lost their coin. It happened: a quantity typed and saved,
-     * the coin gone from the list, the total short of it and nobody knowing
-     * why. Every amount above zero brings its coin back into the list.
+     * Amounts that lost their coin: a quantity saved, the coin gone from the list, the total
+     * short and nobody knowing why. Every amount above zero brings its coin back.
      */
     fun reconcile(ctx: Context) {
-        // "SOL" is what the wallet calls the coin that has no token account, and
-        // it is not a mint. Starred from the portfolio it landed in here as a
-        // key nobody could price, chart or buy, sitting next to the Solana the
-        // market already followed by mint. Everything under it moves across.
+        // "SOL" is what the wallet calls the coin with no token account, not a mint. Starred from
+        // the portfolio it landed here as a key nobody could price, chart or buy, next to the Solana
+        // the market already followed by mint. Everything under it moves across.
         rename(ctx, com.clearsign.core.NATIVE_SOL_MINT, Jupiter.SOL_MINT)
 
         val all = prefs(ctx).all
@@ -65,13 +52,9 @@ object Watchlist {
     }
 
     /**
-     * The same coin under a better name.
-     *
-     * A coin is followed by one key, and the key it was first saved under is not
-     * always the key it should be kept under. Renaming has to carry the amount,
-     * the bell and the last known price with it, or the coin comes back stripped
-     * of everything the person typed into it. The destination wins when both
-     * exist: it is the one that works.
+     * The same coin under a better name. Renaming carries the amount, the bell and the last
+     * known price, or the coin comes back stripped of everything typed into it. The destination
+     * wins when both exist: it is the one that works.
      */
     fun rename(ctx: Context, from: String, to: String) {
         if (from == to || !has(ctx, from)) return

@@ -13,16 +13,10 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * The hourly look at what the Seeker crowd is buying.
- *
- * Its own worker, on its own key, deliberately unrelated to whether the agent is
- * trading: this reads other people's wallets and spends nothing, so it has no
- * business being tied to a switch about your own money. Hourly because that is
- * what one free key pays for — a measured pass over 10,527 wallets took 106
- * calls and eighteen seconds, and turned up 209 that had moved.
- *
- * Unmetered network only. Half a megabyte an hour on a phone plan for a coin
- * leaderboard is not a trade anybody would take.
+ * The hourly look at what the Seeker crowd is buying. Its own worker on its own key,
+ * unrelated to whether the agent trades: it reads other people's wallets and spends nothing.
+ * Hourly because that is what one free key pays for: a measured pass over 10,527 wallets took
+ * 106 calls and eighteen seconds and found 209 movers. Unmetered network only: half a megabyte an hour for a leaderboard is not a trade.
  */
 object SeekerKeeper {
     private const val WORK = "apex-seeker-scan"

@@ -11,16 +11,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The model, talking to the wallet through five tools it cannot abuse.
- *
- * Two shapes are supported: the Anthropic Messages API, and any endpoint that
- * speaks the OpenAI chat format (OpenRouter, DeepSeek, a model on your own
- * machine). No SDK — both are a POST with a JSON body, and a wallet should not
- * grow a dependency tree to send one.
- *
- * What leaves the phone: the conversation, the balances and the addresses the
- * model needs to reason about. What never leaves: any key. The model proposes;
- * [AgentBroker] decides; the Seed Vault is untouchable either way.
+ * The model, talking to the wallet through five tools it cannot abuse. Two shapes: the
+ * Anthropic Messages API and any endpoint speaking the OpenAI chat format (OpenRouter,
+ * DeepSeek, a model on your own machine). No SDK, both are a POST with a JSON body. What
+ * leaves the phone: the conversation, balances and addresses. What never leaves: any key.
+ * The model proposes, [AgentBroker] decides, the Seed Vault is untouchable either way.
  */
 object Brain {
     private const val TAG = "Velum-Brain"
@@ -37,14 +32,10 @@ object Brain {
     fun configured(ctx: Context) = Secrets.model(ctx).ready
 
     /**
-     * Send [history] plus the new user message and run the tool loop to the end.
-     * Returns every turn produced, so the screen can show the tool results too.
-     *
-     * The answer streams. [onText] gets the assistant's text so far, each time a
-     * piece arrives, so the screen can show the first word after a second rather
-     * than the whole paragraph after ten. Tool calls are collected as they stream
-     * and run once the turn ends, exactly as before; a provider that will not
-     * stream falls back to one whole answer through the same callback.
+     * Send [history] plus the new message and run the tool loop to the end; every turn comes
+     * back so the screen can show tool results. The answer streams: [onText] gets the text so
+     * far as each piece arrives. Tool calls are collected while streaming and run when the turn
+     * ends; a provider that will not stream falls back to one whole answer through the same callback.
      */
     suspend fun ask(ctx: Context, history: List<Turn>, agentName: String, onText: (String) -> Unit = {}): Reply = withContext(Dispatchers.IO) {
         val cfg = Secrets.model(ctx)
@@ -71,11 +62,9 @@ object Brain {
                 if (turn.text.isNotBlank()) produced += Turn("assistant", turn.text.trim())
                 if (turn.calls.isEmpty()) return@withContext Reply.Ok(produced)
 
-                // Anthropic wants every result of one assistant turn in a single
-                // user message; one message per result is a 400 as soon as the
-                // model calls two tools at once, which it does when asked to look
-                // at the budget and the market before answering. OpenAI-shaped
-                // endpoints want the opposite: one `tool` message per call.
+                // Anthropic wants every result of one assistant turn in a single user message; one message
+                // per result is a 400 as soon as the model calls two tools at once. OpenAI-shaped endpoints
+                // want the opposite: one `tool` message per call.
                 val results = JSONArray()
                 for ((id, name, args) in turn.calls) {
                     val result = runCatching { BrainTools.run(ctx, name, args, agentName) }
@@ -103,14 +92,11 @@ object Brain {
     }
 
     /**
-     * POST with `stream: true` and read server-sent events until the turn ends.
-     *
-     * Two dialects, one reader. Anthropic sends typed blocks (`content_block_start`
-     * / `_delta` / `_stop`) and tool arguments as partial JSON; OpenAI-shaped
-     * endpoints send `choices[0].delta` with `content` and `tool_calls[]` pieces
-     * keyed by index, then `[DONE]`. Both get reassembled into exactly the
-     * assistant message the non-streaming answer would have carried, so the rest
-     * of the loop does not know the difference.
+     * POST with `stream: true` and read server-sent events until the turn ends. Two dialects,
+     * one reader: Anthropic sends typed blocks (`content_block_start` / `_delta` / `_stop`) and
+     * tool arguments as partial JSON; OpenAI-shaped endpoints send `choices[0].delta` with
+     * `content` and `tool_calls[]` by index, then `[DONE]`. Both reassemble into the message
+     * the non-streaming answer would have carried, so the rest of the loop cannot tell.
      */
     private fun stream(url: String, body: JSONObject, cfg: Secrets.Model, onText: (String) -> Unit): Streamed {
         val c = try {
@@ -219,9 +205,8 @@ object Brain {
     }
 
     /**
-     * One question, one answer, no tools, on whichever provider is configured.
-     * For the checks that want a verdict rather than a conversation. Null when
-     * nobody answered or the provider complained.
+     * One question, one answer, no tools, on the configured provider: for checks that want a
+     * verdict. Null when nobody answered or the provider complained.
      */
     suspend fun complete(ctx: Context, system: String, user: String, maxTokens: Int = 256): String? = withContext(Dispatchers.IO) {
         val cfg = Secrets.model(ctx)
@@ -247,9 +232,8 @@ object Brain {
     // ---- the prompt ------------------------------------------------------------
 
     /**
-     * Built from the live policy, so there is only ever one knob: change the
-     * rules in the app and the model's brief changes with them. It is told the
-     * truth about its position — it cannot sign, and a refusal is final.
+     * Built from the live policy, so there is one knob: change the rules and the model's brief
+     * changes with them. It is told the truth: it cannot sign, and a refusal is final.
      */
     fun systemPrompt(ctx: Context): String {
         val s = SessionWallet.current(ctx)
@@ -336,9 +320,8 @@ object Brain {
     }
 
     /**
-     * One tiny real call, so a wrong key is caught here instead of in the middle
-     * of a conversation. Returns null when it worked, or the provider's own
-     * complaint — which is more useful than anything we could invent.
+     * One tiny real call, so a wrong key is caught here and not mid-conversation. Null when it
+     * worked, else the provider's own complaint, more useful than anything we could invent.
      */
     suspend fun test(ctx: Context): String? = withContext(Dispatchers.IO) {
         val cfg = Secrets.model(ctx)

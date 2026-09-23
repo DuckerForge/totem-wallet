@@ -13,22 +13,17 @@ import androidx.compose.ui.graphics.toArgb
 import java.util.Locale
 
 /**
- * What the bubble shows, chosen by the person.
- *
- * The face (what the small circle says at a glance), the rows of the open
- * panel, the coin to watch, the size, and where it was left on the screen.
- * Kept in the app's prefs so the service and the page read the same thing.
+ * What the bubble shows, chosen by the person: the face, the rows of the open panel, the
+ * coin to watch, the size, where it was left. In the app's prefs so the service and the
+ * page read the same thing.
  */
 object CompanionPrefs {
     private const val P = "apex_companion"
 
     /**
-     * Cosa dice il cerchietto.
-     *
-     * `ROTATE` non e' una faccia, e' due facce a turno: la moneta aperta e la
-     * paghetta, quattro secondi ciascuna. E' il modo in cui una bolla grande
-     * come un'unghia riesce a dire le due cose che si vogliono sapere davvero,
-     * invece di farne scegliere una e nascondere l'altra.
+     * What the small circle says. `ROTATE` is not a face but two in turn, the open coin and the
+     * budget, four seconds each: how a bubble the size of a fingernail says both things worth
+     * knowing instead of hiding one.
      */
     enum class Face { ROTATE, AGENT, HEALTH, TOTAL, COIN, BUDGET }
 
@@ -44,14 +39,9 @@ object CompanionPrefs {
     fun setSize(ctx: Context, dp: Int) = p(ctx).edit().putInt("size", dp).apply()
 
     /**
-     * Dove l'hai lasciata.
-     *
-     * Prima non si salvava: la trascinavi dove ti serviva, e alla prima
-     * modifica di una qualsiasi impostazione (che fa ripartire il servizio) la
-     * ritrovavi in alto a sinistra. Una cosa che sta sopra tutte le altre app
-     * deve stare dove l'hai messa, o sei tu a doverti adattare a lei.
-     *
-     * −1 vuol dire "mai trascinata", e allora decide il servizio.
+     * Where you left it. It was not saved: any settings change restarted the service and the
+     * bubble was back top left. Something that sits over every app must stay where you put it.
+     * −1 means never dragged, and the service decides.
      */
     fun spotX(ctx: Context): Int = p(ctx).getInt("x", -1)
     fun spotY(ctx: Context): Int = p(ctx).getInt("y", -1)
@@ -69,32 +59,25 @@ object CompanionPrefs {
         val coinSymbol: String?,
         val coinChange: Double?,
         val trading: Boolean,
-        /** La paghetta adesso, gia' accorciata ("17,4 $"), e di quanto si e' mossa da quando l'hai messa. */
+        /** The budget now, already shortened ("17.4 $"), and how much it moved since you put it in. */
         val budgetText: String? = null,
         val budgetChange: Double? = null,
     )
 
     /**
-     * The face, as a bitmap: the same drawing for the bubble on screen and the
-     * preview on the page.
-     *
-     * **Sembra una sfera, e non costa niente.** Un vero 3D qui vorrebbe dire una
-     * superficie OpenGL accesa sopra ogni altra app, cioe' la GPU sveglia per
-     * sempre per un cerchietto: l'esatto contrario di quello che serve a una
-     * cosa che sta sullo schermo tutto il giorno. La profondita' qui e' dipinta
-     * — gradiente radiale spostato verso la luce, una specchiatura in alto a
-     * sinistra, l'ombra che si raccoglie in basso, il bordo acceso solo dove la
-     * luce lo prende — e si ridisegna **solo quando cambiano i numeri**, non a
-     * ogni fotogramma. A riposo e' un bitmap fermo.
+     * The face as a bitmap, the same drawing for the bubble and the preview. It looks like a
+     * sphere and costs nothing: real 3D would mean an OpenGL surface over every app, the GPU
+     * awake forever for a small circle. Depth is painted (radial gradient toward the light, a
+     * highlight top left, shadow gathering below, the rim lit only where the light hits) and
+     * redrawn only when the numbers change. At rest it is a still bitmap.
      */
     fun faceBitmap(px: Int, face: Face, d: FaceData): Bitmap {
         val p = Halo.palette
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val cx = px / 2f
-        // La sfera sta un pelo sopra il centro e lascia sotto lo spazio per la
-        // sua ombra: senza ombra una palla sopra un'altra app non e' appoggiata
-        // da nessuna parte.
+        // The sphere sits a hair above center and leaves room below for its shadow:
+        // without one, a ball over another app rests on nothing.
         val cy = px * 0.47f
         val r = px * 0.44f
         val body0 = p.card.toArgb()
@@ -109,7 +92,7 @@ object CompanionPrefs {
         }
         c.drawCircle(cx, cy + r * 0.32f, r * 1.05f, shadow)
 
-        // --- il bagliore, quando lavora --------------------------------------
+        // --- the glow, while it works -----------------------------------------
         if (d.trading) {
             val a = p.accent.toArgb()
             val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -122,10 +105,9 @@ object CompanionPrefs {
             c.drawCircle(cx, cy, r * 1.14f, glow)
         }
 
-        // --- il corpo della sfera ---------------------------------------------
-        //
-        // Sul colore delle schede, non su quello del fondo: era una palla nera
-        // su fondi neri, e la luce dipinta sopra non aveva niente da illuminare.
+        // --- the sphere's body --------------------------------------------------------------
+        // On the card color, not the ground's: it was a black ball on black grounds, and the painted
+        // light had nothing to light.
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.35f, cy - r * 0.42f, r * 1.75f,
@@ -135,8 +117,8 @@ object CompanionPrefs {
         }
         c.drawCircle(cx, cy, r, body)
 
-        // La specchiatura: dove la luce batte per prima. Era il doppio di
-        // cosi' e cadeva proprio sul braccio sinistro della V, che sbiancava.
+        // The highlight, where the light hits first. It was twice this and fell right
+        // on the V's left arm, which washed out.
         val spec = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.38f, cy - r * 0.54f, r * 0.50f,
@@ -146,7 +128,7 @@ object CompanionPrefs {
         }
         c.drawCircle(cx - r * 0.38f, cy - r * 0.54f, r * 0.50f, spec)
 
-        // Il bordo: chiaro in alto dove la luce lo prende, scuro in basso.
+        // The rim: light at the top where the light catches it, dark at the bottom.
         val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = r * 0.05f
@@ -168,9 +150,8 @@ object CompanionPrefs {
         c.drawArc(rect, 0f, 360f, false, arc)
 
         /**
-         * Il gradiente del marchio lungo l'anello, dal viola al ciano alla menta.
-         * Si usa solo dove il colore non e' gia' un messaggio: salute bassa e
-         * moneta in perdita restano rosso e ambra, tinta unica.
+         * The brand gradient along the ring, violet to cyan to mint. Only where the color is not
+         * already a message: low health and a losing coin stay red and amber, flat.
          */
         fun brand() {
             arc.shader = android.graphics.SweepGradient(
@@ -202,10 +183,9 @@ object CompanionPrefs {
         }
 
         /**
-         * Il segno dell'app: una V dal viola al ciano, per quando non c'e' un
-         * numero da dire. Piena sempre, non a meta' quando e' ferma: era il
-         * segno a sparire sotto la luce, non la luce a essere troppa. Sotto
-         * ha un'ombra scura, cosi' si stacca anche dai temi chiari.
+         * The app's mark, a V from violet to cyan, for when there is no number to say. Always full,
+         * not half when still: it was the mark vanishing under the light, not the light being too
+         * much. A dark shadow under it, so it stands out on light themes too.
          */
         fun mark(alpha: Int) {
             val path = android.graphics.Path().apply {
@@ -231,15 +211,15 @@ object CompanionPrefs {
                 c.drawArc(rect, -90f, 360f, false, arc)
                 val n = d.openPositions
                 if (d.trading && n != null) {
-                    // Il numero e' la cosa piu' grande della bolla, e si accende
-                    // dall'alto verso il basso, dal bianco al colore del marchio.
+                    // The number is the biggest thing in the bubble, and it lights from top to
+                    // bottom, white to brand color.
                     text.textSize = r * 0.92f
                     val top = cy - text.textSize * 0.55f
                     text.shader = LinearGradient(0f, top, 0f, top + text.textSize, intArrayOf(0xFFFFFFFF.toInt(), 0xFF4DFFD0.toInt()), null, Shader.TileMode.CLAMP)
                     c.drawText(n.toString(), cx, cy + text.textSize * 0.34f, text)
                     text.shader = null
                 } else {
-                    // Fermo: il segno dell'app, non un trattino.
+                    // Idle: the app's mark, not a dash.
                     mark(if (d.trading) 255 else 190)
                 }
                 statusDot(d.trading)

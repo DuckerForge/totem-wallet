@@ -6,10 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Transactions the wallet builds *itself* (theme purchase, revoke, close,
- * send): build → simulate → Seed Vault biometric → send → local log. The
- * simulation runs *before* the biometric prompt, so a transaction that would
- * fail never costs the user a fingerprint.
+ * Transactions the wallet builds itself (theme, revoke, close, send): build, simulate, Seed
+ * Vault biometric, send, local log. The simulation runs before the prompt, so a transaction
+ * that would fail never costs a fingerprint.
  */
 object WalletActions {
     private const val TAG = "ClearSign-Actions"
@@ -37,16 +36,10 @@ object WalletActions {
     )
 
     /**
-     * Build the transaction and read it back, **before** anyone signs anything.
-     *
-     * `signAndSend` already analyses the bytes — but only after signing and
-     * sending, to write the ledger row. That is backwards for the two flows that
-     * hand money to a key: funding the agent's budget and making a gift link both
-     * asked for a fingerprint without ever showing where the money went. The
-     * promise this app is built on is that you see the receipt first, so these
-     * flows get the same preview Send and Swap have always had.
-     *
-     * Returns null when the transaction cannot even be built or simulated.
+     * Build the transaction and read it back before anyone signs. `signAndSend` analyzes the
+     * bytes only after sending, to write the ledger row: backwards for the two flows that hand
+     * money to a key, funding the budget and making a gift link, which asked for a fingerprint
+     * without showing where the money went. Null when it cannot be built or simulated.
      */
     suspend fun preview(
         ctx: Context,
@@ -118,9 +111,8 @@ object WalletActions {
     }
 
     /**
-     * Sign and send a transaction that was built elsewhere (a Jupiter swap): we
-     * do not rebuild it — the bytes are signed as-is after the user approved the
-     * receipt. The Seed Vault signs the message; the signature is spliced back.
+     * Sign and send a transaction built elsewhere (a Jupiter swap): not rebuilt, signed as-is
+     * after the receipt was approved. The Seed Vault signs the message; the signature is spliced back.
      */
     suspend fun signAndSendRaw(
         ctx: Context, signer: SeedVaultSigner, owner: String, txBytes: ByteArray,
@@ -168,13 +160,9 @@ object WalletActions {
     )
 
     /**
-     * The mints worth opening a fee account for: the usual suspects, plus the
-     * coins this person actually trades.
-     *
-     * A hand-written list of six was the whole reason the fee earned nothing:
-     * every other coin had no account, and a swap into a coin with no account
-     * does not merely skip the fee, it **fails** ([Jupiter.feeAccountIfUsable]).
-     * Blocking, so call it on IO.
+     * The mints worth a fee account: the usual suspects plus the coins this person trades. A
+     * hand-written six was why the fee earned nothing: a swap into a coin with no account does
+     * not skip the fee, it fails ([Jupiter.feeAccountIfUsable]). Blocking, IO.
      */
     fun feeMintsToOpen(ctx: Context, owner: String): List<String> {
         val held = runCatching { SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner) }
@@ -209,11 +197,9 @@ object WalletActions {
     }
 
     /**
-     * The two failures a person actually meets, said in their own words.
-     *
-     * The System Program reports "not enough lamports" as `custom program error:
-     * 0x1`, which tells a human nothing. Everything else falls back to the raw
-     * text, because a wrong guess is worse than an honest dump.
+     * The two failures a person meets, in their words. The System Program reports "not enough
+     * lamports" as `custom program error: 0x1`; everything else falls back to the raw text,
+     * because a wrong guess is worse than an honest dump.
      */
     private fun humanError(ctx: Context, sim: SolanaRpc.SimResult, needLamports: Long? = null, haveLamports: Long? = null): String {
         val raw = (sim.logs + listOfNotNull(sim.err)).joinToString(" ")
@@ -254,9 +240,8 @@ object WalletActions {
     val treasuryConfigured: Boolean get() = Base58.decodePubkey(BuildConfig.SKR_TREASURY) != null
 
     /**
-     * Pay [THEME_PRICE_SKR] SKR to the treasury and unlock [palette]. The
-     * treasury's associated token account is created idempotently by the buyer,
-     * so the treasury never has to be prepared in advance.
+     * Pay [THEME_PRICE_SKR] SKR to the treasury and unlock [palette]. The treasury's token
+     * account is created idempotently by the buyer, so it never needs preparing.
      */
     suspend fun payTheme(ctx: Context, signer: SeedVaultSigner, owner: String, palette: HaloPalette, quote: SkrQuote): Result {
         val src = quote.account ?: return Result.Failed(ctx.getString(R.string.theme_unlock_no_skr))

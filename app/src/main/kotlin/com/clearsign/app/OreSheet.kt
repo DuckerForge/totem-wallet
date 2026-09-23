@@ -54,31 +54,25 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * ORE, dal portafoglio. In alto quello che si puo' fare, sotto la griglia,
- * in fondo i numeri: i bottoni e lo scontrino si vedono senza scorrere, e
- * la griglia sta subito sotto il dito quando tocca scegliere le caselle.
- *
- * Il conto alla rovescia si ridisegna ogni secondo dallo slot letto una
- * volta e non chiede niente alla catena: si rilegge quando il giro e' finito
- * e la pausa e' passata. Riscuoti e Scava passano da anteprima, scontrino e
- * impronta come ogni cosa che questo portafoglio spedisce.
- *
- * Un giro dura una cinquantina di secondi e l'impronta ne porta via
- * qualcuno: il Deploy si ricostruisce sul giro del momento quando si tiene
- * premuto, e solo se restano almeno [SIGN_MARGIN_S] secondi. Visto sul
- * telefono il 22 settembre: firmato a giro finito, il nodo rifiuta.
+ * ORE, from the wallet: what you can do on top, the grid under it, the numbers at the
+ * bottom, so buttons and receipt show without scrolling and the grid sits under the finger
+ * when picking squares. The countdown redraws every second from a slot read once and asks the
+ * chain nothing; it rereads when the round is over and the pause has passed. Claim and Dig go
+ * through preview, receipt and print like everything this wallet sends. A round lasts about
+ * fifty seconds and the print takes a few: the Deploy is rebuilt on the current round when
+ * held, and only if [SIGN_MARGIN_S] seconds remain (22 Sep: signed at round end, the node refuses).
  */
 private sealed interface OreState {
     object Idle : OreState
     object Analyzing : OreState
-    /** [dig] e' quanto per casella e quali caselle: alla firma il Deploy si ricostruisce sul giro di adesso. */
+    /** [dig] is how much per square and which squares: at signing the Deploy is rebuilt on the current round. */
     data class Review(val analyzed: ReceiptEngine.Analyzed, val ixs: List<WalletTx.Instruction>, val kind: String, val dig: Pair<Long, Set<Int>>? = null) : OreState
     object Signing : OreState
     data class Done(val signature: String, val what: String, val dig: Boolean) : OreState
     data class Error(val message: String) : OreState
 }
 
-/** Quanto deve restare del giro per firmare un Deploy: l'anteprima, il dito, l'impronta e l'invio. */
+/** How much of the round must remain to sign a Deploy: the preview, the finger, the print, the send. */
 private const val SIGN_MARGIN_S = 15.0
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -95,19 +89,18 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
     var digging by remember { mutableStateOf(false) }
     var perSquare by remember { mutableStateOf("0.001") }
     var picked by remember { mutableStateOf(setOf<Int>()) }
-    /** «Aspetta il prossimo giro», che sparisce da solo quando il giro riparte: non e' un errore, e' un momento. */
+    /** "Wait for the next round", which disappears on its own when the round restarts: not an error, a moment. */
     var waiting by remember { mutableStateOf(false) }
     /**
-     * Il dado che rotola. Quando arriva un giro chiuso nuovo la griglia si
-     * accende casella per casella e si ferma su quella vincente; [reveal] e'
-     * la casella accesa in quel momento, [revealed] l'id del giro gia' mostrato.
+     * The rolling die: when a new closed round arrives the grid lights square by square and stops
+     * on the winner; [reveal] is the lit square, [revealed] the round already shown.
      */
     var reveal by remember { mutableStateOf<Int?>(null) }
     var revealed by remember { mutableLongStateOf(-1L) }
     LaunchedEffect(view?.lastRound?.id) {
         val last = view?.lastRound ?: return@LaunchedEffect
         val win = last.winningSquare ?: return@LaunchedEffect
-        // La prima lettura non e' un evento: si mostra e basta. Dal secondo giro in poi si vede rotolare.
+        // The first read is not an event: shown, no more. From the second round on you see it roll.
         if (revealed < 0) { revealed = last.id; return@LaunchedEffect }
         if (last.id == revealed) return@LaunchedEffect
         revealed = last.id
@@ -121,11 +114,11 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         delay(2_500)
         reveal = null
     }
-    /** I giri chiusi dall'archivio, per la vista «ultimi giri»: dove scava la rete, e cosa e' uscito. */
+    /** The closed rounds from the archive, for the "last rounds" view: where the network digs, and what came out. */
     var past by remember { mutableStateOf<List<PastRound>>(emptyList()) }
     var history by remember { mutableStateOf(false) }
     LaunchedEffect(refresh) { past = withContext(Dispatchers.IO) { runCatching { OreArchive.rounds() }.getOrDefault(emptyList()) } }
-    /** Quanto vale un ORE in SOL, per dire se al prezzo di oggi la puntata conviene. Null finche' non si sa. */
+    /** What one ORE is worth in SOL, to say whether the stake pays at today's price. Null until known. */
     var oreSol by remember { mutableStateOf<Double?>(null) }
     LaunchedEffect(Unit) {
         val px = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(Ore.MINT, com.clearsign.core.NATIVE_SOL_MINT)) }.getOrNull() }
@@ -138,9 +131,9 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         view = withContext(Dispatchers.IO) { runCatching { OreMiner.read(SolanaRpc.urlFor(null), owner) }.getOrNull() }
         loading = false
     }
-    // Un secondo alla volta. A giro finito si aspetta la pausa, quaranta slot,
-    // e si rilegge; se il giro nuovo non e' ancora partito si riprova ogni
-    // dodici secondi, solo con il foglio aperto nella pausa.
+    // One second at a time. At round end wait the pause, forty slots, and reread;
+    // if the new round has not started, retry every twelve seconds, only with the
+    // sheet open in the pause.
     LaunchedEffect(view) {
         val v = view ?: return@LaunchedEffect
         while (true) {
@@ -161,7 +154,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         }
     }
 
-    /** Un rifiuto del nodo che parla del giro finito, detto in parole. */
+    /** A node refusal that speaks of the finished round, in words. */
     fun explain(message: String): String =
         if (message.contains("invalid account data", true) || message.contains("InvalidAccountData") || message.contains("invalid seeds", true)) ctx.getString(R.string.ore_round_ended_signing)
         else message
@@ -171,9 +164,9 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
-        // Il foglio prende tutto lo schermo ed e' una finestra a parte, che si
-        // mangia i margini di sistema: `statusBarsPadding` qui vale zero. La
-        // barra di stato si misura dalle risorse, che non mentono.
+        // The sheet takes the whole screen as a separate window that eats the system
+        // insets: `statusBarsPadding` is zero here. The status bar is measured from
+        // resources, which do not lie.
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBar = remember(density) {
             with(density) {
@@ -194,8 +187,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ore.com"))) }
                 }
             }
-            // Il giro: una barra che si svuota col tempo, nei colori del marchio,
-            // e il numero del giro accanto. Nella pausa la barra e' vuota e ambra.
+            // The round: a bar draining with time, in brand colors, the round number
+            // beside it. In the pause the bar is empty and amber.
             if (v != null) {
                 val left = v.secondsLeft(now)
                 val roundS = 200 * Ore.SLOT_MS / 1000.0
@@ -222,16 +215,16 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                 }
             }
 
-            // Il giro appena chiuso: la casella uscita, come ha pagato, e se c'eri.
+            // The round just closed: the square that came out, how it paid, whether you were on it.
             v?.lastRound?.let { last -> last.winningSquare?.let { win -> LastRound(v, last, win) } }
 
             when {
                 loading && v == null -> Working(stringResource(R.string.ore_loading))
                 v == null -> Banner(stringResource(R.string.ore_unreachable), Halo.amber, HIcon.WARNING)
                 else -> {
-                    // La folla di fine giro, media degli ultimi giri in archivio: la quota si conta su quella.
+                    // The end-of-round crowd, the average of the last archived rounds: the share is counted on that.
                     val crowd = if (past.size >= 5) OreCrowd.averageDeployed(past) else null
-                    // ---- quello che si puo' fare, sopra la griglia ------------------------
+                    // ---- what you can do, above the grid -----------------------------------
                     when (val s = state) {
                         OreState.Idle -> {
                             if (!digging) {
@@ -266,13 +259,13 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         fontFamily = Inter, fontSize = 12.sp, color = Halo.ink,
                                     )
                                 }
-                                // Le caselle piu' vuote adesso: la quota di ORE e' la mia parte
-                                // della casella, e il costo e' lo stesso ovunque.
+                                // The emptiest squares now: the ORE share is my part of the square, and
+                                // the cost is the same everywhere.
                                 v.round?.let { r ->
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text(stringResource(R.string.ore_best_label), style = HaloType.small, color = Halo.muted)
                                         listOf(1, 3, 5).forEach { k ->
-                                            // Una casella dove sei gia' sopra il programma la salta: non si ripropone.
+                                            // A square you are already on the program skips: not offered again.
                                             SmallChip(k.toString(), null, tint = Halo.cyan) {
                                                 val mine = v.mySquares.toSet()
                                                 picked = OreOdds.best(Ore.SQUARES, r.deployed, r.count).filter { it !in mine }.take(k).toSet(); Haptics.tick(ctx)
@@ -280,12 +273,12 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         }
                                     }
                                 }
-                                // L'atteso, con le regole del programma: quanto ORE, quanto SOL
-                                // resta sul tavolo, e se al prezzo di oggi torna.
+                                // The outlook, by the program's rules: how much ORE, how much SOL stays on
+                                // the table, and whether it pays at today's price.
                                 val r = v.round
                                 if (r != null && lamports > 0 && picked.isNotEmpty()) {
-                                    // La quota si conta sulla casella com'e' a fine giro, non com'e' adesso:
-                                    // a inizio giro e' vuota e la rete la riempie sempre fino alla media.
+                                    // The share is counted on the square as it is at round end, not now: at round
+                                    // start it is empty and the network always fills it to the average.
                                     val others = picked.sorted().map { maxOf(r.deployed[it], crowd?.getOrNull(it) ?: 0L) }
                                     val outlook = OreOdds.outlook(lamports, others, r.expectedReward, v.motherlode)
                                     val pct = String.format(java.util.Locale.ROOT, "%.1f", outlook.costFraction * 100)
@@ -297,7 +290,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         style = HaloType.small, color = Halo.ink,
                                     )
                                     if (worth != null) {
-                                        // Quanto torna per ogni SOL messo, ORE venduto a oggi: una media, mai una certezza.
+                                        // What comes back per SOL put in, ORE sold at today's price: an average, never a certainty.
                                         val ratio = (outlook.expectedSolBack + worth * 1e9) / outlook.stake
                                         val good = ratio >= 1.0
                                         Text(
@@ -311,7 +304,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 }
                                 val open = v.open(now, SIGN_MARGIN_S)
                                 if (waiting || !open) Banner(stringResource(R.string.ore_wait_banner), Halo.amber, HIcon.HOURGLASS)
-                                // Il bottone dice cosa manca: le caselle, o il giro.
+                                // The button says what is missing: the squares, or the round.
                                 PrimaryButton(
                                     when {
                                         picked.isEmpty() -> stringResource(R.string.ore_pick_squares)
@@ -356,8 +349,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                 HoldToConfirm(if (s.kind == "ore_dig") stringResource(R.string.ore_hold_dig) else stringResource(R.string.ore_hold_claim), enabled = stillOpen) {
                                     state = OreState.Signing
                                     scope.launch {
-                                        // Il Deploy si ricostruisce sul giro di adesso: fra l'anteprima e il
-                                        // dito puo' passare un giro intero. Stesse caselle, stessi SOL.
+                                        // The Deploy is rebuilt on the current round: between preview and finger a
+                                        // whole round can pass. Same squares, same SOL.
                                         val ixs = if (s.dig == null) s.ixs else {
                                             val k = ownerKey
                                             val rpc = SolanaRpc.urlFor(null)
@@ -381,7 +374,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                         }
                         OreState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
                         is OreState.Done -> {
-                            // Lo scontrino resta qui dopo la firma, e sta anche fra gli Scontrini.
+                            // The receipt stays here after signing, and is in Receipts too.
                             Banner(stringResource(R.string.ore_sent), Halo.mint, HIcon.CHECK)
                             GlassCard {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -403,10 +396,10 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                         }
                     }
 
-                    // ---- la griglia: il SOL di tutti su ogni casella, le tue accese, le scelte cerchiate ----
+                    // ---- the grid: everybody's SOL on each square, yours lit, the picked ones circled ----
                     val typed = perSquare.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 1e9).toLong() } ?: 0L
-                    // Adesso, o la media degli ultimi giri: la stessa griglia, un'altra fotografia.
-                    // I due punti di vista e la legenda del puntino, su una riga sola.
+                    // Now, or the average of the last rounds: the same grid, another snapshot.
+                    // The two views and the dot legend on one line.
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (past.size >= 5) {
                             SmallChip(stringResource(R.string.ore_view_now), null, tint = if (!history) Halo.mint else Halo.muted) { history = false }
@@ -459,9 +452,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
 }
 
 /**
- * Cinque per cinque. Ogni casella si scalda col SOL che ha sopra, nel colore
- * secondario del tema; le tue sono nel colore primario, quelle che stai
- * scegliendo hanno il bordo acceso. Il numero e' il SOL di tutti.
+ * Five by five. Each square warms with the SOL on it, in the theme's second color; yours are
+ * in the first, the ones being picked have a lit edge. The number is everybody's SOL.
  */
 @Composable
 private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare: Long, reveal: Int?, lastWin: Int?, heat: LongArray?, crowd: LongArray?, onPick: (Int) -> Unit) {
@@ -498,7 +490,7 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                         Modifier.weight(1f).aspectRatio(1.3f).clip(rs(10))
                             .background(Halo.cardSoft).background(fill)
                             .border(if (isPicked || isMine || lit || won) 1.5.dp else 1.dp, edge, rs(10))
-                            // Dove sei gia' sopra non si rimette: il programma salterebbe la casella.
+                            // Where you already are is not re-placed: the program would skip the square.
                             .clickable(enabled = picking && !isMine) { onPick(s) },
                     ) {
                         Text((s + 1).toString(), fontFamily = Mono, fontSize = 9.sp, color = Halo.muted.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 4.dp))
@@ -509,10 +501,10 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
                             modifier = Modifier.align(Alignment.Center).padding(top = 2.dp),
                         )
                         if (isMine) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).height(6.dp).width(6.dp).clip(rs(3)).background(Halo.mint))
-                        // Le caselle che pagano a uno solo, sapute prima del giro.
+                        // The squares that pay one miner only, known before the round.
                         if (solo and (1 shl s) != 0) Box(Modifier.align(Alignment.BottomEnd).padding(5.dp).height(5.dp).width(5.dp).clip(rs(3)).background(Halo.amber))
-                        // Mentre scegli: la quota dell'ORE che avresti se vincesse questa, con la cifra
-                        // scritta, contata sulla casella piena come a fine giro.
+                        // While picking: the ORE share you would have if this one won, with the typed
+                        // amount, counted on the full square as at round end.
                         if (picking && perSquare > 0) {
                             val share = OreOdds.share(perSquare, maxOf(sol, crowd?.getOrNull(s) ?: 0L))
                             Text(
@@ -529,10 +521,9 @@ private fun Grid(v: OreMiner.View, picked: Set<Int>, picking: Boolean, perSquare
 }
 
 /**
- * Il giro appena chiuso, in una riga: quale casella e' uscita, se il premio
- * si e' diviso o l'ha preso uno solo, e cosa vuol dire per te. Il tuo conto
- * Miner porta ancora le caselle di quel giro finche' non fai checkpoint, e da
- * li' si sa se c'eri e quanto ti tocca.
+ * The round just closed, in one line: which square came out, whether the prize was split or
+ * taken by one, what it means for you. Your Miner account still carries that round's squares
+ * until you checkpoint, and from there we know whether you were on it and what you get.
  */
 @Composable
 private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
@@ -541,7 +532,7 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
     val meTop = v.miner != null && last.topMiner.contentEquals(v.miner.authority)
     val how = if (last.isSplit) stringResource(R.string.ore_last_split, last.count.getOrNull(win)?.toInt() ?: 0) else stringResource(R.string.ore_last_solo)
     val outcome = when {
-        // Pro quota sull'ORE del giro piu' la pentola, se e' uscita: come `checkpoint.rs`.
+        // Pro rata on the round's ORE plus the pot if it came out: as in `checkpoint.rs`.
         onIt > 0L && last.isSplit && total > 0 -> stringResource(R.string.ore_last_you_won, Ore.ore(java.math.BigInteger.valueOf(last.rewardOre + last.motherlode).multiply(java.math.BigInteger.valueOf(onIt)).divide(java.math.BigInteger.valueOf(total)).toLong()))
         onIt > 0L && meTop -> stringResource(R.string.ore_last_you_won, Ore.ore(last.rewardOre + java.math.BigInteger.valueOf(last.motherlode).multiply(java.math.BigInteger.valueOf(onIt)).divide(java.math.BigInteger.valueOf(total.coerceAtLeast(1))).toLong()))
         onIt > 0L -> stringResource(R.string.ore_last_you_lost_draw)
@@ -561,7 +552,7 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
                 Text(title, style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink)
                 Text(how + (if (outcome.isNotEmpty()) " · $outcome" else ""), style = HaloType.label, color = if (won) Halo.mint else Halo.muted)
             }
-            // Un giro vinto e' una carta da mostrare, come la paghetta chiusa.
+            // A won round is a card to show, like the closed budget.
             if (won) {
                 Spacer(Modifier.width(8.dp))
                 RoundIconButton(HIcon.SHARE, tint = Halo.mint, description = stringResource(R.string.share)) {
@@ -572,7 +563,7 @@ private fun LastRound(v: OreMiner.View, last: Ore.Round, win: Int) {
     }
 }
 
-/** Un numero con la sua etichetta sopra, come nelle schede del portafoglio. */
+/** A number with its label above, as in the wallet cards. */
 @Composable
 private fun Stat(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier, sub: String? = null) {
     Column(modifier) {
@@ -582,7 +573,7 @@ private fun Stat(label: String, value: String, color: androidx.compose.ui.graphi
     }
 }
 
-/** Il bottone pieno, nei colori del marchio, che sta in una riga accanto a un altro. */
+/** The filled button, in brand colors, that sits in a row next to another. */
 @Composable
 private fun Chunky(label: String, icon: HIcon, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(

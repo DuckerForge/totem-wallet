@@ -200,7 +200,7 @@ class CompanionService : Service() {
             setPadding(0, dp(2f), 0, dp(6f))
         }
 
-        // La barra: da meno lo stop a piu' l'obiettivo, col punto dove sei.
+        // The bar: from minus the stop to plus the target, with the dot where you are.
         val track = View(this).apply {
             background = GradientDrawable().apply { cornerRadius = dp(3f).toFloat(); setColor(p.stroke.toArgb()) }
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(6f))
@@ -635,7 +635,7 @@ class CompanionService : Service() {
         targetLine?.visibility = if (pos == null) View.GONE else View.VISIBLE
         targetLine?.text = pos?.let { getString(R.string.comp_targets, it.takeProfitPct, it.stopLossPct) }
 
-        // La barra va da −stop a +obiettivo, e il pieno e' dove sei adesso.
+        // The bar runs from −stop to +target, and the fill is where you are now.
         barTrack?.visibility = if (pos == null) View.GONE else View.VISIBLE
         barFill?.visibility = if (pos == null) View.GONE else View.VISIBLE
         if (pos != null) {

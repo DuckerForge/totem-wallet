@@ -14,11 +14,9 @@ import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 
 /**
- * Attested receipts: every approved receipt is signed by a hardware-backed key
- * that belongs to *this app install*. The result is exportable evidence of what
- * the wallet showed the user at the moment they signed — "I approved 0.5 SOL to
- * Alice, no risks" — verifiable by anyone with the app's public key. No wallet
- * offers this; no extra biometric prompt (the key is the app's, not the user's).
+ * Attested receipts: every approved receipt is signed by a hardware-backed key belonging to
+ * this app install, exportable evidence of what the wallet showed at the moment of signing,
+ * verifiable by anyone with the app's public key. No extra biometric prompt: the key is the app's, not the user's.
  */
 object Attestation {
     private const val TAG = "ClearSign-Attest"

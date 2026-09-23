@@ -51,18 +51,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The Agent tab, in two depths.
- *
- * Simple answers the three questions a person actually has, in order: is it
- * working, what does it hold, what did it do. One line of state, one block of
- * money, two buttons, the open coins, the last moves, and a row of small chips
- * for the rest. No paragraphs: the guarantees live behind one link.
- *
- * Pro, a switch at the top that is remembered, adds everything else underneath:
- * the model, the collar's numbers, lane and targets with the shadow book, the
- * live trace, and the bridge to an agent on a computer. The tab used to show
- * all of it to everyone, seven paragraphs and twenty buttons on one scroll, and
- * half of it about a bridge to a PC that most people will never run.
+ * The Agent tab, in two depths. Simple answers the three questions a person has, in order:
+ * is it working, what does it hold, what did it do. Pro, a remembered switch at the top,
+ * adds the model, the collar's numbers, lane and targets with the shadow book, the live
+ * trace, and the bridge to a computer. The tab used to show all of it to everyone: seven
+ * paragraphs and twenty buttons, half about a PC bridge most people will never run.
  */
 @Composable
 internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> Unit = {}) {
@@ -184,13 +177,9 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                // Da dove e' partita a dove sta adesso.
-                //
-                // Il totale grande e la differenza col segno c'erano gia', ma la
-                // differenza da sola non dice mai da dove viene: "+0,008" e'
-                // tanto o poco a seconda di quanto ci hai messo, e quel numero
-                // non stava da nessuna parte su questa pagina. Due righe, i due
-                // capi, e in mezzo la strada.
+                // From where it started to where it stands. The big total and the signed difference were
+                // there, but "+0.008" is a lot or a little depending on what you put in, and that number was
+                // nowhere on the page. Two lines, the two ends, the road between.
                 if (balance != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.env_put_in), style = HaloType.small, color = Halo.muted, modifier = Modifier.width(96.dp))
@@ -211,10 +200,9 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 if (session.expired) { Spacer(Modifier.height(6.dp)); Banner(stringResource(R.string.env_expired_note), Halo.amber, HIcon.HOURGLASS) }
             }
 
-            // The two things you do here. Starting is a choice of lane, so it
-            // opens a small sheet rather than flipping a switch.
-            // Starting is the one full button on this page; stopping is quieter,
-            // the chat is the other way in, and the Eyes are a link.
+            // The two things you do here. Starting is a choice of lane, so it opens a small sheet; it
+            // is the one full button on the page. Stopping is quieter, the chat is the other way in,
+            // the Eyes are a link.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (cfg.on) {
                     GhostButton(stringResource(R.string.trader_stop_action), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber, height = 54.dp) {
@@ -232,11 +220,9 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(stringResource(R.string.agent_positions).uppercase(), style = HaloType.label, color = Halo.muted)
-                        // A stopped loop with coins still open is the state nobody
-                        // should have to work out for themselves. The stop loss
-                        // lives in the loop and nowhere else, so while it is off a
-                        // position with no on-chain order has nothing watching it
-                        // in either direction. Said here, in red, above the rows.
+                        // A stopped loop with coins still open is the state nobody should have to work out. The
+                        // stop-loss lives in the loop and nowhere else, so while it is off a position with no
+                        // on-chain order has nothing watching it either way. Said here, in red, above the rows.
                         val unwatched = open.count { !it.parked && it.triggerOrder == null }
                         if (!cfg.on && unwatched > 0) {
                             Banner(stringResource(R.string.trader_unwatched, unwatched), Halo.red, HIcon.WARNING)
@@ -422,10 +408,6 @@ private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false,
     }
 }
 
-/*
- * What the agent did last, five lines. Each is a ledger row, so the receipt
- * behind it is one tab away; here it is the sentence, the sum, and when.
- */
 /** The last budget's account: what went in, what came back, how it went. Shown where the next one is made. */
 @Composable
 private fun LastBudget(refresh: Int) {
@@ -464,10 +446,9 @@ private fun LastBudget(refresh: Int) {
 }
 
 /**
- * Copy trading, where the person can see it. The star in Scout follows a
- * wallet; this is the list of what that star did, with each wallet's last buy
- * from the feed. What they buy goes to the front of the loop's list, through
- * the same gates as everything else.
+ * Copy trading where the person can see it. The star in Scout follows a wallet; this lists
+ * what that star did, with each wallet's last buy. What they buy goes to the front of the
+ * loop's list, through the same gates.
  */
 @Composable
 private fun FollowsSection(refresh: Int) {
@@ -495,16 +476,10 @@ private fun FollowsSection(refresh: Int) {
                             fontFamily = Inter, fontSize = 10.5.sp, color = if (last != null) Halo.mint else Halo.muted, maxLines = 1,
                         )
                     }
-                    // Tre comandi, e nessuno dei tre sembrava un comando.
-                    //
-                    // Erano tre scritte nude: "sells too", "buys only", "Following".
-                    // Toccandole succedeva qualcosa, ma niente diceva che si
-                    // potessero toccare ne' quale fosse lo stato acceso. E la
-                    // domanda che la gente si fa qui e' "come lo metto a
-                    // copiare", a cui la risposta e' che lo sta gia' facendo:
-                    // seguire uno **e'** copiarlo. Adesso c'e' scritto, e le due
-                    // cose che si possono davvero cambiare hanno la forma di
-                    // cose che si cambiano.
+                    // Three commands, and none looked like one: bare words ("sells too", "buys only",
+                    // "Following") that did something when tapped, with nothing saying they could be tapped or
+                    // which state was on. The question here is "how do I make it copy", and the answer is that
+                    // following is copying: now it says so, and the two things that can change look changeable.
                     var mirror by remember(w) { mutableStateOf(Follows.mirrors(ctx, w)) }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
@@ -518,9 +493,8 @@ private fun FollowsSection(refresh: Int) {
                         )
                     }
                     Spacer(Modifier.width(2.dp))
-                    // La stella, la stessa di Scout: accesa vuol dire che lo
-                    // segui, e toccarla smette. Un'icona che si riconosce batte
-                    // una parola che va letta.
+                    // The star, the same as Scout's: lit means you follow it, tapping stops.
+                    // A recognizable icon beats a word that has to be read.
                     Box(
                         Modifier.size(34.dp).clip(rs(999)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) },
                         contentAlignment = Alignment.Center,
@@ -574,9 +548,8 @@ private fun RecentMoves(refresh: Int) {
 }
 
 /**
- * Starting is a choice of lane, said in the two words people in crypto use.
- * The reason it cannot start, when there is one, is here before the button,
- * not six minutes later in a note.
+ * Starting is a choice of lane, in the two words crypto uses. The reason it cannot start,
+ * when there is one, sits here before the button, not six minutes later in a note.
  */
 @Composable
 private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
@@ -595,17 +568,11 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
             StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
             StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
-            // I due numeri che si vogliono cambiare sulla porta, e sono due
-            // domande diverse che sembravano una sola.
-            //
-            // Quante monete alla volta risponde a "su quante cose scommetto".
-            // Quanto ci mette risponde a "quanto rischio su ognuna", ed era
-            // l'unica delle due che non si poteva toccare: stava nel motore,
-            // ferma all'ottanta per cento. Con un posto solo l'ottanta per cento
-            // di tutta la paghetta sembra tutta la paghetta, e l'unico modo di
-            // metterci meno era stringere il collare, cioe' rispondere a una
-            // terza domanda che nessuno aveva fatto. La riga qui sotto dice la
-            // fetta in SOL e in soldi, e si muove con tutti e due i cursori.
+            // The two numbers to change at the door, two different questions that looked like one. How
+            // many coins at once answers "how many bets"; how much per coin answers "how much per bet",
+            // and it was the one you could not touch: fixed in the engine at eighty percent, which with
+            // one slot looks like the whole budget, so the only way to put in less was tightening the
+            // collar. The line below says the slice in SOL and money, and moves with both sliders.
             SliderRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString(), cfg.maxPositions.toFloat(), 1f..5f, Halo.cyan, steps = 3) {
                 cfg = cfg.copy(maxPositions = it.toInt().coerceIn(1, 5))
             }
@@ -613,8 +580,8 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 stringResource(R.string.agent_slice), cfg.slicePercent.toString() + "%",
                 cfg.slicePercent / 100f, 0.1f..1f, Halo.mint, steps = 17,
             ) { cfg = cfg.copy(slicePercent = (it * 100).toInt().coerceIn(10, 100)) }
-            // La commissione che la moneta stessa trattiene. Zero e' la porta
-            // chiusa, ed e' il valore di partenza: si apre solo di proposito.
+            // The fee the coin itself keeps. Zero is the closed door and the starting
+            // value: it opens only on purpose.
             SliderRow(
                 stringResource(R.string.agent_fee_max),
                 if (cfg.maxFeePct == 0) stringResource(R.string.agent_payout_off) else cfg.maxFeePct.toString() + "%",
@@ -624,8 +591,8 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
                 if (s != null && p != null) SizingNote(s.capLamports, p.perTxLamports, p.askAboveLamports, cfg.slicePercent, cfg.maxPositions)
             }
-            // Scavare ORE: una parte della paghetta affidata a un esecutore,
-            // tanto al giorno su tante caselle, sotto lo stesso collare.
+            // Digging ORE: part of the budget handed to an executor, so much a day on so
+            // many squares, under the same collar.
             SwitchRow(stringResource(R.string.agent_ore_title), stringResource(R.string.agent_ore_sub), cfg.oreOn) { cfg = cfg.copy(oreOn = it) }
             if (cfg.oreOn) {
                 SliderRow(
@@ -647,8 +614,8 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 }
                 Text(stringResource(R.string.ore_wager_note), style = HaloType.small, color = Halo.amber)
             }
-            // Il guadagno in moneta dura: alla chiusura, quello che sta sopra il
-            // capitale diventa ORE. Vale anche senza scavare: e' un'altra cosa.
+            // The gain in hard coin: on close, what sits above the capital becomes ORE.
+            // Works without digging too: it is a separate thing.
             SwitchRow(stringResource(R.string.agent_ore_bury_title), stringResource(R.string.agent_ore_bury_sub), cfg.oreBury) { cfg = cfg.copy(oreBury = it) }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.AGENT) {
@@ -697,22 +664,11 @@ private fun TruthBlock(icon: HIcon, title: String, body: String) {
 private const val NIGHT_MS = 12 * 3600_000L
 
 /**
- * What happened while you slept.
- *
- * A trading desk spends the first hour of the day building context before it
- * touches anything: what moved overnight, what it is still holding, how much it
- * is allowed to lose today. On a phone that hour does not exist, and the parts
- * of it a wallet can honestly answer are already sitting on this device.
- *
- * So this costs **nothing**. Four local reads: the ledger file, the positions in
- * prefs, the crowd file Scout already downloaded, and the budget's own caps. A
- * morning brief that spent a request every time it was opened would be a brief
- * people learn not to open, and the quota it eats is the quota the crowd scan
- * needs.
- *
- * It draws nothing when the night was empty. A card that says "nothing happened"
- * every morning teaches people to scroll past it, and then it is not there on
- * the morning something did.
+ * What happened while you slept. A desk spends its first hour building context: what moved
+ * overnight, what it still holds, how much it may lose today. This costs nothing: four local
+ * reads (ledger, positions, the crowd file Scout downloaded, the budget's caps). A brief
+ * that spent a request per open is one people learn not to open. It draws nothing when the
+ * night was empty: "nothing happened" every morning teaches people to scroll past it.
  */
 @Composable
 private fun NightCard(refresh: Int) {
@@ -753,9 +709,9 @@ private fun NightCard(refresh: Int) {
             Text(
                 stringResource(
                     when {
-                        // "Mentre dormivi" alle due del pomeriggio e' una frase
-                        // che non regge: la finestra e' la stessa dodici ore, ma
-                        // il nome cambia con l'ora e cosi' deve fare il verdetto.
+                        // "While you slept" at two in the afternoon does not hold: the
+                        // window is the same twelve hours, but the name changes with
+                        // the hour and so must the verdict.
                         moves.isNotEmpty() && hour in 4..12 -> R.string.night_worked
                         moves.isNotEmpty() -> R.string.night_worked_recent
                         coins.isNotEmpty() -> R.string.night_still

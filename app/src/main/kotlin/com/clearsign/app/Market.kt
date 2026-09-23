@@ -8,18 +8,11 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Every coin there is, ranked, the way a person expects a market screen to work.
- *
- * The wallet's own lists answer "what can this wallet trade": Jupiter's registry,
- * Solana only, ordered by things a trader cares about. That is the wrong list for
- * the question "how is bitcoin doing", and it is the wrong list for following a
- * coin you hold somewhere else. This is the other list — CoinGecko's, free and
- * without a key, ranked by market capitalisation, with every chain in it.
- *
- * What comes back knows whether a coin also lives on Solana ([Coin.mint]). That
- * one field is the difference between a row you can buy from and a row you can
- * only watch, and the screen says which is which rather than offering a button
- * that cannot work.
+ * Every coin there is, ranked, the way a market screen is expected to work. The wallet's
+ * lists (Jupiter's registry, Solana only) answer what this wallet can trade, the wrong list
+ * for "how is bitcoin doing" or for following a coin held elsewhere. This is CoinGecko's,
+ * free, no key, by market cap, every chain. [Coin.mint] says whether a coin also lives on
+ * Solana: the difference between a row you can buy from and one you can only watch.
  */
 object Market {
     private const val TAG = "Apex-Market"
@@ -49,21 +42,15 @@ object Market {
     @Volatile private var top: List<Coin> = emptyList()
     @Volatile private var topAt = 0L
     private val mints = java.util.concurrent.ConcurrentHashMap<String, String>(
-        // Solana's own coin has no entry in CoinGecko's platform map: nothing
-        // "lives on" the chain it is the gas of, so the lookup comes back empty
-        // and the market screen concluded that Solana cannot be charted or
-        // bought. Wrapped SOL is the mint every pool and every quote on this
-        // chain actually names, which makes it the right answer to "which mint
-        // is this coin", even though nobody minted it.
+        // Solana's own coin has no entry in CoinGecko's platform map (nothing "lives on" the chain
+        // it is the gas of), so the lookup came back empty and the screen concluded Solana cannot
+        // be charted or bought. Wrapped SOL is the mint every pool and quote names: the right answer.
         mapOf("solana" to "So11111111111111111111111111111111111111112"),
     )
 
     /**
-     * What is already in memory, and never a network call.
-     *
-     * For anything drawn on screen: [top] blocks, and a composable that blocks on
-     * a cold cache freezes the frame it is drawing. The market screen fills this
-     * when it opens, so by the time a coin sheet needs it, it is there.
+     * What is already in memory, never a network call: [top] blocks, and a composable blocking
+     * on a cold cache freezes its frame. The market screen fills this when it opens.
      */
     fun cachedTop(): List<Coin> = top
 
@@ -127,8 +114,8 @@ object Market {
     }
 
     /**
-     * The Solana mint for a coin, when it has one. One extra call, remembered for
-     * the life of the process, and only made when somebody actually opens a coin.
+     * The Solana mint for a coin, when it has one: one extra call, remembered for the process,
+     * made only when somebody opens the coin.
      */
     fun mintOf(id: String): String? {
         mints[id]?.let { return it.takeIf { m -> m.isNotEmpty() } }
@@ -139,10 +126,9 @@ object Market {
     }
 
     /**
-     * Coins that do not live on Solana but have an official bridged form there:
-     * the same asset, held by a custodian or a bridge, tradable on Jupiter. Only
-     * the versions Jupiter marks verified and that carry real liquidity
-     * (checked on the 15th of September 2026): the search is full of copies.
+     * Coins that do not live on Solana but have an official bridged form there: the same asset
+     * held by a custodian or a bridge, tradable on Jupiter. Only versions Jupiter marks verified
+     * with real liquidity (checked 15 Sep 2026): the search is full of copies.
      */
     data class Bridged(val label: String, val mint: String)
     val bridged: Map<String, List<Bridged>> = mapOf(
@@ -162,20 +148,12 @@ object Market {
     }
 
     /**
-     * Candles for a coin that has no pool to read: bitcoin, ether, anything that
-     * does not live on this chain.
-     *
-     * GeckoTerminal only knows pools, so it can draw a Solana coin beautifully
-     * and cannot draw bitcoin at all — and "no chart" on the most famous coin in
-     * the list reads as a broken screen, not as a missing pool. CoinGecko's OHLC
-     * is the same data one level up: an exchange-weighted price rather than one
-     * pool's, free, no key, and it covers every coin in the ranking.
-     *
-     * The candle size is chosen by the API from the number of days asked for
-     * (a day gives half-hours, a month gives four-hours, a year gives four-day
-     * candles), which is why the spans here are named after the range they cover
-     * and never after a candle size we do not control. No volume comes back with
-     * it; the screen asks the market data for that instead of inventing bars.
+     * Candles for a coin with no pool to read: bitcoin, ether, anything not on this chain.
+     * GeckoTerminal knows only pools and cannot draw bitcoin, and "no chart" on the most famous
+     * coin reads as a broken screen. CoinGecko's OHLC is the same data one level up, exchange-
+     * weighted, free, every coin. The API picks the candle size from the days asked (a day gives
+     * half-hours, a month four-hours, a year four-day candles), so spans are named after the
+     * range covered. No volume comes back; the screen asks the market data instead of inventing bars.
      */
     private val ohlcCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Gecko.Candle>>>()
     private const val OHLC_TTL_MS = 5 * 60_000L

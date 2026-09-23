@@ -10,12 +10,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * What the model is allowed to reach for. Five tools, and **not one of them
- * signs**: they build bytes and hand them to [AgentBroker], which is the only
- * place in this app that decides and the only place that holds the budget key.
- *
- * So a jailbroken prompt, a poisoned web page or a plain hallucination can at
- * worst produce a transaction the collar then refuses. The model is a proposer.
+ * What the model may reach for: five tools, and not one signs. They build bytes and hand
+ * them to [AgentBroker], the only place that decides and the only place holding the budget
+ * key. A jailbroken prompt, a poisoned web page or a hallucination can at worst produce a
+ * transaction the collar then refuses. The model is a proposer.
  */
 object BrainTools {
 
@@ -112,13 +110,10 @@ object BrainTools {
         .put(tool("pause", "Stop the agent. After this nothing is signed until the person turns it back on. Use it the moment the user asks you to stop, or if you suspect something is wrong.", JSONObject()))
 
     /**
-     * The candidate list, gated and ranked.
-     *
-     * The model is good at reading a shortlist and terrible at picking a coin
-     * out of its own memory, where the training data is a year stale and every
-     * ticker it remembers has since been minted by somebody else. So the
-     * shortlist is built here, from live data, by rules that were tuned against
-     * real trades, and the model's job starts after that.
+     * The candidate list, gated and ranked. The model reads a shortlist well and picks a coin
+     * from memory terribly: its training data is a year stale and every ticker it remembers has
+     * since been minted by somebody else. The shortlist is built here from live data, by rules
+     * tuned against real trades; the model's job starts after.
      */
     private suspend fun marketScan(ctx: Context, risk: String, limit: Int): JSONObject {
         val r = risk.trim().lowercase().replace(" ", "")
@@ -161,12 +156,10 @@ object BrainTools {
     // ---- the loop, switched on from the conversation -------------------------
 
     /**
-     * Turn the loop on, and hand back the numbers it will actually use.
-     *
-     * The slice is not whatever the model asked for: it is derived from the
-     * collar, because a move above the silent threshold needs a fingerprint and
-     * there is nobody there. Returning the derived figure rather than accepting
-     * one is what stops the model promising a size the phone will never sign.
+     * Turn the loop on and hand back the numbers it will actually use. The slice is not what the
+     * model asked for: it derives from the collar, since a move above the silent threshold needs
+     * a fingerprint and nobody is there. Returning the derived figure stops the model promising a
+     * size the phone will never sign.
      */
     private fun startTrading(ctx: Context, args: JSONObject): JSONObject {
         val s = SessionWallet.current(ctx) ?: return JSONObject().put("error", "There is no budget to trade with. The person has to create one in the Agent tab first.")
@@ -479,9 +472,8 @@ object BrainTools {
     }
 
     /**
-     * A shortcut, no longer a gate: the handful of coins whose mint and decimals
-     * we can answer without a round trip to Jupiter. Anything not here is looked
-     * up by [resolve], so the agent is not limited to this table.
+     * A shortcut, no longer a gate: the coins whose mint and decimals we can answer without a
+     * round trip. Anything else goes through [resolve].
      */
     private val KNOWN = mapOf(
         "SOL" to (AgentPolicy.WSOL to 9),
@@ -497,12 +489,9 @@ object BrainTools {
         KNOWN[name.uppercase()] ?: KNOWN.values.firstOrNull { it.first == name }
 
     /**
-     * A symbol, a name or a mint address, turned into (mint, decimals).
-     *
-     * Anything in Jupiter's registry can be named, which is the whole of Solana
-     * that has a market. Where several coins share a ticker, a verified one wins
-     * over an unverified one, because a ticker is not a name and anybody can
-     * mint "BONK" this morning.
+     * A symbol, a name or a mint, turned into (mint, decimals). Anything in Jupiter's registry
+     * can be named. Where several coins share a ticker a verified one wins: a ticker is not a
+     * name, and anybody can mint "BONK" this morning.
      */
     private suspend fun resolve(name: String): Pair<String, Int>? {
         val q = name.trim()

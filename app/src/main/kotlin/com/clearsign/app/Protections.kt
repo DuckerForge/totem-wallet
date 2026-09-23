@@ -3,9 +3,8 @@ package com.clearsign.app
 import com.clearsign.core.RiskFlag
 
 /**
- * The honest inventory of what this app does for the user — every defense that
- * is actually implemented, one line each, so "what does it protect me from?"
- * has a precise answer (and the jury can count).
+ * The honest inventory of what this app does for the user: every defense actually
+ * implemented, one line each, so "what does it protect me from" has a precise answer.
  */
 object Protections {
     data class Item(val icon: HIcon, val titleRes: Int, val bodyRes: Int)

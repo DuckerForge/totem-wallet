@@ -81,10 +81,8 @@ internal fun WalletHealthCard(owner: String?, refreshKey: Int = 0) {
                         HaloIcon(iconFor(issue.kind), colorFor(issue.kind), 15.dp); Spacer(Modifier.width(8.dp))
                         Text(textFor(ctx, issue), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
                     }
-                    // A frozen account is the one line here with no fix behind it.
-                    // Only the freeze authority can thaw it, it cannot even be
-                    // closed to get the rent back, and listing it next to things
-                    // you *can* fix promised a button that could never exist.
+                    // A frozen account is the one line here with no fix behind it: only the freeze authority can
+                    // thaw it, it cannot even be closed for the rent, and a button next to fixable things promised one that could never exist.
                     if (issue.kind == HealthIssue.Kind.FROZEN) {
                         Text(
                             stringResource(R.string.health_frozen_why),

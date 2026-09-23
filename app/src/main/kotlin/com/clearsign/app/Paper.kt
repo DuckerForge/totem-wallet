@@ -9,24 +9,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The shadow book: what every exit rule would have done, on the coins this agent
- * actually met.
- *
- * A target and a stop are two numbers somebody picked once. Nobody — not a blog,
- * not us — knows whether +30/−15 is right for the coins *this* scan finds, and
- * the only way to find out without paying for the answer is to run the other
- * rules beside the real one, on the same coins, at the same moments.
- *
- * Two kinds of row, and the second is the interesting one:
- *
- *  * **bought**: the agent really bought it. Here the shadow answers "was your
- *    exit the right exit".
- *  * **blocked**: the agent wanted it and something stopped it — the collar, the
- *    silent threshold, a scan veto, the web check. These run too, and they answer
- *    a question nobody can otherwise answer: *did that wall save me money or cost
- *    me money?* A safety rule that has never been measured is a belief.
- *
- * Nothing here signs, sends, or touches a key. It is a notebook.
+ * The shadow book: what every exit rule would have done on the coins this agent actually
+ * met. A target and a stop are two numbers somebody picked once, and the only way to learn
+ * whether +30/−15 fits the coins this scan finds, without paying for the answer, is to run
+ * the other rules beside the real one. Two kinds of row: bought, where the shadow answers
+ * "was your exit the right exit"; and blocked (collar, silent threshold, scan veto, web
+ * check), which answers "did that wall save or cost me money". A safety rule never measured
+ * is a belief. Nothing here signs, sends or touches a key: a notebook.
  */
 object Paper {
     private const val PREFS = "apex_paper"
@@ -36,9 +25,8 @@ object Paper {
     private const val MAX_OPEN = 12
 
     /**
-     * One coin followed by every rule at once. [sizeLamports] is what the trade
-     * would have put in, so the costs are the real ones; [blockedBy] is null when
-     * the agent actually bought it.
+     * One coin followed by every rule at once. [sizeLamports] is what the trade would have put
+     * in, so costs are real; [blockedBy] is null when the agent actually bought.
      */
     data class Pos(
         val mint: String,
@@ -71,11 +59,9 @@ object Paper {
     fun lastStepAt(ctx: Context): Long = prefs(ctx).getLong("stepAt", 0L)
 
     /**
-     * Start following [symbol] under every rule.
-     *
-     * [entryLamports] is the price per whole token the agent was quoted, so the
-     * shadow starts exactly where the real trade would have: no better price than
-     * the one that was actually on offer.
+     * Start following [symbol] under every rule. [entryLamports] is the price per token the agent
+     * was quoted, so the shadow starts where the real trade would have: no better price than the
+     * one on offer.
      */
     fun open(
         ctx: Context,
@@ -106,11 +92,9 @@ object Paper {
     }
 
     /**
-     * Move every open row to the price it is at now.
-     *
-     * [priceOf] returns lamports per whole token, or null when nobody answered —
-     * and a null holds everything, exactly as it does in the live loop. Paced by
-     * [STEP_EVERY_MS] because each open row costs one quote.
+     * Move every open row to its price now. [priceOf] returns lamports per token, or null when
+     * nobody answered, and a null holds everything, as in the live loop. Paced by
+     * [STEP_EVERY_MS]: each open row costs one quote.
      */
     suspend fun step(ctx: Context, yourTake: Int, yourStop: Int, priceOf: suspend (Pos) -> Double?) {
         val now = System.currentTimeMillis()
@@ -144,12 +128,9 @@ object Paper {
     }
 
     /**
-     * What the walls did, in lamports.
-     *
-     * Positive means the coins the agent was stopped from buying went on to make
-     * money, so the wall cost you that. Negative means it saved you that. Measured
-     * on the rule you are actually running, because that is the trade you would
-     * have made.
+     * What the walls did, in lamports. Positive: the coins the agent was stopped from buying went
+     * on to make money, so the wall cost you that. Negative: it saved you that. Measured on the
+     * rule you actually run, the trade you would have made.
      */
     fun blockedVerdict(ctx: Context, yourRule: String = ExitRule.YOURS): Pair<Int, Long> {
         val rows = all(ctx).filter { it.blockedBy != null }

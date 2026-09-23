@@ -39,9 +39,8 @@ import kotlinx.coroutines.withContext
 import java.net.URL
 
 /**
- * A Blink, opened as a card: what it is, its buttons, and then the receipt.
- * The transaction the server hands back is treated like one from any dApp:
- * simulated, read, held to confirm, signed with the print.
+ * A Blink opened as a card: what it is, its buttons, then the receipt. The transaction the
+ * server hands back is treated like any dApp's: simulated, read, held to confirm, signed with the print.
  */
 @Composable
 internal fun BlinkSheet(link: String, signer: SeedVaultSigner, owner: String, onDismiss: () -> Unit) {

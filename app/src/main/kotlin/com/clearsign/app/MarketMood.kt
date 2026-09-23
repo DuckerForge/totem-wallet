@@ -6,19 +6,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The mood of the market, from three free keyless sources.
- *
- * Ported from the same idea in the MEGAGEN app, and with its warning kept: **none
- * of this predicts a price.** It is sentiment and momentum, useful as a gate —
- * "do not go hunting while everything is bleeding" — and useless as a forecast.
- *
- *  * Fear & Greed (alternative.me): one 0..100 number for how the crowd feels.
- *  * CoinGecko /global: how the whole crypto market moved in 24h, and BTC dominance.
- *  * S&P and Nasdaq futures (Yahoo): whether traditional money is risk-on right now.
- *
- * The last one is the interesting one. Crypto tends to follow the futures, so the
- * cross between them is worth more than either alone: futures up while crypto is
- * still down reads differently from both falling together.
+ * The mood of the market from three free keyless sources: Fear & Greed (alternative.me),
+ * CoinGecko /global (24h move, BTC dominance), S&P and Nasdaq futures (Yahoo). None of it
+ * predicts a price: sentiment and momentum, useful as a gate ("do not hunt while everything
+ * bleeds"), useless as a forecast. The futures are the interesting one: crypto tends to follow
+ * them, so futures up while crypto is still down reads differently from both falling.
  */
 object MarketMood {
     private const val TAG = "ClearSign-Mood"

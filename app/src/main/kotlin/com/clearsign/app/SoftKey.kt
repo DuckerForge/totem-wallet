@@ -7,12 +7,10 @@ import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable
 import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec
 
 /**
- * An Ed25519 key this app holds itself, rather than the Seed Vault.
- *
- * Two things need one: the agent envelope, because the Seed Vault will not sign
- * without a person present and the envelope must sign while you sleep; and a
- * gift link, because whoever opens the link has to be able to sweep it. Both are
- * deliberately small and disposable. Nothing that matters lives on such a key.
+ * An Ed25519 key this app holds itself, not the Seed Vault. Two things need one: the budget,
+ * because the Seed Vault will not sign without a person and the budget must sign while you
+ * sleep; and a gift link, because whoever opens it must be able to sweep it. Both small and
+ * disposable: nothing that matters lives on such a key.
  */
 object SoftKey {
     private const val CURVE = "Ed25519"
@@ -31,10 +29,9 @@ object SoftKey {
     }
 
     /**
-     * Move everything this key holds to [to], minus the fee. Returns the
-     * signature, or null with a reason. Used to claim a gift and to reclaim one.
+     * What a sweep did: the signature, or the reason it did not, and the lamports that moved.
+     * [sweepAll] moves everything a key holds to the target minus the fee: claiming a gift, and reclaiming one.
      */
-    /** What a sweep did: the signature, or the reason it did not, and the lamports that moved. */
     data class Sweep(val signature: String?, val error: String?, val lamports: Long)
 
     suspend fun sweepAll(from: ByteArray, to: String, cluster: String? = null): Sweep {

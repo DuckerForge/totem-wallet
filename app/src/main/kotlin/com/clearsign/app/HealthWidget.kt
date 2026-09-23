@@ -52,16 +52,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The home-screen "Wallet health" widget.
- *
- * A score ring, the SOL balance with its fiat value and the top thing to fix —
- * from the same engine as the in-app Wallet Health card, painted in whatever
- * theme the user picked. Values are cached in prefs so the widget draws
- * instantly; the data refreshes when stale, from the Watchtower worker, when the
- * app comes to the foreground, and on the widget's own refresh tap.
- *
- * Two responsive layouts: narrow shows the ring and the balance, wide adds the
- * reclaimable rent and the alert line on the right.
+ * The home-screen "Wallet health" widget: a score ring, the SOL balance with its value and
+ * the top thing to fix, from the same engine as the in-app card, in the user's theme.
+ * Values are cached in prefs so it draws instantly; data refreshes when stale, from the
+ * Watchtower worker, on foreground, and on the widget's own refresh tap. Two layouts:
+ * narrow shows ring and balance, wide adds the reclaimable rent and the alert line.
  */
 class HealthWidget : GlanceAppWidget() {
 
@@ -259,18 +254,12 @@ class HealthWidget : GlanceAppWidget() {
 }
 
 /**
- * The widget's own refresh tap.
- *
- * Il lavoro **non si fa qui dentro**. Un tocco su un widget arriva come una
- * trasmissione, e una trasmissione ha dieci secondi di vita: oltre quelli
- * Android non aspetta, ferma tutto e mostra "L'app non risponde". E questo
- * aggiornamento fa quattro chiamate di rete in fila — i conti token, il saldo,
- * il prezzo, il cambio — che su una rete lenta i dieci secondi se li mangiano
- * senza accorgersene. Successo davvero, il 18/09/2026, con l'utente fermo sulla
- * schermata iniziale: `am_anr ... Broadcast of Intent { dat=glance-action:/… }`.
- *
- * Quindi qui si mette solo in coda. A farlo e' WorkManager, che di tempo ne ha,
- * e che quando ha finito ridipinge lui i widget.
+ * The widget's own refresh tap. The work is not done here: a widget tap arrives as a
+ * broadcast with ten seconds to live, and this refresh makes four network calls in a row
+ * (token accounts, balance, price, rate) that eat those seconds on a slow network. It
+ * happened, 18 Sep 2026, with the person standing on the home screen: `am_anr ... Broadcast
+ * of Intent { dat=glance-action:/… }`. So this only enqueues; WorkManager has the time, and
+ * repaints the widgets when done.
  */
 class RefreshHealthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
@@ -278,7 +267,7 @@ class RefreshHealthAction : ActionCallback {
     }
 }
 
-/** Il giro vero, fuori dai dieci secondi della trasmissione. */
+/** The real run, outside the broadcast's ten seconds. */
 class WidgetRefreshWorker(ctx: Context, params: androidx.work.WorkerParameters) : androidx.work.CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         runCatching { HealthWidgetData.refresh(applicationContext) }
@@ -295,17 +284,11 @@ object HealthWidgetData {
     private const val PREFS = "clearsign_widget"
 
     /**
-     * Quando la foto e' troppo vecchia per ridisegnarla e si va sulla catena.
-     *
-     * Erano quindici minuti, e il widget si sveglia ogni mezz'ora: quindi ogni
-     * risveglio trovava la foto scaduta e rileggeva tutto, una decina di
-     * chiamate, quarantotto volte al giorno. Erano piu' chiamate di un agente
-     * acceso a mani vuote, e le faceva anche chi l'agente non l'ha mai toccato.
-     *
-     * Due ore, perche' questa foto non e' uno strumento per operare: e' un numero
-     * da guardare di sfuggita sulla schermata home. E resta fresca lo stesso
-     * quando conta, perche' si rilegge da sola all'apertura dell'app, dopo ogni
-     * operazione dell'agente, e a ogni giro della torre di guardia.
+     * When the snapshot is too old to redraw and the chain is asked. It was fifteen minutes, and
+     * the widget wakes every half hour, so every wake reread everything: ten calls, forty-eight
+     * times a day, more than an idle agent, for people who never touched the agent. Two hours,
+     * because this is a number glanced at on the home screen, and it refreshes anyway on app
+     * open, after every agent move, and on every Watchtower round.
      */
     private const val STALE_MS = 2 * 3600_000L
 
@@ -362,12 +345,9 @@ object HealthWidgetData {
 
     fun isStale(ctx: Context): Boolean = (System.currentTimeMillis() - (load(ctx)?.at ?: 0L)) > STALE_MS
 
-    /** Fetch score, balance and value for the connected wallet, then repaint the widgets. */
     /**
-     * Mettilo in coda invece di farlo subito.
-     *
-     * `REPLACE`: se uno pigia il tasto cinque volte non partono cinque giri, ne
-     * resta uno solo, l'ultimo.
+     * Fetch score, balance and value for the connected wallet, then repaint the widgets, queued
+     * rather than run at once. `REPLACE`: five taps on the button leave one job, the last.
      */
     fun enqueue(ctx: Context) {
         androidx.work.WorkManager.getInstance(ctx).enqueueUniqueWork(
@@ -380,10 +360,9 @@ object HealthWidgetData {
     suspend fun refresh(ctx: Context, updateWidgets: Boolean = true) = withContext(Dispatchers.IO) {
         val owner = Settings.watchWallet(ctx) ?: return@withContext
         val rpc = SolanaRpc.urlFor(null)
-        // A node that did not answer is not a wallet with nothing in it. The
-        // lenient reader turned a failed call into an empty list, the score
-        // became 100 and the alert line "all clean", and that overwrote a true
-        // snapshot on the home screen. Keep what we had and try again later.
+        // A node that did not answer is not a wallet with nothing in it: the lenient reader made a
+        // failed call an empty list, the score became 100, "all clean" overwrote a true snapshot on
+        // the home screen. Keep what we had and try later.
         val accounts = runCatching { SolanaRpc.tokensOf(rpc, owner) }.getOrNull() ?: return@withContext
         val health = WalletHealth.of(owner, accounts)
         val lamports = runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() ?: load(ctx)?.lamports ?: 0L

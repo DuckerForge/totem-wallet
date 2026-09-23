@@ -274,8 +274,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         // The deal already struck with RocketX, traveling with the payment up to the signature.
         var bridgeDeal by remember { mutableStateOf<RocketX.Deal?>(null) }
         var showBridgeHistory by remember { mutableStateOf(false) }
-        // L'invio privato entra dal Manda ma gira nel ponte: qui si porta dietro
-        // quello che era gia' stato scritto di la'.
+        // Private send enters from Send but runs through the bridge: it carries
+        // along what was already typed over there.
         var privateSend by remember { mutableStateOf<Pair<String, String>?>(null) }
         var showContactTap by remember { mutableStateOf(false) }
         var showCustomize by remember { mutableStateOf(false) }

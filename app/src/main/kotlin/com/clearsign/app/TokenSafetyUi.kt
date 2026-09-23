@@ -61,11 +61,8 @@ internal fun safetyLabel(flag: SafetyFlag): String = stringResource(
 )
 
 /**
- * What the coin itself can do to you, next to what the transaction does.
- *
- * A clean transaction can still hand you a token whose creator can freeze it or
- * that nobody will buy back — and that is invisible in the receipt, because on
- * chain it is a perfectly ordinary transfer.
+ * What the coin itself can do to you, next to what the transaction does: a clean transaction
+ * can hand you a token whose creator can freeze it or that nobody buys back, invisible in the receipt.
  */
 @Composable
 internal fun SafetyCard(safety: TokenSafety, symbol: String) {
@@ -103,18 +100,11 @@ internal fun SafetyDot(safety: TokenSafety?) {
 
 
 /**
- * What you are about to *receive*, judged on its own.
- *
- * The receipt answers "what does this transaction do", and for a coin that is
- * about to be drained that answer is "nothing wrong": you pay, you receive,
- * every address is ordinary, no risk. Buying a rug is an honest transaction.
- *
- * So when something other than SOL is arriving, the receipt also says what the
- * thing arriving *is*: whether it can be sold back, whether its creator can
- * freeze it, and whether its pool is being pulled out from under it right now.
- * Best effort and never in the way of signing. It appears when the answer
- * arrives, and its absence means we could not reach the registry, not that the
- * coin is fine.
+ * What you are about to receive, judged on its own. The receipt answers what the transaction
+ * does, and buying a rug is an honest transaction: you pay, you receive, no risk. So when
+ * something other than SOL arrives the receipt also says what it is: sellable back, freezable
+ * by its creator, its pool being pulled right now. Best effort, never in the way of signing;
+ * its absence means the registry was unreachable, not that the coin is fine.
  */
 @Composable
 internal fun IncomingCoinCard(r: com.clearsign.core.Receipt, owner: String?) {

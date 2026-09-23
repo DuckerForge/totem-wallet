@@ -11,16 +11,10 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
 /**
- * Scanning an Agent Gate request off a screen.
- *
- * An agent running on a computer has no way to reach the phone: there is no
- * server in this design and there never will be. So it renders the request as a
- * QR and the phone reads it. The request is routed to [AgentGateActivity]
- * *explicitly*, so no other app can claim the `apex://` scheme (and the legacy `omni://`), and tagged
- * `via=qr` so the receipt can say how it arrived.
- *
- * Returns a launcher: call it to open the camera. zxing asks for the camera
- * permission itself, which is why there is none of that here.
+ * Scanning an Agent Gate request off a screen. An agent on a computer cannot reach the phone,
+ * there is no server, so it renders the request as a QR and the phone reads it. Routed to
+ * [AgentGateActivity] explicitly, so no other app can claim `apex://` (or the legacy `omni://`),
+ * and tagged `via=qr` so the receipt says how it arrived. Returns a launcher; zxing asks for the camera permission itself.
  */
 @Composable
 internal fun rememberAgentScan(onError: (String) -> Unit = {}): () -> Unit {

@@ -20,7 +20,7 @@ android {
     // the scan reads thousands of wallets on a schedule, and if it ever burns through its
     // month the agent must keep trading as if nothing happened. Blank → the feature is off.
     val scanRpcUrl = localProps.getProperty("clearsign.scanRpcUrl", "")
-    // Le altre chiavi del pool RPC. Vuote = fornitore assente. Mai committate.
+    // The other RPC pool keys. Blank = provider absent. Never committed.
     val alchemyRpcUrl = localProps.getProperty("clearsign.alchemyRpcUrl", "")
     val chainstackRpcUrl = localProps.getProperty("clearsign.chainstackRpcUrl", "")
     val rpcfastRpcUrl = localProps.getProperty("clearsign.rpcfastRpcUrl", "")
@@ -29,11 +29,10 @@ android {
     // Every phone reads this file; none of them scans. Blank → each phone falls
     // back to scanning for itself, which is fine for one user and absurd for many.
     val crowdUrl = localProps.getProperty("clearsign.crowdUrl", "")
-    // Con il servizio, il telefono legge il nodo passando da li' e la chiave
-    // resta sul servizio: nell'APK non c'e'. La chiave propria vale solo per
-    // una build senza servizio, che e' una build per una persona.
+    // With the service, the phone reads the node through it and the key stays on the
+    // service, out of the APK. An own key only matters for a build without the service, a one-person build.
     val scanUrl = if (crowdUrl.isNotBlank()) crowdUrl.trimEnd('/') + "/?rpc=1" else scanRpcUrl
-    // L'archivio condiviso, letto senza chiave. Vuoto: si passa dal servizio.
+    // The shared archive, read without a key. Blank: go through the service.
     val archiveUrl = localProps.getProperty("clearsign.archiveUrl", "")
     // Wallet that receives SKR for premium themes. Blank → purchases disabled in the UI.
     val skrTreasury = localProps.getProperty("clearsign.skrTreasury", "")
@@ -61,11 +60,9 @@ android {
         buildConfigField("String", "JUP_REFERRAL", "\"$jupReferral\"")
     }
 
-    // The store wants a key that stays the same for the life of the app: the
-    // first upload decides it, and every update has to match it. It lives
-    // outside the repository, named in local.properties, so it is never
-    // committed and never printed. Without those four lines release falls back
-    // to the debug key, which still sideloads onto the Seeker.
+    // The store wants one key for the life of the app: the first upload decides it, every
+    // update must match. It lives outside the repo, named in local.properties, never committed
+    // or printed. Without those four lines release falls back to the debug key, which still sideloads.
     val storeFilePath = localProps.getProperty("clearsign.storeFile", "")
     val hasRealKey = storeFilePath.isNotBlank() && File(storeFilePath).exists()
     signingConfigs {

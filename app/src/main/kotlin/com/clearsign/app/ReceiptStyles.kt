@@ -36,9 +36,8 @@ import com.clearsign.core.Receipt
 import com.clearsign.core.Severity
 
 /**
- * Alternative receipt layouts, one per theme family. Same data as the card
- * layout (hero, risks, split map, details, stats) — a different object:
- * a paper till receipt for Ember, a terminal log for Phosphor.
+ * Alternative receipt layouts, one per theme family, same data as the card layout: a paper
+ * till receipt for Ember, a terminal log for Phosphor.
  */
 
 // ---- shared pieces ------------------------------------------------------------

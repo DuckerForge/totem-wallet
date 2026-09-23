@@ -7,10 +7,9 @@ import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * dApp Store reputation for the app that opened us, from the free public
- * Seeker Tracker catalog (no key). Rating, review count, publisher (and whether
- * it's a claimed/verified publisher), current version and last-update date —
- * or "not listed", which is itself a caution for a sideloaded app.
+ * dApp Store reputation for the app that opened us, from the free Seeker Tracker catalog (no
+ * key): rating, review count, publisher and whether it is verified, version, last update. Or
+ * "not listed", itself a caution for a sideloaded app.
  */
 data class StoreRep(
     val listed: Boolean,

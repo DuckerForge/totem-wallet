@@ -37,12 +37,9 @@ import com.clearsign.core.ContactTap
 object ContactInbox { val incoming = mutableStateOf<ContactTap.Card?>(null) }
 
 /**
- * Trading contacts by touching two phones.
- *
- * Two tocks, one each way. "Show mine" makes this phone the tag with its
- * signed card; "Read theirs" listens. What comes in is shown with the check
- * already done and saved as a contact verified by touch, the one kind of
- * contact address poisoning cannot imitate.
+ * Trading contacts by touching two phones. Two tocks, one each way: "Show mine" makes this
+ * phone the tag with its signed card, "Read theirs" listens. What comes in is shown already
+ * checked and saved as a contact verified by touch, the one kind address poisoning cannot imitate.
  */
 @Composable
 internal fun ContactTapSheet(owner: String, onSaved: () -> Unit, onDismiss: () -> Unit) {

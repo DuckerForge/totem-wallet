@@ -177,7 +177,7 @@ internal fun WalletHero(
         pv?.let { view ->
             val main = view.main.filter { it.raw > 0 }
             val others = view.others.filter { it.raw > 0 }
-            // Un portafoglio vuoto lo dice, e dice cosa fare: prima la scheda spariva e basta.
+            // An empty wallet says so, and says what to do: before, the card just disappeared.
             if (main.isEmpty() && others.isEmpty() && view.defi.isEmpty()) {
                 GlassCard {
                     EmptyState(HIcon.WALLET, stringResource(R.string.hero_empty_title), stringResource(R.string.hero_empty_body), stringResource(R.string.receive_btn) to { onAction(HomeAction.RECEIVE) })
@@ -573,9 +573,8 @@ private fun DefiTile(d: DefiPosition, currency: String, onClick: () -> Unit) {
         DefiPosition.Kind.ORE -> d.sub.substringBefore(" · ")
         else -> d.fiat?.let { fmtFiat(it, currency) } ?: d.sub
     }
-    // 106 dp: tre tessere piu' due spazi stanno nei 339 dp della scheda su un
-    // telefono largo 411. La quarta fa scorrere la fila. Ogni tessera apre un
-    // foglio, e lo dice col chevron e con la pressione.
+    // 106 dp: three tiles plus two gaps fit the card's 339 dp on a 411-wide phone.
+    // The fourth scrolls the row. Every tile opens a sheet, and says so with the chevron and the press.
     HaloTile(106.dp, onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TokenLogo(if (d.kind == DefiPosition.Kind.ORE) com.clearsign.core.Ore.MINT else d.symbol, d.symbol, d.image, 24.dp)

@@ -22,12 +22,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 /**
- * Bridges Android's Intent-based Seed Vault API to suspend functions.
- *
- * The Seed Vault performs every key operation inside the TEE and gates it with
- * the device biometric; the app only ever sends/receives Intents. This bridge
- * must be constructed while the Activity is CREATED (before it is STARTED),
- * because [ComponentActivity.registerForActivityResult] requires it.
+ * Bridges Android's Intent-based Seed Vault API to suspend functions. Every key operation
+ * runs inside the TEE behind the biometric; the app only sends and receives Intents. Build
+ * it while the Activity is CREATED: [ComponentActivity.registerForActivityResult] requires it.
  */
 class ActivityResultBridge(activity: ComponentActivity) {
     private var pending: CompletableDeferred<ActivityResult>? = null
@@ -75,12 +72,9 @@ data class SvAccount(
 )
 
 /**
- * Real [HardwareSigner] backed by the Solana Seed Vault. Private keys never
- * leave the vault; signing is authorised by the user's biometric.
- *
- * Call [connect] once (from a coroutine) to authorise the app for a seed and
- * cache the account public key; after that [sign] can be called from a
- * background thread (it blocks that thread while the biometric prompt runs).
+ * The real [HardwareSigner], backed by the Seed Vault: keys never leave it, signing is
+ * authorized by biometric. Call [connect] once from a coroutine to authorize a seed and cache
+ * the public key; then [sign] may run on a background thread (it blocks while the prompt runs).
  */
 class SeedVaultSigner(
     private val context: Context,
@@ -107,9 +101,8 @@ class SeedVaultSigner(
     }
 
     /**
-     * Grant the runtime permission, authorise (or reuse) a seed, and fetch the
-     * account public key. [ACCESS_SEED_VAULT] is a *dangerous* permission, so it
-     * must be requested at runtime before any Seed Vault call.
+     * Grant the runtime permission, authorize or reuse a seed, fetch the public key.
+     * [ACCESS_SEED_VAULT] is a dangerous permission: request it before any Seed Vault call.
      */
     suspend fun connect(): String {
         if (!hasPermission) {
@@ -125,9 +118,8 @@ class SeedVaultSigner(
     }
 
     /**
-     * Ensure permission + Seed Vault availability, authorise a seed (the user
-     * picks which), and return the seed's accounts so the caller can let the
-     * user choose which wallet to connect. Call [selectAccount] with the choice.
+     * Permission, Seed Vault availability, a seed authorized by the user, and its accounts so
+     * the caller can offer a choice. Follow with [selectAccount].
      */
     suspend fun authorizeAndListAccounts(): List<SvAccount> {
         if (!hasPermission) {
@@ -147,10 +139,9 @@ class SeedVaultSigner(
     }
 
     /**
-     * Make sure we are connected *and* signing with exactly the account the dApp
-     * was authorized for. After a reauthorize (auth token from a previous run)
-     * the signer starts cold, and blindly taking the first account would sign
-     * with the wrong key — so the account is matched by public key, or we refuse.
+     * Connected, and signing with exactly the account the dApp authorized. After a reauthorize
+     * the signer starts cold, and taking the first account would sign with the wrong key: the
+     * account is matched by public key, or we refuse.
      */
     suspend fun ensureAccount(pubkeyBase58: String) {
         if (isConnected && selected?.pubkeyBase58 == pubkeyBase58) return
@@ -160,9 +151,8 @@ class SeedVaultSigner(
     }
 
     /**
-     * List the seed's accounts. Prefers the accounts content provider (gives the
-     * user-set names like "atreides.skr"); if that needs privileged access
-     * (Simulator), falls back to enumerating the first several BIP44 accounts.
+     * The seed's accounts: the content provider first (it has the user's names, "atreides.skr");
+     * when that needs privileged access (Simulator), the first BIP44 accounts.
      */
     private suspend fun listAccounts(token: Long): List<SvAccount> {
         accountsFromProvider(token).takeIf { it.isNotEmpty() }?.let { return it }
@@ -211,11 +201,9 @@ class SeedVaultSigner(
     }
 
     /**
-     * Reuse an existing authorisation by reading the wallet content provider.
-     * This direct read needs ACCESS_SEED_VAULT_PRIVILEGED (only granted to
-     * system apps / the Seed Vault Simulator's privileged callers), so on a
-     * normal install it throws SecurityException — we then fall back to the
-     * Intent-based [authorize] flow, which only needs ACCESS_SEED_VAULT.
+     * Reuse an existing authorization by reading the wallet content provider. That read needs
+     * ACCESS_SEED_VAULT_PRIVILEGED (system apps, the Simulator), so a normal install throws
+     * SecurityException and falls back to the Intent-based [authorize], which needs only ACCESS_SEED_VAULT.
      */
     private fun existingAuthToken(): Long? = try {
         val cursor = Wallet.getAuthorizedSeeds(
@@ -274,9 +262,8 @@ class SeedVaultSigner(
     }
 
     /**
-     * Synchronous [HardwareSigner.sign] required by ClearSignFlow. It blocks the
-     * *calling* thread (never call it on the main thread) while the Seed Vault
-     * biometric prompt runs on the main thread.
+     * The synchronous [HardwareSigner.sign] ClearSignFlow needs: blocks the calling thread
+     * (never the main one) while the biometric prompt runs on main.
      */
     override fun sign(serializedTx: ByteArray): ByteArray = runBlocking { signSuspend(serializedTx) }
 }

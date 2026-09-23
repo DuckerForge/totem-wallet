@@ -3,12 +3,8 @@ package com.clearsign.app
 import com.journeyapps.barcodescanner.CaptureActivity
 
 /**
- * The scanner, upright.
- *
- * zxing's own capture activity follows the sensor, which on this phone means it
- * opens sideways — you end up tilting your head to read a QR. This subclass
- * exists only so the manifest can pin it to portrait, like every other screen
- * in the app.
+ * The scanner, upright. zxing's capture activity follows the sensor and opens sideways on
+ * this phone; this subclass exists so the manifest can pin it to portrait like every other screen.
  */
 class ScanPortraitActivity : CaptureActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {

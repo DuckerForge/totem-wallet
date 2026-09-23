@@ -1,9 +1,8 @@
 package com.clearsign.app
 
 /**
- * A single "how safe is my wallet right now" score with the concrete issues
- * behind it. Computed from the owner's token accounts (approvals still live, dust
- * to reclaim) plus the local trust book — every issue maps to a one-tap fix.
+ * One "how safe is my wallet right now" score with the concrete issues behind it, from the
+ * owner's token accounts (live approvals, dust to reclaim) and the local trust book. Every issue maps to a one-tap fix.
  */
 data class HealthIssue(val kind: Kind, val count: Int, val detail: String) {
     enum class Kind { UNLIMITED_APPROVAL, LIMITED_APPROVAL, DUST_ACCOUNTS, FROZEN }

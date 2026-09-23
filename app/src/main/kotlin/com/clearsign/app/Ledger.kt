@@ -10,10 +10,9 @@ import java.util.TimeZone
 import kotlin.math.pow
 
 /*
- * The structured ledger — one entry per transaction the user approved, with
- * raw amounts, counterparties, risks, fiat snapshots and the attested proof.
- * Everything the "Scontrini" tab and the tax exports need, kept as monthly
- * JSONL files under filesDir (append-only; edits rewrite the month).
+ * The structured ledger: one entry per approved transaction, with raw amounts,
+ * counterparties, risks, fiat snapshots and the attested proof. Everything the Receipts tab
+ * and the tax exports need, as monthly JSONL files under filesDir (append-only; edits rewrite the month).
  */
 
 /** One asset movement of the user's wallet. rawAmount < 0 = leaves the wallet. */
@@ -120,9 +119,8 @@ object Ledger {
     fun all(ctx: Context): List<LedgerEntry> = months(ctx).flatMap { month(ctx, it) }
 
     /**
-     * The newest [n] entries, of one [kind] or of any: what a card on a page
-     * shows. Months are read newest first and only until the list is full,
-     * so a card asking for five rows never parses a year of files.
+     * The newest [n] entries, of one [kind] or any, for a card. Months are read newest first and
+     * only until the list is full, so five rows never parse a year of files.
      */
     fun recent(ctx: Context, n: Int, kind: String? = null): List<LedgerEntry> = synchronized(lock) {
         takeAcross(months(ctx).map { ym -> { readMonth(ctx, ym) } }, n) { kind == null || it.kind == kind }

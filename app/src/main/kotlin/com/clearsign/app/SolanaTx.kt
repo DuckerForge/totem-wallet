@@ -6,14 +6,10 @@ import com.clearsign.core.InstructionKind
 import com.clearsign.core.NATIVE_SOL_MINT
 
 /**
- * A small, self-contained Solana transaction reader — just enough to build a
- * clear-signing receipt from the real bytes a dApp asks us to sign, and to
- * splice our Seed Vault signature back into the transaction.
- *
- * It parses both legacy and v0 wire formats. For v0, accounts that live in
- * Address Lookup Tables are not present in the message, so instructions that
- * reference them are reported with a null destination (resolving them needs an
- * RPC round-trip — a documented next step, alongside Helius simulation).
+ * A small Solana transaction reader: enough to build a receipt from the real bytes a dApp
+ * asks us to sign, and to splice the Seed Vault signature back in. Legacy and v0 wire formats;
+ * for v0, accounts in Address Lookup Tables are not in the message, so instructions using
+ * them report a null destination until resolved over RPC.
  */
 object SolanaTx {
 
@@ -52,10 +48,9 @@ object SolanaTx {
             get() = instructions.mapNotNull { staticAccountKeys.getOrNull(it.programIdIndex) }.distinct()
 
         /**
-         * Static keys that are *writable* — the only accounts whose SOL balance a
-         * transfer can change, so the candidate set for "where the money goes".
-         * Signers come first (writable = first `numRequiredSignatures - numReadonlySigned`),
-         * then non-signers (writable until the last `numReadonlyUnsigned`).
+         * Static keys that are writable, the only accounts whose SOL a transfer can change, so the
+         * candidate set for "where the money goes". Signers first (writable = the first
+         * `numRequiredSignatures - numReadonlySigned`), then non-signers (writable until the last `numReadonlyUnsigned`).
          */
         val writableKeys: List<String>
             get() {
@@ -69,17 +64,12 @@ object SolanaTx {
             }
     }
 
-    /*
-     * The message part of a serialized transaction: everything after the
-     * signature array. This is what an ed25519 signature must cover — the Seed
-     * Vault signs exactly the bytes it is handed, so it must be handed this.
-     */
     /**
-     * A transaction can declare at most this many signatures. The wire format
-     * allows a much larger number, and `count * 64` on a large one overflows to
-     * a negative offset that slips past a `<= size` check and blows up inside
-     * the copy. The limit is not arbitrary: a Solana message cannot hold more
-     * signers than it has accounts, and an account list is a single byte.
+     * A transaction may declare at most this many signatures. The wire format allows far more,
+     * and `count * 64` on a large one overflows to a negative offset that slips past a `<= size`
+     * check and blows up inside the copy. Not arbitrary: a message cannot hold more signers than
+     * accounts, and the account list is one byte. [messageBytes] below is everything after the
+     * signature array, the bytes an ed25519 signature covers: the Seed Vault signs exactly what it is handed.
      */
     private const val MAX_SIGNATURES = 255
 
@@ -93,11 +83,8 @@ object SolanaTx {
     }
 
     /**
-     * The transaction's own first signature, base58, which is its id on chain.
-     *
-     * Worth having when a send gets no answer: the bytes were already signed, so
-     * the id is knowable without the node telling us, and the chain can be asked
-     * whether it landed.
+     * The transaction's own first signature, base58, its id on chain: knowable without the node
+     * when a send gets no answer, so the chain can be asked whether it landed.
      */
     fun firstSignature(signedTx: ByteArray): String? = runCatching {
         val r = Reader(signedTx)
@@ -197,8 +184,8 @@ object SolanaTx {
                 else -> DecodedInstruction(InstructionKind.UNKNOWN, program)
             }
             COMPUTE_BUDGET_PROGRAM -> null // fee/limit hints; nothing for the receipt
-            // ORE: un Deploy o un Automate mettono SOL in gioco. Chi paga le caselle
-            // e' il conto 1, e se non e' chi firma lo dice il motore dei rischi.
+            // ORE: a Deploy or an Automate puts SOL in play. Account 1 pays for the
+            // squares, and if it is not the signer the risk engine says so.
             com.clearsign.core.Ore.PROGRAM -> when (val call = com.clearsign.core.Ore.decode(ix.data, ix.accounts.map { i -> d.staticAccountKeys.getOrNull(i) ?: "" })) {
                 is com.clearsign.core.Ore.Call.Deploy -> DecodedInstruction(InstructionKind.WAGER, program, amountRaw = call.total, subject = call.authority?.takeIf { it.isNotEmpty() })
                 is com.clearsign.core.Ore.Call.Automate -> DecodedInstruction(

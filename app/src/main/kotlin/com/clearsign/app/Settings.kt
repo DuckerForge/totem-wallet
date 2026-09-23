@@ -29,31 +29,21 @@ object Settings {
     val textScale = mutableStateOf(1f)
 
     /**
-     * Your own slice of the balance, kept between trades.
-     *
-     * A quarter, a half and three quarters are somebody else's idea of how you
-     * trade. This is the one you set once and then press, and it is worth storing
-     * because the whole point of it is not typing the number again.
-     * Zero means you have not set one.
+     * Your own slice of the balance, kept between trades. A quarter, a half and three quarters
+     * are somebody else's idea; this is the one you set once and press. Zero: not set.
      */
     val swapCustomPct = mutableStateOf(0)
 
     /**
-     * Let the model read the web about a coin before the agent buys it.
-     *
-     * Off by default because it spends money that is not the trade: about a cent
-     * per search on your own Anthropic key, on the one coin per purchase. See
-     * [CoinCheck].
+     * Let the model read the web about a coin before the agent buys it. Off by default: about a
+     * cent per search on your own Anthropic key. See [CoinCheck].
      */
     val webCheck = mutableStateOf(false)
 
     /**
-     * The Agent tab, with everything on it.
-     *
-     * Off, the tab answers three questions and stops: is it working, what does it
-     * hold, what did it do. On, it also shows the model, the collar's numbers,
-     * the lane and targets, the shadow book, the live trace, and the bridge to an
-     * agent on a computer. Same page, one switch, remembered.
+     * The Agent tab with everything on it. Off, three questions: is it working, what does it
+     * hold, what did it do. On, also the model, the collar's numbers, lane and targets, the
+     * shadow book, the live trace, the bridge to a computer. One switch, remembered.
      */
     val agentPro = mutableStateOf(false)
 
@@ -62,18 +52,11 @@ object Settings {
     val walletOpen = mutableStateOf(true)
 
     /**
-     * Il nodo con cui questo telefono parla con Solana, quando la persona ne
-     * porta uno suo.
-     *
-     * L'app nasce con un nodo compilato dentro, che e' di chi pubblica l'app e
-     * che tutte le installazioni si dividono. Va benissimo finche' sono poche.
-     * Con l'agente acceso un telefono fa qualche migliaio di chiamate al giorno,
-     * e mille telefoni sono milioni: a quel punto il nodo di chi pubblica finisce,
-     * e finisce **per tutti insieme**, compreso chi non ha l'agente acceso e sta
-     * solo guardando il saldo.
-     *
-     * Quindi si puo' portare il proprio, come si porta la propria chiave del
-     * modello. Vuoto vuol dire quello compilato, cioe' come prima.
+     * The node this phone talks to Solana with, when the person brings their own. The app ships
+     * with one compiled in, the publisher's, shared by every install: fine while they are few.
+     * With the agent on a phone makes thousands of calls a day and a thousand phones make
+     * millions, and the publisher's node runs out for everyone at once, including whoever is
+     * only looking at a balance. Empty means the compiled one.
      */
     val rpcUrl = mutableStateOf("")
 
@@ -94,8 +77,8 @@ object Settings {
     }
 
     /**
-     * Solo https, e solo un indirizzo che sta in piedi. Un nodo scritto male
-     * spegnerebbe la catena per chi l'ha scritto, senza dire perche'.
+     * Only https, and only a URL that stands up: a misspelled node would switch the chain off
+     * for whoever typed it, without saying why.
      */
     fun setRpcUrl(ctx: Context, url: String) {
         val v = url.trim().takeIf { it.startsWith("https://") && it.length > 12 }.orEmpty()
@@ -105,8 +88,8 @@ object Settings {
     }
 
     /**
-     * Il proprio se c'e', quello compilato se no. Il pool sa qual e' il
-     * proprio: lo mette per primo e resta dietro come ripiego.
+     * The own node if there is one, else the compiled one. The pool knows which is own: first
+     * in line, with the compiled one behind as fallback.
      */
     private fun applyRpc() {
         val own = rpcUrl.value.takeIf { it.isNotBlank() }
@@ -154,7 +137,7 @@ object Settings {
         textScale.value = c
     }
 
-    /** «Tieni premuto per nascondere» si dice finche' non lo si e' fatto una volta. */
+    /** "Hold to hide" is said until it has been done once. */
     fun hideHintSeen(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("hide_hint_seen", false)
     fun setHideHintSeen(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("hide_hint_seen", true).apply()
 
@@ -179,9 +162,8 @@ object Settings {
     }
 
     /**
-     * Guest: the phone in somebody else's hands. Amounts are covered, the
-     * actions that spend are off. In memory only: the door asks the print on
-     * every return anyway, so a restart ends it.
+     * Guest: the phone in somebody else's hands. Amounts covered, spending actions off. In
+     * memory only: the door asks the print on every return, so a restart ends it.
      */
     val guest = mutableStateOf(false)
 
@@ -195,25 +177,17 @@ object Settings {
         homeActionsTick.value++
     }
     val homeActionsTick = mutableStateOf(0)
-    // Il ponte al posto del link.
-    //
-    // Il link e' il modo di **chiedere** soldi a qualcuno, e si usa quando c'e'
-    // qualcuno dall'altra parte: e' una cosa che capita, non una cosa che fai.
-    // Il ponte lo fai da solo, ed e' l'unico modo che questo portafoglio ha di
-    // portare i soldi fuori da Solana. Chi lo vuole indietro lo rimette da
-    // Personalizza: sono le stesse nove, cambia solo quale sta sulla prima
-    // pagina.
+    // The bridge in place of the link. The link asks somebody for money and is used when there
+    // is somebody on the other side: a thing that happens, not a thing you do. The bridge you do
+    // alone, and it is the only way this wallet takes money out of Solana. Customize brings the
+    // link back: same nine actions, only the front page changes.
     val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "BRIDGE", "AGENT")
 
     /**
-     * A hand over the screen (the proximity sensor) covers the numbers. **Off by default.**
-     *
-     * It was on, and it fired on the wrong thing: a thumb travelling up the
-     * screen passes the sensor, so scrolling the wallet locked the numbers and
-     * asked for a fingerprint. A privacy trick that goes off while you are
-     * reading is not protecting anything, it is taking the page away. It stays
-     * in settings for the people who want it, and for the demo, where a hand
-     * deliberately laid over the top is exactly the gesture being shown.
+     * A hand over the screen (the proximity sensor) covers the numbers. Off by default: it fired
+     * on the wrong thing, a thumb traveling up the screen passes the sensor, so scrolling locked
+     * the numbers and asked for a fingerprint. It stays for those who want it, and for the demo,
+     * where a hand laid over the top is exactly the gesture being shown.
      */
     fun coverToHide(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cover_hide", false)
     fun setCoverToHide(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("cover_hide", on).apply()

@@ -10,9 +10,8 @@ import android.os.LocaleList
 import android.provider.Settings
 
 /**
- * Per-app language. Android 13+ stores it in the system (LocaleManager) so it
- * survives reinstalls and shows in Settings -> App languages; older builds are
- * sent to the app's system settings page.
+ * Per-app language. Android 13+ stores it in the system (LocaleManager), so it survives
+ * reinstalls and shows under Settings > App languages; older builds go to the app's settings page.
  */
 object AppLocale {
     /** "en", "it", ... or null = follow the system. */

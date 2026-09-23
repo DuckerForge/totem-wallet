@@ -12,12 +12,8 @@ import com.clearsign.core.TransactionDecoder
 import com.clearsign.core.TransactionScanner
 
 /*
- * Demo wiring for the on-device build.
- *
- * These are in-memory stand-ins for the real ports (Helius simulate, Blockaid
- * scan, on-chain decode). They let the full :core safety pipeline run on the
- * Seeker today; phases 3–5 swap them for the real Seed Vault signer, Helius RPC
- * simulator, web3-solana decoder and the Mobile Wallet Adapter endpoint.
+ * Demo wiring for the on-device build: in-memory stand-ins for the real ports (simulate,
+ * scan, decode) so the whole :core safety pipeline runs on the Seeker with no dApp.
  */
 
 /** The user's own wallet (in the real app this comes from Seed Vault). */

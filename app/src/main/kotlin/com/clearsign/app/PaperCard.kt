@@ -23,16 +23,10 @@ import androidx.compose.ui.unit.sp
 import com.clearsign.core.ExitRule
 
 /**
- * What the other exit rules would have done, on your coins.
- *
- * Two questions get answered here and nowhere else in the app. Whether the target
- * and stop you set are the right ones for what this scan finds — and whether the
- * walls that stop the agent are saving you money or costing it. Both are numbers
- * from your own trades, which is the only kind worth having.
- *
- * The card refuses to give advice on too little. Under [ENOUGH] closed trades it
- * shows the table and says plainly that it does not mean anything yet, because a
- * suggestion made on eight trades is a suggestion made on noise.
+ * What the other exit rules would have done on your coins. Two questions answered nowhere
+ * else: whether your target and stop fit what this scan finds, and whether the walls that
+ * stop the agent save or cost money, both from your own trades. Under [ENOUGH] closed trades
+ * it shows the table and says it does not mean anything yet: a suggestion on eight trades is noise.
  */
 private const val ENOUGH = 20
 private const val MARGIN = 1.20   // 20% better before it is worth changing anything
@@ -50,29 +44,18 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
     val closed = yours?.closed ?: 0
 
     /**
-     * La riga che mancava: **non fare niente**.
-     *
-     * Il libro ombra confrontava le regole di uscita fra loro — vendi al 15,
-     * vendi al 50, insegui il massimo — e mai con la cosa piu' ovvia del mondo,
-     * cioe' non comprare. Cosi' la domanda era sempre "quale regola perde meno",
-     * mai "conveniva muoversi".
-     *
-     * E qui costa zero, perche' tutto questo libro e' gia' misurato **in SOL**:
-     * chi tiene i suoi SOL e non tocca niente sta esattamente a zero. Non un
-     * numero stimato, non una serie di prezzi da scaricare: zero.
-     *
-     * Non e' una regola vera nel motore di proposito. Aggiungerla a
-     * `ExitRule.all()` come `Fixed(HOLD, 0, 0)` avrebbe due difetti misurati nel
-     * codice: `step` protegge entrambe le soglie con `> 0`, quindi quella riga
-     * resterebbe aperta per sempre e non entrerebbe mai nelle statistiche; e
-     * `netLamports` toglie comunque due commissioni piu' l'affitto del conto,
-     * quindi **dichiarerebbe una perdita di 0,00205 SOL per non aver fatto
-     * niente**, che e' una bugia.
+     * The row that was missing: do nothing. The shadow book compared exit rules with each other
+     * and never with the obvious thing, not buying, so the question was always "which rule loses
+     * least", never "was moving worth it". It costs zero here because the book is measured in
+     * SOL: holding SOL sits exactly at zero. Not a real engine rule on purpose: as
+     * `Fixed(HOLD, 0, 0)` in `ExitRule.all()`, `step` guards both thresholds with `> 0` so the
+     * row would stay open forever, and `netLamports` would still subtract two fees plus rent,
+     * declaring a 0.00205 SOL loss for doing nothing.
      */
     val doNothing = Paper.Stat(rule = HOLD, closed = closed, wins = 0, netLamports = 0L)
     val table = (stats + doNothing).sortedByDescending { it.netLamports }
-    // Il migliore fra le regole vere: "non fare niente" non si puo' applicare
-    // col tasto, e proporlo accenderebbe una scatola col tasto morto dentro.
+    // The best among the real rules: "do nothing" cannot be applied with the
+    // button, and offering it would light a box with a dead button inside.
     val best = stats.filter { it.closed > 0 }.maxByOrNull { it.netLamports }
 
     GlassCard {
@@ -157,11 +140,8 @@ internal fun PaperCard(refresh: Int, onChange: () -> Unit) {
 }
 
 /**
- * Il nome della riga che non e' una regola.
- *
- * Va prima di tutte nel `when`, perche' il ramo finale di questa funzione e'
- * `else -> shadow_rule_timed`: una riga con un nome che non conosce si
- * presenterebbe come "A tempo, sei ore" senza dire niente a nessuno.
+ * The name of the row that is not a rule. First in the `when`: its final branch is
+ * `else -> shadow_rule_timed`, so an unknown name would show as "Timed, six hours".
  */
 private const val HOLD = "hold"
 
@@ -175,11 +155,9 @@ private fun ruleName(rule: String) = when (rule) {
 }
 
 /**
- * The two numbers a rule becomes when you accept it.
- *
- * Only the fixed rules can be applied: the loop's exit is a target and a stop, and
- * pretending a trailing rule fits in those two fields would set something that is
- * not the rule that won.
+ * The two numbers a rule becomes when accepted. Only fixed rules apply: the loop's exit is a
+ * target and a stop, and forcing a trailing rule into them would set something other than the
+ * rule that won.
  */
 private fun applyRule(rule: String): Pair<Int, Int>? = when (rule) {
     ExitRule.QUICK -> 15 to 10

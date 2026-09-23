@@ -6,22 +6,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * What a coin *is*, and how it has moved over more than a day.
- *
- * Jupiter's registry answers "is this tradeable and is it a trap": price,
- * liquidity, holders, authorities. It does not answer "what am I buying", and
- * an agent proposing a purchase with no idea what the thing does is guessing
- * with a straight face. This fills that gap: a sentence about the project, its
- * market cap rank, and the week, month and year behind the last 24 hours.
- *
- * Keyless. The public tier needs no account and no card, which is the whole
- * reason it is worth using here. It also rate-limits by IP and answers 429 when
- * pushed, so every result is cached for an hour and every failure is silent: a
- * missing description is a description we do not have, never a reason to stop.
- *
- * No key at all today. A free demo key (no card) would lift the limit to ten
- * thousand calls a month at a hundred a minute, and the only change needed is
- * an `x-cg-demo-api-key` header in [get].
+ * What a coin is, and how it moved over more than a day. Jupiter's registry answers "is this
+ * tradeable and is it a trap"; not "what am I buying", and an agent proposing a purchase with
+ * no idea what the thing does is guessing. This fills the gap: a sentence about the project,
+ * its rank, and the week, month and year behind the last 24 hours. Keyless, rate-limited by
+ * IP, answers 429 when pushed: cached an hour, every failure silent. A free demo key
+ * (`x-cg-demo-api-key` in [get]) would lift the limit to ten thousand calls a month.
  */
 object CoinGecko {
     private const val TAG = "Apex-Gecko"

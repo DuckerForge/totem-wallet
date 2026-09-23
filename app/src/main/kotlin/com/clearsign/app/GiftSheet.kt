@@ -43,12 +43,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 /**
- * Giving money to someone who has no wallet yet, or whose address you do not
- * know: put it behind a link.
- *
- * The honest part is on the screen, not in a footnote — the link carries the
- * key, so the first person to open it takes the money. In exchange it works with
- * anybody, over any messenger, with no contract and no address.
+ * Giving money to someone with no wallet yet, or whose address you do not know: behind a link.
+ * The honest part is on screen: the link carries the key, so the first to open it takes the
+ * money. In exchange it works with anybody, over any messenger, with no address.
  */
 @Composable
 internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> Unit) {

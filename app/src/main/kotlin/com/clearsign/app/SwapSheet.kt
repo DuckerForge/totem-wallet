@@ -161,13 +161,10 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     val rawIn = parseRaw(amount, from.decimals)
 
     /**
-     * Quote → transaction → receipt, in one place.
-     *
-     * Written once because it happens twice: when you press Review, and every
-     * fifteen seconds afterwards while you are still looking at it. A quote goes
-     * stale, and so does the blockhash inside the transaction it built, so a
-     * review screen left open for a minute was showing a price that no longer
-     * existed on a transaction that would no longer land.
+     * Quote, transaction, receipt, in one place. Written once because it happens twice: on
+     * Review, and every fifteen seconds after while you look. A quote goes stale, and so does
+     * the blockhash in the transaction, so a review left open a minute showed a price that no
+     * longer existed on a transaction that would no longer land.
      */
     suspend fun buildReview(q: Jupiter.Quote, raw: Long): SwapState = try {
         // The building itself lives in SwapBuild, shared with the feed, so the
@@ -188,14 +185,11 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     }
 
     /**
-     * While the review is open the price keeps moving, so the review keeps up.
-     *
-     * With one hard limit. A new quote can come back with a **different route**:
-     * other pools, other accounts, a different number of destinations. Swapping
-     * that in silently means the picture you were reading became a picture of
-     * another transaction while you read it, and on this screen of all screens
-     * that is not allowed. Prices move on their own; the shape of the thing you
-     * are about to sign does not change without you saying so.
+     * While the review is open the price keeps moving, so the review keeps up, with one hard
+     * limit: a new quote can come back with a different route (other pools, other accounts).
+     * Swapping that in silently turns the picture you were reading into another transaction,
+     * and on this screen that is not allowed. Prices move; the shape of what you sign does not
+     * change without you saying so.
      */
     LaunchedEffect(state) {
         val s = state as? SwapState.Review ?: return@LaunchedEffect
@@ -291,11 +285,9 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                // Leave enough SOL behind for the transaction itself, and
-                                // for the wrapped-SOL account Jupiter opens and closes inside
-                                // it: that account needs 0.00204 SOL of rent for the duration,
-                                // on top of the amount. A reserve of 0.002 was 0.00004 short,
-                                // so "MAX" from SOL built a swap that failed in simulation.
+                                // Leave SOL behind for the transaction and for the wrapped-SOL account Jupiter opens and
+                                // closes inside it: 0.00204 SOL of rent for the duration. A reserve of 0.002 was 0.00004
+                                // short, so "MAX" from SOL built a swap that failed in simulation.
                                 val spendable = if (from.mint == Jupiter.SOL_MINT) (fromBalance - 3_000_000L).coerceAtLeast(0) else fromBalance
                                 fun slice(pct: Int) { amount = fmtUnits(spendable / 100L * pct, from.decimals) }
                                 SmallChip("25%", null) { slice(25) }
@@ -412,10 +404,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                         }
                     }
                     is SwapState.Review -> {
-                        // A route that the node says will fail is nearly always a
-                        // stale price, and the fix is a new quote rather than a
-                        // shrug. The hold gesture is gone in that case: signing it
-                        // pays a fee for a transaction that does nothing.
+                        // A route the node says will fail is nearly always a stale price, and the fix is a new
+                        // quote. The hold is gone in that case: signing pays a fee for a transaction that does nothing.
                         val willFail = s.analyzed.receipt.risks.any {
                             it.flag == com.clearsign.core.RiskFlag.SIMULATION_FAILED && it.severity == com.clearsign.core.Severity.DANGER
                         }
@@ -460,10 +450,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
 
 
 /**
- * Pick your own slice, once.
- *
- * A slider rather than a number field: this is a phone, the useful values are
- * round, and nobody wants a keyboard for "a third of it".
+ * Pick your own slice, once. A slider, not a number field: this is a phone, the useful
+ * values are round, and nobody wants a keyboard for "a third of it".
  */
 @Composable
 private fun CustomPercentSheet(current: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit) {

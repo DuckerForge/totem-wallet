@@ -11,13 +11,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The link between this phone and the bridge the agent talks through.
- *
- * The phone is always the client: it polls the bridge for work, decides, and
- * posts the verdict. Nothing ever needs to reach into the phone, so there is no
- * open port here and the same code will talk to a hosted relay one day. Only
- * unsigned transactions, declared intents and verdicts travel over this link;
- * the envelope key does not exist anywhere else.
+ * The link between this phone and the bridge the agent talks through. The phone is always
+ * the client: it polls for work, decides, posts the verdict; no open port here, and the same
+ * code will talk to a hosted relay one day. Only unsigned transactions, declared intents and
+ * verdicts travel; the budget key exists nowhere else.
  */
 object AgentLink {
     private const val PREFS = "apex_link"
@@ -46,14 +43,10 @@ object AgentLink {
         val host = uri.getQueryParameter("host")?.trimEnd('/') ?: return null
         val token = uri.getQueryParameter("token")?.takeIf { it.length >= 16 } ?: return null
         if (!(host.startsWith("http://") || host.startsWith("https://"))) return null
-        // Cleartext only towards your own network, never towards the internet.
-        //
-        // The app allows cleartext at all for one reason: an agent runs on a
-        // machine on the same wifi, at an address like http://192.168.1.10:8765,
-        // and Android has no way to permit cleartext for "the local network"
-        // alone. So the permission stays open at the manifest and the narrowing
-        // happens here, where we actually know the address. A pairing link that
-        // sends a token in the clear across the internet is refused.
+        // Cleartext only toward your own network, never the internet. It is allowed at all because
+        // an agent runs on a machine on the same wifi (http://192.168.1.10:8765) and Android cannot
+        // permit cleartext for "the local network" alone: the manifest stays open and the narrowing
+        // happens here, where the address is known. A pairing token in the clear over the internet is refused.
         if (host.startsWith("http://") && !isLocal(host)) return null
         val name = uri.getQueryParameter("name")?.take(40)?.ifBlank { null } ?: "agent"
         val link = Link(host, token, name, System.currentTimeMillis())

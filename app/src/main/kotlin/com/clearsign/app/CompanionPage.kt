@@ -50,12 +50,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The bubble and the widget, on one page of their own.
- *
- * The bubble floats over every app; the widget sits on the home screen. Both
- * are yours to shape: what the small circle says, which rows the open bubble
- * carries, which coin it watches, how big it is. The preview at the top is
- * the same drawing the bubble uses, so what you see is what floats.
+ * The bubble and the widget on one page. The bubble floats over every app, the widget sits
+ * on the home screen; both are yours to shape, and the preview at the top is the same drawing
+ * the bubble uses.
  */
 @Composable
 internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
@@ -178,10 +175,8 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.comp_rows).uppercase(), style = HaloType.label, color = Halo.muted)
-                    // Il totale e il prezzo della moneta stanno gia' in cima al
-                    // pannello nuovo, con la barra e i due numeri della paghetta:
-                    // due interruttori per righe che non esistono piu' sarebbero
-                    // due interruttori che non fanno niente.
+                    // The total and the coin price already sit at the top of the new panel, with the bar and
+                    // the budget's two numbers: two switches for rows that no longer exist would do nothing.
                     listOf("agent" to R.string.comp_row_agent, "health" to R.string.comp_row_health).forEach { (k, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(label), style = HaloType.body, color = Halo.ink, modifier = Modifier.weight(1f))

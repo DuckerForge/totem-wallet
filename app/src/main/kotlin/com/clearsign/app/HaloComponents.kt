@@ -54,34 +54,22 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /**
- * La lingua comune dell'interfaccia: quello che dice «questo si tocca», quello
- * che dice «questo si legge e basta», e i pezzi che ogni pagina usa uguali.
- *
- * Qui dentro niente rete e niente stato dell'app: solo forma, colore e
- * movimento, nei toni di `HaloTheme`. Ogni animazione si legge in draw o in
- * `graphicsLayer`, mai in composizione: un bordo che respira non deve far
- * ricomporre la scheda che orla.
- *
- * La regola che tiene insieme tutto: **un chevron e' una promessa.** Solo cio'
- * che apre qualcosa lo porta, e tutto cio' che apre qualcosa lo porta. Un
- * pannello che si legge e basta non ha ne' chevron ne' pressione.
- *
- * E la seconda: **l'orlo vivo e' delle schede.** Solo `GlassCard` porta il
- * gradiente che scorre. Una riga, una tessera, un pannello, un chip si
- * distinguono col riempimento, e al massimo con un filo del colore `stroke`.
- * Messo su ogni riga, l'orlo vivo faceva di una lista una fila di bolle.
+ * The interface's common language: what says "this is tappable", what says "this is only
+ * read", and the pieces every page uses alike. No network and no app state here, only
+ * shape, color and motion in `HaloTheme`'s tones; every animation is read in draw or
+ * `graphicsLayer`, never in composition. Two rules. A chevron is a promise: only what
+ * opens something carries one, and everything that opens something does. The living
+ * edge belongs to cards: only `GlassCard` carries the flowing gradient; on every row it
+ * turned a list into a row of bubbles.
  */
 
 // ---- l'orlo ------------------------------------------------------------------------
 
 /**
- * Una fase sola per tutti i bordi vivi.
- *
- * Prima ogni scheda aveva la sua animazione infinita, letta in composizione:
- * sulle palette con `livingStroke` ogni `GlassCard` dell'app si ricomponeva a
- * sessanta fotogrammi al secondo e allocava un pennello a fotogramma, per
- * sempre. Adesso `HaloRoot` muove un numero solo, una volta a fotogramma, e i
- * bordi lo leggono dentro il loro draw.
+ * One phase for every living border. Each card had its own infinite animation read in
+ * composition: on palettes with `livingStroke` every `GlassCard` recomposed sixty times a
+ * second and allocated a brush per frame, forever. `HaloRoot` moves one number per frame
+ * and the borders read it in draw.
  */
 object LivingStroke {
     val phase = mutableFloatStateOf(0f)
@@ -91,20 +79,18 @@ object LivingStroke {
 private val LIVING_COLORS = listOf(Color(0xFF9945FF), Color(0xFF14F195), Color(0xFF9945FF))
 
 /**
- * L'orlo di una scheda: una riga sottile nel colore `stroke`, o il gradiente
- * che scorre sulle palette che lo prevedono. Disegnato dentro il bordo, come
- * fa `border`, e letto in draw: un cambio di palette o di fase ridisegna e
- * basta, non ricompone. [color] forza un colore, per un orlo acceso.
- * [living] falso da' sempre il filo `stroke`, anche sulle palette col
- * gradiente: e' l'orlo di quello che non e' una scheda.
+ * A card's edge: a thin line in `stroke`, or the flowing gradient on palettes that have it.
+ * Drawn inside the border like `border`, read in draw: a palette or phase change redraws,
+ * never recomposes. [color] forces a color; [living] false always gives the `stroke` line,
+ * the edge of what is not a card.
  */
 fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null, living: Boolean = true): Modifier = this.then(
     Modifier.drawWithCache {
         val w = width.toPx()
         val inner = Size((size.width - w).coerceAtLeast(0f), (size.height - w).coerceAtLeast(0f))
         val outline = shape.createOutline(inner, layoutDirection, this)
-        // Il gradiente ripete lungo il suo asse: per girare senza cucitura la
-        // fase deve percorrere esattamente un vettore d'asse per ciclo.
+        // The gradient repeats along its axis: to turn with no seam the phase must
+        // travel exactly one axis vector per cycle.
         val dx = 520f
         val dy = 520f * 0.7f
         onDrawWithContent {
@@ -127,15 +113,13 @@ fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null, li
     },
 )
 
-// ---- quello che si tocca -----------------------------------------------------------
+// ---- what you touch ----------------------------------------------------------------
 
 /**
- * Il trattamento di tutto cio' che si tocca, una volta sola.
- *
- * Superficie contenuta, senza orlo se non lo si chiede, si stringe appena
- * sotto il dito e si vela d'inchiostro finche' il dito resta. Niente ripple: su questi fondi
- * scuri non si vede, e un riquadro che cambia forma si vede. La velatura si
- * legge in draw, cosi' una pressione non ricompone la riga.
+ * The treatment of everything tappable, once: contained surface, no edge unless asked,
+ * shrinks a touch under the finger and veils in ink while it stays. No ripple: invisible
+ * on these dark grounds, while a box changing shape is visible. The veil is read in draw,
+ * so a press does not recompose the row.
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -169,10 +153,9 @@ fun Modifier.tappable(
 }
 
 /**
- * La riga che apre qualcosa. Alta almeno 52 dp, un chevron a destra che lo
- * dice, contenuta e con la pressione di [tappable]. Dentro una scheda si usa
- * il raggio delle righe; sulla pagina, [onGround], quello dei pannelli e il
- * colore della scheda.
+ * The row that opens something: at least 52 dp, a chevron on the right, contained, with
+ * [tappable]'s press. Inside a card it uses the row radius; on the page, [onGround], the
+ * panel radius and the card color.
  */
 @Composable
 fun HaloRow(
@@ -206,7 +189,7 @@ fun HaloRow(
     }
 }
 
-/** La tessera che apre qualcosa: contenuta, con la pressione, e il chevron in alto a destra. */
+/** The tile that opens something: contained, pressable, chevron top right. */
 @Composable
 fun HaloTile(width: Dp, onClick: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val src = remember { MutableInteractionSource() }
@@ -216,7 +199,7 @@ fun HaloTile(width: Dp, onClick: () -> Unit, content: @Composable ColumnScope.()
     }
 }
 
-/** Un'icona in un bottone tondo: aggiorna, chiudi, condividi. Gira se [spinning]. */
+/** An icon in a round button: refresh, close, share. Spins when [spinning]. */
 @Composable
 fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = false, size: Dp = 34.dp, description: String? = null, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
@@ -233,11 +216,11 @@ fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = f
     }
 }
 
-// ---- quello che si legge e basta ---------------------------------------------------
+// ---- what you only read ------------------------------------------------------------
 
 /**
- * Il pannello che si legge e basta: un passo sotto la scheda, orlo sottile,
- * niente chevron, niente pressione. Un chevron qui sarebbe una bugia.
+ * The panel that is only read: a step below the card, thin edge, no chevron, no press. A
+ * chevron here would be a lie.
  */
 @Composable
 fun SoftPanel(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Composable ColumnScope.() -> Unit) {
@@ -250,10 +233,9 @@ fun SoftPanel(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Comp
 // ---- il chip ------------------------------------------------------------------------
 
 /**
- * Un chip solo per tutta l'app. Spento e' un'azione leggera nel colore
- * [tint]; [selected] e' un filtro o una modalita' accesa, col riempimento.
- * [pulse] batte tre volte all'arrivo, per il chip che ha un secondo gesto
- * invisibile: si tiene premuto per cambiarlo, e nient'altro lo dice.
+ * One chip for the whole app. Off, a light action in [tint]; [selected], a filter or a mode
+ * that is on, filled. [pulse] beats three times on arrival, for the chip with an invisible
+ * second gesture: hold to change it, and nothing else says so.
  */
 @Composable
 fun HaloChip(
@@ -296,9 +278,8 @@ fun HaloChip(
 // ---- le intestazioni ------------------------------------------------------------------
 
 /**
- * L'intestazione di una pagina, uguale per le cinque tab: titolo a 22 sp, un
- * sottotitolo, una tessera con l'icona o un [leading] a scelta, e un'azione
- * a destra. [sweep] accende la spira di luce una volta, per l'agente.
+ * A page header, the same for the five tabs: a 22 sp title, a subtitle, an icon tile or a
+ * [leading] of choice, and an action on the right. [sweep] lights the sweep once, for the agent.
  */
 @Composable
 fun PageHeader(
@@ -308,7 +289,7 @@ fun PageHeader(
     tint: Color = Halo.cyan,
     leading: (@Composable () -> Unit)? = null,
     sweep: Boolean = false,
-    /** Per la riga sotto il titolo: la home la fa comparire quando il numero grande scorre via. */
+    /** For the line under the title: the home shows it when the big number scrolls away. */
     subModifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -333,7 +314,7 @@ fun PageHeader(
 
 // ---- gli stati vuoti -------------------------------------------------------------------
 
-/** Lo stato vuoto che dice cosa fare: un'icona, un titolo, una riga, e se serve un'azione. */
+/** The empty state that says what to do: an icon, a title, a line, and an action if needed. */
 @Composable
 fun EmptyState(icon: HIcon, title: String, body: String, action: Pair<String, () -> Unit>? = null) {
     Column(Modifier.fillMaxWidth().padding(vertical = Space.xl), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -349,7 +330,7 @@ fun EmptyState(icon: HIcon, title: String, body: String, action: Pair<String, ()
     }
 }
 
-/** La riga vuota dentro una scheda: un'icona piccola e una frase, niente di piu'. */
+/** The empty row inside a card: a small icon and a sentence, nothing more. */
 @Composable
 fun EmptyLine(icon: HIcon, text: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = Space.xs), verticalAlignment = Alignment.CenterVertically) {
@@ -361,7 +342,7 @@ fun EmptyLine(icon: HIcon, text: String) {
 
 // ---- l'interruttore -------------------------------------------------------------------
 
-/** Un titolo, una riga sotto, e l'interruttore nei colori della casa. */
+/** A title, a line under it, and the switch in the house colors. */
 @Composable
 fun SwitchRow(title: String, sub: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -381,10 +362,8 @@ fun SwitchRow(title: String, sub: String?, checked: Boolean, onChange: (Boolean)
 }
 
 /**
- * The change with its sign: green up, red down, in a soft pill of its own
- * colour. Shared by the wallet's "today" and the agent's "since you funded
- * it", so a gain looks the same wherever it is. `chevron` only when the
- * pill opens something.
+ * The change with its sign, green up, red down, in a soft pill of its own color. Shared by
+ * the wallet's "today" and the agent's "since you funded it". `chevron` only when it opens something.
  */
 @Composable
 fun DeltaPill(text: String, up: Boolean, modifier: Modifier = Modifier, chevron: Boolean = false) {
@@ -400,10 +379,8 @@ fun DeltaPill(text: String, up: Boolean, modifier: Modifier = Modifier, chevron:
 }
 
 /**
- * A row that opens a group under itself: the icon tile lights up and the
- * chevron turns instead of swapping, in graphicsLayer, so opening redraws
- * and never recomposes the row. The same row for Settings and for the
- * agent's Pro sections.
+ * A row that opens a group under itself: the icon tile lights and the chevron turns in
+ * graphicsLayer, so opening redraws and never recomposes the row. Settings and the agent's Pro sections.
  */
 @Composable
 fun DisclosureRow(title: String, sub: String?, icon: HIcon, open: Boolean, tint: Color = Halo.cyan, onToggle: () -> Unit) {

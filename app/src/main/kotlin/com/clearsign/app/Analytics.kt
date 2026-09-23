@@ -1,10 +1,8 @@
 package com.clearsign.app
 
 /**
- * Simple realized P&L from the ledger, FIFO. Every priced inflow of a token is a
- * "lot" bought at that fiat value; every priced outflow disposes of the oldest
- * lots first, and the difference is the realized gain/loss. Entries without a
- * fiat snapshot are skipped, so the numbers are honest about what is known.
+ * Realized P&L from the ledger, FIFO: every priced inflow is a lot, every priced outflow
+ * disposes of the oldest lots first. Entries without a fiat snapshot are skipped.
  */
 data class TokenPnl(
     val mint: String, val symbol: String,

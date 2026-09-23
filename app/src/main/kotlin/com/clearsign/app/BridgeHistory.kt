@@ -40,29 +40,13 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * I ponti che questo telefono ha aperto, e dove si va a guardare.
- *
- * Un ponte e' l'unica cosa che l'app fa dove **la meta' che conta non e' su
- * Solana**. Quello che si firma qui e' un deposito a un indirizzo di RocketX;
- * quello che uno aspetta e' una cifra su Base, su Arbitrum, su Bitcoin. Solscan
- * mostra solo la prima meta', e dice "confermato" anche quando dall'altra parte
- * non e' arrivato ancora niente.
- *
- * Per questo ogni riga porta **due transazioni**, che sono due catene diverse:
- * il deposito partito da qui, e l'arrivo dall'altra parte. Tutti e due i link
- * li da' RocketX (`originTransactionUrl`, `destinationTransactionUrl`): un
- * elenco di esploratori scritto a mano qui dentro invecchierebbe in silenzio,
- * com'e' invecchiato quello delle catene. E la cifra che si legge e'
- * `actualAmount`, quella arrivata davvero, non quella promessa dal preventivo.
- *
- * La terza porta e' RocketX, per quando qualcosa si e' piantato in mezzo. Il
- * numero d'ordine va negli appunti prima di aprire la pagina, perche' e' la
- * prima cosa che chiede chi ti risponde, e ricopiarlo a mano da uno schermo e'
- * come non averlo.
- *
- * Lo stato si chiede da solo all'apertura. Era un tasto su ogni riga: il senso
- * di questa pagina e' sapere se sono arrivati, e farlo chiedere a chi guarda
- * era dargli da fare l'unica cosa per cui e' venuto.
+ * The bridges this phone opened, and where to go and look. A bridge is the one thing whose
+ * half that counts is not on Solana: what you sign is a deposit to RocketX, what you wait for
+ * is an amount on Base or Bitcoin, and Solscan says "confirmed" while nothing has arrived. So
+ * each row carries two transactions on two chains, both links from RocketX
+ * (`originTransactionUrl`, `destinationTransactionUrl`), and the amount is `actualAmount`,
+ * what really arrived. The third door is RocketX support, with the order number copied
+ * first: it is the first thing they ask. The status asks itself on open.
  */
 @Composable
 internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
@@ -107,9 +91,8 @@ internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
                         b.toNetwork + (if (b.exchange.isNotBlank()) "  ·  " + b.exchange else ""),
                         style = HaloType.small, color = Halo.muted,
                     )
-                    // Dove dovevano arrivare. Sullo scontrino della firma non c'e'
-                    // (li' l'indirizzo e' quello del deposito), quindi se non sta
-                    // qui non sta da nessuna parte.
+                    // Where it was meant to arrive. The signing receipt does not have it (the
+                    // address there is the deposit's), so if it is not here it is nowhere.
                     (st?.destAddress?.takeIf { it.isNotBlank() } ?: b.toAddress).takeIf { it.isNotBlank() }?.let {
                         Text(shorten(it, 6), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
                     }
@@ -132,9 +115,8 @@ internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
                         (st?.originUrl ?: b.signature.takeIf { it.isNotBlank() }?.let { solscanTxUrl(it, null) })?.let { url ->
                             SmallChip(stringResource(R.string.bridge_h_sent), HIcon.EXTERNAL, tint = Halo.cyan) { open(ctx, url) }
                         }
-                        // L'unica pagina al mondo che dimostra l'arrivo. Finche'
-                        // non c'e', si offre l'indirizzo sull'altra catena, che
-                        // almeno dice quanto c'e' su quel conto adesso.
+                        // The one page in the world that proves arrival. Until it exists, offer
+                        // the address on the other chain, which at least says what it holds now.
                         val dest = st?.destUrl
                         if (dest != null) {
                             SmallChip(stringResource(R.string.bridge_h_got), HIcon.EXTERNAL, tint = Halo.mint) { open(ctx, dest) }
@@ -167,11 +149,11 @@ private fun open(ctx: android.content.Context, url: String) {
     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 }
 
-/** Otto decimali bastano a un ponte, e gli zeri in coda non li vuole nessuno. */
+/** Eight decimals are enough for a bridge, and nobody wants the trailing zeros. */
 private fun fmtAmt(v: Double): String =
     if (v <= 0.0) "?" else String.format(Locale.ROOT, "%.8f", v).trimEnd('0').trimEnd('.')
 
-/** Oggi, ieri, o quanti giorni fa. Un ponte vive ore, non secondi. */
+/** Today, yesterday, or how many days ago. A bridge lives hours, not seconds. */
 private fun fmtDay(ctx: android.content.Context, at: Long): String {
     val days = ((System.currentTimeMillis() - at) / 86_400_000L).toInt()
     return when {
@@ -182,17 +164,10 @@ private fun fmtDay(ctx: android.content.Context, at: Long): String {
 }
 
 /**
- * Il patto, scritto sopra lo scontrino della firma.
- *
- * Lo scontrino sa dire benissimo quello che succede su Solana: escono 0,1 SOL
- * verso un indirizzo. Ma quell'indirizzo e' un deposito di RocketX, e la cosa
- * per cui uno sta firmando, cioe' **quanto gli arriva e dove**, su Solana non
- * c'e' e nessuna simulazione la puo' trovare. Chi firmava vedeva solo se stesso
- * che manda via dei soldi.
- *
- * Quindi sta qui sopra, prima del resto: le due gambe, l'indirizzo dall'altra
- * parte per intero (e' l'unico numero che nessuno puo' piu' correggere dopo), e
- * per mano di chi passa.
+ * The deal, written above the signing receipt. The receipt says what happens on Solana, 0.1
+ * SOL to an address, but that address is a RocketX deposit and what you sign for, how much
+ * arrives and where, is on no simulation. So it sits on top: the two legs, the full address
+ * on the other side (the one number nobody can correct after), and by whose hand it passes.
  */
 @Composable
 internal fun BridgeDealCard(deal: RocketX.Deal) {

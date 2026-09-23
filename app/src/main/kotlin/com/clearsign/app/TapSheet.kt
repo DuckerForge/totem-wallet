@@ -46,11 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Being paid by holding two phones together.
- *
- * The merchant types an amount; the phone starts emitting that request over NFC
- * and shows the same request as a QR for anyone whose phone cannot tap. The
- * honest line stays on screen the whole time: this asks, it does not take.
+ * Being paid by holding two phones together. The merchant types an amount, the phone emits
+ * that request over NFC and shows it as a QR for phones that cannot tap. The honest line stays on screen: this asks, it does not take.
  */
 @Composable
 internal fun TapSheet(address: String, onDismiss: () -> Unit) {

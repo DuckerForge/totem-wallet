@@ -1,9 +1,9 @@
 package com.clearsign.app
 
 /**
- * Mint → (symbol, decimals) for the tokens a Seeker user actually meets, so the
- * receipt says "USDC" instead of "token(EPjF…Dt1v)". Unknown mints fall back to
- * the shortened mint; a Jupiter token-list lookup can extend this at runtime.
+ * Mint to (symbol, decimals) for the tokens a Seeker user meets, so the receipt says "USDC"
+ * instead of "token(EPjF…Dt1v)". Unknown mints fall back to the shortened mint; the registry
+ * extends this at runtime.
  */
 object TokenSymbols {
     private val known: Map<String, String> = mapOf(
@@ -57,9 +57,8 @@ object TokenSymbols {
     fun isNft(mint: String): Boolean = mint in nfts
 
     /**
-     * Record metadata we learned somewhere better than DAS (today: Jupiter's token
-     * registry, see [JupiterTokens]). Marking the mint as asked keeps the DAS pass
-     * from spending a round trip on something we already name correctly.
+     * Record metadata learned somewhere better than DAS (Jupiter's registry, [JupiterTokens]).
+     * Marking the mint as asked keeps the DAS pass from spending a round trip on it.
      */
     fun seed(mint: String, symbol: String?, name: String?, image: String?) {
         symbol?.takeIf { it.isNotBlank() && !known.containsKey(mint) }?.let { learned[mint] = it }
@@ -69,9 +68,8 @@ object TokenSymbols {
     }
 
     /**
-     * Resolve mints through the RPC's DAS `getAssetBatch` (one call, best effort):
-     * symbol, name, logo and NFT-ness. Call off-main before rendering a receipt or a
-     * token list; results become available to the getters immediately after.
+     * Resolve mints through DAS `getAssetBatch` (one call, best effort): symbol, name, logo,
+     * NFT-ness. Off main, before rendering; results reach the getters at once.
      */
     fun resolve(mints: Collection<String>) {
         val todo = mints.filter { it != com.clearsign.core.NATIVE_SOL_MINT && (it !in asked) && (!isKnown(it) || image(it) == null) }.distinct()

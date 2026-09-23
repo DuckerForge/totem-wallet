@@ -6,13 +6,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Local, on-device address book: saved contacts (address → label) and the set of
- * addresses the user has paid before. This is what powers the trust badges
- * (trusted / known / new) and — crucially — feeds [AddressTrust.lookalikeOf] so
- * address-poisoning look-alikes are detected against addresses the user knows.
- *
- * Stored in plain SharedPreferences: it is per-device, non-sensitive metadata
- * (public addresses + user labels), never keys.
+ * The on-device address book: saved contacts (address to label) and the addresses paid
+ * before. It powers the trust badges (trusted, known, new) and feeds [AddressTrust.lookalikeOf],
+ * so poisoning look-alikes are caught against addresses the person knows. Plain
+ * SharedPreferences: public addresses and labels, never keys.
  */
 object Contacts {
     private const val PREFS = "clearsign_contacts"
@@ -62,26 +59,18 @@ object Contacts {
         }
     }
 
-    /** Build the trust model from the local address book (empty allowlist/history
-     *  when nothing saved — then everything reads as NEW, which the receipt
-     *  layer treats as noise rather than a warning). */
     /**
-     * Le chiavi che sono tue contano come tue.
-     *
-     * Il motore sapeva riconoscere "sono io", ma confrontando con un indirizzo
-     * solo, il conto principale. La paghetta dell'agente e' un'altra chiave, e
-     * l'abbiamo generata noi dieci secondi prima: il suo seme e' in questo
-     * telefono. Caricarla faceva comparire sullo scontrino "destinatario mai
-     * visto, portafoglio nuovo di zecca, controlla bene", che e' vero alla
-     * lettera e completamente fuorviante. Un avviso che grida al lupo sul tuo
-     * stesso portafoglio insegna a ignorare gli avvisi, che e' l'unica cosa che
-     * questo prodotto non si puo' permettere.
+     * The trust model from the local address book (empty when nothing saved, so everything reads
+     * NEW, which the receipt treats as noise). Keys that are yours count as yours: the engine
+     * compared with the main account only, and the agent's budget is another key we generated ten
+     * seconds earlier, so funding it said "never-seen recipient, brand-new wallet, check carefully",
+     * true to the letter and misleading. Crying wolf on your own wallet teaches people to ignore warnings.
      */
     private fun mine(ctx: Context): Map<String, String> = buildMap {
         runCatching { SessionWallet.current(ctx)?.pubkey }.getOrNull()?.let {
             put(it, ctx.getString(R.string.trust_my_budget))
         }
-        // Fra il preventivo e la firma la paghetta nuova non e' ancora su disco.
+        // Between the quote and the signature the new budget is not on disk yet.
         runCatching { SessionWallet.preparedPubkey }.getOrNull()?.let {
             put(it, ctx.getString(R.string.trust_my_budget))
         }

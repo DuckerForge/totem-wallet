@@ -8,18 +8,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Buying a little at a time, without the phone.
- *
- * A Recurring order deposits the whole amount with Jupiter today and has its
- * keeper swap one slice per interval. Same virtue as [JupiterTrigger]: it runs
- * while the phone is off. Same discipline: the bytes Jupiter builds go through
- * the receipt and the Seed Vault before anything is signed.
- *
- * Verified against the keyless host on 2026-09-15: `createOrder` answers, and it
- * refuses a round worth less than fifty USDC ("minimum is 50.00 USDC"). The
- * floor is Jupiter's and it is quoted back to the person as Jupiter says it,
- * never guessed locally. `inAmount` is the **whole deposit**; each round is
- * `inAmount / numberOfOrders`.
+ * Buying a little at a time, without the phone. A Recurring order deposits the whole amount
+ * with Jupiter today and its keeper swaps one slice per interval; same virtue as
+ * [JupiterTrigger] and same discipline, receipt and Seed Vault before anything is signed.
+ * Verified keyless 2026-09-15: `createOrder` answers and refuses a round under fifty USDC
+ * ("minimum is 50.00 USDC"), quoted back as Jupiter says it. `inAmount` is the whole deposit;
+ * each round is `inAmount / numberOfOrders`.
  */
 object JupiterRecurring {
     private const val TAG = "Apex-Recurring"

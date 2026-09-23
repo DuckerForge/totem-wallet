@@ -9,16 +9,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The merchant side of a tap: this phone pretends to be an NFC tag holding a
- * payment request.
- *
- * Android hands us raw APDUs from the other phone's reader and we answer them
- * with [Type4Tag], which is pure Kotlin and covered by tests — the part that
- * cannot be tried with a single device is the radio, not the protocol.
- *
- * Nothing secret is reachable from here. The service holds one string, the
- * `solana:` request the user typed, and it is only armed while the tap screen is
- * open. A stranger who taps an idle phone gets nothing at all.
+ * The merchant side of a tap: this phone pretends to be an NFC tag holding a payment
+ * request. Android hands us raw APDUs from the other phone's reader and [Type4Tag], pure
+ * Kotlin under test, answers them: the part that cannot be tried with one device is the
+ * radio, not the protocol. Nothing secret is reachable: the service holds one string, the
+ * `solana:` request typed, armed only while the tap screen is open.
  */
 class TapService : HostApduService() {
 
@@ -61,19 +56,15 @@ class TapService : HostApduService() {
         }
 
         /**
-         * Win the AID while the tap screen is in front.
-         *
-         * `D2760000850101` is the standard NDEF tag application, so we are not the
-         * only app that claims it — on this phone X claims it too, to share a
-         * profile by tapping. With two services on one AID and no default, Android
-         * has no reason to pick us. `setPreferredService` says "while this screen
-         * is up, route it here", which is exactly true and lasts no longer.
+         * Win the AID while the tap screen is in front. `D2760000850101` is the standard NDEF tag
+         * application, and on this phone X claims it too; with two services on one AID and no
+         * default Android has no reason to pick us. `setPreferredService` says "while this screen is
+         * up, route it here", which is true and lasts no longer.
          */
         fun preferWhileVisible(ctx: Context, on: Boolean) {
-            // Inside a sheet the composition's context is often a wrapper around
-            // the Activity, not the Activity: `as? Activity` was null there, the
-            // preference was never set, and the other app that claims the same
-            // AID got the tap. Walk the wrappers until the Activity turns up.
+            // Inside a sheet the composition's context is a wrapper around the Activity, not the
+            // Activity: `as? Activity` was null, the preference never set, and the other app got the tap.
+            // Walk the wrappers until the Activity turns up.
             var c: Context? = ctx
             while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
             val activity = c as? android.app.Activity ?: return

@@ -8,10 +8,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 /**
- * "Is a person here?" — the platform biometric prompt, used before the envelope
- * key signs something the collar would not sign on its own. The envelope is a
- * software key, so this is presence, not the Seed Vault's hardware approval;
- * the receipt says which pocket is signing.
+ * "Is a person here?": the platform biometric prompt, before the budget key signs something
+ * the collar would not sign alone. A software key, so this is presence, not the Seed Vault's
+ * hardware approval; the receipt says which pocket signs.
  */
 object Presence {
     suspend fun confirm(activity: Activity, title: String, subtitle: String): Boolean = suspendCancellableCoroutine { cont ->

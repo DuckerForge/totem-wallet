@@ -23,11 +23,9 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
 /**
- * QR codes, in one place: the receive address, and the signed transaction an
- * agent on another machine needs to read back off the screen.
- *
- * Correction level drops to L on long payloads (a signed Jupiter swap is around
- * a kilobyte): fewer modules means a code a camera can still resolve.
+ * QR codes in one place: the receive address, and the signed transaction an agent on another
+ * machine reads back off the screen. Correction level drops to L on long payloads (a signed
+ * Jupiter swap is about a kilobyte): fewer modules, a code a camera can still resolve.
  */
 private const val DENSE_AT = 900
 

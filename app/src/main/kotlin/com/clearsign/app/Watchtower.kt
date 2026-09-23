@@ -21,10 +21,8 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * Watchtower (Pro): a periodic background check on the wallet you connected and
- * the addresses you've paid. If a live unlimited approval appears, or an address
- * you signed to lands on the blocklist, it posts a local notification — so a
- * problem finds you instead of waiting for you to open the app.
+ * Watchtower: a periodic background check on the connected wallet and the addresses you paid.
+ * A new live unlimited approval, or an address you signed to landing on the blocklist, posts a local notification.
  */
 object Watchtower {
     private const val WORK = "clearsign-watchtower"

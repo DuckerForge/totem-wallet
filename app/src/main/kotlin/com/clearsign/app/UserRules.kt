@@ -8,24 +8,13 @@ import java.io.File
 import java.util.Locale
 
 /**
- * The person's own rules, in their own words, in a file they wrote.
- *
- * What the app ships is one way to trade. Somebody who has traded for years has
- * their own: coins they never touch, a floor on holders, a rule about age, a
- * name they distrust. Those are worth more than any preset, and they belong to
- * the person, not to us. So: a plain Markdown file, brought in from the phone or
- * typed in the rules sheet, read by whichever model the person pays for.
- *
- * Two places read it. The chat gets it as standing instructions, after the
- * truths that never change. The loop asks the model one question per coin it is
- * about to buy: do these rules allow this coin, with these numbers.
- *
- * **The rules can only close doors, never open them.** The collar's caps, the
- * destination list, the vault: none of that is within this file's reach. A file
- * that says "buy everything" buys nothing more than before. The model reading it
- * can say no to one coin; it cannot sign, cannot raise a limit, and when it does
- * not answer the trade proceeds on the numbers, exactly as it would without a
- * file. Same rule as [CoinCheck]: unknown never blocks, and only "no" counts.
+ * The person's own rules, in their own words, in a file they wrote: coins they never touch,
+ * a floor on holders, a rule about age. Plain Markdown, brought in from the phone or typed in
+ * the rules sheet, read by whichever model the person pays for. Two readers: the chat gets it
+ * as standing instructions, the loop asks one question per coin about to be bought. The rules
+ * can only close doors, never open them: caps, destination list and vault are out of reach, a
+ * file saying "buy everything" buys nothing more. Same rule as [CoinCheck]: unknown never
+ * blocks, only "no" counts.
  */
 object UserRules {
     private const val FILE = "agent_rules.md"
@@ -92,10 +81,7 @@ object UserRules {
             "If a rule is unclear, OK. Do not guess, do not add advice, do not explain an OK.\n\n" +
             "The owner's rules:\n---\n" + rules.trim() + "\n---"
 
-    /**
-     * The coin, as lines a model can read and a person could check. Pure, so the
-     * test can look at exactly what leaves the phone.
-     */
+    /** The coin as lines a model can read and a person could check. Pure, so the test sees exactly what leaves the phone. */
     fun facts(t: Candidate, notes: List<String>, lane: String, sliceLamports: Long): String {
         fun money(v: Double?) = v?.let { String.format(Locale.ROOT, "$%,.0f", it) } ?: "unknown"
         fun pct(v: Double?) = v?.let { String.format(Locale.ROOT, "%+.1f%%", it) } ?: "unknown"
@@ -146,10 +132,7 @@ object UserRules {
         }
     }
 
-    /**
-     * Ask the configured model whether the rules allow buying [t]. Unknown when
-     * there is no file, no key, or no readable answer.
-     */
+    /** Ask the configured model whether the rules allow buying [t]. Unknown with no file, no key, or no readable answer. */
     suspend fun verdict(ctx: Context, t: Candidate, notes: List<String>, lane: String, sliceLamports: Long): Verdict {
         val rules = get(ctx) ?: return Verdict.Unknown
         if (!Secrets.model(ctx).ready) return Verdict.Unknown

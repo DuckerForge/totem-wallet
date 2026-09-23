@@ -9,17 +9,11 @@ import java.net.URL
 import java.util.Locale
 
 /**
- * The one check the winning bots have that our gates did not: Rugcheck.
- *
- * Our own gates read the mint: authorities, holders, liquidity, whether it
- * can be sold. Rugcheck reads the story around it: whether the pool's LP is
- * burned or locked or could be pulled tomorrow, whether the token is a copy
- * of a verified one, whether the creator has rugged before, whether it has
- * already been rugged. Free, no key, one call per candidate.
- *
- * Same contract as [CoinCheck]: **unknown never blocks**. A timeout or an
- * unreadable answer is a shrug, and the coin goes on to the next gate. Only a
- * clear "no" stops it, and the trace says which one.
+ * The one check the winning bots have that our gates did not. Our gates read the mint:
+ * authorities, holders, liquidity, whether it can be sold. Rugcheck reads the story around
+ * it: whether the pool's LP is burned, locked or pullable tomorrow, whether the token copies
+ * a verified one, whether the creator rugged before. Free, no key, one call per candidate.
+ * Same contract as [CoinCheck]: unknown never blocks, only a clear "no" stops, and the trace says which.
  */
 object RugCheck {
     private const val TAG = "Apex-Rug"
@@ -33,10 +27,9 @@ object RugCheck {
     }
 
     /**
-     * Where the lines are. Rugcheck's normalised score runs 0 (clean) to 100
-     * (run): their own badge turns red above 50 or so, and a pump.fun coin
-     * with a burned pool sits at 1. LP under half locked on a pool that is
-     * not deep is a pool that can be pulled.
+     * Where the lines are. Rugcheck's normalized score runs 0 (clean) to 100 (run): their badge
+     * turns red above 50 or so, a pump.fun coin with a burned pool sits at 1. LP under half locked
+     * on a shallow pool is a pool that can be pulled.
      */
     private const val SCORE_STOP = 60
     private const val LP_LOCKED_MIN_PCT = 50.0
@@ -79,9 +72,8 @@ object RugCheck {
     }
 
     /**
-     * Rugcheck names its risks in English and the name lands inside an Italian sentence
-     * («Rugcheck ferma BONK: Low Liquidity»). The names it uses often read in Italian;
-     * anything else stays as it came, which is still better than guessing.
+     * Rugcheck names its risks in English and the name lands inside an Italian sentence. The
+     * frequent ones read in Italian; the rest stay as they came, better than guessing.
      */
     private val italianRiskNames = mapOf(
         "freeze authority still enabled" to "autorità di freeze ancora attiva",

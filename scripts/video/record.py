@@ -104,7 +104,11 @@ def do(step: tuple) -> None:
         at = find("Back") if 'text="Back"' in xml else None
         if at is not None:
             tap(*at)
-        elif "active wallets watched" in xml:
+        elif "active wallets watched" in xml or "Tap the star to follow" in xml:
+            # Una pagina scrollata ha la freccia fuori schermo: prima si risale.
+            for _ in range(6):
+                swipe(600, 700, 600, 2100, 200)
+                time.sleep(0.5)
             tap(93, 205)
         elif "one round a minute" in xml:
             # Un ModalBottomSheet si chiude toccando il velo sopra di lui.

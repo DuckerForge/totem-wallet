@@ -882,9 +882,11 @@ private fun DemoSection(signer: SeedVaultSigner, connectedWallet: String?) {
                 ) { Text(stringResource(s.titleRes), fontFamily = Sora, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp, color = if (active) Halo.mint else Halo.muted) }
             }
         }
-        Text(stringResource(scenario.blurbRes), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
-        // The very same receipt a dApp request gets: hero, risks, node map, details.
-        androidx.compose.runtime.key(scenario) { Column { SignReceiptBody(receipt, null) } }
+        // The same receipt a dApp request gets, in its short form: the amount, the risks and
+        // the button. The full one carries the flow map and the decoded calls, and on this
+        // screen, under the chips, that pushed the risk and the refusal below the fold: the two
+        // things the whole demo exists to show were the two you had to go looking for.
+        androidx.compose.runtime.key(scenario) { Column { SignReceiptBody(receipt, null, plain = true, map = false) } }
         if (receipt.blocksApproval) {
             Banner(stringResource(R.string.demo_blocked), Halo.red, HIcon.BLOCK)
         } else {

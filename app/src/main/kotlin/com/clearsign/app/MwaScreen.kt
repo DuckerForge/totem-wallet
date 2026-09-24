@@ -941,6 +941,12 @@ internal fun SignReceiptBody(
      * one is real.
      */
     hero: Boolean = true,
+    /**
+     * Draw the flow map. Off where the whole receipt has to fit one screen without scrolling:
+     * two hundred points of picture between the amount and the button pushed the risk and the
+     * refusal below the fold, and those are the two things a receipt is for.
+     */
+    map: Boolean = true,
 ) {
     val danger = r.blocksApproval
     var sheetAddr by remember { mutableStateOf<NodeDest?>(null) }
@@ -1018,7 +1024,7 @@ internal fun SignReceiptBody(
             Spacer(Modifier.height(12.dp))
             IncomingCoinCard(r, null)
         }
-    } else {
+    } else if (map) {
         // Already drawn, at the top, with the way home in it.
         Spacer(Modifier.height(12.dp))
         Box(

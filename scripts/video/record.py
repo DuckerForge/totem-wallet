@@ -162,6 +162,9 @@ def wait_unlocked(limit: float = 180) -> bool:
 def record(key_name: str, seconds: float, steps: list[tuple]) -> Path:
     """Registra lo schermo mentre esegue [steps]. Torna il file locale."""
     OUT.mkdir(parents=True, exist_ok=True)
+    # Lo schermo che si spegne a meta' ripresa manda l'app in secondo piano, e l'app in
+    # secondo piano si richiude: meta' delle scene erano la porta chiusa a chiave.
+    key("wakeup")
     remote = f"/sdcard/beat_{key_name}.mp4"
     sh("shell", "rm", "-f", remote)
     # `--time-limit` e' la rete di sicurezza: se qualcosa si pianta, si ferma da solo.
@@ -237,6 +240,8 @@ def scene_crowd() -> list[tuple]:
     """
     return [
         ("launch",), ("wait", 1.5),
+        ("text", "Back"), ("wait", 1.0),
+        ("tap", 93, 205), ("wait", 1.0),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
         ("text", "Scout"), ("wait", 5.0),
         ("swipe", 600, 1900, 600, 1300), ("wait", 2.0),
@@ -259,7 +264,10 @@ def scene_ore() -> list[tuple]:
     """
     return [
         ("launch",), ("wait", 1.5),
-        ("tap", 93, 205), ("wait", 1.0),            # chiude un foglio, se ce n'e' uno
+        # Un foglio lasciato aperto dalla scena prima copre tutto: il bottone «Back» in
+        # fondo a PayOverlay se c'e', e la freccia dell'app se invece e' una pagina.
+        ("text", "Back"), ("wait", 1.0),
+        ("tap", 93, 205), ("wait", 1.0),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
         ("seek", "ORE", 6), ("wait", 6.0),
         ("swipe", 600, 1900, 600, 1300), ("wait", 4.0),
@@ -278,7 +286,9 @@ def scene_close() -> list[tuple]:
         # esce dall'app, e da li' in poi i tocchi finiscono sull'app di qualcun altro.
         # La freccia dell'app sta dove sta, anche quando non c'e': un tocco a vuoto
         # sull'intestazione non fa niente.
-        ("launch",), ("wait", 1.5), ("tap", 93, 205), ("wait", 1.5),
+        ("launch",), ("wait", 1.5),
+        ("text", "Back"), ("wait", 1.0),
+        ("tap", 93, 205), ("wait", 1.0), ("tap", 93, 205), ("wait", 1.5),
         ("tap", TABS["receipts"], TAB_Y), ("wait", 3.0),
         ("swipe", 600, 1900, 600, 1200), ("wait", 2.5),
         ("tap", TABS["market"], TAB_Y), ("wait", 3.0),
@@ -296,6 +306,58 @@ AUTO: dict[str, tuple[float, callable]] = {
 }
 
 
+def tour(names: list[str]) -> int:
+    """
+    Tutte le scene in una ripresa sola.
+
+    Fra una ripresa e l'altra l'app va in secondo piano e si richiude: quasi tutte le
+    scene girate una per una hanno finito per filmare la porta chiusa a chiave. Qui si
+    registra una volta, si cammina senza mai uscire, e alla fine si taglia il master nei
+    pezzi, ognuno col suo secondo d'inizio misurato mentre accadeva, non stimato.
+    """
+    if not unlocked():
+        print("Apri l'app con l'impronta e lasciala aperta, aspetto…")
+        sh("shell", "am", "start", "-n", ACT)
+        if not wait_unlocked():
+            print("l'app e' ancora chiusa, mi fermo.")
+            return 1
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    remote = "/sdcard/tour.mp4"
+    sh("shell", "rm", "-f", remote)
+    total = int(sum(AUTO[n][0] for n in names)) + 20
+    rec = subprocess.Popen(
+        ["adb", "shell", "screenrecord", "--bit-rate", "16M", "--time-limit", str(total), remote],
+    )
+    time.sleep(1.2)
+    t0 = time.time()
+    marks: list[tuple[str, float, float]] = []
+    try:
+        for name in names:
+            begin = time.time() - t0
+            for step in AUTO[name][1]():
+                do(step)
+            marks.append((name, begin, time.time() - t0))
+            print(f"  {name:<9} {begin:>5.1f} → {time.time() - t0:>5.1f}")
+    finally:
+        sh("shell", "pkill", "-INT", "-f", "screenrecord")
+        rec.wait(timeout=30)
+    time.sleep(1.5)
+    master = OUT / "tour.mp4"
+    sh("pull", remote, str(master), timeout=300)
+    sh("shell", "rm", "-f", remote)
+
+    for name, begin, end in marks:
+        out = OUT / f"beat_{name}.mp4"
+        subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{begin:.2f}",
+             "-i", str(master), "-t", f"{end - begin:.2f}", "-c", "copy", str(out)],
+            check=False,
+        )
+        print(f"  {out.name}")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if argv and argv[0] == "--manual":
         name = argv[1]
@@ -304,6 +366,8 @@ def main(argv: list[str]) -> int:
         print("scritto", record(name, seconds, [("wait", seconds)]))
         return 0
 
+    one = "--one" in argv
+    argv = [a for a in argv if a != "--one"]
     names = argv or list(AUTO)
     unknown = [n for n in names if n not in AUTO]
     if unknown:
@@ -311,6 +375,9 @@ def main(argv: list[str]) -> int:
         print("non automatiche (serve il dito):", "sign, budget, gate, hardware")
         print("sconosciute:", ", ".join(unknown))
         return 2
+
+    if one:
+        return tour([n for n in names if n != "door"])
 
     if "door" not in names and not unlocked():
         print("Sblocca l'app con l'impronta e lasciala aperta, aspetto…")

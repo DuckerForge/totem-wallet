@@ -104,13 +104,15 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         )
 
         // --- the wings, behind ---------------------------------------------
-        val wingW = phoneW * 0.86f
-        val wingL = phoneLen * 0.62f
+        // Low and wide, pivoted near the middle: high and narrow they came out above the
+        // phone like a pair of horns, and a dark shape with two horns is a steakhouse sign.
+        val wingW = phoneW * 0.92f
+        val wingL = phoneLen * 0.56f
         listOf(-1f, 1f).forEach { side ->
             wing(
-                pivot = Offset(pc.x + side * phoneW * 0.30f, pc.y - phoneLen * 0.10f),
-                degrees = side * Math.toDegrees((0.95f - 0.35f * wings).toDouble()).toFloat(),
-                lift = wingL * (0.55f + 0.15f * wings),
+                pivot = Offset(pc.x + side * phoneW * 0.34f, pc.y + phoneLen * 0.10f),
+                degrees = side * (30f + 28f * wings),
+                lift = wingL * (0.30f + 0.12f * wings),
                 wide = wingW, len = wingL,
                 alpha = wings * leaving * (1f - become),
             )

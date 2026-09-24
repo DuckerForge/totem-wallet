@@ -35,6 +35,27 @@ object Themes {
         return p.isFree || Pro.isPro.value
     }
 
+    /** The dark theme to come back to. Written the moment the light one is picked. */
+    private const val KEY_DARK = "last_dark"
+
+    /** Is the light theme on now. */
+    fun isLight(ctx: Context): Boolean = Halo.palette.ground.relativeLuminance() > 0.5
+
+    /**
+     * The one switch on the header: to the light theme and back to whichever dark one you
+     * were using. Without remembering it, coming back landed everyone on the default and
+     * the theme you had picked was gone.
+     */
+    fun toggleLight(ctx: Context) {
+        if (isLight(ctx)) {
+            val back = prefs(ctx).getString(KEY_DARK, Palettes.default.id) ?: Palettes.default.id
+            select(ctx, if (Palettes.byId(back).ground.relativeLuminance() > 0.5) Palettes.default.id else back)
+        } else {
+            prefs(ctx).edit().putString(KEY_DARK, Halo.palette.id).apply()
+            select(ctx, Palettes.vela.id)
+        }
+    }
+
     fun unlockedIds(ctx: Context): Set<String> = prefs(ctx).getStringSet(KEY_UNLOCKED, emptySet()) ?: emptySet()
 
     /** Record a paid unlock ([signature] = the SKR transfer). */

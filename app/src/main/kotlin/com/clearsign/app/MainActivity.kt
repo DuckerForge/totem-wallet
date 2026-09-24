@@ -778,21 +778,25 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
     var scanError by remember { mutableStateOf<String?>(null) }
     val ownScan = rememberAgentScan { scanError = it }
     val scan = onScan ?: ownScan
-    // The same header as the other tabs. The real mark instead of the icon tile, and
-    // when the big number has scrolled away the line under the title picks it up,
-    // so the figure that counts never leaves.
+    // The same header as the other tabs, and when the big number has scrolled away the line
+    // under the title picks it up, so the figure that counts never leaves. Where the mark used
+    // to sit there is the light switch: the mark is on the launcher and the door already, and
+    // at thirty-eight dp it was a dark blob. A switch earns that corner, a third logo does not.
+    val ctxH = LocalContext.current
+    var lightNow by remember { mutableStateOf(Themes.isLight(ctxH)) }
     PageHeader(
         title = stringResource(R.string.app_name),
         sub = headline,
         subModifier = Modifier.graphicsLayer { alpha = collapse?.value ?: 0f },
         leading = {
-            Box(Modifier.size(38.dp).clip(rs(Radius.row)), contentAlignment = Alignment.Center) {
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(R.mipmap.brand_bird),
-                    contentDescription = null,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
+            val srcT = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Box(
+                Modifier.size(38.dp).tappable(srcT, rs(999), fill = Halo.cardSoft) {
+                    Themes.toggleLight(ctxH); lightNow = Themes.isLight(ctxH); Haptics.tick(ctxH)
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                HaloIcon(if (lightNow) HIcon.SUN else HIcon.MOON, Halo.mint, 19.dp)
             }
         },
     ) {

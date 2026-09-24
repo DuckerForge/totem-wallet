@@ -1,4 +1,4 @@
-# Velum Wallet
+# Totem Wallet
 
 **A wallet for the Solana Seeker that reads every transaction before you sign it, and an agent that trades a small budget on its own, inside a collar you set.**
 

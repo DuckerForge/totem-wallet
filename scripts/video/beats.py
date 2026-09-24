@@ -54,6 +54,7 @@ SCRIPT: list[Beat] = [
         "hook", 9.0, "01 · blind",
         "A phone can ask you to sign something and show you nothing but a name and a button.",
         "La dApp che chiede di firmare, con il suo nome e un tasto e basta.",
+        start=6.5,
     ),
     Beat(
         # il cammino fino alla dApp sta in testa al girato: si riprende da dove
@@ -63,7 +64,7 @@ SCRIPT: list[Beat] = [
         "network says will happen, not from what the app claims.",
         "Dal :testdapp: il drain, lo scontrino che dice la cifra vera e il rischio in rosso, "
         "rifiutato. Poi l'approvazione illimitata: pericolo, un tocco solo bloccato.",
-        start=11.5,
+        start=19.8,
     ),
     Beat(
         "sign", 20.0, "03 · a real payment",
@@ -91,6 +92,7 @@ SCRIPT: list[Beat] = [
         "It also reads the crowd it lives in.",
         "Il censimento: meta' dei Seeker tiene SKR in staking dai Guardiani. Poi i soldi "
         "dimenticati, le commissioni mai riscosse lette dalla catena senza chiavi.",
+        start=10.5,
     ),
     Beat(
         "hardware", 25.0, "07 · the phone itself",
@@ -104,6 +106,7 @@ SCRIPT: list[Beat] = [
         "everything the agent does.",
         "Il preventivo del ponte, il registro della giornata, l'icona. Ultima riga: "
         "What you see is what you sign.",
+        start=4.5,
     ),
 ]
 

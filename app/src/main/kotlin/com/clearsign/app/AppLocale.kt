@@ -21,6 +21,24 @@ object AppLocale {
         return if (list.isEmpty) null else list.get(0).language
     }
 
+    /**
+     * The language the app is actually being read in, cached for the code that has no Context.
+     * Taken from the resources, which is the only answer that cannot disagree with the screen:
+     * the system list says what the phone is set to, and an app told to use English on an
+     * Italian phone is English on screen and Italian in that list.
+     */
+    @Volatile
+    private var appliedTag: String? = null
+
+    /** Called from [Themes.load], which every entry point already calls before drawing. */
+    fun remember(ctx: Context) {
+        appliedTag = runCatching {
+            ctx.resources.configuration.locales[0]?.language
+        }.getOrNull()
+    }
+
+    fun applied(): java.util.Locale? = appliedTag?.let { java.util.Locale.forLanguageTag(it) }
+
     fun set(ctx: Context, tag: String?) {
         if (Build.VERSION.SDK_INT >= 33) {
             ctx.getSystemService(LocaleManager::class.java)?.applicationLocales =

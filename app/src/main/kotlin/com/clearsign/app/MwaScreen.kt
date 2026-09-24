@@ -123,8 +123,17 @@ import kotlin.math.sin
  * receipt once said "L'agente ha dichiarato..." inside an all-English app.
  * `getAdjustedDefault` is the list Android resolves resources with, app choice first.
  */
+/**
+ * The language the receipt speaks. Not the phone's, the app's: Android keeps a per-app
+ * language, and an app set to English on an Italian phone was showing English menus over an
+ * Italian receipt, because this read the device and everything else read the app.
+ * `getAdjustedDefault` returns the app's list when one is set, and the phone's when it is not,
+ * but only after the app locale has been applied to this process, which is why it is asked for
+ * explicitly here first.
+ */
 fun deviceLocaleTag(): String {
-    val l = androidx.core.os.LocaleListCompat.getAdjustedDefault()[0] ?: Locale.getDefault()
+    val app = AppLocale.applied()
+    val l = app ?: androidx.core.os.LocaleListCompat.getAdjustedDefault()[0] ?: Locale.getDefault()
     return when (l.language) { "it" -> "it"; "es" -> "es"; else -> "en" }
 }
 

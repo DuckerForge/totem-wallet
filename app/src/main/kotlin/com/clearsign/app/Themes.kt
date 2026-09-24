@@ -19,6 +19,9 @@ object Themes {
 
     /** Apply the saved selection. Call before `setContent` in every activity. */
     fun load(ctx: Context) {
+        // The one place every entry point passes through before it draws anything, which
+        // makes it the place to note what language the resources resolved to.
+        AppLocale.remember(ctx)
         CustomTheme.palette(ctx) // prime the custom palette so byId() can return it
         val id = prefs(ctx).getString(KEY_SELECTED, Palettes.default.id)
         Halo.palette = if (isUnlocked(ctx, id)) Palettes.byId(id) else Palettes.default

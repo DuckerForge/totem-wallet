@@ -488,10 +488,10 @@ private fun BigTotal(total: Double, currency: String) {
             sweepAnim.animateTo(2f, androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing))
         }
     }
-    // The one number the page is about, in the accent, which the palette already defines as
-    // the colour of money and of anything that went up. In ink it was the same weight as every
-    // label around it, and on a white page the hero read as a heading.
-    val ink = Halo.mint
+    // The digits stay in ink. In the accent they read as a terminal, not as money: a balance
+    // is a fact, and colour on a fact says it means something it does not. The accent belongs
+    // behind it, in the halo, and in the sheen that runs when the number changes.
+    val ink = Halo.ink
     val lit = Halo.mint
     // The blur is created once: inside `graphicsLayer` it was rebuilt on every
     // layer invalidation.
@@ -499,10 +499,12 @@ private fun BigTotal(total: Double, currency: String) {
         android.graphics.RenderEffect.createBlurEffect(18f, 18f, android.graphics.Shader.TileMode.DECAL).asComposeRenderEffect()
     }
     androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-        // The glow behind: the accent, very faint, so the number sits in light.
+        // The glow behind: the accent, blurred wide, so the number sits in its own light instead
+        // of on bare paper. On a dark page a faint one is plenty; under a black headline on
+        // white nothing of it reached the eye, so the light themes get it stronger.
         Text(
             fmtFiat(shown.toDouble(), currency),
-            style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = lit.copy(alpha = 0.18f)),
+            style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = lit.copy(alpha = if (Halo.isLight) 0.30f else 0.18f)),
             modifier = Modifier.graphicsLayer { renderEffect = blur },
         )
         // The sheen is a drawing over the text, not a brush in the style: read in

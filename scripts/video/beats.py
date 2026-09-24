@@ -43,13 +43,10 @@ class Beat:
 
 
 SCRIPT: list[Beat] = [
-    Beat(
-        # il marchio si forma sotto lo splash e sotto il riquadro dell'impronta, che
-        # annerisce la registrazione: si riprende da quando quel riquadro e' chiuso.
-        "door", 3.0, None, None,
-        "La porta: il marchio fermo, il nome, il tasto per entrare. Si apre l'app da fredda.",
-        start=4.9,
-    ),
+    # La porta non e' piu' una scena: l'apertura disegnata in `intro.py` racconta la
+    # stessa cosa e la racconta intera, mentre sul telefono il riquadro dell'impronta la
+    # copre dal primo fotogramma. Due volte il marchio in dieci secondi e' una volta di
+    # troppo.
     Beat(
         "hook", 9.0, "01 · blind",
         "A phone can ask you to sign something and show you nothing but a name and a button.",
@@ -119,7 +116,7 @@ SCRIPT: list[Beat] = [
         "the gains home in ORE.",
         "La griglia cinque per cinque, le caselle piu' vuote segnate, la riga con l'ORE "
         "atteso e il costo atteso. Niente firma: si guarda la griglia.",
-        start=0.0,
+        start=13.0,
     ),
     Beat(
         "crowd", 10.0, "10 · the crowd",

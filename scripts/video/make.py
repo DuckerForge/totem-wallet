@@ -173,11 +173,12 @@ def main(argv: list[str]) -> int:
             missing.append(b.key)
             continue
         wav, said = tracks.get(b.key, (None, b.seconds))
-        # Quanto dura la scena: almeno la frase, ma se la scaletta le da' piu' tempo e il
-        # girato ce l'ha, si prende quello. Una frase corta su una cosa lunga da guardare
-        # la faceva sparire in tre secondi.
+        # Quanto dura la scena: la frase piu' un respiro, e non oltre. Prendendo invece il
+        # tempo che la scaletta le dava, una battuta da nove secondi restava ventisette su
+        # una schermata ferma: l'audio spariva e sembrava rotto. Il respiro in piu' serve
+        # a far leggere l'ultima riga, non a riempire.
         have0 = voice.duration(clip) - b.start
-        want = max(said, min(b.seconds, have0))
+        want = min(have0, said + 2.2)
         source = padded(clip, want, b.start, BUILD)
         have = voice.duration(source) - b.start
         seconds = max(1.0, min(want, have - 0.15))

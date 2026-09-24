@@ -10,6 +10,8 @@ object Themes {
     private const val PREFS = "clearsign_themes"
     private const val KEY_SELECTED = "selected"
     private const val KEY_UNLOCKED = "unlocked"
+    /** The dark theme the light switch comes back to. */
+    private const val KEY_DARK = "last_dark"
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -24,7 +26,12 @@ object Themes {
         if (id == CustomTheme.ID) CustomTheme.palette(ctx)
         val p = Palettes.byId(id)
         if (!isUnlocked(ctx, p.id)) return
-        prefs(ctx).edit().putString(KEY_SELECTED, p.id).apply()
+        val e = prefs(ctx).edit().putString(KEY_SELECTED, p.id)
+        // Any dark theme you pick is the one the switch brings back, whether you picked it
+        // here or in the settings: remembering only the one you happened to leave from sent
+        // people back to the default they had already moved away from.
+        if (p.ground.relativeLuminance() <= 0.5) e.putString(KEY_DARK, p.id)
+        e.apply()
         Halo.palette = p
     }
 
@@ -34,9 +41,6 @@ object Themes {
         val p = Palettes.byId(id)
         return p.isFree || Pro.isPro.value
     }
-
-    /** The dark theme to come back to. Written the moment the light one is picked. */
-    private const val KEY_DARK = "last_dark"
 
     /** Is the light theme on now. */
     fun isLight(ctx: Context): Boolean = Halo.palette.ground.relativeLuminance() > 0.5
@@ -51,7 +55,6 @@ object Themes {
             val back = prefs(ctx).getString(KEY_DARK, Palettes.default.id) ?: Palettes.default.id
             select(ctx, if (Palettes.byId(back).ground.relativeLuminance() > 0.5) Palettes.default.id else back)
         } else {
-            prefs(ctx).edit().putString(KEY_DARK, Halo.palette.id).apply()
             select(ctx, Palettes.vela.id)
         }
     }

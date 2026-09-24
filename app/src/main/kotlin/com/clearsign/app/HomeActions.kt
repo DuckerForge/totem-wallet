@@ -56,7 +56,7 @@ internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AG
 /** Every circle the home can show: its icon and its name. "More" stays out of the list: it is always last. */
 internal fun homeActionIcon(a: HomeAction): HIcon = when (a) {
     HomeAction.SEND -> HIcon.SEND; HomeAction.RECEIVE -> HIcon.RECEIVE; HomeAction.SWAP -> HIcon.SWAP; HomeAction.SCAN -> HIcon.SCAN
-    HomeAction.CROWD -> HIcon.NFC; HomeAction.TAP -> HIcon.NFC; HomeAction.LINK -> HIcon.SHARE; HomeAction.AGENT -> HIcon.AGENT
+    HomeAction.CROWD -> HIcon.SCOUT; HomeAction.TAP -> HIcon.NFC; HomeAction.LINK -> HIcon.SHARE; HomeAction.AGENT -> HIcon.AGENT
     HomeAction.BRIDGE -> HIcon.BRIDGE; HomeAction.MORE -> HIcon.MORE
 }
 internal fun homeActionLabel(a: HomeAction): Int = when (a) {
@@ -192,63 +192,14 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
                 .haloBorder(rs(Radius.pill), living = false),
             contentAlignment = Alignment.Center,
         ) {
-            // This button wears the Seeker itself rather than a generic glyph: it
-            // is our own drawing, and the thing behind it is the crowd of people
-            // holding that exact object.
-            if (icon == HIcon.NFC) CrowdGlyph(tint) else HaloIcon(icon, tint, 23.dp)
+            // Every circle wears an icon of the same size, on the same grid. Scout used to
+            // bring its own Canvas here and came out visibly bigger than its neighbours.
+            HaloIcon(icon, tint, 23.dp)
         }
         Text(label, style = HaloType.label, color = tint, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 
-/**
- * The scout's lens. It had a phone inside, four ticks and a handle, at twenty-six dp: all
- * true, none legible, past a point an icon becomes a smudge. A ring, a line rising in it, a
- * handle: looking at a market in three strokes.
- */
-@Composable
-private fun CrowdGlyph(tint: androidx.compose.ui.graphics.Color) {
-    Canvas(Modifier.size(26.dp)) {
-        val r = size.minDimension * 0.355f
-        val cx = size.width * 0.42f
-        val cy = size.height * 0.40f
-        val c = androidx.compose.ui.geometry.Offset(cx, cy)
-
-        // The glass, faintly filled so the ring reads as a lens and not as a circle.
-        drawCircle(tint.copy(alpha = 0.10f), r, c)
-        drawCircle(tint, r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(1.9f * density))
-
-        // What is inside the glass: a line going somewhere. Clipped to the lens, so
-        // it belongs to the glass rather than sitting on top of it.
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(cx - r * 0.58f, cy + r * 0.34f)
-            lineTo(cx - r * 0.12f, cy - r * 0.16f)
-            lineTo(cx + r * 0.20f, cy + r * 0.12f)
-            lineTo(cx + r * 0.60f, cy - r * 0.46f)
-        }
-        clipPath(androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(c, r - 1f * density)) }) {
-            drawPath(
-                path, tint,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = 1.8f * density,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                    join = androidx.compose.ui.graphics.StrokeJoin.Round,
-                ),
-            )
-        }
-
-        // The handle, thicker than the rim, which is what makes it read as held.
-        drawLine(
-            tint,
-            androidx.compose.ui.geometry.Offset(cx + r * 0.70f, cy + r * 0.70f),
-            androidx.compose.ui.geometry.Offset(cx + r * 0.70f + r * 0.80f, cy + r * 0.70f + r * 0.80f),
-            strokeWidth = 2.4f * density,
-            cap = androidx.compose.ui.graphics.StrokeCap.Round,
-        )
-    }
-}
-
-/** The phone from the tap screen, shrunk to icon size. */
 @Composable
 private fun SeekerGlyph(tint: androidx.compose.ui.graphics.Color) {
     val body = Halo.cardSoft

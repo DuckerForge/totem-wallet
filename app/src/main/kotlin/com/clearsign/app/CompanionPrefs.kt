@@ -83,14 +83,21 @@ object CompanionPrefs {
         val body0 = p.card.toArgb()
 
         // --- l'ombra sotto --------------------------------------------------
+        // A ball over another app has to rest on something, but the shadow was one black
+        // wash for every theme: under a pale ball on a light theme it read as a dirty ring
+        // around it, not as a shadow. It is fainter now, it hugs the ball instead of
+        // spreading past it, and it sits under the ball rather than around it.
+        val light = p.ground.relativeLuminance() > 0.5
+        val shadowY = cy + r * 0.34f
+        val shadowR = r * 0.92f
         val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy + r * 0.32f, r * 1.05f,
-                intArrayOf(AColor.argb(120, 0, 0, 0), AColor.argb(0, 0, 0, 0)),
-                floatArrayOf(0.55f, 1f), Shader.TileMode.CLAMP,
+                cx, shadowY, shadowR,
+                intArrayOf(AColor.argb(if (light) 55 else 110, 0, 0, 0), AColor.argb(0, 0, 0, 0)),
+                floatArrayOf(0.66f, 1f), Shader.TileMode.CLAMP,
             )
         }
-        c.drawCircle(cx, cy + r * 0.32f, r * 1.05f, shadow)
+        c.drawCircle(cx, shadowY, shadowR, shadow)
 
         // --- the glow, while it works -----------------------------------------
         if (d.trading) {

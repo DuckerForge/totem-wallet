@@ -312,16 +312,16 @@ fun HomeScreen(signer: SeedVaultSigner) {
          * that the person holding the phone is you. Signing later calls `ensureAccount`, which
          * authorizes the vault when something is actually signed.
          */
-        suspend fun unlock(saved: String): Boolean {
-            val act = ctx as? android.app.Activity ?: return false
-            val ok = Presence.confirm(act, ctx.getString(R.string.lock_title), ctx.getString(R.string.lock_sub))
-            if (!ok) return false
-            val key = Base58.decodePubkey(saved) ?: return false
+        suspend fun unlockAsking(saved: String): Presence.Result {
+            val act = ctx as? android.app.Activity ?: return Presence.Result.FAILED
+            val r = Presence.ask(act, ctx.getString(R.string.lock_title), ctx.getString(R.string.lock_sub))
+            if (r != Presence.Result.OK) return r
+            val key = Base58.decodePubkey(saved) ?: return Presence.Result.FAILED
             val shell = SvAccount(label = null, derivationUri = android.net.Uri.EMPTY, pubkeyBase58 = saved, pubkeyBytes = key)
             val bal = withContext(Dispatchers.IO) { runCatching { SolanaRpc.assetsSummaryMulti(SolanaRpc.urlFor(null), listOf(saved)) }.getOrNull() }
             val (lam, toks) = bal?.get(saved) ?: (null to 0)
             accounts = listOf(HomeAccount(shell, lam, toks))
-            return true
+            return Presence.Result.OK
         }
 
         // Leaving the app locks it. Coming back always goes through the door, so
@@ -380,14 +380,25 @@ fun HomeScreen(signer: SeedVaultSigner) {
                         fun ask() {
                             busy = true; status = null
                             scope.launch {
-                                val ok = runCatching { unlock(saved!!) }.getOrDefault(false)
+                                val r = runCatching { unlockAsking(saved!!) }.getOrDefault(Presence.Result.FAILED)
                                 busy = false
-                                if (!ok) status = ctx.getString(R.string.lock_failed)
+                                // Closing the sheet is not a failed print. It used to answer
+                                // "not recognized" to someone who had simply tapped away, and
+                                // the door then sat there accusing them. The button is the retry.
+                                if (r == Presence.Result.FAILED) status = ctx.getString(R.string.lock_failed)
                             }
                         }
-                        // A phone that has been here before asks for the print the moment the door appears,
-                        // once. The button is the retry, for a failed print or a dismissed prompt.
-                        LaunchedEffect(saved) { if (saved != null && !busy) ask() }
+                        // A phone that has been here before asks for the print on its own, once. The
+                        // button is the retry, for a failed print or a dismissed prompt.
+                        //
+                        // Not on the first frame, though. The system's fingerprint sheet is a secure
+                        // window: it covers the door and blacks out anything that tries to record the
+                        // screen. Asked immediately, the mark writing itself was seen by nobody, not
+                        // the person holding the phone and not a camera. A second and a quarter is a
+                        // beat, not a wait, and the sheet still arrives before a thumb can reach it.
+                        LaunchedEffect(saved) {
+                            if (saved != null && !busy) { kotlinx.coroutines.delay(1250); if (!busy) ask() }
+                        }
                         ConnectDoor(busy, status, returning = saved != null) {
                             if (saved == null) connect() else ask()
                         }

@@ -86,10 +86,16 @@ class HealthWidget : GlanceAppWidget() {
         }
         val open = androidx.glance.appwidget.action.actionStartActivity(Intent(ctx, MainActivity::class.java))
 
-        // On the card colour, not the page's: a launcher is dark too, and the
-        // widget used to melt into it. The ring carries the brand gradient.
+        // On the card colour, not the page's: a launcher is dark too, and the widget used to
+        // melt into it. The ring carries the brand gradient.
+        //
+        // The corner is the system's, not a number of ours. Android clips a widget to its own
+        // radius, so a 22 dp rectangle inside that clip left a rim of the launcher's default
+        // widget background showing all the way round: the halo. Asking for the same radius
+        // makes our panel and the clip one shape.
         Column(
-            GlanceModifier.fillMaxSize().background(p.ground2).cornerRadius(22.dp)
+            GlanceModifier.fillMaxSize().background(p.card)
+                .cornerRadius(android.R.dimen.system_app_widget_background_radius)
                 .padding(if (roomy) 12.dp else 8.dp).clickable(open),
         ) {
             Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
@@ -110,7 +116,7 @@ class HealthWidget : GlanceAppWidget() {
                                 modifier = GlanceModifier.defaultWeight(), maxLines = 1,
                             )
                             Box(
-                                GlanceModifier.size(22.dp).cornerRadius(11.dp).background(p.cardSoft)
+                                GlanceModifier.size(22.dp).cornerRadius(11.dp).background(p.cardHi)
                                     .clickable(actionRunCallback<RefreshHealthAction>()),
                                 contentAlignment = Alignment.Center,
                             ) { Text("\u21bb", style = TextStyle(color = ColorProvider(p.accent2), fontSize = 12.sp, fontWeight = FontWeight.Bold)) }

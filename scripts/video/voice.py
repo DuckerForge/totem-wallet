@@ -40,7 +40,9 @@ def duration(path: Path) -> float:
          "-of", "default=nw=1:nk=1", str(path)],
         capture_output=True, text=True,
     ).stdout.strip()
-    return float(out) if out else 0.0
+    # ffprobe risponde "N/A" per un file che non ha una durata scritta, e quel testo
+    # buttava giu' tutto il montaggio con un errore che non diceva quale file fosse.
+    return float(out) if out.replace(".", "", 1).isdigit() else 0.0
 
 
 def say(text: str, out: Path, speed: float = 1.06) -> Path:

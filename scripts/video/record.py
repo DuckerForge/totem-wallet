@@ -17,6 +17,7 @@ Ogni scena e' una lista di gesti. Un gesto e' (cosa, argomenti):
     ("stop",)              la chiude
     ("text", "Send")       cerca quel testo sullo schermo e tocca il suo centro
     ("seek", "ORE")        scorre finche' non lo trova, poi lo tocca
+    ("close",)             chiude il foglio aperto, qualunque sia, e niente se non c'e' ne'uno
 
 Le coordinate fisse si sono rivelate la parte fragile: una riga aperta poco prima
 sposta tutto quello che sta sotto, e il tocco successivo finisce su un'altra voce.
@@ -94,6 +95,21 @@ def find(label: str) -> tuple[int, int] | None:
 
 def do(step: tuple) -> None:
     kind = step[0]
+    if kind == "close":
+        # Chiudere «quello che c'e' sopra» non e' un punto sullo schermo: in alto a
+        # sinistra la home ha l'interruttore della luce e Scout ha la freccia, e toccare
+        # li' alla cieca cambiava tema a ogni scena. Si guarda prima cosa c'e'.
+        sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
+        xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
+        at = find("Back") if 'text="Back"' in xml else None
+        if at is not None:
+            tap(*at)
+        elif "active wallets watched" in xml:
+            tap(93, 205)
+        elif "one round a minute" in xml:
+            # Un ModalBottomSheet si chiude toccando il velo sopra di lui.
+            tap(600, 110)
+        return
     if kind == "seek":
         # Scorre finche' la scritta non compare. Un tocco su un'intestazione che apre e
         # chiude e' un interruttore, non un comando: toccarla quando la sezione era gia'
@@ -240,8 +256,7 @@ def scene_crowd() -> list[tuple]:
     """
     return [
         ("launch",), ("wait", 1.5),
-        ("text", "Back"), ("wait", 1.0),
-        ("tap", 93, 205), ("wait", 1.0),
+        ("close",), ("wait", 1.2),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
         ("text", "Scout"), ("wait", 5.0),
         ("swipe", 600, 1900, 600, 1300), ("wait", 2.0),
@@ -264,10 +279,7 @@ def scene_ore() -> list[tuple]:
     """
     return [
         ("launch",), ("wait", 1.5),
-        # Un foglio lasciato aperto dalla scena prima copre tutto: il bottone «Back» in
-        # fondo a PayOverlay se c'e', e la freccia dell'app se invece e' una pagina.
-        ("text", "Back"), ("wait", 1.0),
-        ("tap", 93, 205), ("wait", 1.0),
+        ("close",), ("wait", 1.2),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
         ("seek", "ORE", 6), ("wait", 6.0),
         ("swipe", 600, 1900, 600, 1300), ("wait", 4.0),
@@ -287,8 +299,7 @@ def scene_close() -> list[tuple]:
         # La freccia dell'app sta dove sta, anche quando non c'e': un tocco a vuoto
         # sull'intestazione non fa niente.
         ("launch",), ("wait", 1.5),
-        ("text", "Back"), ("wait", 1.0),
-        ("tap", 93, 205), ("wait", 1.0), ("tap", 93, 205), ("wait", 1.5),
+        ("close",), ("wait", 1.5),
         ("tap", TABS["receipts"], TAB_Y), ("wait", 3.0),
         ("swipe", 600, 1900, 600, 1200), ("wait", 2.5),
         ("tap", TABS["market"], TAB_Y), ("wait", 3.0),
@@ -325,7 +336,10 @@ def tour(names: list[str]) -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     remote = "/sdcard/tour.mp4"
     sh("shell", "rm", "-f", remote)
-    total = int(sum(AUTO[n][0] for n in names)) + 20
+    # Il limite di screenrecord e' un tetto, non una stima: superato, il file finisce a
+    # meta' cammino e l'ultima scena non esiste. Si chiede il massimo che accetta, 180 s,
+    # e la passeggiata si tiene sotto.
+    total = min(180, int(sum(AUTO[n][0] for n in names) * 1.4) + 25)
     rec = subprocess.Popen(
         ["adb", "shell", "screenrecord", "--bit-rate", "16M", "--time-limit", str(total), remote],
     )
@@ -347,11 +361,22 @@ def tour(names: list[str]) -> int:
     sh("pull", remote, str(master), timeout=300)
     sh("shell", "rm", "-f", remote)
 
+    have = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(master)],
+        capture_output=True, text=True).stdout.strip() or 0)
     for name, begin, end in marks:
+        if begin >= have - 0.5:
+            print(f"  {name}: fuori dal girato, la ripresa si e' fermata a {have:.0f}s")
+            continue
+        end = min(end, have)
         out = OUT / f"beat_{name}.mp4"
+        # `-ss` prima di `-i` con `-c copy` salta al fotogramma chiave piu' vicino e per
+        # l'ultimo pezzo copiava fino in fondo: novanta secondi al posto di diciotto. Si
+        # taglia dopo aver aperto il file, e si ricomprime: due secondi a pezzo, esatti.
         subprocess.run(
-            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{begin:.2f}",
-             "-i", str(master), "-t", f"{end - begin:.2f}", "-c", "copy", str(out)],
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(master),
+             "-ss", f"{begin:.2f}", "-to", f"{end:.2f}", "-an",
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(out)],
             check=False,
         )
         print(f"  {out.name}")

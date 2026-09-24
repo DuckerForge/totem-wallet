@@ -57,6 +57,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -136,7 +137,14 @@ private fun trustColor(t: TrustLevel) = when (t) {
 
 /** Halo Material scheme: keeps M3 widgets (text field, sheet) on-brand. A getter,
  *  so it follows the selected palette instead of freezing the first one. */
-internal val HaloScheme get() = darkColorScheme(
+internal val HaloScheme get() = if (Halo.isLight) lightColorScheme(
+    primary = Halo.mint, onPrimary = Halo.ground,
+    secondary = Halo.cyan, onSecondary = Halo.ground,
+    background = Halo.ground, onBackground = Halo.ink,
+    surface = Halo.ground2, onSurface = Halo.ink,
+    surfaceVariant = Halo.card, onSurfaceVariant = Halo.muted,
+    outline = Halo.stroke, error = Halo.red,
+) else darkColorScheme(
     primary = Halo.mint, onPrimary = Halo.ground,
     secondary = Halo.cyan, onSecondary = Halo.ground,
     background = Halo.ground, onBackground = Halo.ink,
@@ -161,6 +169,21 @@ fun HaloRoot(content: @Composable () -> Unit) {
                 LivingStroke.phase.floatValue = (((t - start) / 1_000_000L) % LivingStroke.PERIOD_MS) / LivingStroke.PERIOD_MS.toFloat()
             }
         }
+    }
+    // The window follows the palette: dark icons on a light bar, and the ground painted
+    // under Compose so a light theme does not flash the dark XML background on every open.
+    val view = androidx.compose.ui.platform.LocalView.current
+    val light = Halo.isLight
+    val ground = Halo.ground
+    androidx.compose.runtime.SideEffect {
+        var c: android.content.Context = view.context
+        while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
+        val window = (c as? android.app.Activity)?.window ?: return@SideEffect
+        androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
+        }
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(ground.toArgb()))
     }
     MaterialTheme(colorScheme = HaloScheme) {
         androidx.compose.material3.ProvideTextStyle(androidx.compose.material3.LocalTextStyle.current.copy(letterSpacing = Halo.palette.fonts.tracking.sp)) { content() }

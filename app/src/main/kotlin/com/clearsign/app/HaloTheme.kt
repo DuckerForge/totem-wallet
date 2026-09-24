@@ -199,7 +199,19 @@ object Palettes {
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
-    val all: List<HaloPalette> = listOf(halo, mintSoft, mintNeon, cyanAct, gold, flow, solana, skr, aurora, ember, phosphor)
+    /**
+     * White. The one light theme: paper ground, indigo acts, the same ladder of surfaces
+     * climbing down instead of up. No grain, no glow: the neon stays with the dark ones.
+     */
+    val vela = p(
+        "vela", R.string.theme_vela,
+        ground = 0xFFFFFFFF, ground2 = 0xFFF7F8FC, card = 0xFFE0E3EB, cardSoft = 0xFFEEF0F6, cardHi = 0xFFD2D6E1, stroke = 0xFFB5BBCC,
+        accent = 0xFF3B2FB8, accent2 = 0xFF1F4FA8, ink = 0xFF10151F, muted = 0xFF505A6E, amber = 0xFF7A4900, red = 0xFFC42B3C,
+        premium = false, grain = 0f,
+        fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
+    )
+
+    val all: List<HaloPalette> = listOf(halo, mintSoft, mintNeon, cyanAct, gold, vela, flow, solana, skr, aurora, ember, phosphor)
 
     /** The built-ins plus the user's custom palette (always last). */
     fun withCustom(ctx: android.content.Context): List<HaloPalette> = all + CustomTheme.palette(ctx)
@@ -267,13 +279,13 @@ object CustomTheme {
             // The same ladder the built-in palettes climb, measured from the user's
             // own ground and tinted with their own accent2, so a custom theme has
             // the same depth instead of staying flat while the others gained it.
-            ground = Color(g), ground2 = Color(step(g, a2, 0.034f)),
-            card = Color(step(g, a2, 0.139f)), cardSoft = Color(step(g, a2, 0.080f)),
-            cardHi = Color(step(g, a2, 0.210f)),
+            ground = Color(g), ground2 = Color(step(g, a2, 0.034f, dark)),
+            card = Color(step(g, a2, 0.139f, dark)), cardSoft = Color(step(g, a2, 0.080f, dark)),
+            cardHi = Color(step(g, a2, 0.210f, dark)),
             stroke = Color(mix(g.toInt(), a2.toInt(), 0.34f)),
             accent = Color(a), accent2 = Color(a2), ink = Color(ink),
             // Lifted a quarter of the way to ink: the surfaces moved up under it.
-            accentFill = androidx.compose.ui.graphics.lerp(Color(a), Color(step(g, a2, 0.139f)), 0.45f),
+            accentFill = androidx.compose.ui.graphics.lerp(Color(a), Color(step(g, a2, 0.139f, dark)), 0.45f),
             muted = Color(mix(mix(ink, g.toInt(), 0.42f), ink, 0.25f)), amber = Color(0xFFFFC24B), red = Color(0xFFFF5A6A),
             redSoft = Color(0xFFFF5A6A).copy(alpha = 0.133f), accentSoft = Color(a2).copy(alpha = 0.133f),
             premium = true, grainAlpha = grain, scanlines = scanlines,
@@ -286,8 +298,11 @@ object CustomTheme {
      * One rung of the surface ladder: the ground mixed toward a pale version of the second
      * accent. Keeping the hue makes a raised panel read as the same material, not grey paint.
      */
-    private fun step(ground: Long, accent2: Long, f: Float): Int {
-        val tint = mix(accent2.toInt(), 0xFFFFFFFF.toInt(), 0.72f)
+    private fun step(ground: Long, accent2: Long, f: Float, dark: Boolean): Int {
+        // On a light ground the ladder climbs down: a pale tint would sit above
+        // white and every card would vanish into the page.
+        val toward = if (dark) 0xFFFFFFFF.toInt() else 0xFF10151F.toInt()
+        val tint = mix(accent2.toInt(), toward, 0.72f)
         return mix(ground.toInt(), tint, f)
     }
 
@@ -332,6 +347,8 @@ object Halo {
     val red: Color get() = palette.red
     val redSoft: Color get() = palette.redSoft
     val cyanSoft: Color get() = palette.accentSoft
+    /** A light ground: Material widgets and the status bar icons follow it. */
+    val isLight: Boolean get() = palette.ground.relativeLuminance() > 0.5
 
     // ---- shapes: every corner in the app goes through here, scaled per theme ----
     val radiusScale: Float get() = palette.radiusScale

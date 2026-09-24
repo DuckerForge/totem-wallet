@@ -52,6 +52,16 @@ class PaletteContrastTest {
         }
     }
 
+    /** The big button is a surface too: what is written on it has to be readable on both its ends. */
+    @Test fun theFilledButtonCarriesItsLabel() {
+        for (p in Palettes.all) {
+            for ((name, end) in listOf("fillFrom" to p.fillFrom, "fillTo" to p.fillTo)) {
+                val c = contrastRatio(p.onFill, end)
+                assertTrue(c >= 4.5, "${p.id}: onFill over $name is ${"%.2f".format(c)}:1")
+            }
+        }
+    }
+
     /** Secondary text stays readable on the highest surface, not just on the page. */
     @Test fun textSurvivesTheRaisedSurfaces() {
         for (p in Palettes.all) {

@@ -118,7 +118,7 @@ object CompanionPrefs {
         c.drawCircle(cx, cy, r, body)
 
         // The highlight, where the light hits first. It was twice this and fell right
-        // on the V's left arm, which washed out.
+        // on the mark, which washed out.
         val spec = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.38f, cy - r * 0.54f, r * 0.50f,
@@ -183,26 +183,36 @@ object CompanionPrefs {
         }
 
         /**
-         * The app's mark, a V from violet to cyan, for when there is no number to say. Always full,
-         * not half when still: it was the mark vanishing under the light, not the light being too
-         * much. A dark shadow under it, so it stands out on light themes too.
+         * The app's mark, for when there is no number to say: the Seeker from the back with its
+         * right edge lit, violet low to cyan high. Small, so only the two things that name it are
+         * drawn, the body and the edge. A dark shadow under it, so it stands out on light themes too.
          */
         fun mark(alpha: Int) {
-            val path = android.graphics.Path().apply {
-                moveTo(cx - r * 0.36f, cy - r * 0.28f); lineTo(cx, cy + r * 0.32f); lineTo(cx + r * 0.36f, cy - r * 0.28f)
-            }
+            val ph = r * 1.15f
+            val pw = ph * (69.56f / 150.86f)
+            val left = cx - pw / 2f
+            val top = cy - ph / 2f
+            val corner = ph * 0.092f
+            val body = android.graphics.RectF(left, top, left + pw, top + ph)
             val under = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * 0.26f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                style = Paint.Style.STROKE; strokeWidth = r * 0.16f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
                 color = AColor.argb(if (alpha < 255) 90 else 120, 0, 0, 0)
                 maskFilter = android.graphics.BlurMaskFilter(r * 0.10f, android.graphics.BlurMaskFilter.Blur.NORMAL)
             }
-            c.drawPath(path, under)
-            val v = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * 0.15f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
-                shader = LinearGradient(cx - r * 0.3f, cy + r * 0.3f, cx + r * 0.3f, cy - r * 0.3f, intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt()), null, Shader.TileMode.CLAMP)
-                this.alpha = 255
+            c.drawRoundRect(body, corner, corner, under)
+            val shell = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = r * 0.055f
+                color = AColor.argb(220, 190, 205, 255)
             }
-            c.drawPath(path, v)
+            c.drawRoundRect(body, corner, corner, shell)
+            val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = r * 0.10f; strokeCap = Paint.Cap.ROUND
+                shader = LinearGradient(
+                    cx, top + ph - corner, cx, top + corner,
+                    intArrayOf(0xFF9524F3.toInt(), 0xFF0BF5EC.toInt()), null, Shader.TileMode.CLAMP,
+                )
+            }
+            c.drawLine(left + pw, top + corner, left + pw, top + ph - corner, edge)
         }
 
         when (face) {

@@ -512,10 +512,10 @@ internal fun PrimaryButton(label: String, danger: Boolean, enabled: Boolean = tr
     // for the bottom of a sheet and wrong inside a row: the button ate the row and
     // squeezed whatever shared it — a title, a text field — down to nothing.
     val mod = (if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(54.dp).clip(shape)
-    val fg = if (danger) Halo.red else Halo.ground
+    val fg = if (danger) Halo.red else Halo.onFill
     val src = remember { MutableInteractionSource() }
     Row(
-        Modifier.pressScale(src).then(if (danger) mod.border(1.dp, Halo.red, shape) else mod.background(Brush.linearGradient(listOf(Halo.mint, Halo.cyan)), alpha = if (enabled) 1f else 0.45f))
+        Modifier.pressScale(src).then(if (danger) mod.border(1.dp, Halo.red, shape) else mod.background(Brush.linearGradient(listOf(Halo.fillFrom, Halo.fillTo)), alpha = if (enabled) 1f else 0.45f))
             .clickable(interactionSource = src, indication = null, enabled = enabled) { onClick() },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {

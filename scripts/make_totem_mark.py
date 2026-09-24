@@ -85,13 +85,6 @@ def draw_mark(size, scale=0.92, plate=True):
     pw = ph * PHONE
     cx, cy = size / 2, size / 2 + sq * 0.01
 
-    # The breath behind everything. It has to die out before the edge of the square: a wider
-    # one gets clipped by the canvas and the blur leaves a visible rectangle on any ground.
-    glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    r = sq * 0.30
-    ImageDraw.Draw(glow).ellipse((cx - r, cy - ph * 0.2 - r, cx + r, cy - ph * 0.2 + r), fill=(120, 140, 255, 40))
-    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(size * 0.06)))
-
     # wings: the old V's panels, opened outward at the top, behind the body
     wing_w, wing_l = pw * 0.86, ph * 0.62
     for side in (-1, 1):
@@ -156,6 +149,11 @@ def main():
 
     # Launcher: adaptive icons show the middle 2/3, so the subject sits there on a full-bleed ground.
     icon = Image.new("RGBA", (S, S), GROUND + (255,))
+    # The breath belongs here, on the full-bleed ground, not inside the subject's own square,
+    # where the blur gets clipped and leaves a rectangle on whatever the mark is laid over.
+    glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse((S * 0.22, S * 0.18, S * 0.78, S * 0.74), fill=(120, 140, 255, 30))
+    icon.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * 0.09)))
     subject = draw_mark(int(S * 2 / 3), scale=1.0, plate=False)
     icon.alpha_composite(subject, (int(S / 6), int(S / 6)))
     for dpi, px in ICON.items():

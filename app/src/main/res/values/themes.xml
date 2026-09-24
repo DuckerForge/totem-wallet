@@ -13,10 +13,10 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <!-- Branded cold start: the gem on Halo ground, then hands over to Theme.ClearSign. -->
+    <!-- Branded cold start: the mark on its own ground, then hands over to Theme.ClearSign. -->
     <style name="Theme.ClearSign.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/apex_paper</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_bird</item>
+        <item name="windowSplashScreenBackground">@color/halo_ground</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/brand_bird</item>
         <item name="postSplashScreenTheme">@style/Theme.ClearSign</item>
     </style>
 </resources>

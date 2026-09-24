@@ -7,7 +7,7 @@ as wings: the thunderbird, the best known totem. Same geometry as `GateDemo` in
 LoginDemo.kt, which animates it, so the door settles on this exact image.
 
 Exports (names kept from the old mark, the code reads them by name):
-  mipmap-*/brand_bird.png       the mark on its rounded plate, RGBA (door, home chip)
+  mipmap-*/brand_bird.png       the mark alone, transparent ground, RGBA (door, splash, home chip)
   mipmap-*/ic_launcher_bird.png full-bleed launcher background, subject in the safe zone
   web/apex/icon.png             the mark at 216 px
 
@@ -79,19 +79,23 @@ def draw_mark(size, scale=0.92, plate=True):
         im.paste(pl, (0, 0), mask)
 
     sq = size * scale
-    ph = sq * 0.58
+    # The phone is most of the square: the composition is the phone, and the wings reach
+    # about as far sideways as it is tall. Drawn smaller it read as a stamp in a big empty box.
+    ph = sq * 0.74
     pw = ph * PHONE
-    cx, cy = size / 2, size / 2 + sq * 0.12
+    cx, cy = size / 2, size / 2 + sq * 0.01
 
-    # the breath behind everything
+    # The breath behind everything. It has to die out before the edge of the square: a wider
+    # one gets clipped by the canvas and the blur leaves a visible rectangle on any ground.
     glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse((cx - sq * 0.55, cy - ph * 0.2 - sq * 0.55, cx + sq * 0.55, cy - ph * 0.2 + sq * 0.55), fill=(120, 140, 255, 26))
-    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(size * 0.12)))
+    r = sq * 0.30
+    ImageDraw.Draw(glow).ellipse((cx - r, cy - ph * 0.2 - r, cx + r, cy - ph * 0.2 + r), fill=(120, 140, 255, 40))
+    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(size * 0.06)))
 
     # wings: the old V's panels, opened outward at the top, behind the body
     wing_w, wing_l = pw * 0.86, ph * 0.62
     for side in (-1, 1):
-        layer = glass((int(wing_w), int(wing_l)), depth=0.3)
+        layer = glass((int(wing_w), int(wing_l)), depth=0.12)
         pivot_layer = (wing_w / 2, wing_l * 0.70)
         pivot_canvas = (cx + side * pw * 0.30, cy - ph * 0.10)
         paste_rotated(im, layer, pivot_canvas, pivot_layer, -side * 34.4)  # 0.60 rad, PIL turns counter-clockwise
@@ -140,7 +144,9 @@ def draw_mark(size, scale=0.92, plate=True):
 
 
 def main():
-    mark = draw_mark(S)
+    # No plate: in the door and on the home chip a rounded square behind the mark reads as a
+    # box around it, and the door already has its own ground.
+    mark = draw_mark(S, scale=1.0, plate=False)
     for dpi, px in MARK.items():
         out = os.path.join(RES, f"mipmap-{dpi}", "brand_bird.png")
         mark.resize((px, px), Image.LANCZOS).save(out)

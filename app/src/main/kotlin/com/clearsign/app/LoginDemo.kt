@@ -54,8 +54,10 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     // launcher, so if it ever changes it changes here too.
     val mark = ImageBitmap.imageResource(R.mipmap.brand_bird)
 
+    // The door pulls the scene back while it opens, and lets it return if the print fails.
+    // One way only, the scene stayed at fifteen percent for ever after one bad finger.
     val open = remember { Animatable(0f) }
-    LaunchedEffect(opening) { if (opening) open.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
+    LaunchedEffect(opening) { open.animateTo(if (opening) 1f else 0f, tween(900, easing = FastOutSlowInEasing)) }
 
     Canvas(modifier.fillMaxWidth()) {
         val w = size.width
@@ -69,11 +71,12 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val cy = h * 0.17f
 
         // The phone and the wings, measured in the bitmap: the subject fills 0.92 of the
-        // square, the phone is 0.58 of that and sits a little under the middle.
+        // square and the phone is 0.78 of that, so the composition fills the square instead
+        // of sitting in the middle of it like a stamp.
         val sq = d * 0.92f
-        val phoneLen = sq * 0.58f
+        val phoneLen = sq * 0.74f
         val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
-        val pc = Offset(cx, cy + sq * 0.12f)
+        val pc = Offset(cx, cy + sq * 0.01f)
 
         // --- the timing, which is the story -----------------------------------------------
         val spark = ease(seg(t, 0.05f, 0.30f))
@@ -109,12 +112,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
                 degrees = side * Math.toDegrees((0.95f - 0.35f * wings).toDouble()).toFloat(),
                 lift = wingL * (0.55f + 0.15f * wings),
                 wide = wingW, len = wingL,
-                alpha = wings * leaving * (1f - become * 0.6f),
+                alpha = wings * leaving * (1f - become),
             )
         }
 
         // --- the Seeker, from the back --------------------------------------
-        phone(pc, phoneLen, phoneW, 0f, arrive * leaving * (1f - become * 0.6f), arrive * (0.4f + spark), back = true)
+        // Out entirely as the bitmap comes in: half of each drawn at once showed two phones
+        // slightly apart, and the camera island jumped.
+        phone(pc, phoneLen, phoneW, 0f, arrive * leaving * (1f - become), arrive * (0.4f + spark), back = true)
 
         // --- the line of light, which comes first ------------------------------------------
         // On the phone's right edge, one corner radius in at both ends, written bottom to top:
@@ -150,11 +155,11 @@ private fun DrawScope.wing(pivot: Offset, degrees: Float, lift: Float, wide: Flo
     rotate(degrees, pivot) {
         val top = Offset(pivot.x - wide / 2f, pivot.y - lift)
         val brush = Brush.linearGradient(
-            listOf(Color(0xFF262042), Color(0xFF101424), Color(0xFF090C16)),
+            listOf(Color(0xFF2B2450), Color(0xFF141931), Color(0xFF0B0F1C)),
             start = top, end = Offset(top.x + wide, top.y + len),
         )
         drawRoundRect(brush, top, Size(wide, len), CornerRadius(wide * 0.28f), alpha = alpha * 0.95f)
-        drawRoundRect(Color(0xFF96AAFF).copy(alpha = 0.22f * alpha), top, Size(wide, len), CornerRadius(wide * 0.28f), style = Stroke(1.dp.toPx()))
+        drawRoundRect(Color(0xFF96AAFF).copy(alpha = 0.30f * alpha), top, Size(wide, len), CornerRadius(wide * 0.28f), style = Stroke(1.2.dp.toPx()))
     }
 }
 
@@ -215,7 +220,8 @@ private fun DrawScope.phone(
     if (alpha <= 0.01f) return
     // The body warms as the stroke passes: the one thing that ties the two
     // objects instead of leaving them side by side.
-    val body = lerp(Color(0xFF24243A), NEON_MID, 0.18f * glow)
+    // The same dark glass the bitmap is filled with, so the handover shows nothing.
+    val body = lerp(Color(0xFF1B2036), NEON_MID, 0.10f * glow)
     rotate(angle, center) {
         drawPhone(
             x = center.x - wide / 2f,

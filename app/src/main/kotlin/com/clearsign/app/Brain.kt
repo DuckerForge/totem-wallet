@@ -244,16 +244,16 @@ object Brain {
         val sb = StringBuilder()
         sb.append(
             if (italian) {
-                "Sei l'assistente dentro Velum, un portafoglio Solana sul telefono Seeker. Parli italiano, in modo diretto e breve.\n\n"
+                "Sei l'assistente dentro Totem, un portafoglio Solana sul telefono Seeker. Parli italiano, in modo diretto e breve.\n\n"
             } else {
-                "You are the assistant inside Velum, a Solana wallet on the Seeker phone. Be direct and brief.\n\n"
+                "You are the assistant inside Totem, a Solana wallet on the Seeker phone. Be direct and brief.\n\n"
             },
         )
         sb.append(
             if (italian) {
-                "Tu non firmi niente. Proponi, e Velum decide sul telefono: può firmare in silenzio, chiedere l'impronta alla persona, o rifiutare. Un rifiuto è definitivo: spiegalo con parole semplici e non cercare un'altra strada per fare la stessa cosa.\n\n"
+                "Tu non firmi niente. Proponi, e Totem decide sul telefono: può firmare in silenzio, chiedere l'impronta alla persona, o rifiutare. Un rifiuto è definitivo: spiegalo con parole semplici e non cercare un'altra strada per fare la stessa cosa.\n\n"
             } else {
-                "You never sign anything. You propose, and Velum decides on the phone: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final: explain it plainly and do not look for another route to the same thing.\n\n"
+                "You never sign anything. You propose, and Totem decides on the phone: it may sign silently, ask the person for a fingerprint, or refuse. A refusal is final: explain it plainly and do not look for another route to the same thing.\n\n"
             },
         )
         if (s == null || p == null) {

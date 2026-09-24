@@ -59,6 +59,8 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
     var error by remember { mutableStateOf<String?>(null) }
     // The gift hands real money to a key in a link. You see it first, like everywhere else.
     var review by remember { mutableStateOf<ReceiptEngine.Analyzed?>(null) }
+    // Taking a gift back is money moving too: the same receipt, the same hold.
+    var reclaim by remember { mutableStateOf<Pair<MoneyLinks.Gift, ReceiptEngine.Analyzed>?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     val gifts = remember(refresh) { MoneyLinks.all(ctx) }
     val lamports = (amount.replace(',', '.').toDoubleOrNull() ?: 0.0).let { (it * 1e9).toLong() }
@@ -152,9 +154,13 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                                 Text(g.note.ifBlank { shorten(g.pubkey, 4) }, fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, maxLines = 1)
                             }
                             GhostButton(stringResource(R.string.gift_reclaim), Modifier, HIcon.RECEIVE, tint = Halo.cyan) {
+                                busy = true; error = null
                                 scope.launch {
-                                    error = MoneyLinks.reclaim(ctx, g, owner)
-                                    refresh++
+                                    val seed = MoneyLinks.seedOf(ctx, g.pubkey)
+                                    val analyzed = if (seed == null) null else MoneyLinks.previewSweep(ctx, seed, owner)
+                                    if (analyzed == null) error = ctx.getString(if (seed == null) R.string.gift_key_gone else R.string.gift_already_taken)
+                                    else reclaim = g to analyzed
+                                    busy = false
                                 }
                             }
                         }
@@ -162,6 +168,28 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                 }
                 Spacer(Modifier.height(2.dp))
                 GhostButton(stringResource(R.string.cancel)) { onDismiss() }
+            }
+        }
+    }
+
+    reclaim?.let { (g, r) ->
+        PayOverlay(
+            title = stringResource(R.string.gift_reclaim),
+            hint = stringResource(R.string.gift_open),
+            onBack = { if (!busy) reclaim = null },
+        ) {
+            Column { SignReceiptBody(r.receipt, null, hero = false) }
+            error?.let { Banner(it, Halo.red, HIcon.WARNING) }
+            if (busy) {
+                Working(stringResource(R.string.claim_taking))
+            } else {
+                HoldToConfirm(stringResource(R.string.gift_reclaim)) {
+                    busy = true; error = null
+                    scope.launch {
+                        error = MoneyLinks.reclaim(ctx, g, owner)
+                        busy = false; reclaim = null; refresh++
+                    }
+                }
             }
         }
     }

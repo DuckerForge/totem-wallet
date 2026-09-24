@@ -178,20 +178,30 @@ object WalletActions {
             .take(8)
     }
 
-    suspend fun activateSwapFees(ctx: Context, signer: SeedVaultSigner, owner: String): Result {
-        val treasury = Base58.decodePubkey(BuildConfig.SKR_TREASURY) ?: return Result.Failed(ctx.getString(R.string.theme_unlock_no_treasury))
-        val ownerKey = Base58.decodePubkey(owner) ?: return Result.Failed(ctx.getString(R.string.wa_bad_address))
+    /**
+     * The instructions that open the missing fee accounts, built once and shown before anyone
+     * signs. Null when the treasury is not configured or the address is bad; empty when there
+     * is nothing to open.
+     */
+    suspend fun swapFeesPlan(ctx: Context, owner: String): List<WalletTx.Instruction>? {
+        val treasury = Base58.decodePubkey(BuildConfig.SKR_TREASURY) ?: return null
+        val ownerKey = Base58.decodePubkey(owner) ?: return null
         val program = Base58.decode(SolanaTx.TOKEN_PROGRAM)
         val mints = withContext(Dispatchers.IO) { feeMintsToOpen(ctx, owner) }
-        if (mints.isEmpty()) return Result.Failed(ctx.getString(R.string.swapfees_nothing))
-        val ixs = buildList {
+        if (mints.isEmpty()) return emptyList()
+        return buildList {
             add(WalletTx.setComputeUnitLimit(30_000 + 25_000 * mints.size))
             for (m in mints) {
                 val mint = Base58.decode(m)
                 add(WalletTx.createAtaIdempotent(ownerKey, Pda.associatedTokenAddress(treasury, mint, program), treasury, mint, program))
             }
         }
-        val r = signAndSend(ctx, signer, owner, ixs, LogInfo(kind = "setup", recipientLabel = ctx.getString(R.string.swapfees_log)))
+    }
+
+    /** Sends the plan the person just read, with that same receipt in the ledger. */
+    suspend fun activateSwapFees(ctx: Context, signer: SeedVaultSigner, owner: String, plan: List<WalletTx.Instruction>, receipt: com.clearsign.core.Receipt?): Result {
+        if (plan.isEmpty()) return Result.Failed(ctx.getString(R.string.swapfees_nothing))
+        val r = signAndSend(ctx, signer, owner, plan, LogInfo(kind = "setup", recipientLabel = ctx.getString(R.string.swapfees_log), receipt = receipt))
         if (r is Result.Sent) Jupiter.forgetFeeAccounts()
         return r
     }

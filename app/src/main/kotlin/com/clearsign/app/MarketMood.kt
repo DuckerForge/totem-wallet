@@ -95,7 +95,7 @@ object MarketMood {
             connectTimeout = 6000; readTimeout = 10000
             setRequestProperty("Accept", "application/json")
             // Yahoo answers 403 to a bare client.
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Android) Velum")
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Android) Totem")
         }
         val code = c.responseCode
         val body = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }

@@ -44,8 +44,11 @@ class Beat:
 
 SCRIPT: list[Beat] = [
     Beat(
+        # il marchio si forma sotto lo splash e sotto il riquadro dell'impronta, che
+        # annerisce la registrazione: si riprende da quando quel riquadro e' chiuso.
         "door", 3.0, None, None,
-        "La porta: due Seeker che diventano la V del marchio. Si apre l'app da fredda.",
+        "La porta: il marchio fermo, il nome, il tasto per entrare. Si apre l'app da fredda.",
+        start=4.9,
     ),
     Beat(
         "hook", 9.0, "01 · blind",
@@ -53,11 +56,14 @@ SCRIPT: list[Beat] = [
         "La dApp che chiede di firmare, con il suo nome e un tasto e basta.",
     ),
     Beat(
+        # il cammino fino alla dApp sta in testa al girato: si riprende da dove
+        # lo scontrino e' in pagina.
         "receipt", 33.0, "02 · the receipt",
         "Every transaction is simulated on chain first. The receipt is built from what the "
         "network says will happen, not from what the app claims.",
         "Dal :testdapp: il drain, lo scontrino che dice la cifra vera e il rischio in rosso, "
         "rifiutato. Poi l'approvazione illimitata: pericolo, un tocco solo bloccato.",
+        start=11.5,
     ),
     Beat(
         "sign", 20.0, "03 · a real payment",

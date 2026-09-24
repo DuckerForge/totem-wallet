@@ -13,6 +13,14 @@ Ogni scena e' una lista di gesti. Un gesto e' (cosa, argomenti):
     ("swipe", x1,y1,x2,y2) trascina, 300 ms
     ("wait", secondi)      resta fermo, che e' meta' del montaggio
     ("key", nome)          un tasto di sistema
+    ("launch",)            apre l'app da fredda
+    ("stop",)              la chiude
+    ("text", "Send")       cerca quel testo sullo schermo e tocca il suo centro
+
+Le coordinate fisse si sono rivelate la parte fragile: una riga aperta poco prima
+sposta tutto quello che sta sotto, e il tocco successivo finisce su un'altra voce.
+`("text", ...)` chiede ad `uiautomator` dov'e' quella scritta adesso. Le scritte
+sono quelle inglesi dell'app: se cambiano, cambia qui.
 
 Le coordinate sono in pixel dello schermo vero, 1200 x 2670, lette dal telefono.
 
@@ -60,9 +68,38 @@ def key(name: str) -> None:
     sh("shell", "input", "keyevent", f"KEYCODE_{name.upper()}")
 
 
+def find(label: str) -> tuple[int, int] | None:
+    """Il centro della scritta [label] sullo schermo, adesso. None se non c'e'."""
+    sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
+    xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
+    needle = f'text="{label}"'
+    i = xml.find(needle)
+    if i < 0:
+        i = xml.find(f'content-desc="{label}"')
+        if i < 0:
+            return None
+    j = xml.find('bounds="[', i)
+    if j < 0:
+        return None
+    raw = xml[j + 9: xml.find('"', j + 9)]
+    try:
+        a, b = raw.split("][")
+        x1, y1 = (int(v) for v in a.split(","))
+        x2, y2 = (int(v) for v in b.rstrip("]").split(","))
+    except ValueError:
+        return None
+    return (x1 + x2) // 2, (y1 + y2) // 2
+
+
 def do(step: tuple) -> None:
     kind = step[0]
-    if kind == "tap":
+    if kind == "text":
+        at = find(step[1])
+        if at is None:
+            print(f"    (non trovo «{step[1]}» sullo schermo)")
+        else:
+            tap(*at)
+    elif kind == "tap":
         tap(step[1], step[2])
     elif kind == "swipe":
         swipe(*step[1:])
@@ -70,12 +107,20 @@ def do(step: tuple) -> None:
         key(step[1])
     elif kind == "wait":
         time.sleep(step[1])
+    elif kind == "stop":
+        sh("shell", "am", "force-stop", PKG)
+    elif kind == "launch":
+        sh("shell", "am", "start", "-n", ACT)
     else:
         raise ValueError(f"gesto sconosciuto: {kind}")
 
 
 def unlocked() -> bool:
-    """La barra delle schede esiste solo dentro l'app, dopo l'impronta."""
+    """
+    La barra delle schede esiste solo dentro l'app, dopo l'impronta. Vale come prova che
+    siamo dentro, non come prova del contrario: Scout e gli altri fogli a schermo intero
+    non ce l'hanno, e con questa sola il giro si fermava li'.
+    """
     png = OUT / ".probe.png"
     png.parent.mkdir(parents=True, exist_ok=True)
     raw = subprocess.run(["adb", "exec-out", "screencap", "-p"], capture_output=True, timeout=30).stdout
@@ -90,6 +135,11 @@ def unlocked() -> bool:
         return False
     # La pillola della scheda scelta: tinta, mai grigia, su ogni tema.
     return abs(r - g) + abs(g - b) > 6 and 12 < r < 230
+
+
+def in_app() -> bool:
+    """La finestra a fuoco e' la nostra. Non dice se e' sbloccata, dice dove siamo."""
+    return PKG in sh("shell", "dumpsys", "window", "windows")
 
 
 def wait_unlocked(limit: float = 180) -> bool:
@@ -131,44 +181,68 @@ def record(key_name: str, seconds: float, steps: list[tuple]) -> Path:
 # ---------------------------------------------------------------------------
 
 def scene_door() -> list[tuple]:
-    """L'app da fredda: il marchio che si scrive. Il riquadro dell'impronta si chiude."""
-    sh("shell", "am", "force-stop", PKG)
-    sh("shell", "am", "start", "-n", ACT)
-    return [("wait", 1.2), ("key", "back"), ("wait", 4.5)]
+    """
+    L'app da fredda. Il lancio sta dentro la ripresa, non prima: fuori, la porta era
+    gia' comparsa quando l'encoder apriva, e di quel che si vede all'avvio non restava
+    niente. Il riquadro dell'impronta annerisce il girato, quindi si chiude e si riprende
+    da li': il marchio fermo e il tasto per entrare.
+    """
+    return [("stop",), ("wait", 0.6), ("launch",), ("wait", 2.6), ("key", "back"), ("wait", 4.0)]
 
 
 def scene_hook() -> list[tuple]:
     """Impostazioni, «Prova un attacco»: la dApp che chiede e non mostra niente."""
     return [
-        ("tap", TABS["settings"], TAB_Y), ("wait", 1.5),
-        ("tap", 600, 400), ("wait", 2.0),          # Wallet and safety
-        ("tap", 600, 400), ("wait", 2.5),          # la card in cima: prova un attacco
+        ("launch",), ("wait", 1.5),                          # l'app davanti, sempre
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 1.2),       # da un punto noto
+        ("tap", TABS["settings"], TAB_Y), ("wait", 2.0),
+        ("text", "Wallet and safety"), ("wait", 2.5),
+        ("text", "TRY AN ATTACK"), ("wait", 3.0),
     ]
 
 
 def scene_receipt() -> list[tuple]:
-    """Lo scontrino sul drainer: la cifra vera, il rischio in rosso, bloccato."""
+    """
+    Lo scontrino sul drainer: la cifra vera, il rischio in rosso, bloccato.
+
+    Il cammino sta dentro la scena, anche se poi nel montaggio si salta: una scena
+    che dava per buono dove l'aveva lasciata la precedente falliva ogni volta che si
+    rigirava da sola, ed e' proprio allora che serve.
+    """
     return [
-        ("swipe", 600, 1800, 600, 1200), ("wait", 2.0),
-        ("swipe", 600, 1800, 600, 1100), ("wait", 3.0),
-        ("swipe", 600, 1800, 600, 1100), ("wait", 3.0),
+        ("launch",), ("wait", 1.5),
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 1.2),
+        ("tap", TABS["settings"], TAB_Y), ("wait", 2.0),
+        ("text", "Wallet and safety"), ("wait", 2.0),
+        ("text", "TRY AN ATTACK"), ("wait", 2.5),
+        ("text", "Wallet drainer"), ("wait", 3.0),
+        ("swipe", 600, 1750, 600, 1150), ("wait", 3.0),
+        ("swipe", 600, 1750, 600, 1200), ("wait", 3.5),
     ]
 
 
 def scene_crowd() -> list[tuple]:
     """Scout: cosa comprano i Seeker adesso, e il censimento."""
     return [
-        ("tap", TABS["wallet"], TAB_Y), ("wait", 1.5),
-        ("tap", 116, 1160), ("wait", 4.0),         # il cerchio Scout
-        ("swipe", 600, 1900, 600, 1100), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1100), ("wait", 3.0),
+        ("launch",), ("wait", 1.5),
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
+        ("text", "Scout"), ("wait", 5.0),
+        ("swipe", 600, 1900, 600, 1200), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1200), ("wait", 3.0),
     ]
 
 
 def scene_close() -> list[tuple]:
     """Il registro della giornata, poi il mercato, poi la home."""
     return [
-        ("key", "back"), ("wait", 1.0),
+        # La freccia dentro l'app, non il tasto indietro del telefono: quello, su una
+        # pagina che non ha niente sopra, esce dall'app, e da li' in poi i tocchi
+        # finiscono sull'app di qualcun altro.
+        # Mai il tasto indietro del telefono: su una pagina che non ha niente sopra
+        # esce dall'app, e da li' in poi i tocchi finiscono sull'app di qualcun altro.
+        # La freccia dell'app sta dove sta, anche quando non c'e': un tocco a vuoto
+        # sull'intestazione non fa niente.
+        ("launch",), ("wait", 1.5), ("tap", 93, 205), ("wait", 1.5),
         ("tap", TABS["receipts"], TAB_Y), ("wait", 3.0),
         ("swipe", 600, 1900, 600, 1200), ("wait", 2.5),
         ("tap", TABS["market"], TAB_Y), ("wait", 3.0),
@@ -177,9 +251,9 @@ def scene_close() -> list[tuple]:
 
 
 AUTO: dict[str, tuple[float, callable]] = {
-    "door": (6.0, scene_door),
+    "door": (9.0, scene_door),
     "hook": (9.0, scene_hook),
-    "receipt": (14.0, scene_receipt),
+    "receipt": (24.0, scene_receipt),
     "crowd": (16.0, scene_crowd),
     "close": (16.0, scene_close),
 }
@@ -211,8 +285,9 @@ def main(argv: list[str]) -> int:
         seconds, build = AUTO[name]
         print(f"— {name} ({seconds:.0f} s)")
         steps = build()
-        if name != "door" and not unlocked():
-            print("  l'app si e' chiusa, aspetto l'impronta…")
+        if name != "door" and not in_app():
+            print("  l'app non e' davanti, la riapro e aspetto l'impronta…")
+            sh("shell", "am", "start", "-n", ACT)
             if not wait_unlocked():
                 print("  niente da fare, mi fermo.")
                 return 1

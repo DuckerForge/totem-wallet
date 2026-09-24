@@ -200,13 +200,15 @@ object Palettes {
     )
 
     /**
-     * White. The one light theme: paper ground, indigo acts, the same ladder of surfaces
-     * climbing down instead of up. No grain, no glow: the neon stays with the dark ones.
+     * White, the way Young Platform does it: paper ground, flat grey cards (their #ECEDF1 and
+     * #E3E4E8), near-black ink (#1A1A1A), green acts. Their green (#00D672) is too pale to carry
+     * text on white, so the acting green is the same hue taken down until it reads 7:1; the
+     * bright one survives as the tint under chips. No grain, no glow: the neon stays with the dark ones.
      */
     val vela = p(
         "vela", R.string.theme_vela,
-        ground = 0xFFFFFFFF, ground2 = 0xFFF7F8FC, card = 0xFFE0E3EB, cardSoft = 0xFFEEF0F6, cardHi = 0xFFD2D6E1, stroke = 0xFFB5BBCC,
-        accent = 0xFF3B2FB8, accent2 = 0xFF1F4FA8, ink = 0xFF10151F, muted = 0xFF505A6E, amber = 0xFF7A4900, red = 0xFFC42B3C,
+        ground = 0xFFFFFFFF, ground2 = 0xFFF5F6FA, card = 0xFFE3E4E8, cardSoft = 0xFFECEDF1, cardHi = 0xFFD4D6DC, stroke = 0xFFB8BAC2,
+        accent = 0xFF086038, accent2 = 0xFF00527A, ink = 0xFF1A1A1A, muted = 0xFF5B5D62, amber = 0xFF744500, red = 0xFFC42B3C,
         premium = false, grain = 0f,
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )

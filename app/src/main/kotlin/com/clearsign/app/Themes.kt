@@ -52,7 +52,9 @@ object Themes {
      */
     fun toggleLight(ctx: Context) {
         if (isLight(ctx)) {
-            val back = prefs(ctx).getString(KEY_DARK, Palettes.default.id) ?: Palettes.default.id
+            // The two are a pair: with nothing remembered the light one goes to its own night,
+            // not to the app default, which is a different design.
+            val back = prefs(ctx).getString(KEY_DARK, Palettes.velaNight.id) ?: Palettes.velaNight.id
             select(ctx, if (Palettes.byId(back).ground.relativeLuminance() > 0.5) Palettes.default.id else back)
         } else {
             select(ctx, Palettes.vela.id)

@@ -664,7 +664,7 @@ private fun FieldLabel(text: String) {
 internal fun SmallChip(
     label: String,
     icon: HIcon?,
-    tint: Color = Halo.cyan,
+    tint: Color = Halo.tile,
     onLongClick: (() -> Unit)? = null,
     pulse: Boolean = false,
     onClick: () -> Unit,

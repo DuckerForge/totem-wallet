@@ -1077,6 +1077,7 @@
     <string name="theme_cyan_act">Cyan</string>
     <string name="theme_gold">Gold</string>
     <string name="theme_vela">Vela</string>
+    <string name="theme_vela_night">Vela night</string>
     <string name="home_act_tap">Tap</string>
     <string name="home_act_link">Link</string>
     <string name="home_act_agent">Agent</string>

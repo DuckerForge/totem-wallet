@@ -37,6 +37,13 @@ import voice
 # voce di ognuna va anticipata della somma delle dissolvenze che la precedono.
 FADE = 0.5
 
+# La musica sotto. Sta piano per conto suo, e quando parla la voce si abbassa ancora:
+# non a mano scena per scena, ma con un compressore che la ascolta e la scansa. Cosi'
+# resta giusta anche se una frase cambia lunghezza.
+MUSIC = Path("/home/oliver/Scrivania/irene/Turn+It+Up.mp3")
+MUSIC_LEVEL = 0.42      # il suo posto sotto la voce
+MUSIC_DUCK = 7.0        # quanto la spinge giu' la voce
+
 HERE = Path(__file__).resolve().parent
 SHOT = HERE / "shot"
 BUILD = HERE / "build"
@@ -89,22 +96,53 @@ def crossfade(parts: list[Path], out: Path, d: float = FADE) -> Path:
 
 
 def audio(plan: list[tuple[float, Path | None]], total: float, out: Path) -> Path | None:
-    """Una traccia sola: ogni voce al secondo in cui comincia la sua scena."""
+    """
+    Una traccia sola: ogni voce al secondo in cui comincia la sua scena, e sotto la musica,
+    che si abbassa da sola quando qualcuno parla.
+
+    `sidechaincompress` prende due ingressi: quello da abbassare e quello da ascoltare. La
+    voce passa due volte, una per farsi sentire e una per fare da innesco, perche' un filtro
+    consuma il flusso che legge.
+    """
     heard = [(at, w) for at, w in plan if w is not None]
-    if not heard:
+    if not heard and not MUSIC.exists():
         return None
+
     args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     for _, w in heard:
         args += ["-i", str(w)]
-    # Ogni voce ritardata al suo posto, poi sommate. `adelay` vuole millisecondi.
-    parts = "".join(
-        f"[{i}:a]adelay={int(at * 1000)}|{int(at * 1000)},apad[a{i}];"
-        for i, (at, _) in enumerate(heard)
-    )
-    mix = "".join(f"[a{i}]" for i in range(len(heard)))
-    args += ["-filter_complex",
-             f"{parts}{mix}amix=inputs={len(heard)}:normalize=0,atrim=0:{total:.2f}[out]",
-             "-map", "[out]", "-c:a", "aac", "-b:a", "160k", str(out)]
+    chain = []
+    if heard:
+        # `adelay` vuole millisecondi, e `apad` tiene aperto il flusso fino al mixer.
+        chain += [
+            f"[{i}:a]adelay={int(at * 1000)}|{int(at * 1000)},apad[a{i}]"
+            for i, (at, _) in enumerate(heard)
+        ]
+        mix = "".join(f"[a{i}]" for i in range(len(heard)))
+        chain.append(f"{mix}amix=inputs={len(heard)}:normalize=0,atrim=0:{total:.2f}[spoken]")
+
+    if MUSIC.exists():
+        args += ["-stream_loop", "-1", "-i", str(MUSIC)]
+        m = len(heard)
+        fade_out = max(0.0, total - 3.0)
+        chain.append(
+            f"[{m}:a]atrim=0:{total:.2f},volume={MUSIC_LEVEL},"
+            f"afade=t=in:st=0:d=1.2,afade=t=out:st={fade_out:.2f}:d=3[music]"
+        )
+        if heard:
+            chain.append("[spoken]asplit=2[talk][key]")
+            chain.append(
+                f"[music][key]sidechaincompress=threshold=0.03:ratio={MUSIC_DUCK}:"
+                "attack=25:release=500[under]"
+            )
+            chain.append("[under][talk]amix=inputs=2:normalize=0[out]")
+        else:
+            chain.append("[music]anull[out]")
+    else:
+        chain.append("[spoken]anull[out]")
+
+    args += ["-filter_complex", ";".join(chain), "-map", "[out]",
+             "-c:a", "aac", "-b:a", "192k", str(out)]
     run(*args)
     return out
 

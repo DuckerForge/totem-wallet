@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Totem Wallet · Clock In</title>
+<meta name="description" content="A Solana Seeker wallet that shows you what you sign, and an AI agent that trades from a capped budget inside a collar you set.">
+<link rel="icon" href="img/mark.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    --ground:#070B12; --ground2:#0E131A; --card:#141A24; --stroke:#232C39;
+    --ink:#E6EEFB; --muted:#93A6BE; --mint:#4DFFD0; --cyan:#0BF5EC; --violet:#9524F3;
+    --red:#FF5A6A; --amber:#FFC24B;
+    --display:'Sora',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);
+    -webkit-font-smoothing:antialiased;
+  }
+  .deck{scroll-snap-type:y mandatory;overflow-y:auto;height:100vh}
+  section{
+    scroll-snap-align:start;min-height:100vh;display:flex;align-items:center;
+    padding:6vh clamp(20px,6vw,90px);position:relative;
+  }
+  .wrap{width:100%;max-width:1180px;margin:0 auto;display:grid;gap:clamp(24px,4vw,64px);align-items:center}
+  .split{grid-template-columns:1fr minmax(240px,340px)}
+  @media (max-width:860px){.split{grid-template-columns:1fr}}
+
+  /* Il filo del marchio: sta sul bordo sinistro di ogni schermata, viola in basso
+     e ciano in alto, come il bordo acceso del telefono nel logo. */
+  section::before{
+    content:"";position:absolute;left:0;top:14vh;bottom:14vh;width:3px;border-radius:3px;
+    background:linear-gradient(to top,var(--violet),var(--cyan));opacity:.85;
+  }
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--mint);margin:0 0 18px;
+  }
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(40px,7vw,86px);line-height:1.02;
+     margin:0 0 18px;letter-spacing:-.02em;text-wrap:balance}
+  h2{font-family:var(--display);font-weight:700;font-size:clamp(28px,4.2vw,50px);line-height:1.08;
+     margin:0 0 20px;letter-spacing:-.015em;text-wrap:balance}
+  p{font-size:clamp(15px,1.35vw,19px);line-height:1.62;color:var(--muted);margin:0 0 16px;max-width:62ch}
+  p strong{color:var(--ink);font-weight:600}
+  .lead{font-size:clamp(17px,1.7vw,23px);color:var(--ink)}
+  ul{margin:0 0 16px;padding:0;list-style:none;max-width:62ch}
+  li{position:relative;padding-left:22px;margin:0 0 12px;color:var(--muted);
+     font-size:clamp(14px,1.25vw,17px);line-height:1.55}
+  li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:2px;background:var(--mint)}
+  li b{color:var(--ink);font-weight:600}
+
+  .shot{width:100%;border-radius:22px;display:block;border:1px solid var(--stroke);
+        box-shadow:0 30px 70px rgba(0,0,0,.55)}
+  .mark{width:clamp(140px,16vw,210px);display:block;margin:0 0 30px}
+
+  .figs{display:flex;flex-wrap:wrap;gap:clamp(18px,3vw,46px);margin:26px 0 0}
+  .fig b{display:block;font-family:var(--display);font-weight:700;color:var(--mint);
+         font-size:clamp(26px,3.4vw,40px);line-height:1;letter-spacing:-.02em}
+  .fig span{display:block;font-size:13px;color:var(--muted);margin-top:8px;max-width:20ch}
+
+  .quote{border-left:2px solid var(--mint);padding:2px 0 2px 18px;margin:24px 0 0;
+         font-family:var(--display);font-size:clamp(16px,1.6vw,21px);color:var(--ink);max-width:56ch}
+  .flag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--ground);background:var(--mint);
+        padding:5px 11px;border-radius:999px;margin:0 8px 10px 0;font-weight:700}
+  .flag.warn{background:var(--amber)}
+  .flag.bad{background:var(--red);color:#fff}
+
+  .links{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
+  .links a{font-family:var(--mono);font-size:14px;color:var(--ink);text-decoration:none;
+           border:1px solid var(--stroke);background:var(--card);border-radius:12px;
+           padding:13px 18px;transition:border-color .15s}
+  .links a:hover,.links a:focus-visible{border-color:var(--mint);outline:none}
+  .links a span{color:var(--mint)}
+
+  .pager{position:fixed;right:18px;bottom:16px;font-family:var(--mono);font-size:12px;
+         color:var(--muted);background:rgba(7,11,18,.8);border:1px solid var(--stroke);
+         border-radius:999px;padding:7px 13px;z-index:5}
+
+  @media print{
+    .deck{height:auto;overflow:visible}
+    section{min-height:auto;page-break-after:always;padding:34px 40px}
+    .pager{display:none}
+    body{background:#fff;color:#111}
+    h1,h2,p strong,li b,.quote{color:#111}
+    p,li{color:#333}
+    .shot{box-shadow:none}
+  }
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<main class="deck" id="deck">
+
+  <section>
+    <div class="wrap">
+      <div>
+        <img class="mark" src="img/mark.png" alt="The Totem mark: a Seeker seen from the back, its right edge lit.">
+        <h1>Totem Wallet</h1>
+        <p class="lead">A wallet for the Solana Seeker that reads every transaction before you sign it,
+        and an AI agent that trades a capped budget inside a collar you set.</p>
+        <p class="quote">What you see is what you sign.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">01 · The problem</p>
+        <h2>A name, a button, and your money is gone</h2>
+        <p>When an app asks for a signature you see its name and an Approve button. You do not see
+        how much leaves, to whom, or whether you are handing someone the right to take your tokens
+        whenever they like. <strong>This is blind signing, and it is the first cause of stolen crypto.</strong></p>
+        <p>The Seed Vault signs whatever the wallet hands it. The hardware is not the weak part.
+        The screen in front of it is.</p>
+        <p>And agents make it worse: to trade for you, an AI needs a key, and a key in an agent's
+        hands is a key in a prompt injection's hands.</p>
+      </div>
+      <img class="shot" src="img/door.jpg" alt="The Totem door screen, the mark lit on a dark ground.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">02 · The answer</p>
+        <h2>A receipt before the fingerprint</h2>
+        <p>Every request, from a dApp over Mobile Wallet Adapter, from Send, Swap, a Blink, the
+        bridge, an NFC sticker or the agent, is <strong>simulated on chain first</strong> and shown
+        as a plain receipt: what leaves, to whom, the fee, the risks, the address's trust badge.</p>
+        <p>Then hold to confirm. Then the fingerprint. Keys never leave the vault.</p>
+        <p class="quote">Here the attack is a drainer. The receipt names the real amount and the
+        real recipient, and the signature is blocked before the Seed Vault is even asked.</p>
+      </div>
+      <img class="shot" src="img/receipt.jpg" alt="The receipt on a drainer: minus 49.9 SOL, two severe risks, signature blocked.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">03 · How it reads the truth</p>
+        <h2>The effect, never the claim</h2>
+        <ul>
+          <li><b>On-chain simulation</b>, legacy and v0 with lookup tables: real balance changes,
+          including splits hidden across several wallets.</li>
+          <li><b>Risk engine:</b> drains, unlimited approvals, authority changes, wallet takeover,
+          a foreign fee payer, burn addresses, unexpected signers, bundles.</li>
+          <li><b>Look-alike detection</b> against your own contacts, which is how address poisoning
+          actually works.</li>
+          <li><b>Anti-TOCTOU:</b> it re-simulates the instant before signing and refuses if the
+          state drifted between what you read and what you sign.</li>
+          <li><b>Five attacks built in:</b> a drainer, a look-alike, an unlimited approval, a state
+          drift and a safe payment, all offline, so anyone can try the defences with no dApp.</li>
+        </ul>
+        <div class="figs">
+          <div class="fig"><b>397</b><span>unit tests on the safety core</span></div>
+          <div class="fig"><b>263</b><span>commits since 11 September 2026</span></div>
+          <div class="fig"><b>0</b><span>keys the app can see</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">04 · The agent</p>
+        <h2>It gets a budget, never your seed</h2>
+        <p>You open a budget: a second key, created on the phone, capped in SOL and in days, apart
+        from your wallet. The agent hunts across Solana with the gates the winning bots use, buys a
+        slice, sells at your target or your stop, and closes the budget when it expires.</p>
+        <p>You set the collar: <strong>how much a move, how much a day, how fast, and above what it
+        must ask for your fingerprint.</strong> A policy engine reads the simulated effect of every
+        move, never the agent's claim. Your own rules, written in plain Markdown, can only close
+        doors, never open them.</p>
+        <p class="quote">The collar is the product. The agent can be wrong, hallucinate or be
+        injected: it cannot spend more than the budget, and it cannot reach your wallet.</p>
+      </div>
+      <img class="shot" src="img/home.jpg" alt="The Totem home: balance, the eight action circles, the portfolio and the DeFi positions.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">05 · The agent that lies</p>
+        <h2>An AI hands over a transaction. We check it against the chain.</h2>
+        <p>An agent running on a computer holds no key here. It gives the phone a transaction and a
+        declared intent: what it says it is doing. Totem simulates the real bytes and compares the
+        claim with the effect.</p>
+        <ul>
+          <li>Every outflow must be the declared one, in the declared amount.</li>
+          <li>A swap must actually bring back the token it promised.</li>
+          <li>No hidden delegation, authority change or durable nonce, ever.</li>
+        </ul>
+        <p><span class="flag">Honest agent</span><span class="flag bad">Liar, blocked</span></p>
+        <p>If the agent declares a swap and the transaction is a transfer, the signature is refused
+        and the screen says exactly what did not add up. It never judges whether a trade is smart.
+        It verifies that the agent is telling the truth.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">06 · ORE</p>
+        <h2>The grid, read from the program itself</h2>
+        <p>ORE is a game on Solana: a five by five grid, one round a minute. It is written in Steel,
+        so there is no IDL to lean on. Totem decodes the program by hand and shows
+        <strong>what a square really costs and what it can pay</strong> before anything is put on it.</p>
+        <ul>
+          <li>The live round, the emptiest squares, and how many miners are on the grid right now.</li>
+          <li>A Deploy or a Claim from any dApp shows up in the receipt as what it is: a wager.</li>
+          <li>The agent can dig from its budget, under the same collar, and bring the gains home
+          in ORE when the budget closes.</li>
+        </ul>
+      </div>
+      <img class="shot" src="img/ore.jpg" alt="The ORE five by five grid with the odds on every square, the live round and the miner count.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">07 · The Seeker, and SKR</p>
+        <h2>A number no balance shows</h2>
+        <p>The Genesis Token is one per device, so the crowd is real people holding a Seeker:
+        <strong>120,520 wallets</strong>, enumerated once on chain, about ten and a half thousand
+        of them active enough to watch continuously.</p>
+        <p>Claim and stake moves SKR inside the Guardians' program, so a list built from token
+        accounts finds nothing there. Totem decodes that program and shows the position, with the
+        yield <strong>measured from the share price</strong>, not derived from tokenomics.</p>
+        <div class="figs">
+          <div class="fig"><b>50.8%</b><span>of active Seekers keep SKR staked</span></div>
+          <div class="fig"><b>39,962</b><span>SKR each on average, about $716</span></div>
+          <div class="fig"><b>15.4%</b><span>yield measured, against 21.25% derived</span></div>
+        </div>
+      </div>
+      <img class="shot" src="img/scout.jpg" alt="Scout's census card: half of the active Seekers keep SKR staked, with the average each.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">08 · Why it sticks</p>
+        <h2>It stays with you when the app is closed</h2>
+        <ul>
+          <li><b>A bubble over any app</b> and a widget on the home screen, both showing what the
+          agent is doing and how the wallet is.</li>
+          <li><b>Pay by touch:</b> the phone emulates a payment tag, so someone taps and pays.</li>
+          <li><b>A sticker:</b> write a Solana Pay request onto a blank NFC tag costing cents.</li>
+          <li><b>Contacts by touch,</b> each card signed by the phone's attestation key, which is
+          what closes the door on address poisoning.</li>
+          <li><b>A proof of payment</b> as a QR this phone signed, verified by another phone with
+          no explorer and no network.</li>
+        </ul>
+      </div>
+      <img class="shot" src="img/companion.jpg" alt="The floating companion bubble open over the wallet, showing the agent and the health score.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">09 · Try it</p>
+        <h2>Everything here runs on mainnet today</h2>
+        <p>Not a port and not a mockup. The repository starts on 11 September 2026, during the
+        hackathon, and everything in it is new: Kotlin and Jetpack Compose, a pure-Kotlin safety
+        core, and an attacker dApp shipped in the repo so the defences can be tried by anyone.</p>
+        <div class="links">
+          <a href="https://github.com/DuckerForge/totem-wallet"><span>Code</span> · github.com/DuckerForge/totem-wallet</a>
+          <a href="https://github.com/DuckerForge/totem-wallet/releases/download/v1.0-clockin/TotemWallet-v1.0-clockin.apk"><span>APK</span> · signed release, 8.6 MB</a>
+        </div>
+        <p class="quote">Receipt before signature. Everywhere. On a dApp, on a Blink, on a bridge,
+        on the grid, and on everything the agent does.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+<div class="pager" id="pager" aria-live="polite">1 / 10</div>
+<script>
+  // Le frecce e lo spazio sfogliano, come ci si aspetta da una presentazione. Lo scorrimento
+  // normale continua a funzionare: e' la stessa pagina, non una finta.
+  const deck = document.getElementById('deck');
+  const slides = [...deck.querySelectorAll('section')];
+  const pager = document.getElementById('pager');
+  let at = 0;
+  const go = i => { at = Math.max(0, Math.min(slides.length - 1, i));
+                    slides[at].scrollIntoView({behavior:'smooth', block:'start'}); };
+  addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)) { e.preventDefault(); go(at + 1); }
+    if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)) { e.preventDefault(); go(at - 1); }
+    if (e.key === 'Home') { e.preventDefault(); go(0); }
+    if (e.key === 'End') { e.preventDefault(); go(slides.length - 1); }
+  });
+  // Il numero in basso segue quello che si vede davvero, anche scorrendo col dito.
+  const seen = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) { at = slides.indexOf(e.target);
+      pager.textContent = (at + 1) + ' / ' + slides.length; } });
+  }, {threshold: .55});
+  slides.forEach(s => seen.observe(s));
+</script>
+</body>
+</html>

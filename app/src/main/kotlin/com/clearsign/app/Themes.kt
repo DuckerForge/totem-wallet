@@ -1,6 +1,8 @@
 package com.clearsign.app
 
 import android.content.Context
+import androidx.glance.appwidget.updateAll
+import kotlinx.coroutines.launch
 
 /**
  * Which palette is on, and which premium ones this device paid for. Unlocks are stored with
@@ -33,6 +35,19 @@ object Themes {
         if (p.ground.relativeLuminance() <= 0.5) e.putString(KEY_DARK, p.id)
         e.apply()
         Halo.palette = p
+        // Everything that paints outside Compose reads the palette once and keeps it: the
+        // home widget in its own process, the bubble in its own service. Changing the theme
+        // used to leave both on the old colours until something else happened to redraw them.
+        repaintEverything(ctx)
+    }
+
+    /** The surfaces that live outside the activity and have to be told. */
+    private fun repaintEverything(ctx: Context) {
+        CompanionService.repaint(ctx)
+        val app = ctx.applicationContext
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            runCatching { HealthWidget().updateAll(app) }
+        }
     }
 
     /** A theme is available if it's the free Halo, or ClearSign Pro is unlocked. */

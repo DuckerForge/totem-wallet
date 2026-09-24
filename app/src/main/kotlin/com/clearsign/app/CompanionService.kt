@@ -98,6 +98,7 @@ class CompanionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        alive = true
         Themes.load(this); Settings.load(this)
         startForeground(NOTIF_ID, notification())
         wm = getSystemService(WindowManager::class.java)
@@ -110,12 +111,16 @@ class CompanionService : Service() {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACTION_HIDE -> hide()
             ACTION_SHOW -> show()
+            // The theme changed under it. The bubble paints its own bitmap and reads the
+            // palette once at start, so without this it kept the old colours until it died.
+            ACTION_REPAINT -> { Themes.load(this); paintFace() }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        alive = false
         scope.cancel()
         root?.let { runCatching { wm.removeView(it) } }
         root = null
@@ -742,6 +747,21 @@ class CompanionService : Service() {
         const val ACTION_STOP = "com.clearsign.app.COMPANION_STOP"
         const val ACTION_HIDE = "com.clearsign.app.COMPANION_HIDE"
         const val ACTION_SHOW = "com.clearsign.app.COMPANION_SHOW"
+        const val ACTION_REPAINT = "com.clearsign.app.COMPANION_REPAINT"
+
+        /**
+         * True while the bubble is on screen. Asked before sending it anything: starting the
+         * service to tell it about a theme would put a bubble over the phone of someone who
+         * never asked for one.
+         */
+        @Volatile
+        private var alive = false
+
+        /** Tell a running bubble to read the palette again. Does nothing if it is not running. */
+        fun repaint(ctx: Context) {
+            if (!alive) return
+            runCatching { ctx.startService(Intent(ctx, CompanionService::class.java).setAction(ACTION_REPAINT)) }
+        }
 
         /** True when Android will let us draw over other apps. */
         fun canRun(ctx: Context): Boolean = android.provider.Settings.canDrawOverlays(ctx)

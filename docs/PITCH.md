@@ -1,4 +1,4 @@
-# Velum Wallet, il pitch deck
+# Totem Wallet, il pitch deck
 
 _Dieci slide con le note per chi parla. Riscritto il 23 settembre 2026 per CLOCK IN. Testo in inglese, come
 tutto il materiale per i giudici; le indicazioni fra parentesi quadre sono in italiano._
@@ -10,11 +10,11 @@ screenshot vero per slide, presi con `scripts/screenshots.sh`. Venti secondi a s
 
 ## Slide 1. Title
 
-**Velum**
+**Totem**
 *What you see is what you sign.*
 A Seeker wallet that reads every transaction before you sign it, and an AI agent that trades a capped budget inside a collar you set.
 
-> "Hi. I'm building Velum. It makes the Seeker sign only what you can read, and it lets an AI agent trade for you without ever holding your key."
+> "Hi. I'm building Totem. It makes the Seeker sign only what you can read, and it lets an AI agent trade for you without ever holding your key."
 
 [Screenshot: la porta, il marchio con i due telefoni.]
 
@@ -78,7 +78,7 @@ A live screen: the charts of the open positions with entry, target and stop draw
 
 ## Slide 8. ORE, three ways
 
-Velum reads the ORE program by hand (Steel, no IDL). A Deploy or a Claim from any dApp shows up on the receipt as what it is: a wager, with the squares and the SOL at stake. The wallet has the 5x5 grid with the real odds from the program's own rules, and the winning square replayed when the round closes. The agent can dig: it delegates part of the budget to an on-chain executor that plays every round while you sleep, and when the budget closes the gain, not the stake, can be swapped into ORE and brought home as hard money.
+Totem reads the ORE program by hand (Steel, no IDL). A Deploy or a Claim from any dApp shows up on the receipt as what it is: a wager, with the squares and the SOL at stake. The wallet has the 5x5 grid with the real odds from the program's own rules, and the winning square replayed when the round closes. The agent can dig: it delegates part of the budget to an on-chain executor that plays every round while you sleep, and when the budget closes the gain, not the stake, can be swapped into ORE and brought home as hard money.
 
 > "ORE is not a tab with a logo. It is in the receipt, in the wallet and in the agent, verified byte by byte on chain."
 
@@ -98,7 +98,7 @@ It sits in front of every signature, so it opens every day. The agent and the OR
 
 Everything runs on a real Seeker today: APK, open repo, 396 unit tests, first commit on 11 September, during the hackathon. Publishing to the dApp Store next.
 
-**Velum. Stop signing blind.**
+**Totem. Stop signing blind.**
 
 > "Thanks. Everything you saw runs on this phone."
 

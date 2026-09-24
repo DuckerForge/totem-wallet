@@ -1,14 +1,14 @@
 # Three minute demo, Clock In
 
 Shot on a real Seeker. Screen recording plus voice. English only. Target 2:50.
-The wallet is Velum. Say the name once at the start and once at the end, nowhere else.
+The wallet is Totem. Say the name once at the start and once at the end, nowhere else.
 
 ## Before recording
 
 - Release build installed, signed with the real key, Seed Vault set up.
 - A test wallet with a little SOL, some SKR, and at least one dead token account so wallet health has something to find.
 - Enough SOL for one ORE dig (0.01 is plenty) and, if the timing allows, a round already won so Claim has something to collect.
-- `:testdapp` installed for the attack beats.
+- `:testdapp` installed for the attack beats. Plan B if it will not start: Settings, «Try an attack», the drainer scenario shows the same red receipt with no dApp.
 - The agent stopped, no open budget, so the first minute card shows.
 - Two NFC stickers and, if a second phone is there, the contact tap beat.
 - Airplane mode off, battery saver off, notifications allowed, TalkBack off.
@@ -17,7 +17,7 @@ The wallet is Velum. Say the name once at the start and once at the end, nowhere
 ## Beat sheet
 
 **0:00 to 0:12, the hook**
-Voice: "A phone can ask you to sign something and show you nothing but a name and a button. This is Velum."
+Voice: "A phone can ask you to sign something and show you nothing but a name and a button. This is Totem."
 Show: the attacker dApp asking to sign. Cut to our receipt appearing over it.
 
 **0:12 to 0:45, the receipt**
@@ -36,7 +36,7 @@ Show: the first minute card, make a budget, the collar (per move, per day, silen
 Then "Watch it work": the timer ring, the charts with entry, target and stop drawn, the reasoning typed out, the voice saying what it does. Turn the phone sideways for the two chart layout.
 
 **1:40 to 1:58, ORE**
-Voice: "ORE is a game on Solana: a five by five grid, one round a minute. Velum reads the grid and says what a square really costs and what it can pay, before you put anything on it. The agent can dig from its budget, under the same collar, and bring the gains home in ORE."
+Voice: "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the grid and says what a square really costs and what it can pay, before you put anything on it. The agent can dig from its budget, under the same collar, and bring the gains home in ORE."
 Show: Dig ORE, the grid with the emptiest squares marked, the outlook line with the expected ORE and the expected cost, hold to dig, the receipt. Then Claim, and the ORE landing in the wallet.
 
 **1:58 to 2:15, what nobody else has**
@@ -52,7 +52,7 @@ Show: a hand over the screen, the numbers vanish, the fingerprint brings them ba
 **2:32 to 2:50, the close**
 Voice: "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, on the grid, and on everything the agent does."
 Show: the bridge quote, then the ledger with the day's entries, then the app icon.
-Last line: "Velum. What you see is what you sign."
+Last line: "Totem. What you see is what you sign."
 
 ## Rules for the cut
 

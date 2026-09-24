@@ -18,7 +18,7 @@ if ! adb get-state >/dev/null 2>&1; then
 fi
 
 shots=(
-  "01-door|La porta: Velum aperto sulla home, saldo visibile, i cerchi delle azioni"
+  "01-door|La porta: Totem aperto sulla home, saldo visibile, i cerchi delle azioni"
   "02-receipt|Uno scontrino di firma da una dApp: importo, destinatario, badge fidato, «Tieni premuto per firmare»"
   "03-blocked|Lo scontrino di un drainer (dal testdapp): rischio grave in rosso, firma bloccata"
   "04-agent|La pagina Agente con la paghetta aperta: libera, in monete, oggi, il collare"

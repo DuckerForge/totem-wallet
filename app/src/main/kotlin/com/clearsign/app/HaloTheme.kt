@@ -54,6 +54,14 @@ data class HaloPalette(
     val receiptStyle: ReceiptStyle,
     /** Card hairlines flow instead of sitting still — Solana's two colours, moving. */
     val livingStroke: Boolean = false,
+    /**
+     * The one big filled button. Dark themes light it with their own accents and write the
+     * page's ground on it; a light theme cannot, because a colour bright enough to fill a
+     * button is never dark enough to carry white text. So the pair travels with the palette.
+     */
+    val fillFrom: Color = accentFill,
+    val fillTo: Color = accent2,
+    val onFill: Color = ground,
 ) {
     val isFree: Boolean get() = !premium
 }
@@ -65,7 +73,7 @@ object Palettes {
         accent: Long, accent2: Long, ink: Long, muted: Long, amber: Long, red: Long,
         premium: Boolean, grain: Float, scanlines: Boolean = false, fillSoft: Boolean = false,
         fonts: HaloFonts, radiusScale: Float = 1f, iconStroke: Float = 1f, receiptStyle: ReceiptStyle = ReceiptStyle.CARDS,
-        livingStroke: Boolean = false,
+        livingStroke: Boolean = false, fillFrom: Long? = null, fillTo: Long? = null, onFill: Long? = null,
     ) = HaloPalette(
         id = id, nameRes = nameRes,
         ground = Color(ground), ground2 = Color(ground2), card = Color(card), cardSoft = Color(cardSoft), cardHi = Color(cardHi), stroke = Color(stroke),
@@ -78,6 +86,9 @@ object Palettes {
         premium = premium, grainAlpha = grain, scanlines = scanlines,
         fonts = fonts, radiusScale = radiusScale, iconStroke = iconStroke, receiptStyle = receiptStyle,
         livingStroke = livingStroke,
+        fillFrom = if (fillFrom != null) Color(fillFrom) else if (fillSoft) androidx.compose.ui.graphics.lerp(Color(accent), Color(card), 0.45f) else Color(accent),
+        fillTo = if (fillTo != null) Color(fillTo) else Color(accent2),
+        onFill = if (onFill != null) Color(onFill) else Color(ground),
     )
 
     /** Dark premium, glass panels, mint + cyan on a blue-black ground. Free. */
@@ -187,6 +198,9 @@ object Palettes {
         ground = G0, ground2 = G2, card = CD, cardSoft = CS, cardHi = CH, stroke = ST,
         accent = 0xFF4CC9FF, accent2 = 0xFF7FD8FF, ink = INK0, muted = MU0, amber = 0xFFFFC24B, red = 0xFFFF5A6A,
         premium = false, grain = 0f, fillSoft = true,
+        // Mixed a third of the way back instead of nearly half: at 0.45 the button's own
+        // label sat on it at 4.2:1, under the floor the rest of the theme keeps.
+        fillFrom = 0xFF3F98C0,
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
@@ -200,16 +214,19 @@ object Palettes {
     )
 
     /**
-     * White, the way Young Platform does it: paper ground, flat grey cards (their #ECEDF1 and
-     * #E3E4E8), near-black ink (#1A1A1A), green acts. Their green (#00D672) is too pale to carry
-     * text on white, so the acting green is the same hue taken down until it reads 7:1; the
-     * bright one survives as the tint under chips. No grain, no glow: the neon stays with the dark ones.
+     * White, built on Young Platform's own ramps read off their stylesheet: their greys
+     * (#F5F5F5 #EDEDED #E0E0E0), their near-black text (#131312), their green and azure. The
+     * bright ones are for fills, not for text: their #00D372 on white is 1.9:1, so what acts
+     * here is the same green further down their ramp, #005F33, which reads at 7.8:1.
      */
     val vela = p(
         "vela", R.string.theme_vela,
-        ground = 0xFFFFFFFF, ground2 = 0xFFF5F6FA, card = 0xFFE3E4E8, cardSoft = 0xFFECEDF1, cardHi = 0xFFD4D6DC, stroke = 0xFFB8BAC2,
-        accent = 0xFF086038, accent2 = 0xFF00527A, ink = 0xFF1A1A1A, muted = 0xFF5B5D62, amber = 0xFF744500, red = 0xFFC42B3C,
+        ground = 0xFFFFFFFF, ground2 = 0xFFF5F5F5, card = 0xFFE0E0E0, cardSoft = 0xFFEDEDED, cardHi = 0xFFD4D4D4, stroke = 0xFFA8A8A8,
+        accent = 0xFF005F33, accent2 = 0xFF005480, ink = 0xFF131312, muted = 0xFF545454, amber = 0xFF73430E, red = 0xFFB34435,
         premium = false, grain = 0f,
+        // The button is their green, the one that is too bright to carry text, with their
+        // near-black written on it: 9.4:1.
+        fillFrom = 0xFF00D372, fillTo = 0xFF00C269, onFill = 0xFF131312,
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
@@ -349,6 +366,10 @@ object Halo {
     val red: Color get() = palette.red
     val redSoft: Color get() = palette.redSoft
     val cyanSoft: Color get() = palette.accentSoft
+    /** The one big filled button, and what is written on it. */
+    val fillFrom: Color get() = palette.fillFrom
+    val fillTo: Color get() = palette.fillTo
+    val onFill: Color get() = palette.onFill
     /** A light ground: Material widgets and the status bar icons follow it. */
     val isLight: Boolean get() = palette.ground.relativeLuminance() > 0.5
 

@@ -19,7 +19,7 @@ object MoneyLinks {
 
     /**
      * The web page behind every link we hand out. A `solana:` URI is invisible to a phone with
-     * no wallet, so both kinds travel as https: Velum opens them directly (verified App Links),
+     * no wallet, so both kinds travel as https: Totem opens them directly (verified App Links),
      * anything else lands on a page that says who asks, how much, and where to get the app.
      */
     const val WEB = "https://duckerforge.github.io/apex"
@@ -61,7 +61,7 @@ object MoneyLinks {
     /**
      * `https://…/apex/g/#k=<seed base58>&n=<note>`: the key travels in the link by design, and
      * in the fragment on purpose, which is never sent to the server, so the host never sees it.
-     * Velum opens the link itself; a phone without it gets the page, which can hand the gift
+     * Totem opens the link itself; a phone without it gets the page, which can hand the gift
      * over to any Solana address the person pastes.
      */
     fun claimUrl(seed: ByteArray, note: String): String =
@@ -114,6 +114,16 @@ object MoneyLinks {
             is WalletActions.Result.Sent -> claimUrl(seed, note) to null
             is WalletActions.Result.Failed -> { runCatching { forget(ctx, pubkey) }; null to r.message }
         }
+    }
+
+    /**
+     * The sweep read back before it is signed, for both ends of a gift: taking it back and
+     * taking it. The gift key pays the fee, so it is the owner of this receipt. Null when the
+     * key is empty or the chain cannot be reached.
+     */
+    suspend fun previewSweep(ctx: Context, seed: ByteArray, to: String): ReceiptEngine.Analyzed? {
+        val plan = SoftKey.sweepPlan(seed, to) ?: return null
+        return WalletActions.preview(ctx, plan.from, plan.instructions)
     }
 
     /** Take a gift back. Only works while nobody has claimed it. */
@@ -169,7 +179,7 @@ object MoneyLinks {
         prefs(ctx).edit().remove("seed_$pubkey").apply()
     }
 
-    private fun seedOf(ctx: Context, pubkey: String): ByteArray? =
+    internal fun seedOf(ctx: Context, pubkey: String): ByteArray? =
         prefs(ctx).getString("seed_$pubkey", null)?.let { Secrets.open(it) }
 
     fun markClaimed(ctx: Context, pubkey: String) {

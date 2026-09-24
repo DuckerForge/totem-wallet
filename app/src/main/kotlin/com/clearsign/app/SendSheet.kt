@@ -639,7 +639,7 @@ internal fun fmtUnits(raw: Long, decimals: Int): String {
 
 /**
  * A scanned QR may be a bare address, a Solana Pay URI (`solana:<addr>?…`), or the web
- * link Velum hands out, which a phone without a wallet can also open.
+ * link Totem hands out, which a phone without a wallet can also open.
  */
 private fun parseScanned(text: String): com.clearsign.core.PayRequest {
     val t = text.trim()

@@ -34,6 +34,21 @@ object SoftKey {
      */
     data class Sweep(val signature: String?, val error: String?, val lamports: Long)
 
+    /** The one transfer a sweep makes, so it can be read before it is signed. */
+    data class SweepPlan(val from: String, val lamports: Long, val instructions: List<WalletTx.Instruction>)
+
+    /** Null when the key is empty or an address is bad: nothing to show, nothing to sign. */
+    suspend fun sweepPlan(from: ByteArray, to: String, cluster: String? = null): SweepPlan? {
+        val pub = pubkeyOf(from)
+        val rpc = SolanaRpc.urlFor(cluster)
+        val balance = runCatching { SolanaRpc.getBalance(rpc, pub) }.getOrNull() ?: 0L
+        val fee = 5_000L
+        if (balance <= fee) return null
+        val fromKey = Base58.decodePubkey(pub) ?: return null
+        val toKey = Base58.decodePubkey(to) ?: return null
+        return SweepPlan(pub, balance - fee, listOf(WalletTx.systemTransfer(fromKey, toKey, balance - fee)))
+    }
+
     suspend fun sweepAll(from: ByteArray, to: String, cluster: String? = null): Sweep {
         val pub = pubkeyOf(from)
         val rpc = SolanaRpc.urlFor(cluster)

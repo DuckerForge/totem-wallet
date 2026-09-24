@@ -46,7 +46,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
 /**
- * Velum's Mobile Wallet Adapter endpoint, the phone as a Ledger: dApps start a local
+ * Totem's Mobile Wallet Adapter endpoint, the phone as a Ledger: dApps start a local
  * association (solana-wallet://) that Android routes here, every request becomes a plain
  * receipt from the real bytes, and the Seed Vault signs only after the person approves
  * what they actually see.

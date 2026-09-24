@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /*
-     * Reader mode: while Velum is in front, holding it against a tag or another phone reads
+     * Reader mode: while Totem is in front, holding it against a tag or another phone reads
      * the request into the send form. Only a read; the ordinary receipt still has to be approved.
      */
     /** The sticker writer borrows the radio; this is how it gives it back. */
@@ -596,6 +596,18 @@ fun HomeScreen(signer: SeedVaultSigner) {
 private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map<String, String>, onSend: (String) -> Unit) {
     var showDemo by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                // ---- Try an attack: the receipt on a drainer, no dApp needed ----
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth().clickable { showDemo = !showDemo }, verticalAlignment = Alignment.CenterVertically) {
+                            SectionTitle(stringResource(R.string.home_demo_hdr), stringResource(R.string.home_demo_sub), HIcon.FLASK)
+                            Spacer(Modifier.weight(1f))
+                            HaloIcon(if (showDemo) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
+                        }
+                        if (showDemo) DemoSection(signer, owner)
+                    }
+                }
+
                 // ---- Wallet health (the score) --------------------------------
                 WalletHealthCard(owner)
                 ForgottenMoneyCard(owner)
@@ -627,17 +639,6 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
                     }
                 }
 
-                // ---- Demo -----------------------------------------------------
-                GlassCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth().clickable { showDemo = !showDemo }, verticalAlignment = Alignment.CenterVertically) {
-                            SectionTitle(stringResource(R.string.home_demo_hdr), stringResource(R.string.home_demo_sub), HIcon.FLASK)
-                            Spacer(Modifier.weight(1f))
-                            HaloIcon(if (showDemo) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
-                        }
-                        if (showDemo) DemoSection(signer, owner)
-                    }
-                }
     }
 }
 
@@ -839,7 +840,7 @@ private fun DemoSection(signer: SeedVaultSigner, connectedWallet: String?) {
     val drainerReason = stringResource(R.string.demo_drainer_reason)
     val case = remember(scenario, myWallet) { DemoCase(scenario, myWallet, drainerReason) }
     val flow = remember(scenario, myWallet) {
-        ClearSignFlow(case.decoder, case.simulator, case.scanner, if (connectedWallet != null) signer else MockSigner(myWallet), case.trust, com.clearsign.core.RiskEngine(deviceLocaleTag()))
+        ClearSignFlow(case.decoder, case.simulator, case.scanner, if (connectedWallet != null) DemoSigner(connectedWallet, signer) else MockSigner(myWallet), case.trust, com.clearsign.core.RiskEngine(deviceLocaleTag()))
     }
     val preview = remember(scenario, myWallet) { flow.preview(DEMO_TX, DEMO_FEE_LAMPORTS) }
     val receipt = preview.receipt

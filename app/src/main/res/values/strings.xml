@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Velum</string>
-    <string name="app_label">Velum Wallet</string>
+    <string name="app_name">Totem</string>
+    <string name="app_label">Totem Wallet</string>
     <string name="tagline">What you see is what you sign</string>
     <string name="header_danger">Risk detected</string>
     <string name="close">Close</string>
@@ -52,7 +52,7 @@
     <string name="and_send">" and sending"</string>
     <string name="tx_n_of">Transaction %1$d of %2$d</string>
     <string name="blocked_bundle">Transaction %1$d carries a severe risk: the whole bundle is blocked.</string>
-    <string name="blocked_single">Severe risk: Velum will not sign this transaction.</string>
+    <string name="blocked_single">Severe risk: Totem will not sign this transaction.</string>
     <string name="blocked_title">Signature blocked</string>
     <string name="pay">YOU PAY</string>
     <string name="receive">YOU RECEIVE</string>
@@ -158,11 +158,11 @@
     <string name="tokens_n">%1$d tokens</string>
     <string name="home_keys_note">Keys in a hardware enclave, never exposed to software.</string>
     <string name="home_ready_title">Ready for dApps</string>
-    <string name="home_ready_note">When a dApp asks for a wallet, pick Velum and “Always”. Every transaction comes through here, decoded and simulated, before it is signed.</string>
+    <string name="home_ready_note">When a dApp asks for a wallet, pick Totem and “Always”. Every transaction comes through here, decoded and simulated, before it is signed.</string>
     <string name="home_contacts_hdr">TRUSTED CONTACTS</string>
     <string name="contacts_empty_note">Save a recipient from a receipt (tap the node → “Save as trusted contact”). Contacts enable the trusted badge and the anti-poisoning defense.</string>
-    <string name="home_demo_hdr">OFFLINE DEMO</string>
-    <string name="home_demo_sub">5 scenarios, no dApp needed</string>
+    <string name="home_demo_hdr">TRY AN ATTACK</string>
+    <string name="home_demo_sub">5 attacks, no dApp needed</string>
     <string name="signing">Signing…</string>
     <string name="demo_signed_hw">Signed by the Seed Vault (TEE)</string>
     <string name="demo_signed_sim">Signed (simulated signature)</string>
@@ -286,7 +286,7 @@
         <item quantity="other">Close %1$d empty accounts</item>
     </plurals>
     <string name="send_title">Send</string>
-    <string name="send_sub">SOL or tokens, with the Velum receipt</string>
+    <string name="send_sub">SOL or tokens, with the Totem receipt</string>
     <string name="send_review_sub">Check the receipt, then hold to sign</string>
     <string name="send_btn">Send</string>
     <string name="receive_btn">Receive</string>
@@ -326,7 +326,7 @@
     <string name="settings_page_sub">Wallet, agent, phone, look.</string>
     <string name="lang_label">LANGUAGE</string>
     <string name="lang_system">System</string>
-    <string name="lang_note">Receipts also read in Spanish; the interface is English or Italian.</string>
+    <string name="lang_note">System follows the phone: Italian on an Italian phone, English anywhere else. Receipts also read in Spanish.</string>
     <string name="store_dapp_store">Solana dApp Store</string>
     <string name="store_play">Google Play</string>
     <string name="store_sideload">Not from a store (sideloaded)</string>
@@ -349,7 +349,7 @@
     <string name="k_stake">staking</string>
     <string name="k_mint">mints</string>
     <string name="k_other">other</string>
-    <string name="prot_row_title">What Velum does for you</string>
+    <string name="prot_row_title">What Totem does for you</string>
     <string name="prot_row_sub">%1$d active defenses · %2$d risk types recognized</string>
     <string name="prot_title">Your defenses</string>
     <string name="prot_intro">Every item below is implemented and active in this build. Nothing is signed before all of them have run.</string>
@@ -402,7 +402,7 @@
     <string name="pdf_tags">Tags</string>
     <string name="pdf_attested">ATTESTED — ES256 signature by this app\'s hardware key over the statement below</string>
     <string name="pdf_not_attested">not attested</string>
-    <string name="pdf_footer">velum · page %1$d</string>
+    <string name="pdf_footer">totem · page %1$d</string>
     <string name="pdf_totals">Totals</string>
     <string name="pdf_fiat_total">Total in %1$s (priced entries)</string>
     <string name="pdf_more_legs">+%1$d more legs</string>
@@ -590,7 +590,7 @@
     <string name="onb_skip">Skip</string>
     <string name="theme_note_pro">Tap a tile to change the look. Every theme is included.</string>
     <string name="theme_pro_tag">Pro</string>
-    <string name="pro_log">Velum Pro</string>
+    <string name="pro_log">Totem Pro</string>
         <string name="lp_title">Forgotten money</string>
     <string name="lp_none">Checked Orca, Raydium and Meteora: no fees waiting in a pool position.</string>
     <string name="lp_owed">At least %1$s %2$s and %3$s %4$s never collected.</string>
@@ -626,9 +626,9 @@
     </plurals>
     <string name="health_frozen_why">Only whoever issued the coin can thaw them. There is nothing you can do, and they cannot even be closed to reclaim the rent.</string>
     <string name="trace_run">Deep scan this address</string>
-    <string name="trace_pro">Deep activity scan — a Velum Pro feature</string>
+    <string name="trace_pro">Deep activity scan — a Totem Pro feature</string>
     <string name="swap_title">Swap</string>
-    <string name="swap_sub">Best route via Jupiter · signed in Velum</string>
+    <string name="swap_sub">Best route via Jupiter · signed in Totem</string>
     <string name="swap_you_pay">You pay</string>
     <string name="swap_you_get">You receive (est.)</string>
     <string name="swap_from_hint">Swap from any token you hold</string>
@@ -669,9 +669,9 @@
     <string name="watch_enable">Enable</string>
     <string name="watch_disable">Disable</string>
     <string name="watch_note">Checks your wallet and the addresses you have paid every few hours. Alerts you if an unlimited approval appears or a paid address is flagged.</string>
-    <string name="watch_flag_title">Velum · address flagged</string>
-    <string name="watch_flag_body">An address you have paid was flagged on the blocklist. Open Velum to review.</string>
-    <string name="watch_appr_title">Velum · approvals to review</string>
+    <string name="watch_flag_title">Totem · address flagged</string>
+    <string name="watch_flag_body">An address you have paid was flagged on the blocklist. Open Totem to review.</string>
+    <string name="watch_appr_title">Totem · approvals to review</string>
     <plurals name="watch_appr_body">
         <item quantity="one">%1$d unlimited approval is live on your wallet. Tap to revoke it.</item>
         <item quantity="other">%1$d unlimited approvals are live on your wallet. Tap to revoke them.</item>
@@ -723,7 +723,7 @@
     <string name="store_sideload_explain">Installed by hand from an APK file, not downloaded from an official store. No store checked it, and anyone can sign an app with any name — trust it only if you know where it came from.</string>
     <string name="store_sideload_but_listed">This app exists on the dApp Store, but this copy was installed by hand (APK), not from the store. Reinstall it from the dApp Store to be sure it is the genuine build.</string>
     <string name="recipient_self">Your wallet</string>
-    <string name="err_dapp_timeout">The dApp never connected. Open it again and tap Connect, then pick Velum.</string>
+    <string name="err_dapp_timeout">The dApp never connected. Open it again and tap Connect, then pick Totem.</string>
     <string name="webcheck_title">Read the web before buying</string>
     <string name="webcheck_on">On. Asks the model before every purchase.</string>
     <string name="webcheck_off">Off. The agent decides on the numbers alone.</string>
@@ -757,19 +757,19 @@
     <string name="rt_agent_ok">Agent intent verified</string>
     <string name="agent_unknown">Unknown agent</string>
     <string name="agent_bad_link">Malformed Agent Gate request: missing transaction or intent.</string>
-    <string name="agent_no_wallet">No wallet connected in Velum yet. Open Velum and connect the Seed Vault first.</string>
+    <string name="agent_no_wallet">No wallet connected in Totem yet. Open Totem and connect the Seed Vault first.</string>
     <string name="agent_done_sent">Signed with the Seed Vault and sent.</string>
     <string name="agent_done_signed">Signed with the Seed Vault and handed back to the agent.</string>
     <string name="agent_reason">Reason: %1$s</string>
     <string name="widget_name">Wallet health</string>
     <string name="widget_desc">Health score, balance and last alert of your wallet, at a glance.</string>
     <string name="widget_health">WALLET HEALTH</string>
-    <string name="widget_no_wallet">Open Velum and connect the Seed Vault</string>
+    <string name="widget_no_wallet">Open Totem and connect the Seed Vault</string>
     <string name="widget_clean">All clean</string>
     <string name="widget_reclaim">%1$s SOL to reclaim</string>
     <string name="widget_card_title">Wallet health widget</string>
     <string name="widget_card_sub">Score, balance and alerts on your home screen.</string>
-    <string name="widget_card_note">Tap Add to let Android place it, or long-press the home screen, choose Widgets and pick Velum. The refresh arrow on the widget updates it without opening the app.</string>
+    <string name="widget_card_note">Tap Add to let Android place it, or long-press the home screen, choose Widgets and pick Totem. The refresh arrow on the widget updates it without opening the app.</string>
     <string name="widget_add">Add</string>
     <string name="widget_refresh">Refresh now</string>
     <string name="widget_added">Ask your launcher to place it</string>
@@ -778,13 +778,13 @@
     <string name="companion_title">Floating companion</string>
     <string name="companion_sub">A bubble with your wallet health, on top of any app.</string>
     <string name="companion_note">Drag it anywhere and it stays there, tap to open the panel. Hide is under the gear, and it comes back from the notification. It needs the Android permission to draw over other apps, and it reads only what the app already knows.</string>
-    <string name="companion_open">Open Velum</string>
+    <string name="companion_open">Open Totem</string>
     <string name="companion_hide">Hide</string>
     <string name="companion_on">On</string>
     <string name="companion_off">Off</string>
     <string name="companion_grant">Grant permission</string>
     <string name="companion_needs_perm">Android permission needed: draw over other apps.</string>
-    <string name="agent_origin_qr">QR scanned with Velum</string>
+    <string name="agent_origin_qr">QR scanned with Totem</string>
     <string name="agent_origin_link">Opened from a link — origin not verifiable</string>
     <string name="agent_origin_app">App on this phone: %1$s</string>
     <string name="agent_name_claimed">name declared by the agent, not verified</string>
@@ -792,12 +792,12 @@
     <string name="agent_signed_note">Your agent needs these bytes. Copy them, or let it read the QR off this screen.</string>
     <string name="gate_card_title">Agent Gate</string>
     <string name="gate_card_sub">Sign for an AI agent, without giving it a key.</string>
-    <string name="gate_card_note">An agent on your computer shows a QR; scan it and Velum checks what the agent DECLARES against what the transaction really DOES, then you approve with biometrics. The key never leaves the Seed Vault.</string>
+    <string name="gate_card_note">An agent on your computer shows a QR; scan it and Totem checks what the agent DECLARES against what the transaction really DOES, then you approve with biometrics. The key never leaves the Seed Vault.</string>
     <string name="gate_scan">Scan an agent request</string>
     <string name="gate_not_a_request">That QR is not an Agent Gate request.</string>
     <string name="tab_agent">Agent</string>
     <string name="agent_tab_sub">Your agent, its budget, and what it may do without you.</string>
-    <string name="agent_tab_how">An agent on your computer prepares a transaction and declares what it does. You scan its QR here: Velum simulates the real bytes and blocks the signature if the declaration does not match. The key never leaves the Seed Vault.</string>
+    <string name="agent_tab_how">An agent on your computer prepares a transaction and declares what it does. You scan its QR here: Totem simulates the real bytes and blocks the signature if the declaration does not match. The key never leaves the Seed Vault.</string>
     <string name="agent_tab_wallet">GIVE THE AGENT THIS ADDRESS</string>
     <string name="agent_tab_none">Connect the Seed Vault from the Wallet tab first.</string>
     <string name="agent_tab_setup">The bridge runs on your computer, locally with Claude Code or as a URL connector for Claude, ChatGPT and Grok. Tap “Link an agent on your computer” for the command.</string>
@@ -844,7 +844,7 @@
     <string name="agent_last_signed">Signed on its own: %1$s</string>
     <string name="agent_last_confirmed">Confirmed by you: %1$s</string>
     <string name="agent_last_expired">No answer in time: %1$s</string>
-    <string name="agent_notif_refused">Velum refused an agent request</string>
+    <string name="agent_notif_refused">Totem refused an agent request</string>
     <string name="agent_notif_signed">The agent acted inside the budget</string>
     <string name="agent_notif_sold">Sold, and the value is back in the budget</string>
     <string name="agent_notif_ask">The agent asks: %1$s</string>
@@ -901,8 +901,8 @@
     <string name="brain_unreachable">Could not reach the model. Check the connection and the key.</string>
     <string name="brain_too_many_steps">I stopped after several steps to avoid going in circles. Tell me what to do next.</string>
     <string name="chat_title">Your agent</string>
-    <string name="chat_sub">It proposes. Velum decides.</string>
-    <string name="chat_empty">Ask for something. I can look up a coin\'s price and safety, quote a swap before doing it, read your portfolio, send SOL, cash in the gains, or stop. I never sign: Velum does, under your rules.</string>
+    <string name="chat_sub">It proposes. Totem decides.</string>
+    <string name="chat_empty">Ask for something. I can look up a coin\'s price and safety, quote a swap before doing it, read your portfolio, send SOL, cash in the gains, or stop. I never sign: Totem does, under your rules.</string>
     <string name="chat_no_key">No model is set up. Open Settings, then Your agent, and add a key. Everything else already works: what I propose still goes through the same rules.</string>
     <string name="chat_ex1">What do I hold?</string>
     <string name="chat_ex2">How did my wallet do today?</string>
@@ -910,7 +910,7 @@
     <string name="chat_hint">Write here</string>
     <string name="chat_signed">Signed on its own</string>
     <string name="chat_confirmed">You confirmed it</string>
-    <string name="chat_refused">Velum refused</string>
+    <string name="chat_refused">Totem refused</string>
     <string name="chat_expired">Expired without an answer</string>
     <string name="chat_checked">Ran %1$s</string>
     <string name="chat_open">Talk to it</string>
@@ -931,13 +931,13 @@
     <string name="claim_taking">Taking it…</string>
     <string name="claim_done">It is yours</string>
     <string name="claim_failed">Could not take it. Try again in a moment.</string>
-    <string name="claim_no_wallet">Connect a wallet in Velum first, then open this link again.</string>
+    <string name="claim_no_wallet">Connect a wallet in Totem first, then open this link again.</string>
     <string name="claim_truth">A gift link carries its own key: whoever opens it first can take it. Nothing else protects it.</string>
     <string name="gift_title">Send money with a link</string>
     <string name="gift_log">Gift link</string>
     <string name="gift_log_taken">Gift taken</string>
     <string name="gift_log_back">Gift taken back</string>
-    <string name="gift_body">Velum makes a small throwaway wallet, puts the amount in it, and hands you a link. Send it to anyone; whoever opens it takes the money into their own wallet.</string>
+    <string name="gift_body">Totem makes a small throwaway wallet, puts the amount in it, and hands you a link. Send it to anyone; whoever opens it takes the money into their own wallet.</string>
     <string name="gift_warn">Whoever has the link has the money. Good for a tip, wrong for a salary. Until someone takes it, you can take it back.</string>
     <string name="gift_amount">Amount</string>
     <string name="gift_note">A note (optional)</string>
@@ -951,7 +951,7 @@
     <string name="req_amount">How much</string>
     <string name="req_note">What for (optional)</string>
     <string name="kind_gift">Gift</string>
-    <string name="tap_service_desc">Velum payment requests</string>
+    <string name="tap_service_desc">Totem payment requests</string>
     <string name="tap_aid_desc">Hold two phones together to ask for a payment</string>
     <string name="tap_title">Tap to be paid</string>
     <string name="tap_sub">Back to back: the two phones face away from each other.</string>
@@ -1028,7 +1028,7 @@
     <!-- request link shape -->
     <string name="recv_link_web">Universal link</string>
     <string name="recv_link_pay">Solana Pay</string>
-    <string name="recv_link_web_note">Opens on any phone. With Velum it goes straight to the request, without it to a page that explains and offers the app.</string>
+    <string name="recv_link_web_note">Opens on any phone. With Totem it goes straight to the request, without it to a page that explains and offers the app.</string>
     <string name="recv_link_pay_note">The classic solana: request. Phantom, Solflare and Backpack read it. A phone with no wallet does nothing with it.</string>
     <!-- what the coin itself can do to you -->
     <string name="safe_title">About %1$s itself</string>
@@ -1050,7 +1050,7 @@
     <string name="safe_few_holders">Almost nobody holds it yet.</string>
     <string name="safe_unverified">Not on Jupiter\'s verified list.</string>
     <string name="safe_issuer">It has an issuer who can freeze it or mint more. Normal for a stablecoin, different from holding SOL.</string>
-    <string name="safe_blocked">There is no way to sell this back. Velum will not build the swap.</string>
+    <string name="safe_blocked">There is no way to sell this back. Totem will not build the swap.</string>
     <string name="safe_checking">Checking the coin…</string>
     <!-- receive / send: the two ways to hand over a request -->
     <string name="recv_block_qr">QR code</string>
@@ -1060,7 +1060,7 @@
     <string name="send_block_nfc">Read by tapping</string>
     <string name="send_block_nfc_sub">The phone listens while you are here</string>
     <string name="send_tap_listening">Hold your phone against the one asking. It must have its tap screen open. This only reads.</string>
-    <string name="tap_how">Back to back, the two backs facing each other. Slide the other one slowly up and down until it reacts. It must be unlocked. It does not need Velum.</string>
+    <string name="tap_how">Back to back, the two backs facing each other. Slide the other one slowly up and down until it reacts. It must be unlocked. It does not need Totem.</string>
     <string name="send_tap">Tap</string>
     <string name="recv_block_link">Ask with a link</string>
     <string name="recv_block_link_sub">To send in a chat</string>
@@ -1076,6 +1076,7 @@
     <string name="theme_mint_neon">Mint neon</string>
     <string name="theme_cyan_act">Cyan</string>
     <string name="theme_gold">Gold</string>
+    <string name="theme_vela">Vela</string>
     <string name="home_act_tap">Tap</string>
     <string name="home_act_link">Link</string>
     <string name="home_act_agent">Agent</string>
@@ -1126,7 +1127,7 @@
     <string name="trader_why_you">You asked to sell %1$s</string>
     <string name="trader_why_buy">%1$s came top of the scan: %2$s</string>
     <string name="trader_idle">Watching the market</string>
-    <string name="trader_notif_title">Velum is trading, %1$d open</string>
+    <string name="trader_notif_title">Totem is trading, %1$d open</string>
     <string name="trader_stop_action">Stop the agent</string>
     <string name="trader_stopped_by_you">You stopped it.</string>
     <string name="widget_trading">Trading · %1$d open · %2$s</string>
@@ -1203,11 +1204,11 @@
     <string name="trace_no_sim">cannot simulate %1$s right now, trying later</string>
     <string name="trace_asked">the collar wants a signature for %1$s, and nobody is here</string>
     <string name="trader_declined">Stopped: you turned down %1$s.</string>
-    <string name="lock_title">Velum</string>
+    <string name="lock_title">Totem</string>
     <string name="lock_sub">Your fingerprint to open the wallet.</string>
     <string name="lock_open">Unlock</string>
     <string name="lock_failed">Not recognized. Try again.</string>
-    <string name="door_title">Velum Wallet</string>
+    <string name="door_title">Totem Wallet</string>
     <string name="pulse_paused">Paused by you</string>
     <string name="pulse_holding">Working · %1$d open</string>
     <string name="pulse_looking">Working · looking</string>
@@ -1358,7 +1359,7 @@
     <string name="agent_positions">Positions</string>
     <string name="agent_recent">Last moves</string>
     <string name="agent_recent_none">The agent has not moved anything yet. Start it above.</string>
-    <string name="agent_truth_link">What Velum guarantees</string>
+    <string name="agent_truth_link">What Totem guarantees</string>
     <string name="pro_model">Model and key</string>
     <string name="pro_collar">The collar</string>
     <string name="pro_trading">Lane and targets</string>
@@ -1542,8 +1543,8 @@
     <string name="sticker_lock">Lock the sticker</string>
     <string name="sticker_lock_sub">Nobody can rewrite it with their own address later. It cannot be undone.</string>
     <string name="sticker_web">Web link instead of Solana Pay</string>
-    <string name="sticker_web_on">Opens in any browser too, even without a wallet. Velum opens Send.</string>
-    <string name="sticker_web_off">Standard Solana Pay: Velum, Phantom, Solflare and the others open the payment.</string>
+    <string name="sticker_web_on">Opens in any browser too, even without a wallet. Totem opens Send.</string>
+    <string name="sticker_web_off">Standard Solana Pay: Totem, Phantom, Solflare and the others open the payment.</string>
     <string name="sticker_write">Write the sticker</string>
     <string name="sticker_hold">Hold the sticker against the back of the phone…</string>
     <string name="sticker_locked">Written and locked. Touch it to try.</string>
@@ -1609,7 +1610,7 @@
     <string name="blink_build_failed">The action did not give a transaction.</string>
     <string name="blink_hold">Hold to sign</string>
     <string name="blink_done">Done.</string>
-    <string name="blink_truth">A Blink is an API that hands you a transaction. Velum reads and simulates it like any other before the fingerprint. Nothing is signed by opening the link.</string>
+    <string name="blink_truth">A Blink is an API that hands you a transaction. Totem reads and simulates it like any other before the fingerprint. Nothing is signed by opening the link.</string>
     <string name="ctap_open">Exchange contacts by touch</string>
     <string name="ctap_title">Contacts by touch</string>
     <string name="ctap_sub">Two phones, back to back, twice.</string>
@@ -1632,7 +1633,7 @@
     <string name="home_customize_note">Switch one off and it moves to More. Up and down change the order.</string>
     <string name="home_customize_reset">Back to the default</string>
     <string name="chip_title">Your wallet</string>
-    <string name="chip_info">This is the Seed Vault account Velum reads. The key never leaves the vault; every signature asks your fingerprint.</string>
+    <string name="chip_info">This is the Seed Vault account Totem reads. The key never leaves the vault; every signature asks your fingerprint.</string>
     <string name="cover_title">A hand over the screen hides the numbers</string>
     <string name="cover_sub">Cover the top of the screen and the amounts are covered until your fingerprint.</string>
     <string name="comp_page_title">Bubble and widget</string>
@@ -1641,7 +1642,7 @@
     <string name="comp_preview_sub">The same drawing the bubble uses. Change the face below and watch it here.</string>
     <string name="comp_bubble">The bubble</string>
     <string name="comp_auto">Come back on its own</string>
-    <string name="comp_auto_sub">Every time Velum opens, the bubble comes up.</string>
+    <string name="comp_auto_sub">Every time Totem opens, the bubble comes up.</string>
     <string name="comp_face">What the small circle says</string>
     <string name="comp_face_agent">Agent</string>
     <string name="comp_face_health">Health</string>

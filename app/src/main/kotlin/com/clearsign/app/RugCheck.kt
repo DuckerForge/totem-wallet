@@ -101,7 +101,7 @@ object RugCheck {
         val c = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 6_000; readTimeout = 8_000
             setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "Velum/1.0")
+            setRequestProperty("User-Agent", "Totem/1.0")
         }
         if (c.responseCode in 200..299) JSONObject(c.inputStream.bufferedReader().readText()) else null
     } catch (e: Exception) {

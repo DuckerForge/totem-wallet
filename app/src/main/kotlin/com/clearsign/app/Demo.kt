@@ -10,6 +10,7 @@ import com.clearsign.core.ScanResult
 import com.clearsign.core.Simulator
 import com.clearsign.core.TransactionDecoder
 import com.clearsign.core.TransactionScanner
+import kotlinx.coroutines.runBlocking
 
 /*
  * Demo wiring for the on-device build: in-memory stand-ins for the real ports (simulate,
@@ -101,8 +102,8 @@ class DemoCase(scenario: Scenario, private val myWallet: String = DEMO_WALLET, p
                 Scenario.STATE_DRIFT ->
                     // Preview looks like a small safe transfer; by signing time the
                     // effect has drifted into a near-total drain.
-                    if (calls == 1) listOf(sol(DEMO_WALLET, -1_500_000_000), sol(ALICE, 1_500_000_000))
-                    else listOf(sol(DEMO_WALLET, -48_000_000_000), sol(ALICE, 48_000_000_000))
+                    if (calls == 1) listOf(sol(myWallet, -1_500_000_000), sol(ALICE, 1_500_000_000))
+                    else listOf(sol(myWallet, -48_000_000_000), sol(ALICE, 48_000_000_000))
             }
         }
     }
@@ -111,6 +112,16 @@ class DemoCase(scenario: Scenario, private val myWallet: String = DEMO_WALLET, p
         private const val POISONED_ATTACKER = "DraiNerXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX01"
         private const val DAPP_DELEGATE = "DappDe1egateXXXXXXXXXXXXXXXXXXXXXXXXXX02"
     }
+}
+
+/**
+ * The Seed Vault behind the demo. After an unlock the vault knows the address but has not
+ * selected the account, so `publicKey()` on it throws, and the demo asked in composition.
+ * This answers with the saved address and authorizes the vault only when something is signed.
+ */
+class DemoSigner(private val wallet: String, private val real: SeedVaultSigner) : HardwareSigner {
+    override fun publicKey(): String = wallet
+    override fun sign(serializedTx: ByteArray): ByteArray = runBlocking { real.ensureAccount(wallet); real.signSuspend(serializedTx) }
 }
 
 /** Placeholder signer for phases 1–2; replaced by the Seed Vault signer in phase 3. */

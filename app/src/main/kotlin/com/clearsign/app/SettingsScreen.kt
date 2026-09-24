@@ -25,6 +25,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -117,8 +118,11 @@ private fun LanguageCard() {
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             var current by remember { mutableStateOf(AppLocale.current(ctx)) }
+            // Italian is not a choice any more, it is what System gives on an Italian phone.
+            // A phone that picked it explicitly goes back to System, which reads the same.
+            LaunchedEffect(Unit) { if (current == "it") { AppLocale.set(ctx, null); current = null } }
             SectionTitle(stringResource(R.string.lang_label), stringResource(R.string.settings_sub), HIcon.INFO)
-            ChipRow(listOf(null to stringResource(R.string.lang_system), "en" to "English", "it" to "Italiano"), current) { tag ->
+            ChipRow(listOf(null to stringResource(R.string.lang_system), "en" to "English"), current) { tag ->
                 if (tag != current) { AppLocale.set(ctx, tag); current = tag; Haptics.tick(ctx) }
             }
             Text(stringResource(R.string.lang_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
@@ -558,18 +562,42 @@ private fun SwapFeesCard(signer: SeedVaultSigner, owner: String?) {
                         fontFamily = Inter, fontSize = 11.5.sp, color = if (list.isEmpty()) Halo.mint else Halo.amber,
                     )
                 }
-                if (busy) Working(stringResource(R.string.theme_unlock_signing))
+                // Rent leaves the wallet here: the receipt first, then the hold, like everywhere else.
+                var review by remember { mutableStateOf<Pair<List<WalletTx.Instruction>, ReceiptEngine.Analyzed>?>(null) }
+                if (busy) Working(stringResource(R.string.send_analyzing))
                 else GhostButton(stringResource(R.string.swapfees_btn), icon = HIcon.COINS, tint = Halo.mint) {
                     busy = true; msg = null
                     scope.launch {
-                        msg = when (val r = WalletActions.activateSwapFees(ctx, signer, owner)) {
-                            is WalletActions.Result.Sent -> ctx.getString(R.string.swapfees_done)
-                            is WalletActions.Result.Failed -> r.message
+                        val plan = WalletActions.swapFeesPlan(ctx, owner)
+                        val analyzed = if (plan.isNullOrEmpty()) null else WalletActions.preview(ctx, owner, plan)
+                        when {
+                            plan == null -> msg = ctx.getString(R.string.theme_unlock_no_treasury)
+                            plan.isEmpty() -> msg = ctx.getString(R.string.swapfees_nothing)
+                            analyzed == null -> msg = ctx.getString(R.string.wa_no_blockhash)
+                            else -> review = plan to analyzed
                         }
                         busy = false
                     }
                 }
                 msg?.let { Text(it, fontFamily = Inter, fontSize = 11.5.sp, color = Halo.mint) }
+                review?.let { (plan, analyzed) ->
+                    var sending by remember { mutableStateOf(false) }
+                    PayOverlay(title = stringResource(R.string.swapfees_title), hint = stringResource(R.string.swapfees_note), onBack = { if (!sending) review = null }) {
+                        Column { SignReceiptBody(analyzed.receipt, null, hero = false) }
+                        if (sending) Working(stringResource(R.string.theme_unlock_signing))
+                        else if (analyzed.receipt.blocksApproval) Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
+                        else HoldToConfirm(stringResource(R.string.swapfees_btn)) {
+                            sending = true
+                            scope.launch {
+                                msg = when (val r = WalletActions.activateSwapFees(ctx, signer, owner, plan, analyzed.receipt)) {
+                                    is WalletActions.Result.Sent -> ctx.getString(R.string.swapfees_done)
+                                    is WalletActions.Result.Failed -> r.message
+                                }
+                                sending = false; review = null
+                            }
+                        }
+                    }
+                }
             }
         }
     }

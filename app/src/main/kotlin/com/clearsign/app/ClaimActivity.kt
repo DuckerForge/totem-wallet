@@ -55,8 +55,14 @@ private fun ClaimScreen(seed: ByteArray?, note: String?, onClose: () -> Unit) {
     var done by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val owner = remember { Settings.watchWallet(ctx) }
+    // What the sweep does, read from the chain before the hold: a gift taken used
+    // to be the one signature in the app with no receipt in front of it.
+    var analyzed by remember { mutableStateOf<ReceiptEngine.Analyzed?>(null) }
 
     LaunchedEffect(seed) { if (seed != null) lamports = MoneyLinks.peek(seed) }
+    LaunchedEffect(seed, owner, lamports) {
+        if (seed != null && owner != null && (lamports ?: 0L) > 0L) analyzed = MoneyLinks.previewSweep(ctx, seed, owner)
+    }
 
     Column(
         Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 26.dp),
@@ -85,6 +91,7 @@ private fun ClaimScreen(seed: ByteArray?, note: String?, onClose: () -> Unit) {
                     Banner(stringResource(R.string.claim_no_wallet), Halo.amber, HIcon.WARNING)
                 } else {
                     Text(stringResource(R.string.claim_into, shorten(owner, 4)), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.muted)
+                    analyzed?.let { a -> Column(Modifier.fillMaxWidth()) { SignReceiptBody(a.receipt, null, hero = false) } }
                     if (busy) {
                         Working(stringResource(R.string.claim_taking))
                     } else {

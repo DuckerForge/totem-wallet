@@ -327,17 +327,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                         OreState.Analyzing -> Working(stringResource(R.string.send_analyzing))
                         is OreState.Review -> {
                             val r = s.analyzed.receipt
-                            GlassCard {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    r.calls.forEach { c ->
-                                        Text(c.method, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
-                                        c.args.forEach { (n, value) -> Text("$n · $value", fontFamily = Mono, fontSize = 11.sp, color = Halo.muted) }
-                                    }
-                                    r.outflows.forEach { d -> Text("−" + fmtAmt(d), fontFamily = Mono, fontSize = 12.sp, color = Halo.red, style = Tabular) }
-                                    r.inflows.forEach { d -> Text("+" + fmtAmt(d), fontFamily = Mono, fontSize = 12.sp, color = Halo.mint, style = Tabular) }
-                                }
-                            }
-                            r.risks.forEach { RiskRow(it) }
+                            // The same receipt as Send and Swap, not a thinner one of its own.
+                            Column { SignReceiptBody(r, null, plain = true, hero = false) }
                             if (r.blocksApproval) {
                                 Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
                                 GhostButton(stringResource(R.string.back), Modifier.fillMaxWidth()) { state = OreState.Idle }

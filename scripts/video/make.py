@@ -28,8 +28,14 @@ from pathlib import Path
 
 import beats
 import cut
+import intro
 import record
 import voice
+
+# Quanto dura una dissolvenza fra due scene. Mezzo secondo: si sente che e' un taglio
+# voluto e non si perde tempo. Le scene si sovrappongono per questo tratto, quindi la
+# voce di ognuna va anticipata della somma delle dissolvenze che la precedono.
+FADE = 0.5
 
 HERE = Path(__file__).resolve().parent
 SHOT = HERE / "shot"
@@ -53,6 +59,32 @@ def padded(clip: Path, need: float, start: float, work: Path) -> Path:
     run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(clip),
         "-vf", f"tpad=stop_mode=clone:stop_duration={need - have + 0.3:.2f}",
         "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out))
+    return out
+
+
+def crossfade(parts: list[Path], out: Path, d: float = FADE) -> Path:
+    """
+    Cuce con una dissolvenza fra una scena e l'altra invece che di netto.
+
+    `concat -c copy` non ricomprime niente ed e' la via giusta quando le scene si
+    attaccano; per sovrapporle serve `xfade`, che invece ricomprime. Si paga una volta,
+    alla fine, e in cambio il video non sbatte da una schermata all'altra.
+    """
+    if len(parts) == 1:
+        return cut.stitch(parts, out)
+    args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+    for p in parts:
+        args += ["-i", str(p)]
+    lens = [voice.duration(p) for p in parts]
+    chain, prev, at = [], "[0:v]", 0.0
+    for i in range(1, len(parts)):
+        at += lens[i - 1] - d
+        tag = f"[v{i}]"
+        chain.append(f"{prev}[{i}:v]xfade=transition=fade:duration={d}:offset={at:.3f}{tag}")
+        prev = tag
+    args += ["-filter_complex", ";".join(chain), "-map", prev,
+             "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", str(out)]
+    run(*args)
     return out
 
 
@@ -88,10 +120,15 @@ def main(argv: list[str]) -> int:
     st = cut.stage(lay, BUILD)
     tracks = {} if "--mute" in argv else voice.all_tracks()
 
-    parts: list[Path] = []
+    # L'apertura: il marchio che si scrive, disegnato qui perche' sul telefono e' coperto
+    # dal riquadro dell'impronta.
+    opening = BUILD / f"intro_{lay.name}.mp4"
+    if "--no-intro" not in argv and not opening.exists():
+        intro.build(lay, opening)
+    parts: list[Path] = [] if "--no-intro" in argv else [opening]
     plan: list[tuple[float, Path | None]] = []
     missing: list[str] = []
-    at = 0.0
+    at = voice.duration(opening) - FADE if parts else 0.0
     for b in beats.SCRIPT:
         clip = SHOT / f"beat_{b.key}.mp4"
         if not clip.exists():
@@ -111,8 +148,8 @@ def main(argv: list[str]) -> int:
         parts.append(out)
         # La voce parte un quarto di secondo dopo lo stacco: entrare sulla
         # prima immagine suona come se stesse gia' parlando da prima.
-        plan.append((at + 0.25, wav))
-        at += seconds
+        plan.append((at + 0.35, wav))
+        at += seconds - FADE
         print(f"  {b.key:<9} {seconds:>5.1f}s")
 
     if not parts:
@@ -120,7 +157,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     silent = BUILD / f"silent_{lay.name}.mp4"
-    cut.stitch(parts, silent)
+    crossfade(parts, silent)
     final = BUILD / f"totem_{lay.name}.mp4"
     voiced = audio(plan, at, BUILD / "voice.m4a")
     if voiced is None:

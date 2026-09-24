@@ -67,20 +67,28 @@ SCRIPT: list[Beat] = [
         start=0.0,
     ),
     Beat(
-        "sign", 20.0, "03 · a real payment",
+        "wallet", 20.0, "03 · the wallet",
+        "It is a whole wallet, not a demo. Everything the phone holds on one page, what it is "
+        "worth today, what is staked, what is working in DeFi, and every coin on Solana with "
+        "its chart.",
+        "La home col saldo e le otto azioni, il portafoglio, lo staking e la DeFi, poi Mercato "
+        "e una moneta col suo grafico.",
+    ),
+    Beat(
+        "sign", 20.0, "04 · a real payment",
         "A real payment reads the same way. Hold to confirm, then the Seed Vault.",
         "Manda, lo scontrino, la fiducia dell'indirizzo, tieni premuto. STACCO. "
         "Riprende dal registro con il valore in euro, poi la prova QR.",
         hands=True,
     ),
     Beat(
-        "budget", 20.0, "04 · the budget",
+        "budget", 20.0, "05 · the budget",
         "A budget kept apart from the wallet. It never sees the seed.",
         "La paghetta: creala, il collare coi tetti, la riga del calcolo in dollari.",
         hands=True,
     ),
     Beat(
-        "gate", 20.0, "05 · the agent that lies",
+        "gate", 20.0, "06 · the agent that lies",
         "It looks for a coin, buys a slice, sells at a target or a stop, and asks for a "
         "fingerprint above its limits.",
         "scripts/test-agent.sh honest: 'Intento agente OK', si firma. Poi liar: dichiara "
@@ -88,9 +96,23 @@ SCRIPT: list[Beat] = [
         hands=True,
     ),
     Beat(
+        "agent", 16.0, "07 · the agent's page",
+        "The agent has a page of its own: what it may spend, what it has already done, the "
+        "model it runs on, and a live trace of every step it takes.",
+        "La scheda Agente: la paghetta col collare, il risultato dell'ultima, le righe Pro.",
+    ),
+    Beat(
+        "health", 18.0, "08 · the wallet checks itself",
+        "It also checks the wallet itself. Approvals you forgot, accounts holding rent you can "
+        "reclaim, and pool fees nobody ever collected, read straight from the chain with no key "
+        "of yours.",
+        "Impostazioni, Wallet and safety: il punteggio, i soldi dimenticati, le deleghe e i "
+        "conti, i contatti fidati.",
+    ),
+    Beat(
         # Questa scena vale trentamila dollari: e' il premio che ORE ha messo il 21/09 per
         # chi lo integra davvero, e nella scaletta non c'era affatto.
-        "ore", 22.0, "06 · ORE",
+        "ore", 22.0, "09 · ORE",
         "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the "
         "grid and says what a square really costs and what it can pay, before you put "
         "anything on it. The agent can dig from its budget, under the same collar, and bring "
@@ -100,20 +122,20 @@ SCRIPT: list[Beat] = [
         start=0.0,
     ),
     Beat(
-        "crowd", 10.0, "07 · the crowd",
+        "crowd", 10.0, "10 · the crowd",
         "It also reads the crowd it lives in.",
         "Il censimento: meta' dei Seeker tiene SKR in staking dai Guardiani. Poi i soldi "
         "dimenticati, le commissioni mai riscosse lette dalla catena senza chiavi.",
         start=0.0,
     ),
     Beat(
-        "hardware", 25.0, "08 · the phone itself",
+        "hardware", 25.0, "11 · the phone itself",
         "It uses the hardware the Seeker actually has.",
         "Pagamento col tocco fra due telefoni, oppure la richiesta scritta su un adesivo NFC. "
         "Poi la mano sullo schermo: i numeri spariscono, l'impronta li riporta.",
     ),
     Beat(
-        "close", 20.0, "09 · everywhere",
+        "close", 20.0, "12 · everywhere",
         "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, and on "
         "everything the agent does.",
         "Il preventivo del ponte, il registro della giornata, l'icona. Ultima riga: "

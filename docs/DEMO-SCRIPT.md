@@ -25,6 +25,10 @@ Voice: "Every transaction is simulated on chain first. The receipt is built from
 Show: the drain attempt. The receipt says the real amount and the real recipient, and the risk in red. Reject.
 Then the unlimited approval: severe risk, the signature is blocked before the Seed Vault is even asked.
 
+**0:40 to 1:00, the wallet itself**
+Voice: "It is a whole wallet, not a demo. Everything the phone holds on one page, what it is worth today, what is staked, what is working in DeFi, and every coin on Solana with its chart."
+Show: the home with the balance and the eight actions, the portfolio, the staking and DeFi cards, then Market and one coin with its chart.
+
 **0:45 to 1:05, signing something real**
 Voice: "A real payment reads the same way. Hold to confirm, then the Seed Vault."
 Show: Send, the receipt, the address trust badge, hold, fingerprint, the entry landing in the ledger.
@@ -38,6 +42,14 @@ Then "Watch it work": the timer ring, the charts with entry, target and stop dra
 **1:40 to 1:58, ORE**
 Voice: "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the grid and says what a square really costs and what it can pay, before you put anything on it. The agent can dig from its budget, under the same collar, and bring the gains home in ORE."
 Show: Dig ORE, the grid with the emptiest squares marked, the outlook line with the expected ORE and the expected cost, hold to dig, the receipt. Then Claim, and the ORE landing in the wallet.
+
+**1:20 to 1:34, the agent's own page**
+Voice: "The agent has a page of its own: what it may spend, what it has already done, the model it runs on, and a live trace of every step it takes."
+Show: the Agent tab, the budget card with the collar, the last budget's result, the Pro rows.
+
+**1:34 to 1:50, the wallet checks itself**
+Voice: "It also checks the wallet itself. Approvals you forgot, accounts holding rent you can reclaim, and pool fees nobody ever collected, read straight from the chain with no key of yours."
+Show: Settings, Wallet and safety: the health score, forgotten money, delegations and accounts, trusted contacts.
 
 **1:58 to 2:15, what nobody else has**
 Voice: "It also reads the crowd it lives in."

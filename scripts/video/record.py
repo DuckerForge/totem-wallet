@@ -273,6 +273,52 @@ def scene_crowd() -> list[tuple]:
     ]
 
 
+def scene_wallet() -> list[tuple]:
+    """
+    L'app come portafoglio: il saldo, le otto azioni, quello che c'e' dentro, lo staking e
+    la DeFi. Poi il mercato e una moneta col suo grafico. Senza questa il video racconta un
+    sistema di sicurezza, e quello che si consegna e' un portafoglio.
+    """
+    return [
+        ("launch",), ("wait", 1.5),
+        ("close",), ("wait", 1.5),
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1000, 600, 2100), ("wait", 1.5),
+        ("tap", TABS["market"], TAB_Y), ("wait", 3.5),
+        ("swipe", 600, 1900, 600, 1400), ("wait", 2.5),
+        ("text", "Bitcoin"), ("wait", 6.0),
+        ("swipe", 600, 1900, 600, 1400), ("wait", 3.0),
+        ("close",), ("wait", 2.0),
+    ]
+
+
+def scene_agent() -> list[tuple]:
+    """La scheda Agente: la paghetta, il collare, il risultato dell'ultima, le righe Pro."""
+    return [
+        ("launch",), ("wait", 1.5),
+        ("close",), ("wait", 1.5),
+        ("tap", TABS["agent"], TAB_Y), ("wait", 3.5),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1000, 600, 2100), ("wait", 2.0),
+    ]
+
+
+def scene_health() -> list[tuple]:
+    """Quello che il portafoglio si controlla da solo: punteggio, rent, deleghe, contatti."""
+    return [
+        ("launch",), ("wait", 1.5),
+        ("close",), ("wait", 1.5),
+        ("tap", TABS["settings"], TAB_Y), ("wait", 2.2),
+        ("text", "Wallet and safety"), ("wait", 3.5),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1400), ("wait", 3.0),
+    ]
+
+
 def scene_ore() -> list[tuple]:
     """
     La griglia di ORE. Nessuna firma: si apre e si guarda, le probabilita' vere lette dal
@@ -315,6 +361,9 @@ AUTO: dict[str, tuple[float, callable]] = {
     "door": (9.0, scene_door),
     "hook": (9.0, scene_hook),
     "receipt": (24.0, scene_receipt),
+    "wallet": (34.0, scene_wallet),
+    "agent": (20.0, scene_agent),
+    "health": (22.0, scene_health),
     "ore": (26.0, scene_ore),
     "crowd": (34.0, scene_crowd),
     "close": (16.0, scene_close),
@@ -323,26 +372,45 @@ AUTO: dict[str, tuple[float, callable]] = {
 
 def tour(names: list[str]) -> int:
     """
-    Tutte le scene in una ripresa sola.
+    Le scene in una ripresa sola, o in poche se non ci stanno.
 
-    Fra una ripresa e l'altra l'app va in secondo piano e si richiude: quasi tutte le
-    scene girate una per una hanno finito per filmare la porta chiusa a chiave. Qui si
-    registra una volta, si cammina senza mai uscire, e alla fine si taglia il master nei
-    pezzi, ognuno col suo secondo d'inizio misurato mentre accadeva, non stimato.
+    Fra una ripresa e l'altra l'app va in secondo piano e si richiude: le scene girate
+    una per una finivano per filmare la porta chiusa a chiave. Si registra di seguito, si
+    cammina senza mai uscire, e alla fine si taglia il master nei pezzi, ognuno col suo
+    secondo d'inizio misurato mentre accadeva.
+
+    `screenrecord` pero' si ferma a centottanta secondi, e superato il tetto il file
+    finisce a meta' strada senza dirlo: il giro si spezza in gruppi che ci stanno.
     """
-    if not unlocked():
-        print("Apri l'app con l'impronta e lasciala aperta, aspetto…")
-        sh("shell", "am", "start", "-n", ACT)
-        if not wait_unlocked():
-            print("l'app e' ancora chiusa, mi fermo.")
-            return 1
+    groups: list[list[str]] = [[]]
+    budget = 0.0
+    for name in names:
+        need = AUTO[name][0] * 1.2
+        if budget + need > 160 and groups[-1]:
+            groups.append([])
+            budget = 0.0
+        groups[-1].append(name)
+        budget += need
 
+    for g, group in enumerate(groups):
+        if not unlocked():
+            print("Apri l'app con l'impronta e lasciala aperta, aspetto…")
+            sh("shell", "am", "start", "-n", ACT)
+            if not wait_unlocked():
+                print("l'app e' ancora chiusa, mi fermo.")
+                return 1
+        if len(groups) > 1:
+            print(f"— ripresa {g + 1} di {len(groups)}: {', '.join(group)}")
+        if _take(group) != 0:
+            return 1
+    return 0
+
+
+def _take(names: list[str]) -> int:
+    """Una ripresa e i suoi tagli."""
     OUT.mkdir(parents=True, exist_ok=True)
     remote = "/sdcard/tour.mp4"
     sh("shell", "rm", "-f", remote)
-    # Il limite di screenrecord e' un tetto, non una stima: superato, il file finisce a
-    # meta' cammino e l'ultima scena non esiste. Si chiede il massimo che accetta, 180 s,
-    # e la passeggiata si tiene sotto.
     total = min(180, int(sum(AUTO[n][0] for n in names) * 1.4) + 25)
     rec = subprocess.Popen(
         ["adb", "shell", "screenrecord", "--bit-rate", "16M", "--time-limit", str(total), remote],
@@ -374,9 +442,9 @@ def tour(names: list[str]) -> int:
             continue
         end = min(end, have)
         out = OUT / f"beat_{name}.mp4"
-        # `-ss` prima di `-i` con `-c copy` salta al fotogramma chiave piu' vicino e per
-        # l'ultimo pezzo copiava fino in fondo: novanta secondi al posto di diciotto. Si
-        # taglia dopo aver aperto il file, e si ricomprime: due secondi a pezzo, esatti.
+        # `-ss` prima di `-i` con `-c copy` salta al fotogramma chiave e per l'ultimo pezzo
+        # copiava fino in fondo: novanta secondi al posto di diciotto. Si taglia dopo aver
+        # aperto il file, e si ricomprime: due secondi a pezzo, esatti.
         subprocess.run(
             ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(master),
              "-ss", f"{begin:.2f}", "-to", f"{end:.2f}", "-an",

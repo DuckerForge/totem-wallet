@@ -47,7 +47,7 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
     // moving background: the first time you watch, the third annoys. At the end
     // the mark stays, still.
     val run = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { run.animateTo(1f, tween(6000, easing = LinearEasing)) }
+    LaunchedEffect(Unit) { run.animateTo(1f, tween(4000, easing = LinearEasing)) }
     val t = run.value
 
     // The real mark, not a drawing that resembles it: the same image as the
@@ -79,14 +79,14 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val pc = Offset(cx, cy + sq * 0.01f)
 
         // --- the timing, which is the story -----------------------------------------------
-        val spark = ease(seg(t, 0.05f, 0.30f))
+        val spark = ease(seg(t, 0.04f, 0.30f))
         // A still beat with the stroke lit and nothing under it, then the Seeker lights up,
         // already in place: no movement, revealed under a light that was already there.
-        val arrive = ease(seg(t, 0.38f, 0.55f))
+        val arrive = ease(seg(t, 0.34f, 0.50f))
         // The wings open behind it, from nearly closed to their seat.
-        val wings = ease(seg(t, 0.58f, 0.84f))
+        val wings = ease(seg(t, 0.52f, 0.76f))
         // And the scene settles on the bitmap, which is the same picture.
-        val become = ease(seg(t, 0.86f, 0.97f))
+        val become = ease(seg(t, 0.78f, 0.92f))
 
         // Opening the door does not skip the story, it lets it finish and then pulls everything
         // back. `opening` used to push the scene straight to the mark, and the flag stayed up while
@@ -128,7 +128,9 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
             val x = pc.x + phoneW / 2f
             val a = Offset(x, pc.y + phoneLen / 2f - phoneLen * 0.092f)
             val b = Offset(x, pc.y - phoneLen / 2f + phoneLen * 0.092f)
-            neon(a, b, spark, (0.4f + 0.6f * spark), d, (1f - become * 0.8f) * leaving)
+            // As thick as in the bitmap, measured on the phone it runs along: scaled from the
+            // mark square it came out over twice as wide, a tube that shrank at the handover.
+            neon(a, b, spark, (0.4f + 0.6f * spark), phoneLen * 0.011f, (1f - become) * leaving)
         }
 
         // --- and the mark settles --------------------------------------------
@@ -173,11 +175,8 @@ private val NEON_HIGH = Color(0xFF0BF5EC)
  * the color changes along the way and that is how only the arrived part shows. Three passes:
  * a wide faint halo, a medium one, and the real thread, which is the one read.
  */
-private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, d: Float, fade: Float = 1f) {
+private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, core: Float, fade: Float = 1f) {
     if (reveal <= 0f) return
-    // As thick as in the logo, not a neon tube: measured on the mark, the one
-    // thing the stroke is part of.
-    val core = d * 0.017f
     val steps = 44
     for (i in 0 until steps) {
         val u0 = i / steps.toFloat()

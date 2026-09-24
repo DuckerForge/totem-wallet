@@ -93,9 +93,72 @@
     .shot{box-shadow:none}
   }
   @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+  /* ---- L'accensione, come il tema Phosphor dell'app ----------------------------
+     L'app ha gia' un tema a tubo catodico: righe di scansione, una banda che scorre e
+     un lampo (HaloSurface.kt). Qui quella stessa lingua apre ogni schermata: una riga
+     al centro che si allarga fino ai bordi, con due fili che scappano in alto e in basso.
+     Tutto parte da fermo e visibile: senza JavaScript la pagina si legge lo stesso. */
+  .lit .wrap{animation:crt-open .52s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes crt-open{
+    0%{clip-path:inset(49.6% 0);filter:brightness(3.4) saturate(.6)}
+    58%{clip-path:inset(11% 0);filter:brightness(1.35)}
+    100%{clip-path:inset(0);filter:none}
+  }
+  .lit .edge{animation:edge-out .5s ease-out both}
+  .edge{position:absolute;left:0;right:0;height:1px;top:50%;opacity:0;pointer-events:none;
+        background:linear-gradient(to right,transparent,var(--cyan),transparent)}
+  .edge.down{background:linear-gradient(to right,transparent,var(--violet),transparent)}
+  @keyframes edge-out{0%{opacity:.95;top:50%}80%{opacity:.7}100%{opacity:0;top:0}}
+  .lit .edge.down{animation:edge-out-down .5s ease-out both}
+  @keyframes edge-out-down{0%{opacity:.95;top:50%}80%{opacity:.7}100%{opacity:0;top:100%}}
+
+  /* Il filo del marchio cresce dal centro quando la schermata entra. */
+  section::before{transform:scaleY(0);transform-origin:50% 50%;transition:transform .62s cubic-bezier(.2,.8,.2,1) .08s}
+  section.lit::before{transform:scaleY(1)}
+
+  /* Il testo sale dopo, una riga alla volta: l'occhio segue l'ordine di lettura. */
+  .lit .eyebrow,.lit h1,.lit h2,.lit p,.lit ul,.lit .figs,.lit .links,.lit .mark,.lit .shot{
+    animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .lit .eyebrow{animation-delay:.10s} .lit .mark{animation-delay:.10s}
+  .lit h1,.lit h2{animation-delay:.17s}
+  .lit p{animation-delay:.24s} .lit ul{animation-delay:.28s}
+  .lit .figs,.lit .links{animation-delay:.34s}
+  .lit .shot{animation-delay:.20s}
+
+  /* Il cursore che lampeggia dopo l'occhiello, come su un terminale. */
+  .eyebrow::after{content:"";display:inline-block;width:.55em;height:1em;margin-left:.5em;
+    background:var(--mint);vertical-align:-.15em;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* Il vetro: righe di scansione fermissime e una banda che passa ogni tanto. */
+  .glass{position:fixed;inset:0;pointer-events:none;z-index:4}
+  .glass::before{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(to bottom,rgba(0,0,0,.34) 0 1px,transparent 1px 3px);
+    animation:unsteady 7s steps(1) infinite;opacity:.055}
+  @keyframes unsteady{0%,100%{opacity:.055}8%{opacity:.028}9%{opacity:.07}34%{opacity:.045}61%{opacity:.072}84%{opacity:.04}}
+  .glass::after{content:"";position:absolute;left:0;right:0;height:26vh;
+    background:linear-gradient(to bottom,transparent,rgba(150,180,255,.045),transparent);
+    animation:roll 9s linear infinite}
+  @keyframes roll{from{transform:translateY(-130%)}to{transform:translateY(560%)}}
+
+  .shot{transition:transform .35s cubic-bezier(.2,.8,.2,1),border-color .35s,box-shadow .35s}
+  .shot:hover{transform:translateY(-8px) scale(1.012);border-color:#3A4A5E;
+              box-shadow:0 40px 90px rgba(0,0,0,.66)}
+
+  @media (prefers-reduced-motion:reduce){
+    .lit .wrap,.lit .edge,.lit .eyebrow,.lit h1,.lit h2,.lit p,.lit ul,.lit .figs,
+    .lit .links,.lit .mark,.lit .shot{animation:none}
+    section::before{transform:scaleY(1);transition:none}
+    .glass{display:none} .eyebrow::after{animation:none;opacity:.6}
+  }
+  @media print{.glass{display:none} .edge{display:none} .eyebrow::after{display:none}
+    .lit .wrap,.lit *{animation:none!important} section::before{transform:scaleY(1)}}
 </style>
 </head>
 <body>
+<div class="glass" aria-hidden="true"></div>
 <main class="deck" id="deck">
 
   <section>
@@ -103,8 +166,8 @@
       <div>
         <img class="mark" src="img/mark.png" alt="The Totem mark: a Seeker seen from the back, its right edge lit.">
         <h1>Totem Wallet</h1>
-        <p class="lead">A wallet for the Solana Seeker that reads every transaction before you sign it,
-        and an AI agent that trades a capped budget inside a collar you set.</p>
+        <p class="lead">A wallet for the Solana Seeker that shows you what a transaction really does
+        before you sign it, and an agent that trades a small budget inside limits you set.</p>
         <p class="quote">What you see is what you sign.</p>
       </div>
     </div>
@@ -115,15 +178,14 @@
       <div>
         <p class="eyebrow">01 · The problem</p>
         <h2>You see the amount. You do not see who gets it.</h2>
-        <p>A wallet shows you a name, a number and a network fee, and an Approve button. What it
-        does not show you is <strong>where the money actually goes</strong>. The addresses turn up
-        afterwards, in an explorer, when the transaction is already signed. If one of them belongs
-        to a scammer, you find that out too late.</p>
-        <p>It does not show what you are granting, either: an unlimited approval looks like an
-        ordinary confirmation, and it keeps working until you revoke it.</p>
+        <p>A wallet shows you a name, a number and a network fee, and a button that says Approve.
+        What it does not show you is <strong>where the money actually goes</strong>. The addresses
+        turn up later, in an explorer, once the transaction is already signed. If one of them
+        belongs to someone who is robbing you, you learn it too late.</p>
+        <p>It does not show what you are granting, either. An unlimited approval looks like an
+        ordinary confirmation, and it keeps working until you go and revoke it.</p>
         <p>The Seed Vault signs whatever the wallet hands it. The hardware is not the weak part.
-        The screen in front of it is. And agents make it worse: to trade for you, an AI needs a
-        key, and a key in an agent's hands is a key in a prompt injection's hands.</p>
+        The screen in front of it is.</p>
       </div>
       <img class="shot" src="img/door.jpg" alt="The Totem door screen, the mark lit on a dark ground.">
     </div>
@@ -133,18 +195,17 @@
     <div class="wrap split">
       <div>
         <p class="eyebrow">02 · What a signature should show</p>
-        <h2>Who receives it, and whether you know them</h2>
-        <p>This is the screen before the fingerprint. Not a summary the app wrote: the effect the
-        network says the transaction will have.</p>
+        <h2>Every wallet the money touches, before you sign</h2>
+        <p>This is the screen that comes before the fingerprint. It is not a summary the app
+        wrote: it is what the network says the transaction will do.</p>
         <ul>
-          <li><b>The recipient, by name</b> when it is someone you have saved, with a trust badge:
-          a contact of yours, an address you have paid before, or one you have never seen.</li>
-          <li><b>A map of where the money goes</b>, every leg of it, including the splits a swap
-          hides across several wallets.</li>
-          <li><b>The fee, separately</b>, so it is never confused with what you are sending.</li>
-          <li><b>Look-alike detection</b> against your own contacts: an address that matches one of
-          yours at the ends and differs in the middle is marked, because that is how address
-          poisoning works.</li>
+          <li><b>Every address the money reaches</b>, drawn as a map, including the legs a swap
+          spreads across several wallets.</li>
+          <li><b>Who they are:</b> a contact of yours, an address you have paid before, or one
+          you have never seen. Tap any of them to see what that wallet actually is.</li>
+          <li><b>The fee on its own line</b>, so it is never mixed up with what you are sending.</li>
+          <li><b>Look-alikes flagged:</b> an address that matches one of yours at the start and the
+          end but differs in the middle is marked, because that is exactly how people get robbed.</li>
         </ul>
       </div>
       <img class="shot" src="img/preview.jpg" alt="The receipt before signing: you pay 1.5 SOL, a map from you to Alice, and Alice marked as a trusted contact.">
@@ -154,98 +215,35 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">03 · The answer</p>
-        <h2>A receipt before the fingerprint</h2>
-        <p>Every request, from a dApp over Mobile Wallet Adapter, from Send, Swap, a Blink, the
-        bridge, an NFC sticker or the agent, is <strong>simulated on chain first</strong> and shown
-        as a plain receipt: what leaves, to whom, the fee, the risks, the address's trust badge.</p>
-        <p>Then hold to confirm. Then the fingerprint. Keys never leave the vault.</p>
-        <p class="quote">Here the attack is a drainer. The receipt names the real amount and the
-        real recipient, and the signature is blocked before the Seed Vault is even asked.</p>
+        <p class="eyebrow">03 · The same screen, on an attack</p>
+        <h2>It stops before the Seed Vault is asked</h2>
+        <p>Here a dApp asks to drain the wallet. The receipt names the real amount and the real
+        recipient, marks the address as known for draining wallets, and notes that you have never
+        sent anything there before.</p>
+        <p><strong>The signature is refused.</strong> The Seed Vault is never even asked, so there
+        is no prompt to tap through by accident.</p>
+        <p>Five attacks are built into the app and work with no dApp and no network: a drainer, a
+        look-alike address, an unlimited approval, a state change between reading and signing, and
+        an ordinary safe payment for comparison. Anyone can try them.</p>
       </div>
-      <img class="shot" src="img/receipt.jpg" alt="The receipt on a drainer: minus 49.9 SOL, two severe risks, signature blocked.">
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <div>
-        <p class="eyebrow">04 · How it reads the truth</p>
-        <h2>The effect, never the claim</h2>
-        <ul>
-          <li><b>On-chain simulation</b>, legacy and v0 with lookup tables: real balance changes,
-          including splits hidden across several wallets.</li>
-          <li><b>Risk engine:</b> drains, unlimited approvals, authority changes, wallet takeover,
-          a foreign fee payer, burn addresses, unexpected signers, bundles.</li>
-          <li><b>Look-alike detection</b> against your own contacts, which is how address poisoning
-          actually works.</li>
-          <li><b>Anti-TOCTOU:</b> it re-simulates the instant before signing and refuses if the
-          state drifted between what you read and what you sign.</li>
-          <li><b>Five attacks built in:</b> a drainer, a look-alike, an unlimited approval, a state
-          drift and a safe payment, all offline, so anyone can try the defences with no dApp.</li>
-        </ul>
-        <div class="figs">
-          <div class="fig"><b>397</b><span>unit tests on the safety core</span></div>
-          <div class="fig"><b>263</b><span>commits since 11 September 2026</span></div>
-          <div class="fig"><b>0</b><span>keys the app can see</span></div>
-        </div>
-      </div>
+      <img class="shot" src="img/receipt.jpg" alt="The receipt on a drainer: minus 49.9 SOL, two severe risks, and the signature blocked.">
     </div>
   </section>
 
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">05 · The agent</p>
-        <h2>It gets a budget, never your seed</h2>
-        <p>You open a budget: a second key, created on the phone, capped in SOL and in days, apart
-        from your wallet. The agent hunts across Solana with the gates the winning bots use, buys a
-        slice, sells at your target or your stop, and closes the budget when it expires.</p>
-        <p>You set the collar: <strong>how much a move, how much a day, how fast, and above what it
-        must ask for your fingerprint.</strong> A policy engine reads the simulated effect of every
-        move, never the agent's claim. Your own rules, written in plain Markdown, can only close
-        doors, never open them.</p>
-        <p class="quote">The collar is the product. The agent can be wrong, hallucinate or be
-        injected: it cannot spend more than the budget, and it cannot reach your wallet.</p>
-      </div>
-      <img class="shot" src="img/home.jpg" alt="The Totem home: balance, the eight action circles, the portfolio and the DeFi positions.">
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <div>
-        <p class="eyebrow">06 · The agent that lies</p>
-        <h2>An AI hands over a transaction. We check it against the chain.</h2>
-        <p>An agent running on a computer holds no key here. It gives the phone a transaction and a
-        declared intent: what it says it is doing. Totem simulates the real bytes and compares the
-        claim with the effect.</p>
-        <ul>
-          <li>Every outflow must be the declared one, in the declared amount.</li>
-          <li>A swap must actually bring back the token it promised.</li>
-          <li>No hidden delegation, authority change or durable nonce, ever.</li>
-        </ul>
-        <p><span class="flag">Honest agent</span><span class="flag bad">Liar, blocked</span></p>
-        <p>If the agent declares a swap and the transaction is a transfer, the signature is refused
-        and the screen says exactly what did not add up. It never judges whether a trade is smart.
-        It verifies that the agent is telling the truth.</p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap split">
-      <div>
-        <p class="eyebrow">07 · ORE</p>
+        <p class="eyebrow">04 · ORE</p>
         <h2>The grid, read from the program itself</h2>
-        <p>ORE is a game on Solana: a five by five grid, one round a minute. It is written in Steel,
-        so there is no IDL to lean on. Totem decodes the program by hand and shows
-        <strong>what a square really costs and what it can pay</strong> before anything is put on it.</p>
+        <p>ORE is a game on Solana: a five by five grid, one round every minute. It is written in
+        Steel, so there is no IDL to lean on. Totem decodes the program by hand and shows
+        <strong>what a square really costs and what it can pay</strong>, before you put anything on it.</p>
         <ul>
-          <li>The live round, the emptiest squares, and how many miners are on the grid right now.</li>
-          <li>A Deploy or a Claim from any dApp shows up in the receipt as what it is: a wager.</li>
-          <li>The agent can dig from its budget, under the same collar, and bring the gains home
-          in ORE when the budget closes.</li>
+          <li>The live round, the emptiest squares right now, and how many miners are on the grid.</li>
+          <li>A Deploy or a Claim from any dApp appears in the receipt as what it is: a wager,
+          with the squares and the SOL at stake.</li>
+          <li>The agent can dig from its budget under the same limits, and bring the gains home in
+          ORE when the budget closes.</li>
         </ul>
       </div>
       <img class="shot" src="img/ore.jpg" alt="The ORE five by five grid with the odds on every square, the live round and the miner count.">
@@ -255,52 +253,179 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">08 · The Seeker, and SKR</p>
-        <h2>A number no balance shows</h2>
-        <p>The Genesis Token is one per device, so the crowd is real people holding a Seeker:
-        <strong>120,520 wallets</strong>, enumerated once on chain, about ten and a half thousand
-        of them active enough to watch continuously.</p>
-        <p>Claim and stake moves SKR inside the Guardians' program, so a list built from token
-        accounts finds nothing there. Totem decodes that program and shows the position, with the
-        yield <strong>measured from the share price</strong>, not derived from tokenomics.</p>
-        <div class="figs">
-          <div class="fig"><b>50.8%</b><span>of active Seekers keep SKR staked</span></div>
-          <div class="fig"><b>39,962</b><span>SKR each on average, about $716</span></div>
-          <div class="fig"><b>15.4%</b><span>yield measured, against 21.25% derived</span></div>
-        </div>
+        <p class="eyebrow">05 · The agent</p>
+        <h2>A budget of its own, and limits you write</h2>
+        <p>You open a budget: a second key, made on the phone, with a cap in SOL and a date it
+        ends. Your seed is never part of it. The agent looks for a coin every few minutes, checks
+        it against the same gates the serious bots use, buys a slice, and sells at your target or
+        your stop.</p>
+        <p>You set the limits: <strong>how much per move, how much per day, how often, and above
+        what amount it has to stop and ask for your fingerprint.</strong> Every move is measured by
+        its simulated effect, not by what the agent says it is doing. Rules you write yourself can
+        only close doors, never open them.</p>
+        <p>And you can watch it: the open positions on charts with entry, target and stop drawn in,
+        its reasoning typed out as it arrives, and a voice that says what it is doing.</p>
       </div>
-      <img class="shot" src="img/scout.jpg" alt="Scout's census card: half of the active Seekers keep SKR staked, with the average each.">
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap split">
-      <div>
-        <p class="eyebrow">09 · Why it sticks</p>
-        <h2>It stays with you when the app is closed</h2>
-        <ul>
-          <li><b>A bubble over any app</b> and a widget on the home screen, both showing what the
-          agent is doing and how the wallet is.</li>
-          <li><b>Pay by touch:</b> the phone emulates a payment tag, so someone taps and pays.</li>
-          <li><b>A sticker:</b> write a Solana Pay request onto a blank NFC tag costing cents.</li>
-          <li><b>Contacts by touch,</b> each card signed by the phone's attestation key, which is
-          what closes the door on address poisoning.</li>
-          <li><b>A proof of payment</b> as a QR this phone signed, verified by another phone with
-          no explorer and no network.</li>
-        </ul>
-      </div>
-      <img class="shot" src="img/companion.jpg" alt="The floating companion bubble open over the wallet, showing the agent and the health score.">
+      <img class="shot" src="img/home.jpg" alt="The Totem home: balance, the action circles, the portfolio and the DeFi positions.">
     </div>
   </section>
 
   <section>
     <div class="wrap">
       <div>
-        <p class="eyebrow">10 · Try it</p>
-        <h2>Everything here runs on mainnet today</h2>
+        <p class="eyebrow">06 · An agent on your computer</p>
+        <h2>It never holds a key. It has to prove what it is doing.</h2>
+        <p>An agent running somewhere else hands the phone a transaction and a declaration: this
+        is what I am about to do. Totem simulates the real bytes and compares the two.</p>
+        <ul>
+          <li>Every outflow has to be the one it declared, in the amount it declared.</li>
+          <li>A swap has to actually bring back the token it promised.</li>
+          <li>No delegation, authority change or durable nonce hidden anywhere in it.</li>
+        </ul>
+        <p>If the declaration and the effect do not match, the signature does not happen, and the
+        screen lists which part did not match. It does not judge whether a trade is a good idea.
+        It checks that the agent is telling the truth.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">07 · Scout</p>
+        <h2>What the other Seekers are doing, right now</h2>
+        <p>The Genesis Token is one per device, so the crowd is real people holding a Seeker:
+        <strong>120,520 wallets</strong>, enumerated once on chain, and about ten and a half
+        thousand of them active enough to watch continuously.</p>
+        <ul>
+          <li><b>Live:</b> the buys and sells as they land, with the wallet behind each one.</li>
+          <li><b>Buying, Holding, Whales:</b> what the crowd is picking up, what it actually holds,
+          and who the big ones are. Tap any of them to see that wallet's moves drawn on the chart.</li>
+          <li><b>Follow a wallet</b> and the phone tells you when it buys. The agent can mirror it.</li>
+          <li><b>Buy from the feed</b> without leaving the row, with the same receipt as everywhere.</li>
+        </ul>
+        <p>And a number no balance shows: <strong>half of the active Seekers keep their SKR staked
+        with the Guardians</strong>, about 39,962 each. Read straight from the staking program, with
+        the yield measured from the share price: 15.4%, against the 21.25% you would get by deriving
+        it from tokenomics.</p>
+      </div>
+      <img class="shot" src="img/scout.jpg" alt="Scout's census card: half of the active Seekers keep SKR staked, with the average each.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">08 · The market, inside the wallet</p>
+        <h2>Every coin, its chart, and what yours would be worth</h2>
+        <p>No jumping to a browser to look something up.</p>
+        <ul>
+          <li><b>Every coin on Solana</b>, ranked by market cap, searchable, each with its chart and
+          its price history from CoinGecko.</li>
+          <li><b>What if it were as big as…</b> pick any other coin and see what one of yours would
+          be worth at that market cap, and what your holding would be worth. Times two, ten, a hundred.</li>
+          <li><b>Favourites</b> with their total, and a bell when something moves five percent.</li>
+          <li><b>Bitcoin and Ethereum</b> as they really exist on Solana: the official bridged ones,
+          not the copies.</li>
+          <li><b>Realised profit and loss</b> per coin, worked out from your own receipts, and a
+          card you can share.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">09 · Money in a link</p>
+        <h2>Pay someone who has no wallet at all</h2>
+        <p>Totem makes a small throwaway wallet, puts the amount inside it, and hands you a link.
+        Send it however you like: a message, a chat, a piece of paper.</p>
+        <p>Whoever opens it takes the money, and if they have no wallet the link opens a page that
+        works anyway. Nothing was taken? The list of open gifts shows it, and you take it back.</p>
+        <p>The honest part is written on the screen: the link carries the key, so the first person
+        who opens it gets the money. In exchange it works with anybody, over anything, with no
+        address and no app on the other side.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">10 · Pay by touch</p>
+        <h2>The things only a Seeker can do</h2>
+        <ul>
+          <li><b>Get paid by touch.</b> The phone behaves like a payment card: the other person
+          holds theirs against it and pays.</li>
+          <li><b>A sticker.</b> Write a payment request onto a blank NFC tag costing a few cents,
+          and stick it on a counter. Anyone who taps it with any wallet gets the payment ready.
+          Lock it and nobody can rewrite it.</li>
+          <li><b>Contacts by touch.</b> Two phones touch and save each other, each card signed by
+          the phone's own key. From then on, a look-alike address has nothing to grab onto.</li>
+          <li><b>Proof of payment.</b> After a payment the phone makes a QR it has signed itself.
+          Another phone reads it and confirms the amount and the recipient, with no explorer and no
+          network at all.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">11 · Swaps and bridges</p>
+        <h2>Out of the public queue, and across two hundred chains</h2>
+        <ul>
+          <li><b>Swaps go out privately</b> through Jupiter Ultra, past the bots that read the
+          public queue, with the route and the slippage chosen from how volatile the coin actually is.</li>
+          <li><b>Orders that live on chain:</b> sell at a target, buy below a price, buy in rounds.
+          They fire with the phone switched off.</li>
+          <li><b>A bridge to more than two hundred chains</b> with no account, and the receipt
+          first, like everything else.</li>
+          <li><b>A private send</b> from Solana to Solana through the same bridge, with an honest
+          line about what it does and does not hide. It is not a mixer, and the app says so.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">12 · It stays with you</p>
+        <h2>A widget, and a face that follows you over any app</h2>
+        <p>Most of what matters happens when the app is closed.</p>
+        <ul>
+          <li><b>A widget on the home screen</b> with the wallet's health score, the balance, and
+          what is worth fixing. It refreshes without opening the app.</li>
+          <li><b>A small face that floats over any app,</b> draggable anywhere, showing the agent's
+          work, the budget, the health or the coin you care about. You pick which.</li>
+          <li><b>Notifications that carry a picture</b> of where each coin sits between its stop and
+          its target, with Sell now and Stop on the notification itself.</li>
+          <li><b>It audits itself:</b> approvals you forgot, rent locked in dead accounts, and pool
+          fees nobody ever collected on Orca, Raydium and Meteora, found straight from the chain
+          with no key of yours.</li>
+        </ul>
+      </div>
+      <img class="shot" src="img/companion.jpg" alt="The floating companion open over the wallet, showing the agent and the health score.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">13 · Try it</p>
+        <h2>All of this runs on mainnet today</h2>
         <p>Not a port and not a mockup. The repository starts on 11 September 2026, during the
-        hackathon, and everything in it is new: Kotlin and Jetpack Compose, a pure-Kotlin safety
-        core, and an attacker dApp shipped in the repo so the defences can be tried by anyone.</p>
+        hackathon, and everything in it is new: Kotlin and Jetpack Compose, a safety core in pure
+        Kotlin with 397 tests, and an attacker dApp shipped in the repo so anyone can try the
+        defences for themselves.</p>
+        <div class="figs">
+          <div class="fig"><b>397</b><span>tests on the safety core</span></div>
+          <div class="fig"><b>263</b><span>commits since 11 September</span></div>
+          <div class="fig"><b>0</b><span>keys the app can see</span></div>
+        </div>
         <div class="links">
           <a href="https://github.com/DuckerForge/totem-wallet"><span>Code</span> · github.com/DuckerForge/totem-wallet</a>
           <a href="https://github.com/DuckerForge/totem-wallet/releases/download/v1.0-clockin/TotemWallet-v1.0-clockin.apk"><span>APK</span> · signed release, 8.6 MB</a>
@@ -320,6 +445,16 @@
   const slides = [...deck.querySelectorAll('section')];
   const pager = document.getElementById('pager');
   let at = 0;
+
+  // I due fili che scappano ai bordi quando la schermata si accende. Aggiunti da qui e non
+  // scritti nel corpo della pagina: senza JavaScript non servono a niente e non devono esserci.
+  slides.forEach(s => {
+    for (const cls of ['edge', 'edge down']) {
+      const e = document.createElement('i'); e.className = cls; e.setAttribute('aria-hidden', 'true');
+      s.appendChild(e);
+    }
+  });
+
   const go = i => { at = Math.max(0, Math.min(slides.length - 1, i));
                     slides[at].scrollIntoView({behavior:'smooth', block:'start'}); };
   addEventListener('keydown', e => {
@@ -328,11 +463,17 @@
     if (e.key === 'Home') { e.preventDefault(); go(0); }
     if (e.key === 'End') { e.preventDefault(); go(slides.length - 1); }
   });
-  // Il numero in basso segue quello che si vede davvero, anche scorrendo col dito.
+
+  // Il numero in basso segue quello che si vede davvero, anche scorrendo col dito, e la
+  // schermata si accende una volta sola: riaccendersi a ogni passaggio diventa un tic.
   const seen = new IntersectionObserver(es => {
-    es.forEach(e => { if (e.isIntersecting) { at = slides.indexOf(e.target);
-      pager.textContent = (at + 1) + ' / ' + slides.length; } });
-  }, {threshold: .55});
+    es.forEach(e => {
+      if (!e.isIntersecting) return;
+      at = slides.indexOf(e.target);
+      pager.textContent = (at + 1) + ' / ' + slides.length;
+      if (!e.target.classList.contains('lit')) e.target.classList.add('lit');
+    });
+  }, {threshold: .45});
   slides.forEach(s => seen.observe(s));
 </script>
 </body>

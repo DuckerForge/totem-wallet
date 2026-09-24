@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 
 class AddressPoisonTest {
     private val friend = "DEM0ownerWa11etF0rTests0n1yNotARea1Key111jQ"
-    private val poison = "cHAHx9Qz2LmN4pRt8VwYb3CdEfGh6JkLmN7PqRsTVZjQ"
+    private val poison = "DEM0x9Qz2LmN4pRt8VwYb3CdEfGh6JkLmN7PqRs11jQ"
 
     @Test fun sameEndsDifferentMiddleIsALookalike() {
         val hit = AddressPoison.lookalike(poison, listOf(friend, "7NzrN8GzgAykyNrGE8eUWNM5rBHZjHrzKGuLTeeCFgf1"))

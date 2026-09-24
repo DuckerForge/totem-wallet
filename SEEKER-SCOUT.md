@@ -54,8 +54,11 @@ Cloudflare Worker (cron */4)  ──scrive──>  KV "crowd"  ──GET──> 
         └── chiave Helius DEDICATA, separata da quella dell'agente
 ```
 
-**Worker:** `https://<your-worker>.workers.dev` · codice in `tools/seeker-worker/`
-KV namespace `<kv-namespace-id>` · segreto `HELIUS_URL` · account `infernaytb`
+**Worker:** il codice sta in `tools/seeker-worker/`. L'indirizzo del worker, l'id del
+namespace KV e il nome dell'account non stanno qui: il worker espone un proxy RPC senza
+autenticazione davanti alla chiave Helius, e un indirizzo scritto in un file pubblico e' un
+invito a bruciarne la quota. Chi lo rimette in piedi usa il suo, con `npx wrangler deploy`.
+Segreti da mettere con `wrangler secret put`: `HELIUS_URL`, `FB_SECRET`, `RX_KEY`.
 
 Comandi (da `tools/seeker-worker/`): `npx wrangler deploy`,
 `npx wrangler kv key get --binding=SEEKER state --remote`, `npx wrangler tail`.

@@ -30,6 +30,8 @@
   }
   .wrap{width:100%;max-width:1180px;margin:0 auto;display:grid;gap:clamp(24px,4vw,64px);align-items:center}
   .split{grid-template-columns:1fr minmax(240px,340px)}
+  /* Un ritaglio largo, non un telefono intero: alla colonna stretta non si leggerebbe. */
+  .split.detail{grid-template-columns:1fr minmax(300px,470px)}
   @media (max-width:860px){.split{grid-template-columns:1fr}}
 
   /* Il filo del marchio: sta sul bordo sinistro di ogni schermata, viola in basso
@@ -174,7 +176,7 @@
   </section>
 
   <section>
-    <div class="wrap split">
+    <div class="wrap split detail">
       <div>
         <p class="eyebrow">01 · The problem</p>
         <h2>You see the amount. You do not see who gets it.</h2>
@@ -186,8 +188,11 @@
         ordinary confirmation, and it keeps working until you go and revoke it.</p>
         <p>The Seed Vault signs whatever the wallet hands it. The hardware is not the weak part.
         The screen in front of it is.</p>
+        <p><strong>So Totem puts the answer on that screen.</strong> Here is 1.5 SOL leaving,
+        drawn as a map to the wallet that receives it, with that wallet named as a contact you
+        already trust. The fee sits on its own line. Nothing is signed yet.</p>
       </div>
-      <img class="shot" src="img/door.jpg" alt="The Totem door screen, the mark lit on a dark ground.">
+      <img class="shot" src="img/moneymap.jpg" alt="The money map before signing: you pay 1.5 SOL, an arrow from You to Alice, Alice marked as a trusted contact, and the network fee on its own line.">
     </div>
   </section>
 

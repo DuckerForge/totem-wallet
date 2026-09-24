@@ -88,20 +88,32 @@ SCRIPT: list[Beat] = [
         hands=True,
     ),
     Beat(
-        "crowd", 10.0, "06 · the crowd",
+        # Questa scena vale trentamila dollari: e' il premio che ORE ha messo il 21/09 per
+        # chi lo integra davvero, e nella scaletta non c'era affatto.
+        "ore", 22.0, "06 · ORE",
+        "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the "
+        "grid and says what a square really costs and what it can pay, before you put "
+        "anything on it. The agent can dig from its budget, under the same collar, and bring "
+        "the gains home in ORE.",
+        "La griglia cinque per cinque, le caselle piu' vuote segnate, la riga con l'ORE "
+        "atteso e il costo atteso. Niente firma: si guarda la griglia.",
+        start=6.0,
+    ),
+    Beat(
+        "crowd", 10.0, "07 · the crowd",
         "It also reads the crowd it lives in.",
         "Il censimento: meta' dei Seeker tiene SKR in staking dai Guardiani. Poi i soldi "
         "dimenticati, le commissioni mai riscosse lette dalla catena senza chiavi.",
         start=10.5,
     ),
     Beat(
-        "hardware", 25.0, "07 · the phone itself",
+        "hardware", 25.0, "08 · the phone itself",
         "It uses the hardware the Seeker actually has.",
         "Pagamento col tocco fra due telefoni, oppure la richiesta scritta su un adesivo NFC. "
         "Poi la mano sullo schermo: i numeri spariscono, l'impronta li riporta.",
     ),
     Beat(
-        "close", 20.0, "08 · everywhere",
+        "close", 20.0, "09 · everywhere",
         "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, and on "
         "everything the agent does.",
         "Il preventivo del ponte, il registro della giornata, l'icona. Ultima riga: "

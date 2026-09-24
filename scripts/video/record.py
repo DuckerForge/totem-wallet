@@ -16,6 +16,7 @@ Ogni scena e' una lista di gesti. Un gesto e' (cosa, argomenti):
     ("launch",)            apre l'app da fredda
     ("stop",)              la chiude
     ("text", "Send")       cerca quel testo sullo schermo e tocca il suo centro
+    ("seek", "ORE")        scorre finche' non lo trova, poi lo tocca
 
 Le coordinate fisse si sono rivelate la parte fragile: una riga aperta poco prima
 sposta tutto quello che sta sotto, e il tocco successivo finisce su un'altra voce.
@@ -93,7 +94,19 @@ def find(label: str) -> tuple[int, int] | None:
 
 def do(step: tuple) -> None:
     kind = step[0]
-    if kind == "text":
+    if kind == "seek":
+        # Scorre finche' la scritta non compare. Un tocco su un'intestazione che apre e
+        # chiude e' un interruttore, non un comando: toccarla quando la sezione era gia'
+        # aperta la chiudeva, e la cosa da riprendere spariva.
+        for _ in range(int(step[2]) if len(step) > 2 else 5):
+            at = find(step[1])
+            if at is not None:
+                tap(*at)
+                return
+            swipe(600, 1900, 600, 1250)
+            time.sleep(1.1)
+        print(f"    (non trovo «{step[1]}» nemmeno scorrendo)")
+    elif kind == "text":
         at = find(step[1])
         if at is None:
             print(f"    (non trovo «{step[1]}» sullo schermo)")
@@ -117,24 +130,19 @@ def do(step: tuple) -> None:
 
 def unlocked() -> bool:
     """
-    La barra delle schede esiste solo dentro l'app, dopo l'impronta. Vale come prova che
-    siamo dentro, non come prova del contrario: Scout e gli altri fogli a schermo intero
-    non ce l'hanno, e con questa sola il giro si fermava li'.
+    Siamo dentro, non alla porta. Prima si guardava il colore di un pixel della pillola
+    della scheda scelta, e su un tema col fondo nero quel pixel e' nero come tutto il
+    resto, quindi diceva sempre di no.
     """
-    png = OUT / ".probe.png"
-    png.parent.mkdir(parents=True, exist_ok=True)
-    raw = subprocess.run(["adb", "exec-out", "screencap", "-p"], capture_output=True, timeout=30).stdout
-    if not raw:
+    if not in_app():
         return False
-    png.write_bytes(raw)
-    try:
-        from PIL import Image
-
-        r, g, b = Image.open(png).convert("RGB").getpixel((TABS["wallet"], TAB_Y))
-    except Exception:
-        return False
-    # La pillola della scheda scelta: tinta, mai grigia, su ogni tema.
-    return abs(r - g) + abs(g - b) > 6 and 12 < r < 230
+    sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
+    xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
+    # La domanda giusta e' «e' alla porta?», non «c'e' la barra delle schede»: meta'
+    # dell'app sono fogli a schermo intero che la barra non ce l'hanno, e con quella
+    # domanda il giro si fermava su Scout dicendo che l'app era chiusa.
+    door = ('text="Unlock"', 'text="Connect Seed Vault"', 'text="TOTEM WALLET"')
+    return not any(d in xml for d in door)
 
 
 def in_app() -> bool:
@@ -222,13 +230,41 @@ def scene_receipt() -> list[tuple]:
 
 
 def scene_crowd() -> list[tuple]:
-    """Scout: cosa comprano i Seeker adesso, e il censimento."""
+    """
+    Scout per intero: la diretta, chi tiene cosa, le balene, e la pagina di una persona
+    con le sue mosse segnate sul grafico. La diretta da sola e' una lista che scorre:
+    quello che si deve vedere e' che dietro ogni riga c'e' un portafoglio vero.
+    """
     return [
         ("launch",), ("wait", 1.5),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
         ("text", "Scout"), ("wait", 5.0),
-        ("swipe", 600, 1900, 600, 1200), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1200), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1300), ("wait", 2.0),
+        ("text", "Holding"), ("wait", 4.0),
+        ("text", "Whales"), ("wait", 4.0),
+        ("text", "Live"), ("wait", 3.0),
+        # La faccia della prima riga: apre il portafoglio che ha appena comprato.
+        ("tap", 120, 551), ("wait", 5.0),
+        ("swipe", 600, 1900, 600, 1300), ("wait", 3.0),
+    ]
+
+
+def scene_ore() -> list[tuple]:
+    """
+    La griglia di ORE. Nessuna firma: si apre e si guarda, le probabilita' vere lette dal
+    programma. E' la scena del premio ORE, quella che da sola vale la candidatura.
+
+    Il cammino: la scheda ORE sta in fondo al portafoglio, sotto «IN DEFI», e il
+    portafoglio parte chiuso. Prima si apre, poi si scende, poi si tocca.
+    """
+    return [
+        ("launch",), ("wait", 1.5),
+        ("tap", 93, 205), ("wait", 1.0),            # chiude un foglio, se ce n'e' uno
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
+        ("seek", "ORE", 6), ("wait", 6.0),
+        ("swipe", 600, 1900, 600, 1300), ("wait", 4.0),
+        ("swipe", 600, 1900, 600, 1400), ("wait", 4.0),
+        ("swipe", 600, 1400, 600, 1900), ("wait", 3.0),
     ]
 
 
@@ -254,7 +290,8 @@ AUTO: dict[str, tuple[float, callable]] = {
     "door": (9.0, scene_door),
     "hook": (9.0, scene_hook),
     "receipt": (24.0, scene_receipt),
-    "crowd": (16.0, scene_crowd),
+    "ore": (26.0, scene_ore),
+    "crowd": (34.0, scene_crowd),
     "close": (16.0, scene_close),
 }
 

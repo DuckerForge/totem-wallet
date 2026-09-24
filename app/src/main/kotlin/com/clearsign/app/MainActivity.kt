@@ -608,15 +608,22 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
     var showDemo by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 // ---- Try an attack: the receipt on a drainer, no dApp needed ----
+                // It opens over everything, like every other receipt in the app. Grown inside
+                // this page it sat under a screenful of settings, and the thing it exists to
+                // show, the risk and the button that refuses it, was below the fold.
                 GlassCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth().clickable { showDemo = !showDemo }, verticalAlignment = Alignment.CenterVertically) {
-                            SectionTitle(stringResource(R.string.home_demo_hdr), stringResource(R.string.home_demo_sub), HIcon.FLASK)
-                            Spacer(Modifier.weight(1f))
-                            HaloIcon(if (showDemo) HIcon.CHEVRON_DOWN else HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
-                        }
-                        if (showDemo) DemoSection(signer, owner)
+                    Row(Modifier.fillMaxWidth().clickable { showDemo = true }, verticalAlignment = Alignment.CenterVertically) {
+                        SectionTitle(stringResource(R.string.home_demo_hdr), stringResource(R.string.home_demo_sub), HIcon.FLASK)
+                        Spacer(Modifier.weight(1f))
+                        HaloIcon(HIcon.CHEVRON_RIGHT, Halo.muted, 18.dp)
                     }
+                }
+                if (showDemo) {
+                    PayOverlay(
+                        title = stringResource(R.string.home_demo_hdr),
+                        hint = stringResource(R.string.demo_offline_note),
+                        onBack = { showDemo = false },
+                    ) { DemoSection(signer, owner) }
                 }
 
                 // ---- Wallet health (the score) --------------------------------
@@ -876,10 +883,6 @@ private fun DemoSection(signer: SeedVaultSigner, connectedWallet: String?) {
             }
         }
         Text(stringResource(scenario.blurbRes), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            HaloIcon(HIcon.INFO, Halo.cyan, 13.dp); Spacer(Modifier.width(5.dp))
-            Text(stringResource(R.string.demo_offline_note), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
-        }
         // The very same receipt a dApp request gets: hero, risks, node map, details.
         androidx.compose.runtime.key(scenario) { Column { SignReceiptBody(receipt, null) } }
         if (receipt.blocksApproval) {

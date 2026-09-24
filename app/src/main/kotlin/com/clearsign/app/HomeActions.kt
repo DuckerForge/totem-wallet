@@ -238,7 +238,7 @@ internal fun RecentReceiptsCard(onOpen: () -> Unit) {
             CardHeader(stringResource(R.string.tab_receipts), onOpen)
             entries.forEach { e ->
                 HaloRow(
-                    title = e.dApp.takeIf { it.isNotBlank() } ?: kindLabel(ctx, e.kind),
+                    title = e.dApp.takeIf { it.isNotBlank() }?.let { Ledger.signerName(ctx, it) } ?: kindLabel(ctx, e.kind),
                     sub = kindLabel(ctx, e.kind),
                     leading = {
                         Box(Modifier.size(30.dp).clip(rs(Radius.row)).background(Halo.card), contentAlignment = Alignment.Center) { HaloIcon(HIcon.RECEIPT, Halo.muted, 15.dp) }

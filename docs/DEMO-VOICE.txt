@@ -1,0 +1,25 @@
+A wallet shows you a name and a button, and you sign away everything. Totem simulates the transaction on chain and shows what will actually happen. This one is blocked before the Seed Vault is even asked.
+
+A real payment reads the same way. Hold to confirm, then the Seed Vault. The keys never leave it.
+
+The agent gets a budget of its own and never your seed. You set the collar: how much a move, how much a day, and above that it has to ask you. Then you watch it work, every step, as it happens.
+
+An AI agent never holds a key here. It hands over a transaction and says what it does. Totem checks the claim against the real effect. This one lied, and it is blocked.
+
+It stays with you: a bubble over any app, and a widget on the home screen, both showing what the agent is doing and how the wallet is.
+
+ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the program itself and says what a square really costs and what it can pay. The agent can dig from its budget, under the same collar, and bring the gains home in ORE.
+
+Totem reads the crowd it lives in: ten thousand Seeker wallets, and what they are buying right now. And a fact no balance shows: half of them keep their SKR staked with the Guardians.
+
+The Seeker has hardware nobody else has. Get paid by touch. Write a payment request on a cent sticker. Swap contacts by touching two phones. And prove a payment with a QR this phone signed, checked by another phone with no explorer and no network.
+
+Pay someone who has no wallet at all. The money travels inside a link.
+
+Swaps go out privately, past the bots that read the public queue. And a bridge to two hundred chains, with the receipt first.
+
+It audits itself: approvals you forgot, rent locked in dead accounts, and pool fees nobody ever collected, read straight from the chain with no key of yours.
+
+Every coin on Solana with its chart, and what yours would be worth with theirs. Every signature kept, with what it cost that day.
+
+Receipt before signature. Everywhere. Totem.

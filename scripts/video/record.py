@@ -15,6 +15,7 @@ Ogni scena e' una lista di gesti. Un gesto e' (cosa, argomenti):
     ("key", nome)          un tasto di sistema
     ("launch",)            apre l'app da fredda
     ("stop",)              la chiude
+    ("start", "pkg/.Act")  apre un'altra app, per la scena dell'agente
     ("text", "Send")       cerca quel testo sullo schermo e tocca il suo centro
     ("seek", "ORE")        scorre finche' non lo trova, poi lo tocca
     ("close",)             chiude il foglio aperto, qualunque sia, e niente se non c'e' ne'uno
@@ -47,6 +48,8 @@ from pathlib import Path
 
 PKG = "com.clearsign.app"
 ACT = f"{PKG}/{PKG}.MainActivity"
+# La dApp di prova, che nella scena dell'Agent Gate fa la parte dell'agente.
+TESTER = "com.clearsign.tester/.MainActivity"
 OUT = Path(__file__).resolve().parent / "shot"
 
 # La barra in basso, letta sullo schermo da 1200 x 2670.
@@ -144,6 +147,8 @@ def do(step: tuple) -> None:
         sh("shell", "am", "force-stop", PKG)
     elif kind == "launch":
         sh("shell", "am", "start", "-n", ACT)
+    elif kind == "start":
+        sh("shell", "am", "start", "-n", step[1])
     else:
         raise ValueError(f"gesto sconosciuto: {kind}")
 
@@ -211,125 +216,61 @@ def record(key_name: str, seconds: float, steps: list[tuple]) -> Path:
 # Le scene che si registrano da sole. Le chiavi sono quelle di `beats.py`.
 # ---------------------------------------------------------------------------
 
-def scene_door() -> list[tuple]:
-    """
-    L'app da fredda. Il lancio sta dentro la ripresa, non prima: fuori, la porta era
-    gia' comparsa quando l'encoder apriva, e di quel che si vede all'avvio non restava
-    niente. Il riquadro dell'impronta annerisce il girato, quindi si chiude e si riprende
-    da li': il marchio fermo e il tasto per entrare.
-    """
-    return [("stop",), ("wait", 0.6), ("launch",), ("wait", 2.6), ("key", "back"), ("wait", 4.0)]
-
-
-def scene_hook() -> list[tuple]:
-    """Impostazioni, «Prova un attacco»: la dApp che chiede e non mostra niente."""
-    return [
-        ("launch",), ("wait", 1.5),                          # l'app davanti, sempre
-        ("tap", TABS["wallet"], TAB_Y), ("wait", 1.2),       # da un punto noto
-        ("tap", TABS["settings"], TAB_Y), ("wait", 2.0),
-        ("text", "Wallet and safety"), ("wait", 2.5),
-        ("text", "TRY AN ATTACK"), ("wait", 3.0),
-    ]
-
-
 def scene_receipt() -> list[tuple]:
     """
-    Lo scontrino sul drainer: la cifra vera, il rischio in rosso, bloccato.
+    Lo scontrino sul drainer: la cifra vera, il rischio in rosso, la firma bloccata.
 
-    Il cammino sta dentro la scena, anche se poi nel montaggio si salta: una scena
-    che dava per buono dove l'aveva lasciata la precedente falliva ogni volta che si
-    rigirava da sola, ed e' proprio allora che serve.
+    Il cammino sta dentro la scena, anche se poi nel montaggio si salta: una scena che dava
+    per buono dove l'aveva lasciata la precedente falliva ogni volta che si rigirava da sola,
+    ed e' proprio allora che serve.
     """
     return [
-        ("launch",), ("wait", 1.5),
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 1.2),
         ("tap", TABS["settings"], TAB_Y), ("wait", 2.0),
         ("text", "Wallet and safety"), ("wait", 2.0),
         ("text", "TRY AN ATTACK"), ("wait", 2.5),
-        ("text", "Wallet drainer"), ("wait", 3.0),
-        ("swipe", 600, 1750, 600, 1150), ("wait", 3.0),
-        ("swipe", 600, 1750, 600, 1200), ("wait", 3.5),
+        ("text", "Wallet drainer"), ("wait", 5.0),
+        ("swipe", 600, 1750, 600, 1250), ("wait", 4.0),
     ]
 
 
-def scene_crowd() -> list[tuple]:
+def scene_gate() -> list[tuple]:
     """
-    Scout per intero: la diretta, chi tiene cosa, le balene, e la pagina di una persona
-    con le sue mosse segnate sul grafico. La diretta da sola e' una lista che scorre:
-    quello che si deve vedere e' che dietro ogni riga c'e' un portafoglio vero.
+    L'agente che mente. La dApp di prova fa da agente: dichiara uno swap e manda un invio,
+    e il portafoglio la smentisce. Nessuna firma: il bugiardo non ci arriva.
     """
     return [
-        ("launch",), ("wait", 1.5),
-        ("close",), ("wait", 1.2),
-        ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
-        ("text", "Scout"), ("wait", 5.0),
-        ("swipe", 600, 1900, 600, 1300), ("wait", 2.0),
-        ("text", "Holding"), ("wait", 4.0),
-        ("text", "Whales"), ("wait", 4.0),
-        ("text", "Live"), ("wait", 3.0),
-        # La faccia della prima riga: apre il portafoglio che ha appena comprato.
-        ("tap", 120, 551), ("wait", 5.0),
-        ("swipe", 600, 1900, 600, 1300), ("wait", 3.0),
+        ("close",), ("wait", 1.0),
+        ("start", TESTER), ("wait", 3.0),
+        ("text", "Agent Gate, lying agent"), ("wait", 6.0),
+        ("swipe", 600, 1800, 600, 1300), ("wait", 4.0),
     ]
 
 
-def scene_wallet() -> list[tuple]:
+def scene_bubble() -> list[tuple]:
     """
-    L'app come portafoglio: il saldo, le otto azioni, quello che c'e' dentro, lo staking e
-    la DeFi. Poi il mercato e una moneta col suo grafico. Senza questa il video racconta un
-    sistema di sicurezza, e quello che si consegna e' un portafoglio.
+    La bolla sopra un'altra app, e il widget. La bolla deve essere gia' accesa: il permesso
+    di disegnare sopra le altre app si da' una volta a mano, e qui non si puo' chiedere.
     """
     return [
-        ("launch",), ("wait", 1.5),
-        ("close",), ("wait", 1.5),
-        ("tap", TABS["wallet"], TAB_Y), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
-        ("swipe", 600, 1000, 600, 2100), ("wait", 1.5),
-        ("tap", TABS["market"], TAB_Y), ("wait", 3.5),
-        ("swipe", 600, 1900, 600, 1400), ("wait", 2.5),
-        ("text", "Bitcoin"), ("wait", 6.0),
-        ("swipe", 600, 1900, 600, 1400), ("wait", 3.0),
-        ("close",), ("wait", 2.0),
-    ]
-
-
-def scene_agent() -> list[tuple]:
-    """La scheda Agente: la paghetta, il collare, il risultato dell'ultima, le righe Pro."""
-    return [
-        ("launch",), ("wait", 1.5),
-        ("close",), ("wait", 1.5),
-        ("tap", TABS["agent"], TAB_Y), ("wait", 3.5),
-        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
-        ("swipe", 600, 1000, 600, 2100), ("wait", 2.0),
-    ]
-
-
-def scene_health() -> list[tuple]:
-    """Quello che il portafoglio si controlla da solo: punteggio, rent, deleghe, contatti."""
-    return [
-        ("launch",), ("wait", 1.5),
-        ("close",), ("wait", 1.5),
-        ("tap", TABS["settings"], TAB_Y), ("wait", 2.2),
-        ("text", "Wallet and safety"), ("wait", 3.5),
-        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1400), ("wait", 3.0),
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.0),
+        ("key", "home"), ("wait", 3.0),
+        ("swipe", 300, 1300, 900, 1300), ("wait", 3.0),
+        ("key", "home"), ("wait", 3.0),
     ]
 
 
 def scene_ore() -> list[tuple]:
     """
     La griglia di ORE. Nessuna firma: si apre e si guarda, le probabilita' vere lette dal
-    programma. E' la scena del premio ORE, quella che da sola vale la candidatura.
+    programma. E' la scena del premio ORE.
 
-    Il cammino: la scheda ORE sta in fondo al portafoglio, sotto «IN DEFI», e il
-    portafoglio parte chiuso. Prima si apre, poi si scende, poi si tocca.
+    La scheda ORE sta in fondo al portafoglio, sotto «IN DEFI», e la sezione puo' essere
+    chiusa: si cerca scorrendo invece di toccare l'intestazione, che e' un interruttore.
     """
     return [
-        ("launch",), ("wait", 1.5),
-        ("close",), ("wait", 1.2),
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
         ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
         ("seek", "ORE", 6), ("wait", 6.0),
         ("swipe", 600, 1900, 600, 1300), ("wait", 4.0),
@@ -338,35 +279,78 @@ def scene_ore() -> list[tuple]:
     ]
 
 
-def scene_close() -> list[tuple]:
-    """Il registro della giornata, poi il mercato, poi la home."""
+def scene_crowd() -> list[tuple]:
+    """
+    Scout: prima il censimento, che e' il numero che vale il premio SKR, poi la diretta,
+    le balene e la pagina di una persona.
+    """
     return [
-        # La freccia dentro l'app, non il tasto indietro del telefono: quello, su una
-        # pagina che non ha niente sopra, esce dall'app, e da li' in poi i tocchi
-        # finiscono sull'app di qualcun altro.
-        # Mai il tasto indietro del telefono: su una pagina che non ha niente sopra
-        # esce dall'app, e da li' in poi i tocchi finiscono sull'app di qualcun altro.
-        # La freccia dell'app sta dove sta, anche quando non c'e': un tocco a vuoto
-        # sull'intestazione non fa niente.
-        ("launch",), ("wait", 1.5),
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
+        ("text", "Scout"), ("wait", 5.0),
+        ("text", "Holding"), ("wait", 5.0),
+        ("swipe", 600, 1900, 600, 1300), ("wait", 3.0),
+        ("text", "Whales"), ("wait", 4.0),
+        ("text", "Live"), ("wait", 3.0),
+        ("tap", 120, 551), ("wait", 5.0),
+    ]
+
+
+def scene_swap() -> list[tuple]:
+    """Lo swap con la rotta e la riga sulla coda privata, poi il preventivo del ponte."""
+    return [
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 2.0),
+        ("text", "Swap"), ("wait", 4.5),
+        ("swipe", 600, 1800, 600, 1300), ("wait", 4.0),
         ("close",), ("wait", 1.5),
-        ("tap", TABS["receipts"], TAB_Y), ("wait", 3.0),
-        ("swipe", 600, 1900, 600, 1200), ("wait", 2.5),
-        ("tap", TABS["market"], TAB_Y), ("wait", 3.0),
-        ("tap", TABS["wallet"], TAB_Y), ("wait", 3.0),
+        ("text", "Bridge"), ("wait", 5.0),
+    ]
+
+
+def scene_health() -> list[tuple]:
+    """Quello che il portafoglio si controlla da solo: punteggio, rent, deleghe, contatti."""
+    return [
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
+        ("tap", TABS["settings"], TAB_Y), ("wait", 2.2),
+        ("text", "Wallet and safety"), ("wait", 3.5),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+        ("swipe", 600, 1900, 600, 1350), ("wait", 3.0),
+    ]
+
+
+def scene_market() -> list[tuple]:
+    """Il mercato con una moneta e il confronto di capitalizzazione, poi il registro."""
+    return [
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
+        ("tap", TABS["market"], TAB_Y), ("wait", 3.5),
+        ("swipe", 600, 1900, 600, 1400), ("wait", 2.0),
+        ("text", "Bitcoin"), ("wait", 5.0),
+        ("swipe", 600, 1900, 600, 1300), ("wait", 4.0),
+        ("close",), ("wait", 1.5),
+        ("tap", TABS["receipts"], TAB_Y), ("wait", 4.0),
+        ("swipe", 600, 1900, 600, 1300), ("wait", 3.0),
+    ]
+
+
+def scene_close() -> list[tuple]:
+    """La chiusura: la home, ferma, col marchio del lanciatore."""
+    return [
+        ("launch",), ("wait", 1.5), ("close",), ("wait", 1.2),
+        ("tap", TABS["wallet"], TAB_Y), ("wait", 5.0),
     ]
 
 
 AUTO: dict[str, tuple[float, callable]] = {
-    "door": (9.0, scene_door),
-    "hook": (9.0, scene_hook),
-    "receipt": (24.0, scene_receipt),
-    "wallet": (34.0, scene_wallet),
-    "agent": (20.0, scene_agent),
-    "health": (22.0, scene_health),
+    "receipt": (26.0, scene_receipt),
+    "gate": (18.0, scene_gate),
+    "bubble": (14.0, scene_bubble),
     "ore": (26.0, scene_ore),
-    "crowd": (34.0, scene_crowd),
-    "close": (16.0, scene_close),
+    "crowd": (36.0, scene_crowd),
+    "swap": (22.0, scene_swap),
+    "health": (20.0, scene_health),
+    "market": (26.0, scene_market),
+    "close": (10.0, scene_close),
 }
 
 

@@ -16,55 +16,94 @@ The wallet is Totem. Say the name once at the start and once at the end, nowhere
 
 ## Beat sheet
 
-**0:00 to 0:12, the hook**
-Voice: "A phone can ask you to sign something and show you nothing but a name and a button. This is Totem."
-Show: the attacker dApp asking to sign. Cut to our receipt appearing over it.
+Fourteen beats, 2:42. The order is by force, not by the order the features were built: the
+thesis first, then the thing hardest to copy, then the two prizes that are handed out by hand
+(ORE 30k, SKR 10k), then the hardware only a Seeker has, then the rest.
 
-**0:12 to 0:45, the receipt**
-Voice: "Every transaction is simulated on chain first. The receipt is built from what the network says will happen, not from what the app claims."
-Show: the drain attempt. The receipt says the real amount and the real recipient, and the risk in red. Reject.
-Then the unlimited approval: severe risk, the signature is blocked before the Seed Vault is even asked.
+**0:00 · 6s · the mark** — drawn, not filmed: the fingerprint sheet is a secure window and
+records black. Music only.
 
-**0:40 to 1:00, the wallet itself**
-Voice: "It is a whole wallet, not a demo. Everything the phone holds on one page, what it is worth today, what is staked, what is working in DeFi, and every coin on Solana with its chart."
-Show: the home with the balance and the eight actions, the portfolio, the staking and DeFi cards, then Market and one coin with its chart.
+**0:06 · 16s · the blind signature, stopped** — no hands
+Voice: "A wallet shows you a name and a button, and you sign away everything. Totem simulates
+the transaction on chain and shows what will actually happen. This one is blocked before the
+Seed Vault is even asked."
+Show: Settings, TRY AN ATTACK, Wallet drainer. The real amount, the two red risks, and
+"Signature blocked: severe risk. The Seed Vault is never even asked."
 
-**0:45 to 1:05, signing something real**
-Voice: "A real payment reads the same way. Hold to confirm, then the Seed Vault."
-Show: Send, the receipt, the address trust badge, hold, fingerprint, the entry landing in the ledger.
-Then tap "Show the proof": a QR signed by this phone, verified by the other device on screen.
+**0:22 · 12s · a real payment reads the same** — fingerprint
+Voice: "A real payment reads the same way. Hold to confirm, then the Seed Vault. The keys never
+leave it."
+Show: Send, the receipt, the trust badge, hold, the print, the row landing in the ledger.
 
-**1:05 to 1:40, the agent**
-Voice: "A budget kept apart from the wallet, inside a collar you set. It never sees the seed. It looks for a coin, buys a slice, sells at a target or a stop, and above its limits it has to ask for your fingerprint."
-Show: the first minute card, make a budget, the collar (per move, per day, silent below), the full screen payment.
-Then "Watch it work": the timer ring, the charts with entry, target and stop drawn, the reasoning typed out, the voice saying what it does. Turn the phone sideways for the two chart layout.
+**0:34 · 22s · the agent, inside a collar** — fingerprint, and an open budget with positions
+Voice: "The agent gets a budget of its own and never your seed. You set the collar: how much a
+move, how much a day, and above that it has to ask you. Then you watch it work, every step, as
+it happens."
+Show: the budget with the collar, then Watch it work: the timer rings, the charts with entry,
+target and stop drawn, the reasoning typed as it lands. Close on the notification with the
+generated picture and the Sell now button.
 
-**1:40 to 1:58, ORE**
-Voice: "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the grid and says what a square really costs and what it can pay, before you put anything on it. The agent can dig from its budget, under the same collar, and bring the gains home in ORE."
-Show: Dig ORE, the grid with the emptiest squares marked, the outlook line with the expected ORE and the expected cost, hold to dig, the receipt. Then Claim, and the ORE landing in the wallet.
+**0:56 · 12s · the agent that lies, blocked** — no hands
+Voice: "An AI agent never holds a key here. It hands over a transaction and says what it does.
+Totem checks the claim against the real effect. This one lied, and it is blocked."
+Show: from the tester, Agent Gate, lying agent. Refused in red, with what does not add up.
 
-**1:20 to 1:34, the agent's own page**
-Voice: "The agent has a page of its own: what it may spend, what it has already done, the model it runs on, and a live trace of every step it takes."
-Show: the Agent tab, the budget card with the collar, the last budget's result, the Pro rows.
+**1:08 · 10s · always with you** — no hands
+Voice: "It stays with you: a bubble over any app, and a widget on the home screen, both showing
+what the agent is doing and how the wallet is."
+Show: the bubble dragged over another app, then the widget refreshing itself.
 
-**1:34 to 1:50, the wallet checks itself**
-Voice: "It also checks the wallet itself. Approvals you forgot, accounts holding rent you can reclaim, and pool fees nobody ever collected, read straight from the chain with no key of yours."
-Show: Settings, Wallet and safety: the health score, forgotten money, delegations and accounts, trusted contacts.
+**1:18 · 18s · ORE** — no hands
+Voice: "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the
+program itself and says what a square really costs and what it can pay. The agent can dig from
+its budget, under the same collar, and bring the gains home in ORE."
+Show: the grid with the real odds, the round, the miners, the emptiest squares, the expected
+ORE against the expected cost. Then the Dig ORE switch inside the budget.
 
-**1:58 to 2:15, what nobody else has**
-Voice: "It also reads the crowd it lives in."
-Show: Scout, what the active Seekers are buying, the census card, half of them keep SKR staked with the Guardians, a fact no balance shows.
-Then wallet health: forgotten money, unclaimed pool fees on Orca, Raydium and Meteora, read straight from the chain with no key.
+**1:36 · 14s · the crowd, and the number nobody has** — no hands
+Voice: "Totem reads the crowd it lives in: ten thousand Seeker wallets, and what they are
+buying right now. And a fact no balance shows: half of them keep their SKR staked with the
+Guardians."
+Show: the census card first, big. Then Live and one person's page.
 
-**2:15 to 2:32, the phone itself**
-Voice: "It uses the hardware the Seeker actually has."
-Show: pay by touch between two phones, or write a payment request on an NFC sticker and tap it.
-Show: a hand over the screen, the numbers vanish, the fingerprint brings them back.
+**1:50 · 16s · what only a Seeker does** — second phone, NFC tag
+Voice: "The Seeker has hardware nobody else has. Get paid by touch. Write a payment request on
+a cent sticker. Swap contacts by touching two phones. And prove a payment with a QR this phone
+signed, checked by another phone with no explorer and no network."
+Show: tap between the two phones, the sticker written and tapped, contact tap, then the signed
+proof read by the other phone.
 
-**2:32 to 2:50, the close**
-Voice: "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, on the grid, and on everything the agent does."
-Show: the bridge quote, then the ledger with the day's entries, then the app icon.
-Last line: "Totem. What you see is what you sign."
+**2:06 · 8s · a link for someone with no wallet** — fingerprint
+Voice: "Pay someone who has no wallet at all. The money travels inside a link."
+Show: the gift amount, the link, the page opening on the other phone.
+
+**2:14 · 10s · private swap, and the bridge** — no hands
+Voice: "Swaps go out privately, past the bots that read the public queue. And a bridge to two
+hundred chains, with the receipt first."
+Show: the swap with its route and the private line, then the bridge quote.
+
+**2:24 · 10s · the wallet audits itself** — no hands
+Voice: "It audits itself: approvals you forgot, rent locked in dead accounts, and pool fees
+nobody ever collected, read straight from the chain with no key of yours."
+Show: the health score, forgotten money on Orca, Raydium and Meteora, delegations, burn and
+reclaim.
+
+**2:34 · 10s · the market, and the book** — no hands
+Voice: "Every coin on Solana with its chart, and what yours would be worth with theirs. Every
+signature kept, with what it cost that day."
+Show: favourites, a coin with its chart, "at X's market cap yours would be worth Y". Then the
+ledger with its filters and the P&L card.
+
+**2:44 · 6s · the close** — no hands
+Voice: "Receipt before signature. Everywhere. Totem."
+Show: the mark, still.
+
+### What must not be said, because it is not true
+
+- There is no on-chain stop loss. Jupiter only offers it through a custodial vault. The stop
+  lives in the agent's loop, and the app says so.
+- Forgotten money is found and counted, not collected: the app opens the platform's own page.
+- The collar is enforced on the phone, not on chain, and the app says so.
 
 ## Rules for the cut
 

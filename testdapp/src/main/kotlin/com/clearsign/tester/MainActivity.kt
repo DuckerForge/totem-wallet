@@ -50,27 +50,31 @@ private val INCINERATOR = Base58.decode("1nc1nerator1111111111111111111111111111
 // A wallet nobody has ever used: zero on-chain history (the drainer tell).
 private val FRESH_WALLET = ByteArray(32) { (200 + it * 3 and 0xFF).toByte() }
 
+/**
+ * The attacks this tester can ask for. In English, like the wallet: the tester is on camera in
+ * the demo video, and an Italian label next to an English receipt reads as two different apps.
+ */
 enum class Scenario(val title: String, val expected: String) {
-    SIMPLE_TRANSFER("💸 Trasferimento SOL", "Invii una piccola somma di SOL"),
-    HIDDEN_FEE("🕵️ Fee nascosta", "Un invio + una 2ª uscita 'nascosta'"),
-    SPL_TRANSFER("🪙 Trasferimento token SPL", "Invii un tuo token (importo minimo)"),
-    UNLIMITED_APPROVAL("♾️ Approvazione illimitata", "DANGER: delega di spesa senza limiti"),
-    SET_AUTHORITY("🔑 Cambio autorità", "DANGER: cede il controllo di un account"),
-    CLOSE_ACCOUNT("🗑️ Chiusura account", "Chiude un token account e recupera il rent"),
-    MEMO_MULTI("🧾 Memo + transfer + fee", "Multi-istruzione con memo e fee"),
-    PRIORITY_FEE("⚡ Priority fee + transfer", "ComputeBudget (fee di priorità) + invio"),
-    NFT_MINT("🎨 Mint (best-effort)", "InitializeMint di un nuovo token/NFT"),
-    SWAP("🔄 Swap reale (Jupiter)", "Swap SOL→USDC (v0 + lookup tables)"),
-    BUNDLE_3TX("📦 Bundle 3 tx", "3 transazioni in un colpo: le verifichi TUTTE, non solo la 1ª"),
-    BURN_ADDRESS("🔥 Invio a indirizzo di burn", "DANGER: destinatario in blocklist (incinerator)"),
-    DRAIN_ALL("🪣 Svuota il wallet", "DANGER: il 95% del saldo a un wallet senza storico"),
-    ASSIGN_WALLET("🏴‍☠️ Cede il tuo wallet", "DANGER: System Assign del tuo account a un programma"),
-    GASLESS("🎁 Fee pagate da altri", "WARN: fee payer estraneo, tu firmi il trasferimento"),
-    AGENT_HONEST("🤖 Agent Gate · agente onesto", "Un agente AI dichiara un micro-invio; Omni verifica intento vs effetto: coerente ✓ (solo firma)"),
-    AGENT_LIAR("🤖 Agent Gate · agente bugiardo", "DANGER: l'agente dichiara uno swap SOL→USDC ma la tx è un invio → bloccato"),
+    SIMPLE_TRANSFER("\uD83D\uDCB8 Send SOL", "A small amount of SOL leaves"),
+    HIDDEN_FEE("\uD83D\uDD75\uFE0F Hidden fee", "One transfer plus a second, quiet one"),
+    SPL_TRANSFER("\uD83E\uDE99 Send an SPL token", "One of your tokens, the smallest amount"),
+    UNLIMITED_APPROVAL("\u267E\uFE0F Unlimited approval", "DANGER: spending rights with no cap"),
+    SET_AUTHORITY("\uD83D\uDD11 Change authority", "DANGER: hands over control of an account"),
+    CLOSE_ACCOUNT("\uD83D\uDDD1\uFE0F Close an account", "Closes a token account and takes the rent back"),
+    MEMO_MULTI("\uD83E\uDDFE Memo, transfer, fee", "Several instructions at once, with a memo"),
+    PRIORITY_FEE("\u26A1 Priority fee and transfer", "ComputeBudget plus a send"),
+    NFT_MINT("\uD83C\uDFA8 Mint, best effort", "InitializeMint for a new token or NFT"),
+    SWAP("\uD83D\uDD04 A real swap (Jupiter)", "SOL to USDC, v0 with lookup tables"),
+    BUNDLE_3TX("\uD83D\uDCE6 Three at once", "Three transactions in one ask: you read them ALL, not just the first"),
+    BURN_ADDRESS("\uD83D\uDD25 Send to a burn address", "DANGER: the recipient is on the blocklist"),
+    DRAIN_ALL("\uD83E\uDDFA Drain the wallet", "DANGER: 95% of the balance to a wallet with no history"),
+    ASSIGN_WALLET("\uD83C\uDFF4\u200D\u2620\uFE0F Give your wallet away", "DANGER: System Assign of your account to a program"),
+    GASLESS("\uD83C\uDF81 Someone else pays the fee", "WARN: a stranger pays, you sign the transfer"),
+    AGENT_HONEST("\uD83E\uDD16 Agent Gate, honest agent", "An AI agent declares a tiny send; the wallet checks claim against effect: they agree \u2713 (sign only)"),
+    AGENT_LIAR("\uD83E\uDD16 Agent Gate, lying agent", "DANGER: the agent declares a SOL to USDC swap, the transaction is a send \u2192 blocked"),
     // The worst case at once: how the screen stacks when the warnings are six, not one, and
     // whether the amount, the map and the button stay reachable.
-    ALL_ALARMS("🚨 Tutti gli allarmi insieme", "DANGER: burn + delega illimitata + cambio autorità + fee nascosta + wallet nuovo"),
+    ALL_ALARMS("\uD83D\uDEA8 Every alarm at once", "DANGER: burn address, unlimited approval, authority change, hidden fee, brand new wallet"),
 }
 
 class MainActivity : ComponentActivity() {
@@ -93,7 +97,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    var status by remember { mutableStateOf("Scegli uno scenario → va a ClearSign via MWA.") }
+                    var status by remember { mutableStateOf("Pick an attack. It goes to the wallet over Mobile Wallet Adapter.") }
                     Column(
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -121,7 +125,7 @@ class MainActivity : ComponentActivity() {
 
     private fun run(scenario: Scenario, setStatus: (String) -> Unit) {
         if (scenario == Scenario.AGENT_HONEST || scenario == Scenario.AGENT_LIAR) { runAgent(scenario, setStatus); return }
-        setStatus("${scenario.title}\nAtteso: ${scenario.expected}\n\nApro ClearSign… (solo firma, non invio)")
+        setStatus("${scenario.title}\nExpected: ${scenario.expected}\n\nOpening the wallet… (sign only, nothing is sent)")
         lifecycleScope.launch {
             val result = mwa.transact(sender) { auth ->
                 val feePayer = auth.publicKey
@@ -164,7 +168,7 @@ class MainActivity : ComponentActivity() {
                     put("reason", "Demo: micro-invio di prova dichiarato correttamente")
                 } else {
                     put("action", "swap"); put("outMint", "SOL"); put("outAmount", 0.000001); put("inMint", "USDC"); put("inAmount", 0.0001)
-                    put("reason", "Demo: l'agente MENTE — dichiara uno swap, la transazione è un invio")
+                    put("reason", "Demo: the agent LIES. It declares a swap; the transaction is a send.")
                 }
             }
             val uri = Uri.Builder().scheme("apex").authority("agent").path("/sign")
@@ -173,9 +177,9 @@ class MainActivity : ComponentActivity() {
                 .appendQueryParameter("account", ownerB58)
                 .appendQueryParameter("send", "0")
                 .build()
-            setStatus("${scenario.title}\n2/2 apro Apex Agent Gate con l'intento dichiarato:\n${intent.getString("action")} ${intent.optString("outAmount")} ${intent.optString("outMint")}" + (if (scenario == Scenario.AGENT_LIAR) " → USDC (falso)" else " → ${Base58.encode(RECIPIENT).take(6)}…"))
+            setStatus("${scenario.title}\n2/2 opening Agent Gate with the declared intent:\n${intent.getString("action")} ${intent.optString("outAmount")} ${intent.optString("outMint")}" + (if (scenario == Scenario.AGENT_LIAR) " → USDC (false)" else " → ${Base58.encode(RECIPIENT).take(6)}…"))
             runCatching { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
-                .onFailure { setStatus("❌ Apex non installato o Agent Gate non disponibile: ${it.message}") }
+                .onFailure { setStatus("❌ The wallet is not installed, or Agent Gate is unavailable: ${it.message}") }
         }
     }
 

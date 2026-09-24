@@ -43,104 +43,106 @@ class Beat:
 
 
 SCRIPT: list[Beat] = [
-    # La porta non e' piu' una scena: l'apertura disegnata in `intro.py` racconta la
-    # stessa cosa e la racconta intera, mentre sul telefono il riquadro dell'impronta la
-    # copre dal primo fotogramma. Due volte il marchio in dieci secondi e' una volta di
-    # troppo.
+    # L'ordine e' per forza, non per come sono nate le funzioni: la tesi, poi la cosa piu'
+    # difficile da copiare, poi i due premi che si assegnano a mano (ORE 30k, SKR 10k), poi
+    # l'hardware che solo un Seeker ha. Chi guarda si ferma presto, e i premi li assegna
+    # qualcuno che il video lo guarda fino a dove regge.
+    #
+    # La porta non c'e': l'apertura la disegna `intro.py`, perche' sul telefono il riquadro
+    # dell'impronta e' una finestra protetta e la registrazione esce nera.
     Beat(
-        "hook", 9.0, "01 · blind",
-        "A phone can ask you to sign something and show you nothing but a name and a button.",
-        "La dApp che chiede di firmare, con il suo nome e un tasto e basta.",
-        start=0.0,
+        "receipt", 16.0, "01 \u00b7 the blind signature",
+        "A wallet shows you a name and a button, and you sign away everything. Totem simulates "
+        "the transaction on chain and shows what will actually happen. This one is blocked "
+        "before the Seed Vault is even asked.",
+        "Impostazioni, TRY AN ATTACK, Wallet drainer: la cifra vera, i due rischi in rosso, "
+        "la firma bloccata.",
     ),
     Beat(
-        # il cammino fino alla dApp sta in testa al girato: si riprende da dove
-        # lo scontrino e' in pagina.
-        "receipt", 33.0, "02 · the receipt",
-        "Every transaction is simulated on chain first. The receipt is built from what the "
-        "network says will happen, not from what the app claims.",
-        "Dal :testdapp: il drain, lo scontrino che dice la cifra vera e il rischio in rosso, "
-        "rifiutato. Poi l'approvazione illimitata: pericolo, un tocco solo bloccato.",
-        start=0.0,
-    ),
-    Beat(
-        "wallet", 20.0, "03 · the wallet",
-        "It is a whole wallet, not a demo. Everything the phone holds on one page, what it is "
-        "worth today, what is staked, what is working in DeFi, and every coin on Solana with "
-        "its chart.",
-        "La home col saldo e le otto azioni, il portafoglio, lo staking e la DeFi, poi Mercato "
-        "e una moneta col suo grafico.",
-    ),
-    Beat(
-        "sign", 20.0, "04 · a real payment",
-        "A real payment reads the same way. Hold to confirm, then the Seed Vault.",
-        "Manda, lo scontrino, la fiducia dell'indirizzo, tieni premuto. STACCO. "
-        "Riprende dal registro con il valore in euro, poi la prova QR.",
+        "sign", 12.0, "02 \u00b7 a real payment",
+        "A real payment reads the same way. Hold to confirm, then the Seed Vault. The keys "
+        "never leave it.",
+        "Invia, lo scontrino, la fiducia dell'indirizzo, tieni premuto, l'impronta, la riga "
+        "nel registro.",
         hands=True,
     ),
     Beat(
-        "budget", 20.0, "05 · the budget",
-        "A budget kept apart from the wallet. It never sees the seed.",
-        "La paghetta: creala, il collare coi tetti, la riga del calcolo in dollari.",
+        "agent", 22.0, "03 \u00b7 the agent, in a collar",
+        "The agent gets a budget of its own and never your seed. You set the collar: how much "
+        "a move, how much a day, and above that it has to ask you. Then you watch it work, "
+        "every step, as it happens.",
+        "La paghetta col collare, poi Guardalo lavorare: anelli, grafici con entrata, "
+        "obiettivo e stop, i pensieri battuti. Chiudi sulla notifica col disegno.",
         hands=True,
     ),
     Beat(
-        "gate", 20.0, "06 · the agent that lies",
-        "It looks for a coin, buys a slice, sells at a target or a stop, and asks for a "
-        "fingerprint above its limits.",
-        "scripts/test-agent.sh honest: 'Intento agente OK', si firma. Poi liar: dichiara "
-        "0,1 SOL, la transazione ne manda 5 a un indirizzo mai visto. Bloccato, in rosso.",
-        hands=True,
+        "gate", 12.0, "04 \u00b7 the agent that lies",
+        "An AI agent never holds a key here. It hands over a transaction and says what it "
+        "does. Totem checks the claim against the real effect. This one lied, and it is "
+        "blocked.",
+        "Dal tester: Agent Gate, lying agent. Rifiutato in rosso, con cosa non torna.",
     ),
     Beat(
-        "agent", 16.0, "07 · the agent's page",
-        "The agent has a page of its own: what it may spend, what it has already done, the "
-        "model it runs on, and a live trace of every step it takes.",
-        "La scheda Agente: la paghetta col collare, il risultato dell'ultima, le righe Pro.",
+        "bubble", 10.0, "05 \u00b7 always with you",
+        "It stays with you: a bubble over any app, and a widget on the home screen, both "
+        "showing what the agent is doing and how the wallet is.",
+        "La bolla trascinata sopra un'altra app, poi il widget che si aggiorna da solo.",
     ),
     Beat(
-        "health", 18.0, "08 · the wallet checks itself",
-        "It also checks the wallet itself. Approvals you forgot, accounts holding rent you can "
-        "reclaim, and pool fees nobody ever collected, read straight from the chain with no key "
-        "of yours.",
-        "Impostazioni, Wallet and safety: il punteggio, i soldi dimenticati, le deleghe e i "
-        "conti, i contatti fidati.",
-    ),
-    Beat(
-        # Questa scena vale trentamila dollari: e' il premio che ORE ha messo il 21/09 per
-        # chi lo integra davvero, e nella scaletta non c'era affatto.
-        "ore", 22.0, "09 · ORE",
+        "ore", 18.0, "06 \u00b7 ORE",
         "ORE is a game on Solana: a five by five grid, one round a minute. Totem reads the "
-        "grid and says what a square really costs and what it can pay, before you put "
-        "anything on it. The agent can dig from its budget, under the same collar, and bring "
-        "the gains home in ORE.",
-        "La griglia cinque per cinque, le caselle piu' vuote segnate, la riga con l'ORE "
-        "atteso e il costo atteso. Niente firma: si guarda la griglia.",
-        start=13.0,
+        "program itself and says what a square really costs and what it can pay. The agent can "
+        "dig from its budget, under the same collar, and bring the gains home in ORE.",
+        "La griglia con le probabilita' vere, il giro, i minatori, le caselle piu' vuote, "
+        "l'ORE atteso contro il costo atteso. Poi l'interruttore Dig ORE nella paghetta.",
     ),
     Beat(
-        "crowd", 10.0, "10 · the crowd",
-        "It also reads the crowd it lives in.",
-        "Il censimento: meta' dei Seeker tiene SKR in staking dai Guardiani. Poi i soldi "
-        "dimenticati, le commissioni mai riscosse lette dalla catena senza chiavi.",
-        start=0.0,
+        "crowd", 14.0, "07 \u00b7 the crowd",
+        "Totem reads the crowd it lives in: ten thousand Seeker wallets, and what they are "
+        "buying right now. And a fact no balance shows: half of them keep their SKR staked "
+        "with the Guardians.",
+        "Prima la scheda del censimento, grande. Poi la diretta e la pagina di una persona.",
     ),
     Beat(
-        "hardware", 25.0, "11 · the phone itself",
-        "It uses the hardware the Seeker actually has.",
-        "Pagamento col tocco fra due telefoni, oppure la richiesta scritta su un adesivo NFC. "
-        "Poi la mano sullo schermo: i numeri spariscono, l'impronta li riporta.",
+        "hardware", 16.0, "08 \u00b7 what only a Seeker does",
+        "The Seeker has hardware nobody else has. Get paid by touch. Write a payment request "
+        "on a cent sticker. Swap contacts by touching two phones. And prove a payment with a "
+        "QR this phone signed, checked by another phone with no explorer and no network.",
+        "Tocco fra i due telefoni, l'adesivo scritto e toccato, lo scambio contatti, e la "
+        "prova firmata letta dall'altro telefono.",
+        hands=True,
     ),
     Beat(
-        "close", 20.0, "12 · everywhere",
-        "Receipt before signature, everywhere. On a dApp, on a Blink, on a bridge, and on "
-        "everything the agent does.",
-        "Il preventivo del ponte, il registro della giornata, l'icona. Ultima riga: "
-        "What you see is what you sign.",
-        start=0.0,
+        "gift", 8.0, "09 \u00b7 a link for someone with no wallet",
+        "Pay someone who has no wallet at all. The money travels inside a link.",
+        "La cifra, il link, e la pagina che si apre sull'altro telefono.",
+        hands=True,
+    ),
+    Beat(
+        "swap", 10.0, "10 \u00b7 private swap, and the bridge",
+        "Swaps go out privately, past the bots that read the public queue. And a bridge to two "
+        "hundred chains, with the receipt first.",
+        "Lo swap con la rotta e la riga sulla coda privata, poi il preventivo del ponte.",
+    ),
+    Beat(
+        "health", 10.0, "11 \u00b7 the wallet audits itself",
+        "It audits itself: approvals you forgot, rent locked in dead accounts, and pool fees "
+        "nobody ever collected, read straight from the chain with no key of yours.",
+        "Il punteggio, i soldi dimenticati su Orca, Raydium e Meteora, le deleghe, i conti "
+        "vuoti col rent, brucia e recupera.",
+    ),
+    Beat(
+        "market", 10.0, "12 \u00b7 the market, and the book",
+        "Every coin on Solana with its chart, and what yours would be worth with theirs. Every "
+        "signature kept, with what it cost that day.",
+        "Preferiti, una moneta col grafico, at X's market cap. Poi il registro e la scheda P&L.",
+    ),
+    Beat(
+        "close", 6.0, "13 \u00b7 everywhere",
+        "Receipt before signature. Everywhere. Totem.",
+        "Il marchio, fermo.",
     ),
 ]
-
 
 def total() -> float:
     return sum(b.seconds for b in SCRIPT)

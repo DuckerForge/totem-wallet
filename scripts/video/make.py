@@ -22,6 +22,7 @@ Uso:
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,7 +41,9 @@ FADE = 0.5
 # La musica sotto. Sta piano per conto suo, e quando parla la voce si abbassa ancora:
 # non a mano scena per scena, ma con un compressore che la ascolta e la scansa. Cosi'
 # resta giusta anche se una frase cambia lunghezza.
-MUSIC = Path("/home/oliver/Scrivania/irene/Turn+It+Up.mp3")
+# Il brano non sta nel repo: non e' nostro, e un percorso di casa scritto qui dentro dice
+# il nome dell'utente e di una cartella che non c'entra. Si passa con TOTEM_MUSIC.
+MUSIC = Path(os.environ.get("TOTEM_MUSIC", ""))
 MUSIC_LEVEL = 0.42      # il suo posto sotto la voce
 MUSIC_DUCK = 7.0        # quanto la spinge giu' la voce
 

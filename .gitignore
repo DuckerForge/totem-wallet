@@ -25,11 +25,32 @@ reputation/test-ledger/
 .vscode/
 
 # --- Internal working notes (not for the public repo) ---
+# Non sono segreti: sono gli appunti con cui si lavora, e dicono cosa non e' ancora fatto.
+# Chi giudica il progetto li leggerebbe insieme al codice.
 PROGRESS.md
-SPRINT-2026-09-11.md
+SPRINT-*.md
 WATCHER-RESULT.md
 STATO.md
 ROADMAP.md
+FABLE-LEGGIMI.md
+docs/AUDIT-*.md
+docs/PIANO-*.md
+docs/CONSEGNA-*.md
+docs/CANDIDATURA-*.md
+docs/SKR-ANSWER.txt
+docs/MOBILE-ANSWER.txt
+
+# --- Il girato del video, e quello che ne esce ---
+# Sono registrazioni dello schermo del portafoglio vero, e pesano centinaia di megabyte:
+# uno solo di quei file supera il limite che GitHub accetta.
+scripts/video/shot/
+scripts/video/build/
+scripts/video/voice/
+*.mp4
+*.wav
+
+# --- Il file vero del worker, che dice quale infrastruttura c'e' dietro ---
+tools/seeker-worker/wrangler.toml
 
 # Roba compilata di Python, generata girando gli strumenti.
 __pycache__/

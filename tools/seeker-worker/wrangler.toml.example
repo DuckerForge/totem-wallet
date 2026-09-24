@@ -1,0 +1,33 @@
+# Copia questo in wrangler.toml e mettici i tuoi. Il file vero non si committa: l'id del
+# namespace e l'indirizzo dell'archivio dicono quale infrastruttura c'e' dietro, e
+# l'archivio ospita anche altri progetti.
+name = "seeker-crowd"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+# Detto esplicitamente, così un deploy fatto da un'altra macchina si comporta uguale.
+workers_dev = true
+preview_urls = false
+
+# Ogni dieci minuti, cioè 144 giri al giorno. Il piano gratuito dà 50 chiamate in
+# uscita per esecuzione e 1.000 scritture KV al giorno: 144 giri per al più tre
+# scritture, cioè saldi, stato, e il pubblicato solo quando cambia, fanno circa
+# 430 e stanno sotto il tetto. Quello che il tetto non reggeva erano le letture
+# degli utenti, che ora vanno in archivio su Firebase e non costano scritture.
+[triggers]
+# Ai dieci la scansione. Cinque minuti dopo, le facce della diretta scaldate in
+# archivio: due esecuzioni separate perche' le cinquanta chiamate in uscita del
+# piano gratuito si contano per esecuzione.
+# E ogni minuto il giro di ORE appena chiuso, in archivio: due chiamate RPC e una
+# scrittura Firebase per giro, zero sui telefoni. Vedi src/ore.js.
+crons = ["*/10 * * * *", "5-59/10 * * * *", "* * * * *"]
+
+[[kv_namespaces]]
+binding = "SEEKER"
+id = "<your KV namespace id>"
+
+[vars]
+# L'archivio condiviso. Non e' un segreto: e' solo l'indirizzo. Il segreto che
+# permette di scrivere sta in FB_SECRET, messo con `wrangler secret put`.
+# Tutto quello che scriviamo vive sotto /clearsign e nient'altro.
+FB_URL = "https://<your-project>-default-rtdb.<region>.firebasedatabase.app"

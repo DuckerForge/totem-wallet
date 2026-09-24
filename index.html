@@ -114,14 +114,16 @@
     <div class="wrap split">
       <div>
         <p class="eyebrow">01 · The problem</p>
-        <h2>A name, a button, and your money is gone</h2>
-        <p>When an app asks for a signature you see its name and an Approve button. You do not see
-        how much leaves, to whom, or whether you are handing someone the right to take your tokens
-        whenever they like. <strong>This is blind signing, and it is the first cause of stolen crypto.</strong></p>
+        <h2>You see the amount. You do not see who gets it.</h2>
+        <p>A wallet shows you a name, a number and a network fee, and an Approve button. What it
+        does not show you is <strong>where the money actually goes</strong>. The addresses turn up
+        afterwards, in an explorer, when the transaction is already signed. If one of them belongs
+        to a scammer, you find that out too late.</p>
+        <p>It does not show what you are granting, either: an unlimited approval looks like an
+        ordinary confirmation, and it keeps working until you revoke it.</p>
         <p>The Seed Vault signs whatever the wallet hands it. The hardware is not the weak part.
-        The screen in front of it is.</p>
-        <p>And agents make it worse: to trade for you, an AI needs a key, and a key in an agent's
-        hands is a key in a prompt injection's hands.</p>
+        The screen in front of it is. And agents make it worse: to trade for you, an AI needs a
+        key, and a key in an agent's hands is a key in a prompt injection's hands.</p>
       </div>
       <img class="shot" src="img/door.jpg" alt="The Totem door screen, the mark lit on a dark ground.">
     </div>
@@ -130,7 +132,29 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">02 · The answer</p>
+        <p class="eyebrow">02 · What a signature should show</p>
+        <h2>Who receives it, and whether you know them</h2>
+        <p>This is the screen before the fingerprint. Not a summary the app wrote: the effect the
+        network says the transaction will have.</p>
+        <ul>
+          <li><b>The recipient, by name</b> when it is someone you have saved, with a trust badge:
+          a contact of yours, an address you have paid before, or one you have never seen.</li>
+          <li><b>A map of where the money goes</b>, every leg of it, including the splits a swap
+          hides across several wallets.</li>
+          <li><b>The fee, separately</b>, so it is never confused with what you are sending.</li>
+          <li><b>Look-alike detection</b> against your own contacts: an address that matches one of
+          yours at the ends and differs in the middle is marked, because that is how address
+          poisoning works.</li>
+        </ul>
+      </div>
+      <img class="shot" src="img/preview.jpg" alt="The receipt before signing: you pay 1.5 SOL, a map from you to Alice, and Alice marked as a trusted contact.">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">03 · The answer</p>
         <h2>A receipt before the fingerprint</h2>
         <p>Every request, from a dApp over Mobile Wallet Adapter, from Send, Swap, a Blink, the
         bridge, an NFC sticker or the agent, is <strong>simulated on chain first</strong> and shown
@@ -146,7 +170,7 @@
   <section>
     <div class="wrap">
       <div>
-        <p class="eyebrow">03 · How it reads the truth</p>
+        <p class="eyebrow">04 · How it reads the truth</p>
         <h2>The effect, never the claim</h2>
         <ul>
           <li><b>On-chain simulation</b>, legacy and v0 with lookup tables: real balance changes,
@@ -172,7 +196,7 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">04 · The agent</p>
+        <p class="eyebrow">05 · The agent</p>
         <h2>It gets a budget, never your seed</h2>
         <p>You open a budget: a second key, created on the phone, capped in SOL and in days, apart
         from your wallet. The agent hunts across Solana with the gates the winning bots use, buys a
@@ -191,7 +215,7 @@
   <section>
     <div class="wrap">
       <div>
-        <p class="eyebrow">05 · The agent that lies</p>
+        <p class="eyebrow">06 · The agent that lies</p>
         <h2>An AI hands over a transaction. We check it against the chain.</h2>
         <p>An agent running on a computer holds no key here. It gives the phone a transaction and a
         declared intent: what it says it is doing. Totem simulates the real bytes and compares the
@@ -212,7 +236,7 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">06 · ORE</p>
+        <p class="eyebrow">07 · ORE</p>
         <h2>The grid, read from the program itself</h2>
         <p>ORE is a game on Solana: a five by five grid, one round a minute. It is written in Steel,
         so there is no IDL to lean on. Totem decodes the program by hand and shows
@@ -231,7 +255,7 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">07 · The Seeker, and SKR</p>
+        <p class="eyebrow">08 · The Seeker, and SKR</p>
         <h2>A number no balance shows</h2>
         <p>The Genesis Token is one per device, so the crowd is real people holding a Seeker:
         <strong>120,520 wallets</strong>, enumerated once on chain, about ten and a half thousand
@@ -252,7 +276,7 @@
   <section>
     <div class="wrap split">
       <div>
-        <p class="eyebrow">08 · Why it sticks</p>
+        <p class="eyebrow">09 · Why it sticks</p>
         <h2>It stays with you when the app is closed</h2>
         <ul>
           <li><b>A bubble over any app</b> and a widget on the home screen, both showing what the
@@ -272,7 +296,7 @@
   <section>
     <div class="wrap">
       <div>
-        <p class="eyebrow">09 · Try it</p>
+        <p class="eyebrow">10 · Try it</p>
         <h2>Everything here runs on mainnet today</h2>
         <p>Not a port and not a mockup. The repository starts on 11 September 2026, during the
         hackathon, and everything in it is new: Kotlin and Jetpack Compose, a pure-Kotlin safety

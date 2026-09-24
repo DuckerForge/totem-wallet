@@ -47,6 +47,7 @@
      permesso resta aperto qui e la stretta la fa AgentLink.isLocal, che rifiuta
      un http verso internet. Ogni altro indirizzo dell'app e' https. -->
 <application
+        android:name=".TotemApp"
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"

@@ -34,11 +34,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The mark, made of two phones. A line of light writes itself on the dark, violet to cyan; two
- * phones light up under it, already posed, and the line turns out to be the fold between them,
- * the V of the mark; the phones leave and the mark stays. Stroke first: with the phones first it
- * read as a V of phones with a line added. The V is two phones touching, the thing this app does.
- * Rules: no stars, nothing falling, one motion at a time, a breath of silence at the end.
+ * The mark: a Seeker with wings. A line of light writes itself up the dark, violet to cyan;
+ * the Seeker lights up under it, and the line turns out to be its right edge; behind it the two
+ * panels of the old V open as wings, the thunderbird; then the scene settles on the mark itself.
+ * Same geometry as `scripts/make_totem_mark.py`, which paints the bitmap, so the door lands on
+ * the launcher's own image. Rules: no stars, nothing falling, one motion at a time, a breath of
+ * silence at the end.
  */
 @Composable
 internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
@@ -67,117 +68,93 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val cx = w / 2f
         val cy = h * 0.17f
 
-        // The phones' V is the mark's V, taken by laying the two phone silhouettes over the icon
-        // until they fell into it: vertex low at 0.82 of the side, arms 38 degrees off vertical.
-        // Reading it off a crop of lines gave them much narrower, because the bottom of the image is something else.
-        val vertex = Offset(cx, cy + d * 0.320f)
-        val armX = d * 0.480f
-        val armY = d * 0.615f
-        val leftTip = Offset(cx - armX, vertex.y - armY)
-        val rightTip = Offset(cx + armX, vertex.y - armY)
-        val armLen = hypot(armX, armY)
+        // The phone and the wings, measured in the bitmap: the subject fills 0.92 of the
+        // square, the phone is 0.58 of that and sits a little under the middle.
+        val sq = d * 0.92f
+        val phoneLen = sq * 0.58f
+        val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
+        val pc = Offset(cx, cy + sq * 0.12f)
 
         // --- the timing, which is the story -----------------------------------------------
-        // Stroke first, then what it is made of. A line of light draws itself on the dark and for a
-        // moment is the only thing on screen: the mark writing itself. Lit and still, the two Seekers
-        // light up under it, already in place, and the line turns out to be the fold between two
-        // phones touching. Then the phones leave into the light and the mark stays.
         val spark = ease(seg(t, 0.05f, 0.30f))
-        // A still beat with the stroke lit and nothing under it. Without it the phones
-        // would enter while it is still being drawn, and neither the line writing
-        // itself nor their arrival would show.
+        // A still beat with the stroke lit and nothing under it, then the Seeker lights up,
+        // already in place: no movement, revealed under a light that was already there.
         val arrive = ease(seg(t, 0.38f, 0.55f))
-        // And another beat at the full V, before the dissolve. `become` used to start
-        // too early and the stroke began sliding while still being drawn, so it came
-        // off the phone mid-run.
-        val become = ease(seg(t, 0.68f, 0.84f))
+        // The wings open behind it, from nearly closed to their seat.
+        val wings = ease(seg(t, 0.58f, 0.84f))
+        // And the scene settles on the bitmap, which is the same picture.
+        val become = ease(seg(t, 0.86f, 0.97f))
 
         // Opening the door does not skip the story, it lets it finish and then pulls everything
         // back. `opening` used to push the scene straight to the mark, and the flag stayed up while
         // the door tried the unlock, so after a failed print the phones were never seen again and
         // the door showed a frozen logo. Now the cycle runs on its own and the opening fades it out.
         val leaving = 1f - op * 0.85f
-        // The phones leave fast once started: with a linear fade the body vanishes
-        // but the camera islands stay legible, two blots floating on the mark.
-        val gone = (1f - become).let { it * it * it }
-        // They light up, they do not arrive: no movement, revealed under a light that
-        // was already there.
-        val phoneAlpha = arrive * gone * leaving
-        // No damping at the tail: it hid the cut when the cycle restarted, and the
-        // cycle no longer restarts. Left in, the mark stayed at forty-five percent forever.
-        val markAlpha = become * leaving
 
         // --- il respiro dietro ---------------------------------------------
         drawCircle(
             Brush.radialGradient(
-                listOf(NEON_MID.copy(alpha = 0.05f * (0.3f + 0.7f * max(spark, markAlpha))), Color.Transparent),
+                listOf(NEON_MID.copy(alpha = 0.05f * (0.3f + 0.7f * max(spark, wings))), Color.Transparent),
                 center = Offset(cx, cy), radius = d * 0.95f,
             ),
             radius = d * 0.95f, center = Offset(cx, cy),
         )
 
-        // --- the two phones, while they last --------------------------------
-        val phoneLen = armLen * 0.98f
-        val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
-        // In the light they do not vanish in place: they draw a breath closer, as if
-        // absorbed. The only movement left.
-        val pull = become * d * 0.06f
-        // Where a phone is now. Used twice, by the phones and by the stroke running on
-        // them, and as long as it is one computation they cannot come apart.
-        fun seat(tip: Offset, side: Float): Offset {
-            val mid = Offset((tip.x + vertex.x) / 2f, (tip.y + vertex.y) / 2f)
-            return Offset(
-                mid.x - side * pull,
-                mid.y + pull * 0.4f,
+        // --- the wings, behind ---------------------------------------------
+        val wingW = phoneW * 0.86f
+        val wingL = phoneLen * 0.62f
+        listOf(-1f, 1f).forEach { side ->
+            wing(
+                pivot = Offset(pc.x + side * phoneW * 0.30f, pc.y - phoneLen * 0.10f),
+                degrees = side * Math.toDegrees((0.95f - 0.35f * wings).toDouble()).toFloat(),
+                lift = wingL * (0.55f + 0.15f * wings),
+                wide = wingW, len = wingL,
+                alpha = wings * leaving * (1f - become * 0.6f),
             )
         }
-        if (phoneAlpha > 0.01f) {
-            listOf(leftTip to -1f, rightTip to 1f).forEach { (tip, side) ->
-                val ang = Math.toDegrees(atan2((tip.x - vertex.x).toDouble(), (vertex.y - tip.y).toDouble())).toFloat()
-                // One facing, one from the back. Two identical backs said the same thing twice and the left
-                // one had to be mirrored, a patch. This way both sides of the phone show, and the stroke
-                // runs on the back, where it sits in the mark. They arrive already warm: the light above is on.
-                phone(seat(tip, side), phoneLen, phoneW, ang, phoneAlpha, arrive * (0.4f + spark), back = side > 0f)
-            }
-        }
+
+        // --- the Seeker, from the back --------------------------------------
+        phone(pc, phoneLen, phoneW, 0f, arrive * leaving * (1f - become * 0.6f), arrive * (0.4f + spark), back = true)
 
         // --- the line of light, which comes first ------------------------------------------
-        // Drawn on the dark and kept lit until the phones are gone; the mark carries its own stroke
-        // painted in, so here it vanishes. It runs on the glass, not beside it: same center and length
-        // as the right phone, inset by a corner radius so the round tip stops inside the edge. Drawn
-        // where the phone will be, so when it arrives it lands on it. Before, it ran vertex to tip,
-        // overshot a tenth each side, and stayed put when the phones were pulled in: two objects, not one.
+        // On the phone's right edge, one corner radius in at both ends, written bottom to top:
+        // drawn where the edge will be, so when the phone arrives the line is already its edge.
         if (spark > 0f && become < 1f) {
-            val ux = (rightTip.x - vertex.x) / armLen
-            val uy = (rightTip.y - vertex.y) / armLen
-            // Not in the middle of the phone: on its left edge, the one facing the
-            // vertex. In the mark the stroke is the fold between the two panels, not a
-            // line across one.
-            val edge = Offset(uy, -ux)
-            val c = seat(rightTip, 1f) + edge * (phoneW * 0.46f)
-            val half = phoneLen / 2f - phoneW * 0.15f
-            // In the mark the stroke is not the arm's axis: it starts below the vertex, cuts the V and
-            // leaves at the right tip, steeper. Measured in the image. As the phones dissolve the stroke
-            // slides onto it, so the mark does not arrive, it settles on something already in place.
-            val a = mix(Offset(c.x - ux * half, c.y - uy * half), Offset(cx - d * 0.310f, cy + d * 0.280f), become)
-            val b = mix(Offset(c.x + ux * half, c.y + uy * half), Offset(cx + d * 0.360f, cy - d * 0.330f), become)
-            neon(a, b, spark, (1f - become) * (0.4f + 0.6f * spark), d, (1f - become * 0.8f) * leaving)
+            val x = pc.x + phoneW / 2f
+            val a = Offset(x, pc.y + phoneLen / 2f - phoneLen * 0.092f)
+            val b = Offset(x, pc.y - phoneLen / 2f + phoneLen * 0.092f)
+            neon(a, b, spark, (0.4f + 0.6f * spark), d, (1f - become * 0.8f) * leaving)
         }
 
-        // --- and the mark arrives --------------------------------------------
+        // --- and the mark settles --------------------------------------------
+        val markAlpha = become * leaving
         if (markAlpha > 0.01f) {
-            // It enters a breath larger and settles: arriving without moving is not
-            // arriving.
-            val k = d * (1.06f - 0.06f * become)
             drawImage(
                 image = mark,
                 srcOffset = IntOffset.Zero,
                 srcSize = IntSize(mark.width, mark.height),
-                dstOffset = IntOffset((cx - k / 2f).toInt(), (cy - k / 2f).toInt()),
-                dstSize = IntSize(k.toInt(), k.toInt()),
+                dstOffset = IntOffset((cx - d / 2f).toInt(), (cy - d / 2f).toInt()),
+                dstSize = IntSize(d.toInt(), d.toInt()),
                 alpha = markAlpha,
             )
         }
+    }
+}
+
+/**
+ * One wing: a panel of the old V, the same dark glass as the phone, turned outward around a
+ * pivot near the phone's shoulder and lifted along its own axis so most of it rises above it.
+ */
+private fun DrawScope.wing(pivot: Offset, degrees: Float, lift: Float, wide: Float, len: Float, alpha: Float) {
+    if (alpha <= 0.01f) return
+    rotate(degrees, pivot) {
+        val top = Offset(pivot.x - wide / 2f, pivot.y - lift)
+        val brush = Brush.linearGradient(
+            listOf(Color(0xFF262042), Color(0xFF101424), Color(0xFF090C16)),
+            start = top, end = Offset(top.x + wide, top.y + len),
+        )
+        drawRoundRect(brush, top, Size(wide, len), CornerRadius(wide * 0.28f), alpha = alpha * 0.95f)
+        drawRoundRect(Color(0xFF96AAFF).copy(alpha = 0.22f * alpha), top, Size(wide, len), CornerRadius(wide * 0.28f), style = Stroke(1.dp.toPx()))
     }
 }
 

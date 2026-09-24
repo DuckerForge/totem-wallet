@@ -16,7 +16,7 @@ A Seeker wallet that reads every transaction before you sign it, and an AI agent
 
 > "Hi. I'm building Totem. It makes the Seeker sign only what you can read, and it lets an AI agent trade for you without ever holding your key."
 
-[Screenshot: la porta, il marchio con i due telefoni.]
+[Screenshot: la porta, il marchio con il Seeker e le ali.]
 
 ## Slide 2. The problem
 

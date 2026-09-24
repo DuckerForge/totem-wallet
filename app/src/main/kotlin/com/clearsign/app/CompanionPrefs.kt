@@ -183,36 +183,51 @@ object CompanionPrefs {
         }
 
         /**
-         * The app's mark, for when there is no number to say: the Seeker from the back with its
-         * right edge lit, violet low to cyan high. Small, so only the two things that name it are
-         * drawn, the body and the edge. A dark shadow under it, so it stands out on light themes too.
+         * What the bubble shows when there is no number to say: the agent itself, the same
+         * robot as the Agent tab, drawn on its twenty-four grid so the two are one drawing.
+         * The mark was the wrong answer here: the bubble is the agent, not the app.
          */
         fun mark(alpha: Int) {
-            val ph = r * 1.15f
-            val pw = ph * (69.56f / 150.86f)
-            val left = cx - pw / 2f
-            val top = cy - ph / 2f
-            val corner = ph * 0.092f
-            val body = android.graphics.RectF(left, top, left + pw, top + ph)
+            val s = r * 1.55f
+            val u = s / 24f
+            val ox = cx - s / 2f
+            val oy = cy - s / 2f
+            fun x(v: Float) = ox + v * u
+            fun y(v: Float) = oy + v * u
+
+            val head = android.graphics.RectF(x(4.5f), y(8.5f), x(19.5f), y(19.5f))
+            val smile = android.graphics.Path().apply {
+                moveTo(x(9f), y(16.6f)); quadTo(x(12f), y(18.2f), x(15f), y(16.6f))
+            }
+            // A dark blur under everything, so the robot still reads on a light theme.
             val under = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * 0.16f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                style = Paint.Style.STROKE; strokeWidth = u * 3.4f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
                 color = AColor.argb(if (alpha < 255) 90 else 120, 0, 0, 0)
                 maskFilter = android.graphics.BlurMaskFilter(r * 0.10f, android.graphics.BlurMaskFilter.Blur.NORMAL)
             }
-            c.drawRoundRect(body, corner, corner, under)
-            val shell = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * 0.055f
-                color = AColor.argb(220, 190, 205, 255)
-            }
-            c.drawRoundRect(body, corner, corner, shell)
-            val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = r * 0.10f; strokeCap = Paint.Cap.ROUND
+            c.drawRoundRect(head, u * 2.5f, u * 2.5f, under)
+            c.drawLine(x(12f), y(8.5f), x(12f), y(5.2f), under)
+
+            val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = u * 1.7f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
                 shader = LinearGradient(
-                    cx, top + ph - corner, cx, top + corner,
+                    cx, y(19.5f), cx, y(4f),
                     intArrayOf(0xFF9524F3.toInt(), 0xFF0BF5EC.toInt()), null, Shader.TileMode.CLAMP,
                 )
             }
-            c.drawLine(left + pw, top + corner, left + pw, top + ph - corner, edge)
+            c.drawRoundRect(head, u * 2.5f, u * 2.5f, ink)
+            c.drawLine(x(12f), y(8.5f), x(12f), y(5.2f), ink)
+            c.drawPath(smile, ink)
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                shader = LinearGradient(
+                    cx, y(19.5f), cx, y(4f),
+                    intArrayOf(0xFF9524F3.toInt(), 0xFF0BF5EC.toInt()), null, Shader.TileMode.CLAMP,
+                )
+            }
+            c.drawCircle(x(12f), y(4f), u * 1.4f, fill)
+            c.drawCircle(x(9.2f), y(13.2f), u * 1.5f, fill)
+            c.drawCircle(x(14.8f), y(13.2f), u * 1.5f, fill)
         }
 
         when (face) {

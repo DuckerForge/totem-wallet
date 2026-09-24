@@ -675,7 +675,10 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
             Text(
                 stringResource(R.string.door_title).uppercase(),
                 style = HaloType.screen,
-                color = Halo.ink.copy(alpha = 0.22f + 0.78f * lit.value),
+                // The name in the theme's own colour, not in ink: on a light theme a black
+                // headline over a white page had nothing to do with the mark under it or the
+                // button below, and the one page that is only the brand read as a form.
+                color = Halo.mint.copy(alpha = 0.22f + 0.78f * lit.value),
                 letterSpacing = 3.sp,
             )
         }

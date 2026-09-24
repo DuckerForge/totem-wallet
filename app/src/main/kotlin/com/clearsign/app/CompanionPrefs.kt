@@ -212,7 +212,7 @@ object CompanionPrefs {
                 style = Paint.Style.STROKE; strokeWidth = u * 1.7f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
                 shader = LinearGradient(
                     cx, y(19.5f), cx, y(4f),
-                    intArrayOf(0xFF9524F3.toInt(), 0xFF0BF5EC.toInt()), null, Shader.TileMode.CLAMP,
+                    intArrayOf(p.accent.toArgb(), p.accent2.toArgb()), null, Shader.TileMode.CLAMP,
                 )
             }
             c.drawRoundRect(head, u * 2.5f, u * 2.5f, ink)
@@ -222,7 +222,7 @@ object CompanionPrefs {
                 style = Paint.Style.FILL
                 shader = LinearGradient(
                     cx, y(19.5f), cx, y(4f),
-                    intArrayOf(0xFF9524F3.toInt(), 0xFF0BF5EC.toInt()), null, Shader.TileMode.CLAMP,
+                    intArrayOf(p.accent.toArgb(), p.accent2.toArgb()), null, Shader.TileMode.CLAMP,
                 )
             }
             c.drawCircle(x(12f), y(4f), u * 1.4f, fill)

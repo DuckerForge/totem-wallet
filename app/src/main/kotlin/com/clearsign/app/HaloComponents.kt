@@ -133,7 +133,9 @@ fun Modifier.tappable(
 ): Modifier {
     val pressed by src.collectIsPressedAsState()
     val pressT = animateFloatAsState(if (pressed) 1f else 0f, tween(120), label = "press")
-    val ink = Halo.ink
+    // The press in the accent, not in ink: a grey wash under a finger says the surface got
+    // dirty, the accent says the app answered.
+    val ink = Halo.mint
     return this
         .pressScale(src, down)
         .clip(shape)
@@ -142,7 +144,7 @@ fun Modifier.tappable(
         .drawWithContent {
             drawContent()
             val t = pressT.value
-            if (t > 0f) drawRect(ink, alpha = 0.07f * t)
+            if (t > 0f) drawRect(ink, alpha = 0.12f * t)
         }
         .then(
             if (onLongClick == null) Modifier.clickable(interactionSource = src, indication = null, enabled = enabled, onClick = onClick)
@@ -239,7 +241,7 @@ fun SoftPanel(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Comp
 fun HaloChip(
     label: String,
     icon: HIcon? = null,
-    tint: Color = Halo.cyan,
+    tint: Color = Halo.tile,
     selected: Boolean = false,
     modifier: Modifier = Modifier,
     fillWidth: Boolean = false,
@@ -284,7 +286,7 @@ fun PageHeader(
     title: String,
     sub: String? = null,
     icon: HIcon? = null,
-    tint: Color = Halo.cyan,
+    tint: Color = Halo.tile,
     leading: (@Composable () -> Unit)? = null,
     sweep: Boolean = false,
     /** For the line under the title: the home shows it when the big number scrolls away. */
@@ -381,7 +383,7 @@ fun DeltaPill(text: String, up: Boolean, modifier: Modifier = Modifier, chevron:
  * graphicsLayer, so opening redraws and never recomposes the row. Settings and the agent's Pro sections.
  */
 @Composable
-fun DisclosureRow(title: String, sub: String?, icon: HIcon, open: Boolean, tint: Color = Halo.cyan, onToggle: () -> Unit) {
+fun DisclosureRow(title: String, sub: String?, icon: HIcon, open: Boolean, tint: Color = Halo.tile, onToggle: () -> Unit) {
     val turn = animateFloatAsState(if (open) 90f else 0f, label = "disclosure")
     HaloRow(
         title, sub, onGround = true, chevron = false,

@@ -62,6 +62,12 @@ data class HaloPalette(
     val fillFrom: Color = accentFill,
     val fillTo: Color = accent2,
     val onFill: Color = ground,
+    /**
+     * The little icon tile that leads almost every row. The second accent on the dark themes,
+     * where the accent has to stay rare to mean anything; the accent itself on the green ones,
+     * where the whole page is built on it.
+     */
+    val tileTint: Color = accent2,
 ) {
     val isFree: Boolean get() = !premium
 }
@@ -73,7 +79,7 @@ object Palettes {
         accent: Long, accent2: Long, ink: Long, muted: Long, amber: Long, red: Long,
         premium: Boolean, grain: Float, scanlines: Boolean = false, fillSoft: Boolean = false,
         fonts: HaloFonts, radiusScale: Float = 1f, iconStroke: Float = 1f, receiptStyle: ReceiptStyle = ReceiptStyle.CARDS,
-        livingStroke: Boolean = false, fillFrom: Long? = null, fillTo: Long? = null, onFill: Long? = null,
+        livingStroke: Boolean = false, fillFrom: Long? = null, fillTo: Long? = null, onFill: Long? = null, tileTint: Long? = null,
     ) = HaloPalette(
         id = id, nameRes = nameRes,
         ground = Color(ground), ground2 = Color(ground2), card = Color(card), cardSoft = Color(cardSoft), cardHi = Color(cardHi), stroke = Color(stroke),
@@ -89,6 +95,7 @@ object Palettes {
         fillFrom = if (fillFrom != null) Color(fillFrom) else if (fillSoft) androidx.compose.ui.graphics.lerp(Color(accent), Color(card), 0.45f) else Color(accent),
         fillTo = if (fillTo != null) Color(fillTo) else Color(accent2),
         onFill = if (onFill != null) Color(onFill) else Color(ground),
+        tileTint = if (tileTint != null) Color(tileTint) else Color(accent2),
     )
 
     /** Dark premium, glass panels, mint + cyan on a blue-black ground. Free. */
@@ -232,11 +239,25 @@ object Palettes {
         premium = false, grain = 0f,
         // The button is their green, the one that is too bright to carry text, with their
         // near-black written on it: 9.4:1.
-        fillFrom = 0xFF00D372, fillTo = 0xFF00C269, onFill = 0xFF131312,
+        fillFrom = 0xFF00D372, fillTo = 0xFF00C269, onFill = 0xFF131312, tileTint = 0xFF005F33,
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
-    val all: List<HaloPalette> = listOf(halo, mintSoft, mintNeon, cyanAct, gold, vela, flow, solana, skr, aurora, ember, phosphor)
+    /**
+     * Vela at night: the same green on black instead of on white. Their bright green is wasted
+     * on a white page, where it can only fill; on black it can do everything, so here it is the
+     * accent itself, and the tiles are green like the rest.
+     */
+    val velaNight = p(
+        "velanight", R.string.theme_vela_night,
+        ground = 0xFF000000, ground2 = 0xFF0B0E0C, card = 0xFF1F2621, cardSoft = 0xFF161B18, cardHi = 0xFF2C352F, stroke = 0xFF415049,
+        accent = 0xFF00D372, accent2 = 0xFF35D6BC, ink = 0xFFECF1EE, muted = 0xFF9BAAA2, amber = 0xFFFFC24B, red = 0xFFFF5A6A,
+        premium = false, grain = 0f,
+        fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
+        fillFrom = 0xFF00D372, fillTo = 0xFF00C269, onFill = 0xFF07140D, tileTint = 0xFF00D372,
+    )
+
+    val all: List<HaloPalette> = listOf(halo, mintSoft, mintNeon, cyanAct, gold, vela, velaNight, flow, solana, skr, aurora, ember, phosphor)
 
     /** The built-ins plus the user's custom palette (always last). */
     fun withCustom(ctx: android.content.Context): List<HaloPalette> = all + CustomTheme.palette(ctx)
@@ -372,6 +393,8 @@ object Halo {
     val red: Color get() = palette.red
     val redSoft: Color get() = palette.redSoft
     val cyanSoft: Color get() = palette.accentSoft
+    /** The icon tile that leads a row. */
+    val tile: Color get() = palette.tileTint
     /** The one big filled button, and what is written on it. */
     val fillFrom: Color get() = palette.fillFrom
     val fillTo: Color get() = palette.fillTo

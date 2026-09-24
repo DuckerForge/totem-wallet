@@ -25,6 +25,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -175,10 +179,17 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
+        // The circle answers the finger, like every other surface: it used to only shrink,
+        // and a shrink alone reads as the page moving rather than the button taking the tap.
+        val pressed by src.collectIsPressedAsState()
+        val glow = animateFloatAsState(if (pressed) 1f else 0f, tween(120), label = "tap")
+        val lit = Halo.mint
         Box(
             // The same living hairline as the cards, so a theme that moves moves
             // everywhere rather than in one place.
-            Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft).haloBorder(rs(Radius.pill), living = false),
+            Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft)
+                .drawWithContent { drawContent(); if (glow.value > 0f) drawRect(lit, alpha = 0.14f * glow.value) }
+                .haloBorder(rs(Radius.pill), living = false),
             contentAlignment = Alignment.Center,
         ) {
             // This button wears the Seeker itself rather than a generic glyph: it

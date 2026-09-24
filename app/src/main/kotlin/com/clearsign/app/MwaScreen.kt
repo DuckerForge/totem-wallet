@@ -1108,7 +1108,7 @@ private fun rememberPkgIcon(pkg: String): androidx.compose.ui.graphics.ImageBitm
 
 /** One labelled stat in the store card (rating, version, age…). */
 @Composable
-private fun StatTile(modifier: Modifier, icon: HIcon, value: String, label: String, tint: Color = Halo.cyan) {
+private fun StatTile(modifier: Modifier, icon: HIcon, value: String, label: String, tint: Color = Halo.tile) {
     Column(
         modifier.clip(rs(12)).background(Halo.cardSoft).haloBorder(rs(12)).padding(horizontal = 8.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),

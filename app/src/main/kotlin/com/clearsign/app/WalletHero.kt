@@ -488,7 +488,10 @@ private fun BigTotal(total: Double, currency: String) {
             sweepAnim.animateTo(2f, androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing))
         }
     }
-    val ink = Halo.ink
+    // The one number the page is about, in the accent, which the palette already defines as
+    // the colour of money and of anything that went up. In ink it was the same weight as every
+    // label around it, and on a white page the hero read as a heading.
+    val ink = Halo.mint
     val lit = Halo.mint
     // The blur is created once: inside `graphicsLayer` it was rebuilt on every
     // layer invalidation.

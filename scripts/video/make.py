@@ -97,7 +97,12 @@ def main(argv: list[str]) -> int:
         if not clip.exists():
             missing.append(b.key)
             continue
-        wav, want = tracks.get(b.key, (None, b.seconds))
+        wav, said = tracks.get(b.key, (None, b.seconds))
+        # Quanto dura la scena: almeno la frase, ma se la scaletta le da' piu' tempo e il
+        # girato ce l'ha, si prende quello. Una frase corta su una cosa lunga da guardare
+        # la faceva sparire in tre secondi.
+        have0 = voice.duration(clip) - b.start
+        want = max(said, min(b.seconds, have0))
         source = padded(clip, want, b.start, BUILD)
         have = voice.duration(source) - b.start
         seconds = max(1.0, min(want, have - 0.15))

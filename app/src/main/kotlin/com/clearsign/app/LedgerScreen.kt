@@ -162,7 +162,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
         Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.cardSoft), contentAlignment = Alignment.Center) { HaloIcon(icon, if (danger) Halo.red else Halo.cyan, 18.dp) }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(e.dApp + (e.host?.let { " · $it" } ?: ""), style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink, maxLines = 1)
+            Text(Ledger.signerName(ctx, e.dApp) + (e.host?.let { " · $it" } ?: ""), style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink, maxLines = 1)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(DateUtils.formatDateTime(ctx, e.at, DateUtils.FORMAT_SHOW_TIME) + " · " + kindLabel(ctx, e.kind) + (if (e.kind == "agent") agentHow(ctx, e.host) else "") + (if (e.kind == "order" && e.note.isNotBlank()) " · " + e.note else "") + (e.recipientLabel?.let { " · $it" } ?: ""), style = HaloType.label.copy(fontWeight = FontWeight.Medium), color = Halo.muted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (e.attestationSig != null) { Spacer(Modifier.width(5.dp)); HaloIcon(HIcon.SHIELD_LOCK, Halo.mint, 11.dp) }

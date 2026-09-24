@@ -43,6 +43,8 @@ enum class HIcon {
     SWAP,
     /** Following a coin. Outline while you are not, filled once you are. */
     STAR, STAR_FILLED,
+    /** Scout: the search lens with the crowd's line inside it. */
+    SCOUT,
     /** The market: a line that has been going up, or one that has been going down. */
     CHART, CHART_DOWN,
     /** The agent: a small head with an antenna. Something that thinks, in a box you can see. */
@@ -278,6 +280,18 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.MORE -> { dot(6f, 12f, 1.6f); dot(12f, 12f, 1.6f); dot(18f, 12f, 1.6f) }
             HIcon.CLOSE -> { line(6.5f, 6.5f, 17.5f, 17.5f); line(17.5f, 6.5f, 6.5f, 17.5f) }
             HIcon.SEARCH -> { circle(10.5f, 10.5f, 6.2f); line(15.1f, 15.1f, 20.5f, 20.5f) }
+            // The search lens with what the crowd is doing drawn inside it. It used to be its
+            // own Canvas in the home row, in a box three points wider than every other icon and
+            // filling nine tenths of it where the others fill two thirds: next to Send it read
+            // as a different size, because it was one. Here it is on the same grid as the rest.
+            HIcon.SCOUT -> {
+                s.drawCircle(tint.copy(alpha = 0.10f), 6.2f * u, p(10.5f, 10.5f))
+                circle(10.5f, 10.5f, 6.2f)
+                // The line is trimmed to the lens by geometry, not by a clip: it starts and
+                // ends inside the glass, so nothing has to be cut.
+                path { moveTo(6.9f, 12.4f); lineTo(9.6f, 9.4f); lineTo(11.6f, 11.1f); lineTo(14.1f, 7.8f) }
+                line(15.1f, 15.1f, 20.5f, 20.5f)
+            }
             // Contactless: the waves everyone already reads as "hold it here".
             HIcon.NFC -> {
                 dot(6.4f, 12f, 1.5f)

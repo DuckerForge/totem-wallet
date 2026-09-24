@@ -85,13 +85,15 @@ def draw_mark(size, scale=0.92, plate=True):
     pw = ph * PHONE
     cx, cy = size / 2, size / 2 + sq * 0.01
 
-    # wings: the old V's panels, opened outward at the top, behind the body
-    wing_w, wing_l = pw * 0.86, ph * 0.62
+    # The old V's panels, behind the body. Low and wide, not high and narrow: pivoted near
+    # the top and turned only a third of a right angle they came out above the phone like a
+    # pair of horns, and a dark shape with two horns is a steakhouse sign, not a wallet.
+    wing_w, wing_l = pw * 0.92, ph * 0.56
     for side in (-1, 1):
         layer = glass((int(wing_w), int(wing_l)), depth=0.12)
-        pivot_layer = (wing_w / 2, wing_l * 0.70)
-        pivot_canvas = (cx + side * pw * 0.30, cy - ph * 0.10)
-        paste_rotated(im, layer, pivot_canvas, pivot_layer, -side * 34.4)  # 0.60 rad, PIL turns counter-clockwise
+        pivot_layer = (wing_w / 2, wing_l * 0.42)
+        pivot_canvas = (cx + side * pw * 0.34, cy + ph * 0.10)
+        paste_rotated(im, layer, pivot_canvas, pivot_layer, -side * 58.0)
 
     # the Seeker, from the back
     body = glass((int(pw), int(ph)), depth=0.0)

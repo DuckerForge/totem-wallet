@@ -219,12 +219,16 @@ object Palettes {
      * bright ones are for fills, not for text: their #00D372 on white is 1.9:1, so what acts
      * here is the same green further down their ramp, #005F33, which reads at 7.8:1. The
      * surfaces carry a little of the same green: a page of pure greys next to a green button
-     * reads as two designs, and the green has nowhere to belong.
+     * reads as two designs, and the green has nowhere to belong. The second accent is a teal
+     * and not their azure, because nearly every icon tile in this app is painted with it: a
+     * page of pale blue tiles over a green ground read as two apps stacked. The page itself
+     * stays white top to bottom and the panels are the green ones: with a tinted page the
+     * cards sat a rumour above it, and the top of every screen read as one flat sheet.
      */
     val vela = p(
         "vela", R.string.theme_vela,
-        ground = 0xFFFFFFFF, ground2 = 0xFFF1F7F3, card = 0xFFDCE8E0, cardSoft = 0xFFE8F1EB, cardHi = 0xFFCDDED4, stroke = 0xFF9FB3A7,
-        accent = 0xFF005F33, accent2 = 0xFF005480, ink = 0xFF131312, muted = 0xFF545454, amber = 0xFF73430E, red = 0xFFB34435,
+        ground = 0xFFFFFFFF, ground2 = 0xFFFAFCFB, card = 0xFFDCE9E2, cardSoft = 0xFFEBF3EE, cardHi = 0xFFCADDD2, stroke = 0xFF9FB3A7,
+        accent = 0xFF005F33, accent2 = 0xFF005A56, ink = 0xFF131312, muted = 0xFF545454, amber = 0xFF73430E, red = 0xFFB34435,
         premium = false, grain = 0f,
         // The button is their green, the one that is too bright to carry text, with their
         // near-black written on it: 9.4:1.

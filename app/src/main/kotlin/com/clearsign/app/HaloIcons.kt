@@ -33,6 +33,8 @@ enum class HIcon {
     CHEVRON_RIGHT, CHEVRON_DOWN, CHEVRON_LEFT, CLOSE, SEARCH, NFC, MORE, HOLD, GEM, WALLET, HISTORY, CONTACTS, PEOPLE, INFO, FINGERPRINT,
     // wallet actions / themes
     LOCK, COINS, QR, PALETTE, RECEIVE, PASTE, SCAN, SHARE,
+    /** The light switch: a crescent to go dark, a sun to come back. */
+    MOON, SUN,
     // brand: a shield sealed with a signature check
     SEAL,
     // brand: the carrier pigeon in a shield
@@ -208,6 +210,22 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 poly(14f, 4f, 20f, 4f, 20f, 10f, 14f, 10f, close = true); dot(17f, 7f, 1.2f)
                 poly(4f, 14f, 10f, 14f, 10f, 20f, 4f, 20f, close = true); dot(7f, 17f, 1.2f)
                 line(14f, 14f, 16.5f, 14f); line(20f, 14f, 20f, 16.5f); line(14f, 17.5f, 14f, 20f); line(17.5f, 20f, 20f, 20f); dot(17f, 17f, 1.2f)
+            }
+            // A crescent: one circle with a bite taken out of it, drawn as two arcs so the
+            // stroke reads at eighteen dp instead of turning into a grey blob.
+            HIcon.MOON -> path {
+                moveTo(16.2f, 4.6f)
+                arcTo(12f, 12f, 8.5f, -60f, 240f)
+                arcTo(16.6f, 12f, 8.2f, 118f, -236f)
+                close()
+            }
+            HIcon.SUN -> {
+                circle(12f, 12f, 4.6f)
+                for (k in 0 until 8) {
+                    val a = Math.toRadians(k * 45.0)
+                    val c = kotlin.math.cos(a).toFloat(); val n = kotlin.math.sin(a).toFloat()
+                    line(12f + c * 7f, 12f + n * 7f, 12f + c * 9.5f, 12f + n * 9.5f)
+                }
             }
             HIcon.PALETTE -> {
                 path { moveTo(12f, 3f); arcTo(12f, 12f, 9f, 270f, 300f); quadTo(12.5f, 15f, 14.5f, 15.5f); quadTo(17f, 16f, 16.5f, 18.5f); quadTo(16f, 21f, 12f, 21f) }

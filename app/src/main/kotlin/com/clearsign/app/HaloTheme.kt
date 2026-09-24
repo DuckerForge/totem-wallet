@@ -217,11 +217,13 @@ object Palettes {
      * White, built on Young Platform's own ramps read off their stylesheet: their greys
      * (#F5F5F5 #EDEDED #E0E0E0), their near-black text (#131312), their green and azure. The
      * bright ones are for fills, not for text: their #00D372 on white is 1.9:1, so what acts
-     * here is the same green further down their ramp, #005F33, which reads at 7.8:1.
+     * here is the same green further down their ramp, #005F33, which reads at 7.8:1. The
+     * surfaces carry a little of the same green: a page of pure greys next to a green button
+     * reads as two designs, and the green has nowhere to belong.
      */
     val vela = p(
         "vela", R.string.theme_vela,
-        ground = 0xFFFFFFFF, ground2 = 0xFFF5F5F5, card = 0xFFE0E0E0, cardSoft = 0xFFEDEDED, cardHi = 0xFFD4D4D4, stroke = 0xFFA8A8A8,
+        ground = 0xFFFFFFFF, ground2 = 0xFFF1F7F3, card = 0xFFDCE8E0, cardSoft = 0xFFE8F1EB, cardHi = 0xFFCDDED4, stroke = 0xFF9FB3A7,
         accent = 0xFF005F33, accent2 = 0xFF005480, ink = 0xFF131312, muted = 0xFF545454, amber = 0xFF73430E, red = 0xFFB34435,
         premium = false, grain = 0f,
         // The button is their green, the one that is too bright to carry text, with their

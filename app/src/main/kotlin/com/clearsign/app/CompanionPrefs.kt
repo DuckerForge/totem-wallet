@@ -157,13 +157,13 @@ object CompanionPrefs {
         c.drawArc(rect, 0f, 360f, false, arc)
 
         /**
-         * The brand gradient along the ring, violet to cyan to mint. Only where the color is not
+         * The brand gradient along the ring, violet to blue to green. Only where the color is not
          * already a message: low health and a losing coin stay red and amber, flat.
          */
         fun brand() {
             arc.shader = android.graphics.SweepGradient(
                 cx, cy,
-                intArrayOf(0xFF9524F3.toInt(), 0xFF4CC9FF.toInt(), 0xFF4DFFD0.toInt(), 0xFF9524F3.toInt()),
+                intArrayOf(0xFF9945FF.toInt(), 0xFF4CC9FF.toInt(), 0xFF14F195.toInt(), 0xFF9945FF.toInt()),
                 floatArrayOf(0f, 0.34f, 0.67f, 1f),
             ).apply { setLocalMatrix(android.graphics.Matrix().apply { postRotate(-90f, cx, cy) }) }
         }

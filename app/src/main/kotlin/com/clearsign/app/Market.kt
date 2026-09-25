@@ -54,6 +54,39 @@ object Market {
      */
     fun cachedTop(): List<Coin> = top
 
+    /**
+     * The list as it was when the app last closed, so the market does not open empty.
+     *
+     * The memory cache dies with the process, and the first visit of every run was a spinner
+     * waiting on a free API over the network. The screen shows what is here immediately and
+     * replaces it as soon as the fresh list lands, which is a second later, not a minute.
+     *
+     * Kept six hours and no longer. These are prices: an old one shown as if it were current
+     * is worse than a wait, and past six hours the screen would rather look empty for a moment.
+     * `topAt` is stamped with the file's own age, so the two minute TTL still forces the refresh.
+     */
+    private const val DISK_MS = 6 * 3600_000L
+    private const val FILE = "market_top.json"
+    @Volatile private var file: java.io.File? = null
+
+    fun warm(ctx: android.content.Context) {
+        val f = java.io.File(ctx.filesDir, FILE).also { file = it }
+        if (top.isNotEmpty() || !f.exists()) return
+        val age = System.currentTimeMillis() - f.lastModified()
+        if (age > DISK_MS) return
+        runCatching {
+            val arr = JSONArray(f.readText())
+            val out = ArrayList<Coin>(arr.length())
+            for (i in 0 until arr.length()) fromJson(arr.optString(i))?.let { out += it }
+            if (out.isNotEmpty()) { top = out; topAt = f.lastModified() }
+        }
+    }
+
+    private fun save() {
+        val f = file ?: return
+        runCatching { f.writeText(JSONArray().apply { top.forEach { put(toJson(it)) } }.toString()) }
+    }
+
     /** The first [PAGE] by market cap. Cached for two minutes: this is a free API. */
     fun top(force: Boolean = false): List<Coin> {
         val now = System.currentTimeMillis()
@@ -62,6 +95,7 @@ object Market {
             ?: return top
         top = parse(arr)
         topAt = now
+        save()
         return top
     }
 

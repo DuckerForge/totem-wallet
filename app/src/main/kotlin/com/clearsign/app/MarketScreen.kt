@@ -76,8 +76,14 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     val fx = rememberFx()
 
     LaunchedEffect(refresh) {
-        loading = true
-        ranked = withContext(Dispatchers.IO) { runCatching { Market.top() }.getOrDefault(emptyList()) }
+        // Whatever is already known goes up first, and the spinner only appears when there is
+        // genuinely nothing to show. Coming back to this tab used to blank the list and wait on
+        // the network for something it had in hand.
+        val known = Market.cachedTop()
+        if (known.isNotEmpty()) ranked = known
+        loading = known.isEmpty()
+        val fresh = withContext(Dispatchers.IO) { runCatching { Market.top() }.getOrDefault(emptyList()) }
+        if (fresh.isNotEmpty()) ranked = fresh
         loading = false
     }
 

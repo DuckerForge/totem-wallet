@@ -28,6 +28,9 @@ reputation/test-ledger/
 # Non sono segreti: sono gli appunti con cui si lavora, e dicono cosa non e' ancora fatto.
 # Chi giudica il progetto li leggerebbe insieme al codice.
 PROGRESS.md
+# Dated working notes: they carry stale todos and open questions, not a story a
+# reader benefits from. The English write-up of the same work is docs/SCOUT.md.
+SEEKER-SCOUT.md
 SPRINT-*.md
 WATCHER-RESULT.md
 STATO.md

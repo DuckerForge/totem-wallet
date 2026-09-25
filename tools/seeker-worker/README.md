@@ -61,3 +61,38 @@ leggeva e riscriveva lo stato: un JSON da 612 KB con 10.527 saldi come chiavi. O
   cambia. Tre scritture per giro al massimo, un giro ogni cinque minuti: sotto le mille al giorno.
 
 Le chiavi vecchie `state` e `roster` non servono più.
+
+## La sentinella (25/09/2026)
+
+Scout e' morto due volte in silenzio: il **15/09** di CPU (`exceededCpu` a 10 ms
+mentre leggeva 612 KB di JSON) e il **16/09** con le mille scritture KV esaurite
+dalle letture degli utenti. Le due volte il primo segnale e' stato accorgersene
+guardando.
+
+Ora la scansione scrive come sta in `/clearsign/health`, dentro la stessa `put`
+dello stato: zero scritture in piu'. E `watchman.mjs` lo legge da **GitHub
+Actions**, ogni mezz'ora.
+
+Sta fuori da Cloudflare di proposito. Il terzo guasto probabile e' l'account che
+supera le centomila richieste al giorno: Cloudflare smette di invocare il worker,
+cron compresi, e una sentinella che vivesse dentro il worker morirebbe con lui,
+zitta, come le altre due volte.
+
+Guarda il sintomo e non le cause. La domanda principale e' una sola, *Scout si e'
+aggiornato negli ultimi 25 minuti*, e quella prende tutti e tre i guasti noti piu'
+il quarto che non abbiamo previsto. Gli altri tre controlli sono le scritture KV
+sopra 750, tre giri di fila che finiscono la riserva di chiamate, e la classifica
+pubblicata piu' vecchia di sei ore.
+
+```bash
+# In locale, per vedere come sta adesso.
+ARCHIVE_URL=https://<db>.firebasedatabase.app node tools/seeker-worker/watchman.mjs
+
+# Su GitHub serve il secret ARCHIVE_URL nelle impostazioni del repo.
+```
+
+**La prova che conta non e' il rosso, e' la mail.** Un controllo che diventa rosso
+senza avvisare nessuno e' lo stesso problema di prima. Si lancia il workflow a
+mano con `stale_min = 1`, si guarda la casella, e solo quando la mail e' arrivata
+la sentinella esiste. Da sapere: GitHub disattiva i cron su un repo pubblico dopo
+60 giorni senza commit.

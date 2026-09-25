@@ -1,0 +1,45 @@
+# La sentinella di Scout.
+#
+# Sta qui e non nel worker di proposito: uno dei modi in cui Scout muore e'
+# Cloudflare che smette di invocare il worker, cron compresi. Un allarme dentro il
+# worker morirebbe con lui, in silenzio, come il 15 e il 16 settembre 2026.
+#
+# Quando questo lavoro fallisce, GitHub manda una mail a chi ha toccato il cron per
+# ultimo. Se la mail non arriva, questo file non serve a niente: la prova si fa
+# lanciandolo a mano con stale_min = 1, e si guarda la casella.
+#
+# GitHub disattiva i cron su un repo pubblico dopo 60 giorni senza commit: se il
+# progetto dorme due mesi, la sentinella si addormenta con lui.
+name: watchman
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      stale_min:
+        description: "Minuti oltre i quali Scout e' considerato fermo (1 per provare che la mail arriva)"
+        required: false
+        default: "25"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: watchman
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Come sta Scout
+        env:
+          ARCHIVE_URL: ${{ secrets.ARCHIVE_URL }}
+          WATCHMAN_STALE_MIN: ${{ github.event.inputs.stale_min }}
+        run: node tools/seeker-worker/watchman.mjs

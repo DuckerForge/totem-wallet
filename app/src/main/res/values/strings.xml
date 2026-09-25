@@ -1080,7 +1080,7 @@
     <string name="theme_vela_night">Vela night</string>
     <string name="home_act_tap">Tap</string>
     <string name="home_act_link">Link</string>
-    <string name="home_act_health">Health</string>
+    <string name="home_act_widget">Widget</string>
     <string name="home_act_more">More</string>
     <string name="home_act_more_sub">Everything that is not on the front page.</string>
     <string name="more_health">Wallet health</string>

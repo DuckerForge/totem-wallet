@@ -86,10 +86,22 @@ class MainActivity : ComponentActivity() {
     /* Stamped when a tap carried no payment request, so the screen can say so. */
     var tapMiss by mutableStateOf(0L)
 
+    /**
+     * Where a notification, a widget or the bubble asked us to land.
+     *
+     * State on the activity rather than a read of `intent`, because the read used to happen
+     * inside `remember`: first composition only. With the app already open, the bubble's
+     * buttons went through onNewIntent, updated the intent nobody read again, and the screen
+     * sat where it was. Cleared once the screen has acted on it, so going back and forth does
+     * not re-open the same sheet.
+     */
+    var openRequest by mutableStateOf<String?>(null)
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         readRequest(intent)
+        openRequest = intent.getStringExtra("open")
     }
 
     /*
@@ -254,12 +266,15 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var status by remember { mutableStateOf<String?>(null) }
         var contacts by remember { mutableStateOf(Contacts.allowlist(ctx)) }
         // A widget quick action asks for a specific sheet.
-        val requested = remember { (ctx as? android.app.Activity)?.intent?.getStringExtra("open") }
-        var showSend by remember { mutableStateOf(requested == "send") }
+        val act = ctx as? MainActivity
+        // Seeded from the launch intent, then kept in step by onNewIntent.
+        LaunchedEffect(Unit) { if (act?.openRequest == null) act?.openRequest = act?.intent?.getStringExtra("open") }
+        val requested = act?.openRequest
+        var showSend by remember { mutableStateOf(false) }
         // A contact tapped in Settings: the send sheet opens already addressed.
         var sendTo by remember { mutableStateOf<String?>(null) }
-        var showReceive by remember { mutableStateOf(requested == "receive") }
-        var showSwap by remember { mutableStateOf(requested == "swap") }
+        var showReceive by remember { mutableStateOf(false) }
+        var showSwap by remember { mutableStateOf(false) }
         // A coin chosen in the market tab: the swap opens already pointing at it.
         var swapMint by remember { mutableStateOf<String?>(null) }
         // Asked from the card of a coin you hold: which one to sell, which one to send.
@@ -285,7 +300,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         // A notification about somebody you follow opens the feed straight on that
         // coin, with the receipt already building. The alert is the start of the
         // loop, not a link to somewhere you then have to navigate.
-        var showCrowd by remember { mutableStateOf(requested == "crowd") }
+        var showCrowd by remember { mutableStateOf(false) }
         var crowdMint by remember { mutableStateOf((ctx as? android.app.Activity)?.intent?.getStringExtra("mint")) }
         var showHealth by remember { mutableStateOf(false) }
         var showPnl by remember { mutableStateOf(false) }
@@ -302,6 +317,28 @@ fun HomeScreen(signer: SeedVaultSigner) {
         val collapse = remember {
             derivedStateOf { (walletScroll.value / with(density) { 180.dp.toPx() }).coerceIn(0f, 1f) }
         }
+        /**
+         * One place that answers "open this", wherever the ask came from: a notification, the
+         * widget, or a button on the bubble. It used to be four separate reads of the intent
+         * done inside `remember`, so a second ask while the app was already up changed nothing,
+         * and "companion" was never listed at all: every bubble button landed on the home.
+         *
+         * Cleared after acting, or coming back to the app would re-open the same sheet.
+         */
+        LaunchedEffect(requested) {
+            when (requested) {
+                null -> {}
+                "send" -> showSend = true
+                "receive" -> showReceive = true
+                "swap" -> showSwap = true
+                "crowd" -> showCrowd = true
+                "companion" -> showCompanion = true
+                "agent" -> tab = Tab.AGENT
+                else -> {}
+            }
+            if (requested != null) act?.openRequest = null
+        }
+
         // A tapped or linked request opens the ordinary send form, already filled in.
         val request = (ctx as? MainActivity)?.incoming
         LaunchedEffect(request) { if (request != null) showSend = true }
@@ -448,7 +485,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                                 HomeAction.CROWD -> showCrowd = true
                                                 HomeAction.TAP -> showTap = true
                                                 HomeAction.LINK -> showGift = true
-                                                HomeAction.HEALTH -> showHealth = true
+                                                HomeAction.WIDGET -> showCompanion = true
                                                 HomeAction.BRIDGE -> showBridge = true
                                                 HomeAction.MORE -> showMore = true
                                             }
@@ -549,7 +586,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                         HomeAction.SWAP -> showSwap = true
                         HomeAction.SCAN -> scanHome()
                         HomeAction.CROWD -> showCrowd = true
-                        HomeAction.HEALTH -> showHealth = true
+                        HomeAction.WIDGET -> showCompanion = true
                         else -> {}
                     }
                 },

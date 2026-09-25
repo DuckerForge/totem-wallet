@@ -189,7 +189,11 @@ def main():
     # A little over the 2/3 an adaptive icon guarantees, and the ceiling is not a matter of
     # taste: rendered under a circle mask, 0.76 cuts the phone's bottom edge off and 0.72
     # puts it on the line. 0.70 is the largest that never clips, on a circle or a squircle.
-    FILL = 0.70
+    # Quanto della piastrella occupa il soggetto. Non e' a occhio: sotto la maschera a
+    # cerchio, che e' il ritaglio piu' stretto che un launcher applichi, gli angoli del
+    # telefono arrivano al 90% del raggio dell'area visibile tipica (72dp su 108) e restano
+    # dentro. Sopra 0.80 cominciano a toccare, e a quel punto si taglia il soggetto, non le ali.
+    FILL = 0.78
     subject = draw_mark(int(S * FILL), scale=1.0, plate=False)
     icon.alpha_composite(subject, (int(S * (1 - FILL) / 2), int(S * (1 - FILL) / 2)))
     for dpi, px in ICON.items():

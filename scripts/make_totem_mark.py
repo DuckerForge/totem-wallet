@@ -186,8 +186,12 @@ def main():
     # Almost nothing: on a light ground a halo turns into a smudge.
     ImageDraw.Draw(glow).ellipse((S * 0.24, S * 0.22, S * 0.76, S * 0.72), fill=(120, 140, 150, 26))
     icon.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * 0.09)))
-    subject = draw_mark(int(S * 2 / 3), scale=1.0, plate=False)
-    icon.alpha_composite(subject, (int(S / 6), int(S / 6)))
+    # A little over the 2/3 an adaptive icon guarantees, and the ceiling is not a matter of
+    # taste: rendered under a circle mask, 0.76 cuts the phone's bottom edge off and 0.72
+    # puts it on the line. 0.70 is the largest that never clips, on a circle or a squircle.
+    FILL = 0.70
+    subject = draw_mark(int(S * FILL), scale=1.0, plate=False)
+    icon.alpha_composite(subject, (int(S * (1 - FILL) / 2), int(S * (1 - FILL) / 2)))
     for dpi, px in ICON.items():
         out = os.path.join(RES, f"mipmap-{dpi}", "ic_launcher_bird.png")
         icon.convert("RGB").resize((px, px), Image.LANCZOS).save(out)

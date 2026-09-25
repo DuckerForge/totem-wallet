@@ -43,8 +43,8 @@ GROUND_HI = (96, 252, 124)
 GROUND_LO = (31, 175, 56)
 # The launcher tile: near-black, with a pale disc behind the mark. The disc is the whole
 # point of the composition, so it is named here rather than buried in main().
-LAUNCH_GROUND = (11, 13, 12)
-DISC = (239, 229, 234)
+LAUNCH_GROUND = (34, 38, 42)
+DISC = (168, 214, 247)
 DISC_R = 0.34
 # Violet to blue to green, the three stops of the brand ramp. They must stay equal to
 # NEON_LOW / NEON_MID / NEON_HIGH in LoginDemo.kt: the door animates this same thread and
@@ -183,8 +183,9 @@ def main():
     # Chosen from a hundred pairings rendered side by side, and the composition is what does
     # the work rather than the colour: a light disc gives the dark slab something to sit on,
     # so the tile stops being a dark square that disappears between Play Store and Discord.
-    # The ground is near-black and the disc is a pale warm grey, the complement of that
-    # ground's own faint green cast, which is why it is not plain white.
+    # The ground is graphite, a warm dark grey rather than black, and the disc is a cold
+    # pale blue. The pairing is deliberate: the two pull in opposite directions on
+    # temperature, so the disc reads as lit rather than as a hole cut in the tile.
     #
     # The subject drops to 0.62 here, against 0.78 without a disc: the mark has to live
     # inside the circle, and a phone whose corners hang over the edge reads as a mistake.

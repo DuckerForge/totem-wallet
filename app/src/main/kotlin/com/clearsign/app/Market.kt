@@ -87,13 +87,42 @@ object Market {
         runCatching { f.writeText(JSONArray().apply { top.forEach { put(toJson(it)) } }.toString()) }
     }
 
+    /**
+     * The next hundred by market cap, appended.
+     *
+     * The screen only ever asked for page one, so the market stopped at the hundredth coin with
+     * nothing to say it had. Pages are additive and de-duplicated by id: the list only grows,
+     * and a refresh of page one replaces the head without throwing away what was read below it.
+     */
+    fun more(): List<Coin> {
+        val page = top.size / PAGE + 1
+        if (page > MAX_PAGES) return top
+        val arr = getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=$page&price_change_percentage=24h")
+            ?: return top
+        val next = parse(arr)
+        if (next.isEmpty()) return top
+        val seen = top.mapTo(HashSet()) { it.id }
+        top = top + next.filter { seen.add(it.id) }
+        save()
+        return top
+    }
+
+    /** Ten pages is a thousand coins, which is further down than anyone scrolls on a phone. */
+    private const val MAX_PAGES = 10
+
     /** The first [PAGE] by market cap. Cached for two minutes: this is a free API. */
     fun top(force: Boolean = false): List<Coin> {
         val now = System.currentTimeMillis()
         if (!force && top.isNotEmpty() && now - topAt < TTL_MS) return top
         val arr = getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=1&price_change_percentage=24h")
             ?: return top
-        top = parse(arr)
+        val head = parse(arr)
+        if (head.isNotEmpty()) {
+            // Page one refreshed in place: the tail below it stays, or scrolling past the
+            // hundredth coin and pulling to refresh would silently take the rest away.
+            val fresh = head.mapTo(HashSet()) { it.id }
+            top = head + top.drop(head.size).filterNot { it.id in fresh }
+        }
         topAt = now
         save()
         return top

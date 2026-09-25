@@ -68,8 +68,14 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     var searching by remember { mutableStateOf(false) }
     var followed by remember { mutableStateOf<List<Market.Coin>>(emptyList()) }
     var editing by remember { mutableStateOf<Market.Coin?>(null) }
+    var loadingMore by remember { mutableStateOf(false) }
 
-    val keys = remember(refresh) { Watchlist.reconcile(ctx); Watchlist.all(ctx) }
+    // reconcile reads every stored preference and can write: off the composition thread, or
+    // the market janks on open for work that has nothing to do with drawing it.
+    var keys by remember { mutableStateOf(Watchlist.all(ctx)) }
+    LaunchedEffect(refresh) {
+        keys = withContext(Dispatchers.IO) { Watchlist.reconcile(ctx); Watchlist.all(ctx) }
+    }
     var unfollow by remember { mutableStateOf<Market.Coin?>(null) }
     val currency by Settings.currency
     // The market answers in dollars; here it reads in the chosen currency.
@@ -247,6 +253,21 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 CoinRow(c, fx, followed = isFollowed, amount = amount, onOpen = { editing = c }) {
                     if (isFollowed) unfollow = c else { Watchlist.add(ctx, c.key); Haptics.tick(ctx); refresh++ }
                 }
+            }
+        }
+        // The end of the list asks for the next hundred. Only on the ranked list: a search
+        // already has its own answer, and the followed list is whatever you chose.
+        if (q.length < 2 && ranked.isNotEmpty() && !loading) {
+            item {
+                LaunchedEffect(ranked.size) {
+                    if (!loadingMore) {
+                        loadingMore = true
+                        val grown = withContext(Dispatchers.IO) { runCatching { Market.more() }.getOrDefault(ranked) }
+                        if (grown.size > ranked.size) ranked = grown
+                        loadingMore = false
+                    }
+                }
+                if (loadingMore) PlaceholderRow()
             }
         }
         item { Spacer(Modifier.height(20.dp)) }

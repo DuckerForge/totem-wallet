@@ -168,9 +168,12 @@ private fun DrawScope.wing(pivot: Offset, degrees: Float, lift: Float, wide: Flo
 }
 
 /** Violet at the bottom and cyan at the top: the two ends of the brand. */
-private val NEON_LOW = Color(0xFF9524F3)
-private val NEON_MID = Color(0xFF666CF4)
-private val NEON_HIGH = Color(0xFF0BF5EC)
+// Same three stops as NEON_LOW / NEON_MID / NEON_HIGH in scripts/make_totem_mark.py.
+// The door animates this thread and settles on the bitmap that script paints, so the two
+// ramps have to be the same numbers or the animation ends on a different colour.
+private val NEON_LOW = Color(0xFF9945FF)
+private val NEON_MID = Color(0xFF4CC9FF)
+private val NEON_HIGH = Color(0xFF14F195)
 
 /**
  * The stroke that draws itself, color flowing along its length. In pieces, not one go, because

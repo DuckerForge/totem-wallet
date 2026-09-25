@@ -24,13 +24,37 @@ ICON = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
 S = 1080 * 2            # rendered at 2160 and downsampled: the antialiasing comes from the shrink
 PHONE = 69.56 / 150.86  # the Seeker, width over height
-GROUND = (7, 11, 18)
-NEON_LOW = (149, 36, 243)
-NEON_HIGH = (11, 245, 236)
+# The launcher ground is light on purpose, and it took four tries to land there.
+#
+# The mark is dark glass, which is the whole idea of it, and as a launcher icon that made
+# it the one tile that vanished: on a real home screen every neighbour (Play Store,
+# Discord, WhatsApp) carries a light or saturated fill, so a dark square reads as a hole
+# in the wallpaper. Lifting the ground off black did nothing, because the subject stayed
+# dark either way. Drawing the slab as a bright outline on black did nothing either: a
+# hairline cannot carry an icon at 48 px. What works is inverting it, and the cleanest
+# inversion is the plainest: a near-white ground with the slab as a dark silhouette and
+# the neon thread as the only colour. Size cannot help, the launcher masks this to its
+# middle two thirds and the subject already fills them.
+#
+# GROUND stays for anything drawn on the app's own dark surfaces; the launcher uses the
+# gradient below.
+GROUND = (14, 22, 34)
+GROUND_HI = (96, 252, 124)
+GROUND_LO = (31, 175, 56)
+# Violet to blue to green, the three stops of the brand ramp. They must stay equal to
+# NEON_LOW / NEON_MID / NEON_HIGH in LoginDemo.kt: the door animates this same thread and
+# settles on this bitmap, so a different ramp there would land green on cyan.
+NEON_LOW = (153, 69, 255)
+NEON_MID = (76, 201, 255)
+NEON_HIGH = (20, 241, 149)
+
 
 
 def lerp(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(len(a)))
+def ramp(t):
+    """The brand thread, bottom to top. Two segments, like the door's."""
+    return lerp(NEON_LOW, NEON_MID, t * 2) if t < 0.5 else lerp(NEON_MID, NEON_HIGH, (t - 0.5) * 2)
 
 
 def glass(size, depth=0.0):
@@ -125,7 +149,7 @@ def draw_mark(size, scale=0.92, plate=True):
         for i in range(steps):
             ya = y1 - (y1 - y0) * i / steps
             yb = y1 - (y1 - y0) * (i + 1) / steps
-            c = lerp(NEON_LOW, NEON_HIGH, (i + 0.5) / steps) + (alpha,)
+            c = ramp((i + 0.5) / steps) + (alpha,)
             ld.line((x, ya, x, yb), fill=c, width=int(width))
         for yy, c in ((y1, NEON_LOW), (y0, NEON_HIGH)):
             ld.ellipse((x - width / 2, yy - width / 2, x + width / 2, yy + width / 2), fill=c + (alpha,))
@@ -150,14 +174,24 @@ def main():
     print("wrote web/apex/icon.png")
 
     # Launcher: adaptive icons show the middle 2/3, so the subject sits there on a full-bleed ground.
-    icon = Image.new("RGBA", (S, S), GROUND + (255,))
+    icon = Image.new("RGBA", (S, S))
+    px = icon.load()
+    for y in range(S):
+        for x in range(S):
+            px[x, y] = lerp(GROUND_HI, GROUND_LO, (x + y) / (2 * S)) + (255,)
     # The breath belongs here, on the full-bleed ground, not inside the subject's own square,
     # where the blur gets clipped and leaves a rectangle on whatever the mark is laid over.
     glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse((S * 0.22, S * 0.18, S * 0.78, S * 0.74), fill=(120, 140, 255, 30))
+    # A whisper of shade under the subject so it sits on the ground instead of floating.
+    # Almost nothing: on a light ground a halo turns into a smudge.
+    ImageDraw.Draw(glow).ellipse((S * 0.24, S * 0.22, S * 0.76, S * 0.72), fill=(120, 140, 150, 26))
     icon.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * 0.09)))
-    subject = draw_mark(int(S * 2 / 3), scale=1.0, plate=False)
-    icon.alpha_composite(subject, (int(S / 6), int(S / 6)))
+    # A little over the 2/3 an adaptive icon guarantees, and the ceiling is not a matter of
+    # taste: rendered under a circle mask, 0.76 cuts the phone's bottom edge off and 0.72
+    # puts it on the line. 0.70 is the largest that never clips, on a circle or a squircle.
+    FILL = 0.70
+    subject = draw_mark(int(S * FILL), scale=1.0, plate=False)
+    icon.alpha_composite(subject, (int(S * (1 - FILL) / 2), int(S * (1 - FILL) / 2)))
     for dpi, px in ICON.items():
         out = os.path.join(RES, f"mipmap-{dpi}", "ic_launcher_bird.png")
         icon.convert("RGB").resize((px, px), Image.LANCZOS).save(out)

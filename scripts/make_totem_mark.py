@@ -24,21 +24,23 @@ ICON = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
 S = 1080 * 2            # rendered at 2160 and downsampled: the antialiasing comes from the shrink
 PHONE = 69.56 / 150.86  # the Seeker, width over height
-# The launcher ground is bright on purpose, and this took two tries to get right.
+# The launcher ground is light on purpose, and it took four tries to land there.
 #
-# The mark itself is dark glass, which is the whole idea, and on a dark ground it read as
-# a hole: on a real home screen every neighbour (Play Store, Discord, WhatsApp) carries a
-# light or saturated fill, so a dark tile is the one that disappears. Lifting the ground
-# off black and warming the halo was not enough, because the subject stayed dark either
-# way. Inverting it is what worked: a saturated ground, the slab as a dark silhouette on
-# top of it. Size cannot help here, the launcher masks this to the middle two thirds and
-# the subject already fills them.
+# The mark is dark glass, which is the whole idea of it, and as a launcher icon that made
+# it the one tile that vanished: on a real home screen every neighbour (Play Store,
+# Discord, WhatsApp) carries a light or saturated fill, so a dark square reads as a hole
+# in the wallpaper. Lifting the ground off black did nothing, because the subject stayed
+# dark either way. Drawing the slab as a bright outline on black did nothing either: a
+# hairline cannot carry an icon at 48 px. What works is inverting it, and the cleanest
+# inversion is the plainest: a near-white ground with the slab as a dark silhouette and
+# the neon thread as the only colour. Size cannot help, the launcher masks this to its
+# middle two thirds and the subject already fills them.
 #
-# GROUND stays for anything drawn on the app's own dark ground; the launcher uses the
+# GROUND stays for anything drawn on the app's own dark surfaces; the launcher uses the
 # gradient below.
 GROUND = (14, 22, 34)
-GROUND_HI = (22, 190, 130)
-GROUND_LO = (8, 90, 96)
+GROUND_HI = (246, 248, 245)
+GROUND_LO = (214, 226, 224)
 # Violet to blue to green, the three stops of the brand ramp. They must stay equal to
 # NEON_LOW / NEON_MID / NEON_HIGH in LoginDemo.kt: the door animates this same thread and
 # settles on this bitmap, so a different ramp there would land green on cyan.
@@ -180,9 +182,9 @@ def main():
     # The breath belongs here, on the full-bleed ground, not inside the subject's own square,
     # where the blur gets clipped and leaves a rectangle on whatever the mark is laid over.
     glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    # A soft lift behind the subject, so the silhouette sits on something and does not
-    # look pasted on. Pale, not coloured: the ground already carries the colour.
-    ImageDraw.Draw(glow).ellipse((S * 0.22, S * 0.18, S * 0.78, S * 0.74), fill=(190, 255, 225, 70))
+    # A whisper of shade under the subject so it sits on the ground instead of floating.
+    # Almost nothing: on a light ground a halo turns into a smudge.
+    ImageDraw.Draw(glow).ellipse((S * 0.24, S * 0.22, S * 0.76, S * 0.72), fill=(120, 140, 150, 26))
     icon.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * 0.09)))
     subject = draw_mark(int(S * 2 / 3), scale=1.0, plate=False)
     icon.alpha_composite(subject, (int(S / 6), int(S / 6)))

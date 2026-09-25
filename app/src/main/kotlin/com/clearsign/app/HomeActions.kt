@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 
 /* The eight things you can start from the wallet home. */
-internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AGENT, BRIDGE, MORE }
+internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, HEALTH, BRIDGE, MORE }
 
 /*
  * The action grid: eight round, neutral buttons. The three tinted tiles this replaces implied
@@ -56,15 +56,15 @@ internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, AG
 /** Every circle the home can show: its icon and its name. "More" stays out of the list: it is always last. */
 internal fun homeActionIcon(a: HomeAction): HIcon = when (a) {
     HomeAction.SEND -> HIcon.SEND; HomeAction.RECEIVE -> HIcon.RECEIVE; HomeAction.SWAP -> HIcon.SWAP; HomeAction.SCAN -> HIcon.SCAN
-    HomeAction.CROWD -> HIcon.SCOUT; HomeAction.TAP -> HIcon.NFC; HomeAction.LINK -> HIcon.SHARE; HomeAction.AGENT -> HIcon.AGENT
+    HomeAction.CROWD -> HIcon.SCOUT; HomeAction.TAP -> HIcon.NFC; HomeAction.LINK -> HIcon.SHARE; HomeAction.HEALTH -> HIcon.SHIELD_LOCK
     HomeAction.BRIDGE -> HIcon.BRIDGE; HomeAction.MORE -> HIcon.MORE
 }
 internal fun homeActionLabel(a: HomeAction): Int = when (a) {
     HomeAction.SEND -> R.string.send_btn; HomeAction.RECEIVE -> R.string.receive_btn; HomeAction.SWAP -> R.string.swap_btn; HomeAction.SCAN -> R.string.send_scan
     HomeAction.CROWD -> R.string.home_act_crowd; HomeAction.TAP -> R.string.home_act_tap; HomeAction.LINK -> R.string.home_act_link
-    HomeAction.AGENT -> R.string.home_act_agent; HomeAction.BRIDGE -> R.string.bridge_short; HomeAction.MORE -> R.string.home_act_more
+    HomeAction.HEALTH -> R.string.home_act_health; HomeAction.BRIDGE -> R.string.bridge_short; HomeAction.MORE -> R.string.home_act_more
 }
-internal val CHOOSABLE_ACTIONS = listOf(HomeAction.SEND, HomeAction.RECEIVE, HomeAction.SWAP, HomeAction.SCAN, HomeAction.CROWD, HomeAction.TAP, HomeAction.LINK, HomeAction.AGENT, HomeAction.BRIDGE)
+internal val CHOOSABLE_ACTIONS = listOf(HomeAction.SEND, HomeAction.RECEIVE, HomeAction.SWAP, HomeAction.SCAN, HomeAction.CROWD, HomeAction.TAP, HomeAction.LINK, HomeAction.HEALTH, HomeAction.BRIDGE)
 
 /** The chosen circles, in order, with More at the end. Rows of four, the last row padded so nothing stretches. */
 @Composable

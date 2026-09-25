@@ -41,6 +41,11 @@ PHONE = 69.56 / 150.86  # the Seeker, width over height
 GROUND = (14, 22, 34)
 GROUND_HI = (96, 252, 124)
 GROUND_LO = (31, 175, 56)
+# The launcher tile: near-black, with a pale disc behind the mark. The disc is the whole
+# point of the composition, so it is named here rather than buried in main().
+LAUNCH_GROUND = (11, 13, 12)
+DISC = (239, 229, 234)
+DISC_R = 0.34
 # Violet to blue to green, the three stops of the brand ramp. They must stay equal to
 # NEON_LOW / NEON_MID / NEON_HIGH in LoginDemo.kt: the door animates this same thread and
 # settles on this bitmap, so a different ramp there would land green on cyan.
@@ -173,27 +178,20 @@ def main():
     mark.resize((216, 216), Image.LANCZOS).save(os.path.join(ROOT, "web", "apex", "icon.png"))
     print("wrote web/apex/icon.png")
 
-    # Launcher: adaptive icons show the middle 2/3, so the subject sits there on a full-bleed ground.
-    icon = Image.new("RGBA", (S, S))
-    px = icon.load()
-    for y in range(S):
-        for x in range(S):
-            px[x, y] = lerp(GROUND_HI, GROUND_LO, (x + y) / (2 * S)) + (255,)
-    # The breath belongs here, on the full-bleed ground, not inside the subject's own square,
-    # where the blur gets clipped and leaves a rectangle on whatever the mark is laid over.
-    glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    # A whisper of shade under the subject so it sits on the ground instead of floating.
-    # Almost nothing: on a light ground a halo turns into a smudge.
-    ImageDraw.Draw(glow).ellipse((S * 0.24, S * 0.22, S * 0.76, S * 0.72), fill=(120, 140, 150, 26))
-    icon.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * 0.09)))
-    # A little over the 2/3 an adaptive icon guarantees, and the ceiling is not a matter of
-    # taste: rendered under a circle mask, 0.76 cuts the phone's bottom edge off and 0.72
-    # puts it on the line. 0.70 is the largest that never clips, on a circle or a squircle.
-    # Quanto della piastrella occupa il soggetto. Non e' a occhio: sotto la maschera a
-    # cerchio, che e' il ritaglio piu' stretto che un launcher applichi, gli angoli del
-    # telefono arrivano al 90% del raggio dell'area visibile tipica (72dp su 108) e restano
-    # dentro. Sopra 0.80 cominciano a toccare, e a quel punto si taglia il soggetto, non le ali.
-    FILL = 0.78
+    # Launcher: a disc behind the mark, on a near-black ground.
+    #
+    # Chosen from a hundred pairings rendered side by side, and the composition is what does
+    # the work rather than the colour: a light disc gives the dark slab something to sit on,
+    # so the tile stops being a dark square that disappears between Play Store and Discord.
+    # The ground is near-black and the disc is a pale warm grey, the complement of that
+    # ground's own faint green cast, which is why it is not plain white.
+    #
+    # The subject drops to 0.62 here, against 0.78 without a disc: the mark has to live
+    # inside the circle, and a phone whose corners hang over the edge reads as a mistake.
+    icon = Image.new("RGBA", (S, S), LAUNCH_GROUND + (255,))
+    r = S * DISC_R
+    ImageDraw.Draw(icon).ellipse((S / 2 - r, S / 2 - r, S / 2 + r, S / 2 + r), fill=DISC + (255,))
+    FILL = 0.62
     subject = draw_mark(int(S * FILL), scale=1.0, plate=False)
     icon.alpha_composite(subject, (int(S * (1 - FILL) / 2), int(S * (1 - FILL) / 2)))
     for dpi, px in ICON.items():

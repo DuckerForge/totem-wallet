@@ -57,3 +57,13 @@ tools/seeker-worker/wrangler.toml
 # Roba compilata di Python, generata girando gli strumenti.
 __pycache__/
 *.pyc
+
+# --- The census, kept out of the public repo on purpose ---
+# 10,527 addresses with a tier and a balance. These are public chain facts, and anyone
+# with an RPC key rebuilds them in a day. But here they were a list you could browse in
+# one click: "these wallets own a Seeker, and here are the 1,252 richest". Those people
+# never asked to be in a target list, and elsewhere we avoid even archiving which mint a
+# budget is checking.
+# It stays inside the APK, because the fallback scan and the live feed's size label read
+# it. Regenerate it with the tools in tools/seeker-worker: see SEEKER-SCOUT.md.
+app/src/main/assets/seekers.txt

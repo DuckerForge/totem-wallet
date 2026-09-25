@@ -238,6 +238,7 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching { JupiterTokens.warmDisk(this@MainActivity) }
                 runCatching { Gecko.warmPools(this@MainActivity) }
+                runCatching { Market.warm(this@MainActivity) }
             }
         }
     }

@@ -24,13 +24,35 @@ ICON = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
 S = 1080 * 2            # rendered at 2160 and downsampled: the antialiasing comes from the shrink
 PHONE = 69.56 / 150.86  # the Seeker, width over height
-GROUND = (7, 11, 18)
-NEON_LOW = (149, 36, 243)
-NEON_HIGH = (11, 245, 236)
+# The launcher ground is bright on purpose, and this took two tries to get right.
+#
+# The mark itself is dark glass, which is the whole idea, and on a dark ground it read as
+# a hole: on a real home screen every neighbour (Play Store, Discord, WhatsApp) carries a
+# light or saturated fill, so a dark tile is the one that disappears. Lifting the ground
+# off black and warming the halo was not enough, because the subject stayed dark either
+# way. Inverting it is what worked: a saturated ground, the slab as a dark silhouette on
+# top of it. Size cannot help here, the launcher masks this to the middle two thirds and
+# the subject already fills them.
+#
+# GROUND stays for anything drawn on the app's own dark ground; the launcher uses the
+# gradient below.
+GROUND = (14, 22, 34)
+GROUND_HI = (22, 190, 130)
+GROUND_LO = (8, 90, 96)
+# Violet to blue to green, the three stops of the brand ramp. They must stay equal to
+# NEON_LOW / NEON_MID / NEON_HIGH in LoginDemo.kt: the door animates this same thread and
+# settles on this bitmap, so a different ramp there would land green on cyan.
+NEON_LOW = (153, 69, 255)
+NEON_MID = (76, 201, 255)
+NEON_HIGH = (20, 241, 149)
+
 
 
 def lerp(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(len(a)))
+def ramp(t):
+    """The brand thread, bottom to top. Two segments, like the door's."""
+    return lerp(NEON_LOW, NEON_MID, t * 2) if t < 0.5 else lerp(NEON_MID, NEON_HIGH, (t - 0.5) * 2)
 
 
 def glass(size, depth=0.0):
@@ -125,7 +147,7 @@ def draw_mark(size, scale=0.92, plate=True):
         for i in range(steps):
             ya = y1 - (y1 - y0) * i / steps
             yb = y1 - (y1 - y0) * (i + 1) / steps
-            c = lerp(NEON_LOW, NEON_HIGH, (i + 0.5) / steps) + (alpha,)
+            c = ramp((i + 0.5) / steps) + (alpha,)
             ld.line((x, ya, x, yb), fill=c, width=int(width))
         for yy, c in ((y1, NEON_LOW), (y0, NEON_HIGH)):
             ld.ellipse((x - width / 2, yy - width / 2, x + width / 2, yy + width / 2), fill=c + (alpha,))
@@ -150,11 +172,17 @@ def main():
     print("wrote web/apex/icon.png")
 
     # Launcher: adaptive icons show the middle 2/3, so the subject sits there on a full-bleed ground.
-    icon = Image.new("RGBA", (S, S), GROUND + (255,))
+    icon = Image.new("RGBA", (S, S))
+    px = icon.load()
+    for y in range(S):
+        for x in range(S):
+            px[x, y] = lerp(GROUND_HI, GROUND_LO, (x + y) / (2 * S)) + (255,)
     # The breath belongs here, on the full-bleed ground, not inside the subject's own square,
     # where the blur gets clipped and leaves a rectangle on whatever the mark is laid over.
     glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse((S * 0.22, S * 0.18, S * 0.78, S * 0.74), fill=(120, 140, 255, 30))
+    # A soft lift behind the subject, so the silhouette sits on something and does not
+    # look pasted on. Pale, not coloured: the ground already carries the colour.
+    ImageDraw.Draw(glow).ellipse((S * 0.22, S * 0.18, S * 0.78, S * 0.74), fill=(190, 255, 225, 70))
     icon.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * 0.09)))
     subject = draw_mark(int(S * 2 / 3), scale=1.0, plate=False)
     icon.alpha_composite(subject, (int(S / 6), int(S / 6)))

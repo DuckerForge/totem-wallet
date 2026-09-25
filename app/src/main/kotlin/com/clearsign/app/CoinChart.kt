@@ -95,6 +95,21 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
         candles = got
         fromPool = viaPool
         loading = false
+
+        // The other spans, fetched behind the first one. Switching span used to start from
+        // nothing every time: pace() holds each foreground call 900 ms and the round trip
+        // follows, so the same chart was paid for three times over. Gecko's background lane
+        // already widens its own gap and stands down three seconds behind anything in
+        // front, so this cannot slow down what the user is looking at, and series() caches
+        // for thirty minutes, which outlasts the visit.
+        if (mint != null && viaPool) {
+            withContext(Dispatchers.IO) {
+                for (other in Gecko.Span.entries) {
+                    if (other == span) continue
+                    runCatching { Gecko.series(mint, other, bg = true) }
+                }
+            }
+        }
     }
 
     // Only the spans the source can honestly draw. A coin with a mint can be

@@ -170,7 +170,10 @@ internal fun WalletHero(
         // something read at a glance: up or down, steady or jagged. See BalanceCurve for
         // what it is a chart of, which is not the obvious thing.
         Box(Modifier.fillMaxWidth()) {
-            if (curve.size >= 8) BalanceSpark(curve, curveCoins, Modifier.matchParentSize())
+            // The curve answers the tap, and lands where the pill above it lands: both are
+            // the same question, what did this do. It sits under HomeActions, which is
+            // declared after it and so takes its own taps first.
+            if (curve.size >= 8) BalanceSpark(curve, curveCoins, Modifier.matchParentSize().clickable(onClick = onPnl))
             HomeActions(enabled = owner != null, onAction = onAction)
         }
 

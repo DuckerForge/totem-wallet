@@ -32,6 +32,8 @@ object JupiterTokens {
         val change24h: Double? = null,
         val verified: Boolean = false,
         val liquidity: Double = 0.0,
+        /** What the registry says the coin is worth in total. Null when it does not say. */
+        val mcap: Double? = null,
         // What the registry knows about the coin itself, for TokenSafety. All of it
         // rides along in the same answer, so grading a coin costs no extra call.
         val organic: String? = null,
@@ -320,6 +322,7 @@ object JupiterTokens {
                 change24h = o.optJSONObject("stats24h")?.optDouble("priceChange")?.takeIf { !it.isNaN() },
                 verified = o.optBoolean("isVerified"),
                 liquidity = o.optDouble("liquidity").takeIf { !it.isNaN() } ?: 0.0,
+                mcap = o.optDouble("mcap").takeIf { !it.isNaN() && it > 0 },
                 organic = o.optString("organicScoreLabel").takeIf { it.isNotEmpty() },
                 // The raw authority fields are the truth; `audit` restates them as
                 // "disabled" booleans and adds what it knows about the holders.

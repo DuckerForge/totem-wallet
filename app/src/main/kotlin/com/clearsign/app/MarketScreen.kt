@@ -98,7 +98,10 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 byId[key.removePrefix("cg:")] ?: ranked.firstOrNull { it.key == key }
             } else {
                 ranked.firstOrNull { it.mint == key } ?: jup[key]?.let { t ->
-                    Market.Coin(id = key, symbol = t.symbol, name = t.name, image = t.icon, priceUsd = t.usd, marketCap = null, rank = null, change24h = t.change24h, mint = key)
+                    // The registry answers with the market cap in the same call, and dropping it
+                    // here is what emptied the comparison inside a favourite's sheet: that block
+                    // returns early with no cap, so it vanished without saying why.
+                    Market.Coin(id = key, symbol = t.symbol, name = t.name, image = t.icon, priceUsd = t.usd, marketCap = t.mcap, rank = null, change24h = t.change24h, mint = key)
                 } ?: solanaCoin(key)
             }
             // Priced now: remember it. Not priced now: show it as it was last time.

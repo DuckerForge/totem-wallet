@@ -88,8 +88,16 @@ def paste_rotated(canvas, layer, pivot_on_canvas, pivot_on_layer, degrees):
     canvas.alpha_composite(rot, (int(pivot_on_canvas[0] - pivot[0]), int(pivot_on_canvas[1] - pivot[1])))
 
 
-def draw_mark(size, scale=0.92, plate=True):
-    """The whole mark inside a square of `size`, the subject filling `scale` of it."""
+def draw_mark(size, scale=0.92, plate=True, detail=True, wings=None, thread=1.0):
+    """The whole mark inside a square of `size`, the subject filling `scale` of it.
+
+    `detail` draws the camera island, `wings` overrides the panels' fill, `thread` scales the
+    neon. The launcher passes detail=False with pale wings and a fatter thread, and the three
+    go together for one reason: at 48 px the island is three sub-pixel rings that read as
+    dirt, and dark wings behind a dark slab merge into one blob with no shape at all. Large,
+    on the door and the home chip, the island is exactly what says Seeker instead of any
+    black rectangle (see `phone` in LoginDemo.kt), so it stays there.
+    """
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     if plate:
         pl = Image.new("RGBA", (size, size))
@@ -115,6 +123,11 @@ def draw_mark(size, scale=0.92, plate=True):
     wing_w, wing_l = pw * 0.92, ph * 0.56
     for side in (-1, 1):
         layer = glass((int(wing_w), int(wing_l)), depth=0.12)
+        if wings:
+            flat = Image.new("RGBA", layer.size, (0, 0, 0, 0))
+            r = int(min(layer.size) * 0.10)
+            ImageDraw.Draw(flat).rounded_rectangle((0, 0, layer.width - 1, layer.height - 1), radius=r, fill=wings + (255,))
+            layer = flat
         pivot_layer = (wing_w / 2, wing_l * 0.42)
         pivot_canvas = (cx + side * pw * 0.34, cy + ph * 0.10)
         paste_rotated(im, layer, pivot_canvas, pivot_layer, -side * 58.0)
@@ -125,23 +138,24 @@ def draw_mark(size, scale=0.92, plate=True):
     w, h = body.size
     edge = (170, 190, 255, 150)
     ink = (22, 28, 44, 255)
-    iw, ih, ix, iy = w * 0.22, h * 0.29, w * 0.12, h * 0.05
-    lw = max(2, int(h * 0.007))
-    d.rounded_rectangle((ix, iy, ix + iw, iy + ih), radius=int(iw / 2), outline=edge, width=lw)
-    for k in range(3):
-        lx, ly, rr = ix + iw / 2, iy + ih * (0.19 + 0.31 * k), iw * 0.30
-        d.ellipse((lx - rr, ly - rr, lx + rr, ly + rr), fill=ink, outline=edge, width=lw)
-    fx, fy, fr = ix + iw * 1.45, iy + ih * 0.26, iw * 0.14
-    d.ellipse((fx - fr, fy - fr, fx + fr, fy + fr), outline=edge, width=lw)
-    bw = max(3, int(h * 0.014))
-    d.line((w - 1, h * 0.22, w - 1, h * 0.29), fill=edge, width=bw)
-    d.line((w - 1, h * 0.33, w - 1, h * 0.46), fill=edge, width=bw)
+    if detail:
+        iw, ih, ix, iy = w * 0.22, h * 0.29, w * 0.12, h * 0.05
+        lw = max(2, int(h * 0.007))
+        d.rounded_rectangle((ix, iy, ix + iw, iy + ih), radius=int(iw / 2), outline=edge, width=lw)
+        for k in range(3):
+            lx, ly, rr = ix + iw / 2, iy + ih * (0.19 + 0.31 * k), iw * 0.30
+            d.ellipse((lx - rr, ly - rr, lx + rr, ly + rr), fill=ink, outline=edge, width=lw)
+        fx, fy, fr = ix + iw * 1.45, iy + ih * 0.26, iw * 0.14
+        d.ellipse((fx - fr, fy - fr, fx + fr, fy + fr), outline=edge, width=lw)
+        bw = max(3, int(h * 0.014))
+        d.line((w - 1, h * 0.22, w - 1, h * 0.29), fill=edge, width=bw)
+        d.line((w - 1, h * 0.33, w - 1, h * 0.46), fill=edge, width=bw)
     im.alpha_composite(body, (int(cx - pw / 2), int(cy - ph / 2)))
 
     # the neon: the right edge itself, lit. A wide soft halo, the thread, a white-hot core.
     x = cx + pw / 2
     y0, y1 = cy - ph / 2 + ph * 0.092, cy + ph / 2 - ph * 0.092
-    core = max(3, int(ph * 0.011))
+    core = max(3, int(ph * 0.011 * thread))
     for width, alpha, blur in ((core * 8, 120, ph * 0.05), (core * 3, 200, ph * 0.012), (core, 255, 0)):
         layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         ld = ImageDraw.Draw(layer)
@@ -190,7 +204,7 @@ def main():
     # taste: rendered under a circle mask, 0.76 cuts the phone's bottom edge off and 0.72
     # puts it on the line. 0.70 is the largest that never clips, on a circle or a squircle.
     FILL = 0.70
-    subject = draw_mark(int(S * FILL), scale=1.0, plate=False)
+    subject = draw_mark(int(S * FILL), scale=1.0, plate=False, detail=False, wings=(112, 132, 172), thread=1.5)
     icon.alpha_composite(subject, (int(S * (1 - FILL) / 2), int(S * (1 - FILL) / 2)))
     for dpi, px in ICON.items():
         out = os.path.join(RES, f"mipmap-{dpi}", "ic_launcher_bird.png")

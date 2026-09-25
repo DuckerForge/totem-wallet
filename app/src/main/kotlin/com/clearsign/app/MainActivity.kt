@@ -448,10 +448,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                                                 HomeAction.CROWD -> showCrowd = true
                                                 HomeAction.TAP -> showTap = true
                                                 HomeAction.LINK -> showGift = true
-                                                // One "Agent" means one place. This used to open the
-                                                // chat directly, which with no key is a grey paragraph
-                                                // and a Close button, and never mentions the budget.
-                                                HomeAction.AGENT -> tab = Tab.AGENT
+                                                HomeAction.HEALTH -> showHealth = true
                                                 HomeAction.BRIDGE -> showBridge = true
                                                 HomeAction.MORE -> showMore = true
                                             }
@@ -552,7 +549,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                         HomeAction.SWAP -> showSwap = true
                         HomeAction.SCAN -> scanHome()
                         HomeAction.CROWD -> showCrowd = true
-                        HomeAction.AGENT -> tab = Tab.AGENT
+                        HomeAction.HEALTH -> showHealth = true
                         else -> {}
                     }
                 },

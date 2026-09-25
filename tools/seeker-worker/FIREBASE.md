@@ -51,6 +51,19 @@ qualsiasi ora.
 
   Il worker tiene al massimo sei righe per moneta, le più recenti, e butta quelle
   più vecchie di una settimana. Non tocca il KV.
+- `/clearsign/health` = `{ d, w, s, ms, spent, at }`, come sta andando la
+  scansione. `w` sono le scritture KV di oggi (il cron da solo ne fa ~430 su
+  mille), `s` quanti giri di fila hanno finito le quarantacinque chiamate, `ms`
+  la durata del giro. Lo scrive la scansione dentro la stessa `put` dello stato,
+  quindi **non costa nessuna scrittura KV in piu'**, e lo manda qui solo se le
+  restano chiamate: la sentinella non ruba mai niente al lavoro vero.
+
+  Lo legge `watchman.mjs` da **GitHub Actions**, cioe' da fuori Cloudflare. E'
+  il punto di tutto: Scout e' morto due volte in silenzio, e uno dei modi in cui
+  muore e' Cloudflare che smette di invocare il worker quando l'account finisce
+  le centomila richieste del giorno. Un allarme dentro il worker morirebbe con
+  lui. Non serve nessuna regola nuova: `.read` e' concesso su `clearsign` e
+  quello che si concede in alto non si toglie in basso.
 - Il worker scrive con il segreto, che sta in `FB_SECRET` fra i segreti di
   Cloudflare. **Mai in un file, mai nel repo, mai dentro l'APK.**
 - Il telefono legge senza chiave, perché il ramo è pubblico in lettura e sono

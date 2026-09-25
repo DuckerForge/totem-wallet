@@ -224,6 +224,7 @@ function fingerprint(s) {
 }
 
 async function sweep(env) {
+  const started = Date.now();
   // Il censimento, a pezzi: le balene con il loro indice, e i cinque blocchi di
   // delfini che toccano a questo giro. Il resto non si legge nemmeno.
   const rwRaw = await env.SEEKER.get("rw");
@@ -341,20 +342,27 @@ async function sweep(env) {
   // sei minuti sono 240.000 invocazioni al giorno e il piano gratuito ne da'
   // centomila: la stessa lettura sull'archivio non costa nessuna invocazione e
   // nessuna scrittura, perche' Firebase conta lo spazio e il traffico.
-  if (fp !== state.crowd) {
+  const changed = fp !== state.crowd;
+  if (changed) {
     await env.SEEKER.put("crowd", out);
     if (fbOn(env)) await fbPut(env, "crowd", out).catch(() => {});
   }
+  // La salute del giro viaggia dentro lo stato, che si scrive comunque: cosi' non
+  // costa nessuna scrittura in piu', ed e' il punto di tutto l'esercizio.
+  const h = health(state.h, now, 1 + (changed ? 1 : 0), started, BUDGET - left);
   await env.SEEKER.put(
     "state2",
     JSON.stringify({
-      buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length, crowd: fp, at: now,
+      buys, cursor, since: now - 30 * 60_000, spent: BUDGET - left, movers: movers.length, crowd: fp, at: now, h,
       // Quando abbiamo guardato ciascun blocco, così il prossimo giro che lo
       // riprende sa da dove leggere le firme invece di buttarle.
       seen: Object.assign({}, seen, Object.fromEntries(chunkIds.map((id) => [id, now]))),
       bal: bufToB64(bal.buffer),
     }),
   );
+  // Il bigliettino per il guardiano, ultima cosa e solo se resta margine: la
+  // sentinella non ruba mai una chiamata alla scansione.
+  if (fbOn(env) && left > 5) await fbPut(env, "health", JSON.stringify(h)).catch(() => {});
 }
 
 function bufToB64(buf) {
@@ -539,6 +547,40 @@ async function holdingsOf(env, addr, ctx) {
     return stored;
   }
   return (await refresh(env, addr)) || stored;
+}
+
+const DAY = 86400_000;
+
+/**
+ * Come sta andando la scansione, in cinque numeri, per chi guarda da fuori.
+ *
+ * Scout e' morto due volte in silenzio: il 15/09/2026 di CPU, il 16/09 con le
+ * mille scritture KV esaurite dalle letture degli utenti. Le due volte il primo
+ * segnale e' stato accorgersene guardando.
+ *
+ * Due avvertenze, scritte qui perche' non si perdano.
+ *
+ * `ms` e' tempo d'orologio, non di CPU: Cloudflare non espone al codice i
+ * millisecondi di CPU, che sono quelli del tetto. Il 15/09 il giro durava 40 ms
+ * d'orologio e moriva a 10 di CPU, quindi `ms` e' un indizio, non la misura. Il
+ * guasto lo prende comunque il guardiano, perche' `at` smette di avanzare.
+ *
+ * `w` conta le scritture di questo cron, non quelle dell'account: `holdingsOf`
+ * scrive `h:<addr>` quando l'archivio e' spento, e resta fuori dal conto.
+ *
+ * `s` e' quanti giri di fila hanno finito la riserva di chiamate: uno capita, tre
+ * vuol dire che la scansione arranca.
+ */
+function health(prev, now, writes, started, spent) {
+  const d = Math.floor(now / DAY);
+  return {
+    d,
+    w: prev && prev.d === d ? (prev.w || 0) + writes : writes,
+    s: spent >= BUDGET ? ((prev && prev.s) || 0) + 1 : 0,
+    ms: now - started,
+    spent,
+    at: now,
+  };
 }
 
 /**

@@ -360,9 +360,14 @@ async function sweep(env) {
       bal: bufToB64(bal.buffer),
     }),
   );
-  // Il bigliettino per il guardiano, ultima cosa e solo se resta margine: la
-  // sentinella non ruba mai una chiamata alla scansione.
-  if (fbOn(env) && left > 5) await fbPut(env, "health", JSON.stringify(h)).catch(() => {});
+  // The note for the watchman, last of everything.
+  //
+  // No guard on `left`, and the first draft got exactly that wrong: a healthy run ends
+  // at `spent: 44`, so a `left > 5` never let anything through and the watchman kept
+  // reporting that the note did not exist. There is nothing left to steal here anyway:
+  // the scan has finished, BUDGET stops at 45 of 50 to leave margin, and `crowd` just
+  // above and `chain` in warm() have always spent from that margin.
+  if (fbOn(env)) await fbPut(env, "health", JSON.stringify(h)).catch(() => {});
 }
 
 function bufToB64(buf) {

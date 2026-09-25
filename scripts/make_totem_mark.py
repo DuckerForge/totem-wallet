@@ -176,6 +176,49 @@ def draw_mark(size, scale=0.92, plate=True, detail=True, wings=None, thread=1.0)
     return im
 
 
+def draw_monogram(size):
+    """The launcher mark: a T, with the neon thread running down the stem's right edge.
+
+    The phone drawing lost here, and it is worth writing down why so nobody puts it back.
+    A phone is a dark rectangle, every phone is, and at 48 px the wings behind it read as
+    stray arrows rather than a bird. Six passes of recolouring never fixed that, because
+    the problem was the subject and not the palette. A letter is the one shape that keeps
+    its identity all the way down to a favicon.
+
+    The thread stays, because it is the one thing carried across every surface: the door
+    animates it, the brand ring sweeps it, and here it turns the stem into a lit edge.
+    """
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx = size / 2
+    t = size * 0.125                      # stroke, thick enough to survive a 48 px tile
+    top, bot = size * 0.245, size * 0.795
+    half = size * 0.265                   # the bar reaches a little wider than half the stem drop
+    ink = (18, 22, 36, 255)
+    d.rounded_rectangle((cx - half, top, cx + half, top + t), radius=int(t / 2), fill=ink)
+    d.rounded_rectangle((cx - t / 2, top, cx + t / 2, bot), radius=int(t / 2), fill=ink)
+
+    # The thread starts under the bar, not at the top: run it the whole way and it reads as
+    # a seam splitting the letter in two.
+    x = cx + t / 2
+    y0, y1 = top + t * 1.15, bot - t * 0.12
+    core = max(3, int(size * 0.019))
+    for width, alpha, blur in ((core * 6, 110, size * 0.035), (core * 2.4, 200, size * 0.009), (core, 255, 0)):
+        layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        ld = ImageDraw.Draw(layer)
+        steps = 60
+        for i in range(steps):
+            ya = y1 - (y1 - y0) * i / steps
+            yb = y1 - (y1 - y0) * (i + 1) / steps
+            ld.line((x, ya, x, yb), fill=ramp((i + 0.5) / steps) + (alpha,), width=int(width))
+        for yy, c in ((y1, NEON_LOW), (y0, NEON_HIGH)):
+            ld.ellipse((x - width / 2, yy - width / 2, x + width / 2, yy + width / 2), fill=c + (alpha,))
+        if blur:
+            layer = layer.filter(ImageFilter.GaussianBlur(blur))
+        im.alpha_composite(layer)
+    return im
+
+
 def main():
     # No plate: in the door and on the home chip a rounded square behind the mark reads as a
     # box around it, and the door already has its own ground.
@@ -204,7 +247,7 @@ def main():
     # taste: rendered under a circle mask, 0.76 cuts the phone's bottom edge off and 0.72
     # puts it on the line. 0.70 is the largest that never clips, on a circle or a squircle.
     FILL = 0.70
-    subject = draw_mark(int(S * FILL), scale=1.0, plate=False, detail=False, wings=(112, 132, 172), thread=1.5)
+    subject = draw_monogram(int(S * FILL))
     icon.alpha_composite(subject, (int(S * (1 - FILL) / 2), int(S * (1 - FILL) / 2)))
     for dpi, px in ICON.items():
         out = os.path.join(RES, f"mipmap-{dpi}", "ic_launcher_bird.png")

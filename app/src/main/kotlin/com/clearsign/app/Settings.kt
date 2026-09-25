@@ -181,11 +181,11 @@ object Settings {
     // is somebody on the other side: a thing that happens, not a thing you do. The bridge you do
     // alone, and it is the only way this wallet takes money out of Solana. Customize brings the
     // link back: same nine actions, only the front page changes.
-    // HEALTH and not AGENT: the agent already has one of the five tabs along the bottom, and a
-    // shortcut that only switches tab spends a slot to say what the tab bar already says. Wallet
-    // health was two taps down inside More, and it is the one thing here you would not think to
-    // go looking for.
-    val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "BRIDGE", "HEALTH")
+    // WIDGET and not AGENT: the agent already has one of the five tabs along the bottom, and a
+    // shortcut that only switches tab spends a slot to say what the tab bar already says. The
+    // bubble and the widget were two taps down inside More, and they are the parts of Totem that
+    // live outside Totem, so the front page is where someone would look for them.
+    val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "BRIDGE", "WIDGET")
 
     /**
      * A hand over the screen (the proximity sensor) covers the numbers. Off by default: it fired

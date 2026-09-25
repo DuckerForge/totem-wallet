@@ -39,6 +39,8 @@ enum class HIcon {
     SEAL,
     // brand: the carrier pigeon in a shield
     PIGEON,
+    /** The widget: a screen with one tile set down on it, which is what a widget is. */
+    WIDGET,
     // swap: two arrows
     SWAP,
     /** Following a coin. Outline while you are not, filled once you are. */
@@ -278,6 +280,12 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.CHEVRON_DOWN -> poly(6f, 9f, 12f, 15f, 18f, 9f)
             HIcon.CHEVRON_LEFT -> poly(15f, 6f, 9f, 12f, 15f, 18f)
             HIcon.MORE -> { dot(6f, 12f, 1.6f); dot(12f, 12f, 1.6f); dot(18f, 12f, 1.6f) }
+            // A screen, and one tile set down in its corner. The pigeon was standing in for this
+            // and read as a duck, which is a fair thing to say about a pigeon at 20 dp.
+            HIcon.WIDGET -> {
+                poly(4.5f, 4.5f, 19.5f, 4.5f, 19.5f, 19.5f, 4.5f, 19.5f, close = true)
+                poly(7.5f, 7.5f, 13f, 7.5f, 13f, 13f, 7.5f, 13f, close = true, fill = true)
+            }
             HIcon.CLOSE -> { line(6.5f, 6.5f, 17.5f, 17.5f); line(17.5f, 6.5f, 6.5f, 17.5f) }
             HIcon.SEARCH -> { circle(10.5f, 10.5f, 6.2f); line(15.1f, 15.1f, 20.5f, 20.5f) }
             // The search lens with what the crowd is doing drawn inside it. It used to be its

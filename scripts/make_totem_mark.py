@@ -39,8 +39,8 @@ PHONE = 69.56 / 150.86  # the Seeker, width over height
 # GROUND stays for anything drawn on the app's own dark surfaces; the launcher uses the
 # gradient below.
 GROUND = (14, 22, 34)
-GROUND_HI = (246, 248, 245)
-GROUND_LO = (214, 226, 224)
+GROUND_HI = (77, 255, 208)
+GROUND_LO = (26, 186, 178)
 # Violet to blue to green, the three stops of the brand ramp. They must stay equal to
 # NEON_LOW / NEON_MID / NEON_HIGH in LoginDemo.kt: the door animates this same thread and
 # settles on this bitmap, so a different ramp there would land green on cyan.

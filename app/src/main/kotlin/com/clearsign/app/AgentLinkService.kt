@@ -34,6 +34,8 @@ class AgentLinkService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(AppLocale.localized(base))
+
     override fun onCreate() {
         super.onCreate()
         Themes.load(this); Settings.load(this)

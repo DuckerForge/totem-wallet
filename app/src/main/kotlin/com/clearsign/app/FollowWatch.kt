@@ -47,7 +47,7 @@ object FollowWatch {
 
     class Watch(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
         override suspend fun doWork(): Result {
-            val ctx = applicationContext
+            val ctx = AppLocale.localized(applicationContext)
             if (!enabled(ctx)) return Result.success()
             val follows = Follows.all(ctx)
             if (follows.isEmpty()) return Result.success()

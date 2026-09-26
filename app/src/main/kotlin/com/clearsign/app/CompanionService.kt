@@ -96,6 +96,8 @@ class CompanionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(AppLocale.localized(base))
+
     override fun onCreate() {
         super.onCreate()
         alive = true
@@ -761,6 +763,18 @@ class CompanionService : Service() {
         fun repaint(ctx: Context) {
             if (!alive) return
             runCatching { ctx.startService(Intent(ctx, CompanionService::class.java).setAction(ACTION_REPAINT)) }
+        }
+
+        /**
+         * Start a running bubble again, so it comes back built in the language just chosen: its
+         * words are read once, at creation. The pause is the one [CompanionPage] needs too, a start
+         * that lands before the stop has finished is swallowed with it.
+         */
+        fun relaunch(ctx: Context) {
+            if (!alive) return
+            val app = ctx.applicationContext
+            stop(app)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ start(app) }, 400)
         }
 
         /** True when Android will let us draw over other apps. */

@@ -18,7 +18,6 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.clickable
@@ -62,17 +61,17 @@ class HealthWidget : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Responsive(setOf(TINY, SHORT, NARROW, WIDE, TALL))
 
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
+    override suspend fun provideGlance(appContext: Context, id: GlanceId) {
+        val context = AppLocale.localized(appContext)
         Themes.load(context); Settings.load(context)
         if (HealthWidgetData.isStale(context)) withTimeoutOrNull(6_000) { HealthWidgetData.refresh(context, updateWidgets = false) }
         val snapshot = HealthWidgetData.load(context)
         val palette = Halo.palette
-        provideContent { GlanceTheme { Content(snapshot, palette) } }
+        provideContent { GlanceTheme { Content(context, snapshot, palette) } }
     }
 
     @Composable
-    private fun Content(d: HealthWidgetData.Snapshot?, p: HaloPalette) {
-        val ctx = LocalContext.current
+    private fun Content(ctx: Context, d: HealthWidgetData.Snapshot?, p: HaloPalette) {
         val size = LocalSize.current
         val ringOnly = size.width < SHORT.width
         val wide = size.width >= WIDE.width
@@ -328,7 +327,8 @@ object HealthWidgetData {
     }
 
     /** The agent's state in one line, for the widget and the bubble. */
-    fun agentLine(ctx: Context): String? {
+    fun agentLine(context: Context): String? {
+        val ctx = AppLocale.localized(context)
         val p = SessionWallet.policy(ctx) ?: return null
         val h = SessionWallet.history(ctx)
         // While the loop is running, what it is doing beats what it is allowed to
@@ -361,7 +361,8 @@ object HealthWidgetData {
         )
     }
 
-    suspend fun refresh(ctx: Context, updateWidgets: Boolean = true) = withContext(Dispatchers.IO) {
+    suspend fun refresh(context: Context, updateWidgets: Boolean = true) = withContext(Dispatchers.IO) {
+        val ctx = AppLocale.localized(context)
         val owner = Settings.watchWallet(ctx) ?: return@withContext
         val rpc = SolanaRpc.urlFor(null)
         // A node that did not answer is not a wallet with nothing in it: the lenient reader made a

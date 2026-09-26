@@ -56,7 +56,7 @@ object Watchtower {
 
 class WatchWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        val ctx = applicationContext
+        val ctx = AppLocale.localized(applicationContext)
         val owner = Settings.watchWallet(ctx) ?: return@withContext Result.success()
         runCatching {
             val accounts = SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner, force = true)

@@ -159,7 +159,7 @@ object OrdersKeeper {
 
     class Worker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
         override suspend fun doWork(): Result {
-            val ctx = applicationContext
+            val ctx = AppLocale.localized(applicationContext)
             val owner = Settings.watchWallet(ctx)
             if (owner != null) {
                 runCatching { Orders.sync(ctx, owner) }.getOrDefault(emptyList()).forEach { o ->

@@ -43,7 +43,7 @@ object SeekerKeeper {
 
     class Scan(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
         override suspend fun doWork(): Result {
-            val ctx = applicationContext
+            val ctx = AppLocale.localized(applicationContext)
             if (!enabled(ctx)) return Result.success()
             // A failed pass is never a reason to retry immediately: the next hour
             // will compare against the same balances and lose nothing.

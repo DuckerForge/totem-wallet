@@ -40,7 +40,7 @@ object TraderKeeper {
 
     class Keeper(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
         override suspend fun doWork(): Result {
-            val ctx = applicationContext
+            val ctx = AppLocale.localized(applicationContext)
             // A budget past its day closes itself: sell, close, bring home, say the account.
             SessionWallet.current(ctx)?.takeIf { it.expired }?.let {
                 val owner = Settings.watchWallet(ctx)

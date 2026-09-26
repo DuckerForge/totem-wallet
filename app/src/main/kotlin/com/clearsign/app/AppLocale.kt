@@ -37,6 +37,19 @@ object AppLocale {
         }.getOrNull()
     }
 
+    /**
+     * [ctx] speaking the app's language. Android applies the per-app choice to activities, but
+     * a Service, a worker and the widget read the application's resources, which stay in the
+     * phone's language: the bubble and the widget were Italian inside an English app.
+     */
+    fun localized(ctx: Context): Context {
+        val tag = current(ctx) ?: return ctx
+        if (ctx.resources.configuration.locales[0]?.language == tag) return ctx
+        val conf = android.content.res.Configuration(ctx.resources.configuration)
+        conf.setLocales(LocaleList.forLanguageTags(tag))
+        return ctx.createConfigurationContext(conf)
+    }
+
     fun applied(): java.util.Locale? = appliedTag?.let { java.util.Locale.forLanguageTag(it) }
 
     fun set(ctx: Context, tag: String?) {
@@ -44,6 +57,9 @@ object AppLocale {
             ctx.getSystemService(LocaleManager::class.java)?.applicationLocales =
                 if (tag == null) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
             (ctx as? Activity)?.recreate()
+            // The surfaces outside the activity keep the old language until told.
+            HealthWidgetData.enqueue(ctx)
+            CompanionService.relaunch(ctx)
         } else {
             runCatching { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + ctx.packageName))) }
         }

@@ -258,6 +258,18 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var sendTo by remember { mutableStateOf<String?>(null) }
         var showReceive by remember { mutableStateOf(false) }
         var showSwap by remember { mutableStateOf(false) }
+        // Bumped to reload the home. Up here so a swap or a send can ask for it on closing.
+        var reload by remember { mutableStateOf(0) }
+        // A coin swapped away stayed on the home until a pull: nothing reloaded after the
+        // sheet closed. Reload now, and again once the chain has had time to land it.
+        fun reloadAfterSend(who: String?) {
+            reload++
+            scope.launch {
+                kotlinx.coroutines.delay(4_000)
+                who?.let { SolanaRpc.forgetTokens(it) }
+                reload++
+            }
+        }
         // A coin chosen in the market tab: the swap opens already pointing at it.
         var swapMint by remember { mutableStateOf<String?>(null) }
         // Asked from the card of a coin you hold: which one to sell, which one to send.
@@ -427,7 +439,6 @@ fun HomeScreen(signer: SeedVaultSigner) {
                         Tab.WALLET -> androidx.compose.runtime.CompositionLocalProvider(LocalEntrance provides remember { java.util.concurrent.atomic.AtomicInteger() }) {
                             // Pull down: everything on the page is asked again.
                             var pulling by remember { mutableStateOf(false) }
-                            var reload by remember { mutableStateOf(0) }
                             androidx.compose.material3.pulltorefresh.PullToRefreshBox(
                                 isRefreshing = pulling,
                                 onRefresh = {
@@ -542,7 +553,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 deal = bridgeDeal,
                 onGift = { showSend = false; showGift = true },
                 onPrivate = { to, amt -> showSend = false; privateSend = to to amt; showBridge = true },
-            ) { showSend = false; sendTo = null; sendMint = null; bridgeMemo = null; bridgeDeal = null; (ctx as? MainActivity)?.incoming = null }
+            ) { showSend = false; sendTo = null; sendMint = null; bridgeMemo = null; bridgeDeal = null; (ctx as? MainActivity)?.incoming = null; reloadAfterSend(owner) }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
         // A page, not a sheet: it sits over everything, tab bar included, because
@@ -610,7 +621,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         if (showGift && owner != null) GiftSheet(signer, owner) { showGift = false }
         if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label, onTap = { showReceive = false; showTap = true }) { showReceive = false }
         if ((showSwap || swapMint != null) && first != null) {
-            SwapSheet(signer, first.pubkeyBase58, buyMint = swapMint, sellMint = swapSellMint) { showSwap = false; swapMint = null; swapSellMint = null }
+            SwapSheet(signer, first.pubkeyBase58, buyMint = swapMint, sellMint = swapSellMint) { showSwap = false; swapMint = null; swapSellMint = null; reloadAfterSend(first.pubkeyBase58) }
         }
     }
 }

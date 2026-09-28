@@ -107,6 +107,8 @@ object WalletActions {
             ),
         )
         Haptics.success(ctx)
+        // The cached token list is from before this transaction: the next read asks the chain.
+        SolanaRpc.forgetTokens(owner)
         return Result.Sent(sig)
     }
 
@@ -147,6 +149,8 @@ object WalletActions {
             ),
         )
         Haptics.success(ctx)
+        // The cached token list is from before this transaction: the next read asks the chain.
+        SolanaRpc.forgetTokens(owner)
         return Result.Sent(sig)
     }
 

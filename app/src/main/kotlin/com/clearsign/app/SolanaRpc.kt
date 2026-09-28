@@ -166,6 +166,11 @@ object SolanaRpc {
     private val tokenListCache = ConcurrentHashMap<String, Cached<List<TokenAccountInfo>>>()
     private const val TOKEN_LIST_TTL_MS = 60_000L
 
+    /** Drop [owner]'s cached token list: after a send or a swap it is the list from before. */
+    fun forgetTokens(owner: String) {
+        tokenListCache.keys.removeIf { it.endsWith("|$owner") }
+    }
+
     /** Warm the caches for [owner] (call right after the account is picked, off-main). */
     fun prefetch(rpcUrl: String, owner: String) {
         runCatching { tokenAccountsOf(rpcUrl, owner, force = true) }

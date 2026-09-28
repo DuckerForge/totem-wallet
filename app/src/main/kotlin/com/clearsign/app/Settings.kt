@@ -187,15 +187,6 @@ object Settings {
     // live outside Totem, so the front page is where someone would look for them.
     val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "BRIDGE", "WIDGET")
 
-    /**
-     * A hand over the screen (the proximity sensor) covers the numbers. Off by default: it fired
-     * on the wrong thing, a thumb traveling up the screen passes the sensor, so scrolling locked
-     * the numbers and asked for a fingerprint. It stays for those who want it, and for the demo,
-     * where a hand laid over the top is exactly the gesture being shown.
-     */
-    fun coverToHide(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cover_hide", false)
-    fun setCoverToHide(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("cover_hide", on).apply()
-
     /** Priority fee for the transactions we build ourselves, in micro‑lamports per compute unit. 0 = none. */
     fun speed(ctx: Context): Long = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("speed", 0L)
     fun setSpeed(ctx: Context, microLamports: Long) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong("speed", microLamports).apply()

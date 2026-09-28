@@ -22,7 +22,7 @@ Built for **Clock In, the Solana Mobile hackathon** (deadline 8 October 2026). A
 
 **Portfolio and DeFi.** Tokens, native stake, SKR staked with the Guardians, Jupiter Lend and Jupiter positions, with the yield per day. Realized P&L per token, and a shareable P&L card.
 
-**Seeker specific.** Pay by touch (NFC host card emulation), write a Solana Pay request on an NFC sticker, exchange contacts by touching two Seekers (signed with the phone's attestation key), proof of payment as a QR signed by the phone, guest mode (cover the screen or long press the balance, fingerprint to come back), a floating companion bubble and a widget you can customise.
+**Seeker specific.** Pay by touch (NFC host card emulation), write a Solana Pay request on an NFC sticker, exchange contacts by touching two Seekers (signed with the phone's attestation key), proof of payment as a QR signed by the phone, guest mode (long press the balance, fingerprint to come back), a floating companion bubble and a widget you can customise.
 
 **Bridge.** Move SOL or USDC to and from other chains through RocketX, with the receipt before the signature and a plain line on what privacy it does and does not give.
 

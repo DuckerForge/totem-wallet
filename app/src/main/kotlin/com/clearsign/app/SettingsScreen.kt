@@ -73,7 +73,6 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
         SettingsGroup(stringResource(R.string.set_g_phone), stringResource(R.string.set_g_phone_sub), HIcon.QR) {
             CompanionLinkCard(owner)
             WatchtowerCard()
-            CoverCard()
         }
 
         SettingsGroup(stringResource(R.string.set_g_look), stringResource(R.string.set_g_look_sub), HIcon.PALETTE) {
@@ -353,21 +352,6 @@ private fun CompanionLinkCard(owner: String?) {
         }
     }
     if (open) CompanionPage(owner) { open = false }
-}
-
-/** A hand over the screen hides the numbers. Off for people who hold the phone near the face a lot. */
-@Composable
-private fun CoverCard() {
-    val ctx = LocalContext.current
-    var on by remember { mutableStateOf(Settings.coverToHide(ctx)) }
-    GlassCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                SectionTitle(stringResource(R.string.cover_title), stringResource(R.string.cover_sub), HIcon.LOCK)
-            }
-            androidx.compose.material3.Switch(checked = on, onCheckedChange = { on = it; Settings.setCoverToHide(ctx, it) })
-        }
-    }
 }
 
 @Composable

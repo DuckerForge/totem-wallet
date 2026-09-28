@@ -1635,8 +1635,6 @@
     <string name="home_customize_reset">Torna a com\'era</string>
     <string name="chip_title">Il tuo wallet</string>
     <string name="chip_info">È il conto del Seed Vault che Totem legge. La chiave non esce mai dal vault; ogni firma chiede la tua impronta.</string>
-    <string name="cover_title">Una mano sullo schermo nasconde i numeri</string>
-    <string name="cover_sub">Copri la parte alta dello schermo e le cifre si coprono fino alla tua impronta.</string>
     <string name="comp_page_title">Bolla e widget</string>
     <string name="comp_page_sub">La bolla galleggia sopra ogni app. Il widget sta sulla home. Tutti e due li fai tu.</string>
     <string name="comp_preview">Come sarà</string>

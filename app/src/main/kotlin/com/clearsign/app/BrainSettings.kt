@@ -169,7 +169,7 @@ private fun BrainField(label: String, value: String, hint: String = "", password
             singleLine = true,
             placeholder = { Text(hint, fontFamily = Inter, fontSize = 12.sp, color = Halo.muted) },
             textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Mono, fontSize = 12.sp, color = Halo.ink),
-            visualTransformation = if (password && !value.startsWith("•")) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.VisualTransformation.None,
+            visualTransformation = if (password && !value.startsWith("•")) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Halo.mint, unfocusedBorderColor = Halo.stroke,
                 focusedContainerColor = Halo.cardSoft, unfocusedContainerColor = Halo.cardSoft, cursorColor = Halo.mint,

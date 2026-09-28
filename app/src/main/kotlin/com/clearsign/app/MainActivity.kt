@@ -165,7 +165,6 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         stopReaderMode()
-        runCatching { getSystemService(android.hardware.SensorManager::class.java).unregisterListener(proximity) }
     }
 
     override fun onDestroy() {
@@ -173,26 +172,9 @@ class MainActivity : ComponentActivity() {
         Voice.release()
     }
 
-    // A hand over the top of the screen, where the proximity sensor is, covers
-    // the numbers: the same guest mode, with the print to come back.
-    private val proximity = object : android.hardware.SensorEventListener {
-        override fun onSensorChanged(e: android.hardware.SensorEvent) {
-            val near = e.values.firstOrNull()?.let { it < (e.sensor.maximumRange.coerceAtLeast(1f) / 2f) } ?: false
-            if (near && Settings.coverToHide(this@MainActivity) && !Settings.guest.value && Settings.watchWallet(this@MainActivity) != null) {
-                Settings.guest.value = true
-                Haptics.success(this@MainActivity)
-            }
-        }
-        override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
-    }
-
     override fun onResume() {
         super.onResume()
         startReaderMode()
-        runCatching {
-            val sm = getSystemService(android.hardware.SensorManager::class.java)
-            sm.getDefaultSensor(android.hardware.Sensor.TYPE_PROXIMITY)?.let { sm.registerListener(proximity, it, android.hardware.SensorManager.SENSOR_DELAY_NORMAL) }
-        }
         // The widget mirrors what the app knows; refresh it whenever we come to the front.
         lifecycleScope.launch { runCatching { HealthWidgetData.refresh(this@MainActivity) } }
         // A paired agent link should be listening whenever the phone is up.

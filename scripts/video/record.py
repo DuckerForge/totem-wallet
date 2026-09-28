@@ -73,14 +73,14 @@ def key(name: str) -> None:
     sh("shell", "input", "keyevent", f"KEYCODE_{name.upper()}")
 
 
-def find(label: str) -> tuple[int, int] | None:
+def find(label: str, last: bool = False) -> tuple[int, int] | None:
     """Il centro della scritta [label] sullo schermo, adesso. None se non c'e'."""
     sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
     xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
-    needle = f'text="{label}"'
-    i = xml.find(needle)
+    look = xml.rfind if last else xml.find
+    i = look(f'text="{label}"')
     if i < 0:
-        i = xml.find(f'content-desc="{label}"')
+        i = look(f'content-desc="{label}"')
         if i < 0:
             return None
     j = xml.find('bounds="[', i)
@@ -96,8 +96,79 @@ def find(label: str) -> tuple[int, int] | None:
     return (x1 + x2) // 2, (y1 + y2) // 2
 
 
+# When the current take started, for the ("at", ...) steps.
+T0 = 0.0
+# Where labels were on screen at the last ("scan", ...), for ("at", T, "seen", label).
+SEEN: dict[str, tuple[int, int]] = {}
+
+
+def scan(labels: list[str]) -> None:
+    """One screen read for several labels: each lookup costs seconds, one read costs one."""
+    sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
+    xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
+    for label in labels:
+        i = xml.find(f'text="{label}"')
+        j = xml.find('bounds="[', i) if i >= 0 else -1
+        if j < 0:
+            SEEN.pop(label, None)
+            continue
+        a, b = xml[j + 9: xml.find('"', j + 9)].split("][")
+        x1, y1 = (int(v) for v in a.split(","))
+        x2, y2 = (int(v) for v in b.rstrip("]").split(","))
+        SEEN[label] = ((x1 + x2) // 2, (y1 + y2) // 2)
+
+
 def do(step: tuple) -> None:
     kind = step[0]
+    if kind == "scan":
+        scan(list(step[1:]))
+        return
+    if kind == "at":
+        # ("at", T, "text", label[, hint, "left"|"right"]) taps [label] at T seconds into the
+        # take; ("at", T, "swipe", x1, y1, x2, y2) swipes then. Looking a label up costs two
+        # to four seconds, so it is looked up first and the tap waits for its second: the
+        # screen changes on the word, not four seconds after it. A label out of a sideways
+        # row is brought in by swiping the row where [hint] sits.
+        at, what = step[1], step[2]
+        pos = None
+        if what == "text":
+            time.sleep(0.8)  # let the previous tap land before reading the screen
+            pos = find(step[3])
+            if pos is None and len(step) > 4:
+                hint = find(step[4])
+                if hint is not None:
+                    a, b = (1000, 250) if step[5] == "left" else (250, 1000)
+                    swipe(a, hint[1], b, hint[1], 250)
+                    time.sleep(0.8)
+                    pos = find(step[3])
+            if pos is None:
+                print(f"    (non trovo «{step[3]}» sullo schermo)")
+                return
+        elif what == "xy":
+            pos = (step[3], step[4])
+        elif what == "seen":
+            pos = SEEN.get(step[3])
+            if pos is None:
+                print(f"    (non ho visto «{step[3]}» nell'ultima lettura)")
+                return
+        elif what == "key":
+            pos = None
+        late = time.time() - T0 - at
+        if late < 0:
+            time.sleep(-late)
+        # Never touch anything outside Totem: an edge swipe once took the take to the
+        # Android home and recorded the other apps.
+        if not in_app():
+            raise RuntimeError("Totem is not in front: stopping the take")
+        elif late > 0.3:
+            print(f"    ({what} {step[3:4]} arrives {late:.1f}s late)")
+        if what == "key":
+            key(step[3])
+        elif pos is not None:
+            tap(*pos)
+        else:
+            swipe(*step[3:7])
+        return
     if kind == "close":
         # Chiudere «quello che c'e' sopra» non e' un punto sullo schermo: in alto a
         # sinistra la home ha l'interruttore della luce e Scout ha la freccia, e toccare
@@ -116,6 +187,13 @@ def do(step: tuple) -> None:
         elif "one round a minute" in xml:
             # Un ModalBottomSheet si chiude toccando il velo sopra di lui.
             tap(600, 110)
+        elif 'content-desc="Close"' in xml:
+            # The sheets' own X (swap, receive): tapping it never leaves the app.
+            tap(*find("Close"))
+        elif 'text="Save and follow"' in xml:
+            # A coin opened from the market has no Back label: every scene after it stayed
+            # stuck there. System back only here, anywhere else it leaves the app and locks it.
+            key("back")
         return
     if kind == "seek":
         # Scorre finche' la scritta non compare. Un tocco su un'intestazione che apre e
@@ -129,14 +207,22 @@ def do(step: tuple) -> None:
             swipe(600, 1900, 600, 1250)
             time.sleep(1.1)
         print(f"    (non trovo «{step[1]}» nemmeno scorrendo)")
-    elif kind == "text":
-        at = find(step[1])
+    elif kind in ("text", "textlast"):
+        # textlast: the same words twice on screen, like a sheet titled Start with a Start button.
+        at = find(step[1], last=kind == "textlast")
         if at is None:
             print(f"    (non trovo «{step[1]}» sullo schermo)")
         else:
             tap(*at)
     elif kind == "tap":
         tap(step[1], step[2])
+        if step[2] == TAB_Y:
+            # A tab keeps its scroll: the home left at the bottom by the ORE scene hid
+            # Receive, Swap and Bridge from every scene after it. Back to the top.
+            time.sleep(0.6)
+            for _ in range(3):
+                swipe(600, 700, 600, 2100, 150)
+                time.sleep(0.3)
     elif kind == "swipe":
         swipe(*step[1:])
     elif kind == "key":
@@ -146,7 +232,10 @@ def do(step: tuple) -> None:
     elif kind == "stop":
         sh("shell", "am", "force-stop", PKG)
     elif kind == "launch":
-        sh("shell", "am", "start", "-n", ACT)
+        # `am start` on a running Totem stacks a second copy on top: the first one stops,
+        # which locks it, and the new one opens at the door. Only launch when not in front.
+        if not in_app():
+            sh("shell", "am", "start", "-n", ACT)
     elif kind == "start":
         sh("shell", "am", "start", "-n", step[1])
     else:
@@ -172,7 +261,8 @@ def unlocked() -> bool:
 
 def in_app() -> bool:
     """La finestra a fuoco e' la nostra. Non dice se e' sbloccata, dice dove siamo."""
-    return PKG in sh("shell", "dumpsys", "window", "windows")
+    # The focused window, not any window: the bubble is ours too and floats over everything.
+    return any(PKG in line for line in sh("shell", "dumpsys", "window").splitlines() if "mCurrentFocus" in line)
 
 
 def wait_unlocked(limit: float = 180) -> bool:
@@ -195,8 +285,10 @@ def record(key_name: str, seconds: float, steps: list[tuple]) -> Path:
     # `--time-limit` e' la rete di sicurezza: se qualcosa si pianta, si ferma da solo.
     rec = subprocess.Popen(
         ["adb", "shell", "screenrecord", "--bit-rate", "16M", "--time-limit",
-         str(int(seconds) + 6), remote],
+         str(int(seconds) + 40), remote],
     )
+    global T0
+    T0 = time.time()
     time.sleep(1.2)   # screenrecord ci mette un attimo ad aprire l'encoder
     try:
         for step in steps:
@@ -304,7 +396,7 @@ def scene_swap() -> list[tuple]:
         ("text", "Swap"), ("wait", 4.5),
         ("swipe", 600, 1800, 600, 1300), ("wait", 4.0),
         ("close",), ("wait", 1.5),
-        ("text", "Bridge"), ("wait", 5.0),
+        ("text", "Bridge"), ("wait", 9.0),
     ]
 
 

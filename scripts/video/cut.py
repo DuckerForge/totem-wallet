@@ -78,6 +78,60 @@ def background(lay: Layout, out: Path) -> Path:
     return out
 
 
+BG_LOOP = 40.0
+
+
+def animated_background(lay: Layout, out: Path, seconds: float = BG_LOOP, fps: int = 30) -> Path:
+    """
+    The ground, moving: three soft lights in the brand's colours drifting on slow closed
+    paths, and a few specks of light rising. Everything turns a whole number of times in
+    [seconds], so the loop has no seam. Drawn at a quarter size and scaled up: it is all
+    blur, the detail would be wasted. Dim on purpose, the phone is the video.
+    """
+    import math
+
+    import numpy as np
+
+    if out.exists():
+        return out
+    w, h = lay.w // 4, lay.h // 4
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    ground = np.array(GROUND[:3], np.float32)
+    lights = [  # colour, strength, size, path (cx, cy, rx, ry, turns, phase)
+        ((0x95, 0x24, 0xF3), 0.22, 0.42, (0.22, 0.30, 0.10, 0.12, 1, 0.0)),
+        ((0x4C, 0xC9, 0xFF), 0.16, 0.38, (0.80, 0.70, 0.12, 0.10, 1, 2.1)),
+        ((0x4D, 0xFF, 0xD0), 0.10, 0.30, (0.55, 0.15, 0.15, 0.08, 2, 4.0)),
+    ]
+    rng = np.random.default_rng(7)
+    specks = [(rng.random(), rng.random(), 0.6 + rng.random() * 1.4, 0.10 + rng.random() * 0.22,
+               int(rng.integers(1, 3)), rng.random() * 6.28) for _ in range(26)]
+    enc = subprocess.Popen([
+        "ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
+        "-r", str(fps), "-i", "-", "-vf", f"scale={lay.w}:{lay.h}:flags=bicubic",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", str(out)],
+        stdin=subprocess.PIPE)
+    n = int(seconds * fps)
+    for i in range(n):
+        a = 2 * math.pi * i / n
+        img = np.broadcast_to(ground, (h, w, 3)).copy()
+        for col, k, size, (cx, cy, rx, ry, turns, ph) in lights:
+            px = (cx + rx * math.cos(a * turns + ph)) * w
+            py = (cy + ry * math.sin(a * turns + ph)) * h
+            s2 = 2 * (size * w) ** 2
+            g = np.exp(-((xx - px) ** 2 + (yy - py) ** 2) / s2) * k
+            img += g[..., None] * (np.array(col, np.float32) - ground)
+        for sx, sy, r, k, turns, ph in specks:
+            py = ((sy - i / n) % 1.0) * h
+            px = sx * w + 3 * math.sin(a * 2 + ph)
+            tw = k * (0.6 + 0.4 * math.sin(a * 3 * turns + ph))
+            g = np.exp(-((xx - px) ** 2 + (yy - py) ** 2) / (2 * r * r)) * tw
+            img += g[..., None] * (np.array((190, 240, 255), np.float32) - img)
+        enc.stdin.write(np.clip(img, 0, 255).astype(np.uint8).tobytes())
+    enc.stdin.close()
+    enc.wait()
+    return out
+
+
 def stage(lay: Layout, work: Path) -> dict:
     """Prepara fondo, telefono e maschera per una disposizione. Una volta sola."""
     d = work / lay.name
@@ -89,6 +143,12 @@ def stage(lay: Layout, work: Path) -> dict:
     base = Image.open(background(lay, d / "bg.png")).convert("RGBA")
     base.alpha_composite(back, (lay.phone_x, lay.phone_y))
     base.convert("RGB").save(d / "base.png")
+
+    # The phone's body alone, for the moving ground.
+    body = Image.new("RGBA", (lay.w, lay.h), (0, 0, 0, 0))
+    body.alpha_composite(back, (lay.phone_x, lay.phone_y))
+    body.save(d / "body.png")
+    animated_background(lay, d / "bg.mp4")
 
     over = Image.new("RGBA", (lay.w, lay.h), (0, 0, 0, 0))
     over.alpha_composite(front, (lay.phone_x, lay.phone_y))
@@ -110,7 +170,8 @@ def stage(lay: Layout, work: Path) -> dict:
 
 
 def scene(lay: Layout, st: dict, clip: Path, seconds: float, text: str | None,
-          label: str | None, out: Path, start: float = 0.0, fps: int = 30) -> Path:
+          label: str | None, out: Path, start: float = 0.0, fps: int = 30,
+          bg_at: float | None = None, chips: list[tuple[Path, float]] | None = None) -> Path:
     """Una scena montata, pronta per essere cucita alle altre."""
     d = st["dir"]
     f = st["frame"]
@@ -130,15 +191,24 @@ def scene(lay: Layout, st: dict, clip: Path, seconds: float, text: str | None,
     # lo schermo di quel telefono: forzare le misure non deforma niente e
     # toglie di mezzo tutta la questione.
     chain = [
-        f"[1:v]scale={f.screen_w}:{f.screen_h},setsar=1[scr]",
+        # The phone records a frame only when the screen changes: seeking into a still
+        # stretch found nothing and showed black. fps fills the gaps with the last frame.
+        f"[1:v]fps={fps},trim=start={start:.3f}:duration={seconds:.3f},setpts=PTS-STARTPTS,"
+        f"scale={f.screen_w}:{f.screen_h},setsar=1[scr]",
         "[3:v]alphaextract[am]",
         "[scr][am]alphamerge[scrm]",
-        f"[0:v][scrm]overlay={st['sx']}:{st['sy']}[a]",
+        f"[ground][scrm]overlay={st['sx']}:{st['sy']}[a]",
         "[a][2:v]overlay=0:0[b]",
     ]
     last = "b"
-    ins = ["-loop", "1", "-i", str(d / "base.png"),
-           "-ss", f"{start}", "-t", f"{seconds}", "-i", str(clip),
+    if bg_at is None:
+        # The still ground, phone body already on it.
+        ins = ["-loop", "1", "-i", str(d / "base.png")]
+        chain.insert(0, "[0:v]null[ground]")
+    else:
+        # The moving ground at the film's own clock, so two scenes crossfading agree on it.
+        ins = ["-stream_loop", "-1", "-ss", f"{bg_at % BG_LOOP:.3f}", "-i", str(d / "bg.mp4")]
+    ins += ["-i", str(clip),
            "-loop", "1", "-i", str(d / "over.png"),
            "-loop", "1", "-i", str(d / "screenmask.png")]
     if card:
@@ -151,6 +221,31 @@ def scene(lay: Layout, st: dict, clip: Path, seconds: float, text: str | None,
         )
         chain.append(f"[{last}][cd]overlay={lay.text_x}:{lay.text_y}[c]")
         last = "c"
+
+    if bg_at is not None:
+        ins += ["-loop", "1", "-i", str(d / "body.png")]
+        chain.insert(0, f"[0:v][{4 + (1 if card else 0)}:v]overlay=0:0[ground]")
+
+    # The words the voice says, as chips under the caption, each fading in as it is said.
+    # They wrap like text and stay until the scene ends.
+    if chips:
+        idx = 4 + (1 if card else 0) + (1 if bg_at is not None else 0)
+        top = lay.text_y + (Image.open(card).height if card else 0) + 28
+        x, y, row_h = 0, top, 0
+        for k, (png, at) in enumerate(chips):
+            cw, ch = Image.open(png).size
+            if x and x + cw > lay.text_w:
+                x, y, row_h = 0, y + row_h + 16, 0
+            ins += ["-loop", "1", "-i", str(png)]
+            t_in = max(0.0, min(at, seconds - 0.6))
+            chain.append(
+                f"[{idx + k}:v]format=rgba,fade=t=in:st={t_in:.2f}:d=0.25:alpha=1,"
+                f"fade=t=out:st={max(0.1, seconds - 0.5):.2f}:d=0.5:alpha=1[chip{k}]"
+            )
+            chain.append(f"[{last}][chip{k}]overlay={lay.text_x + x}:{y}[k{k}]")
+            last = f"k{k}"
+            x += cw + 16
+            row_h = max(row_h, ch)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *ins,

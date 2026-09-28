@@ -68,7 +68,7 @@ def padded(clip: Path, need: float, start: float, work: Path) -> Path:
     out = work / f"pad_{clip.stem}.mp4"
     run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(clip),
         "-vf", f"tpad=stop_mode=clone:stop_duration={need - have + 0.3:.2f}",
-        "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out))
+        "-an", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", str(out))
     return out
 
 

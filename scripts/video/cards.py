@@ -81,6 +81,34 @@ def subtitle(text: str, width: int, size: int = 44, color=INK, name: str = "inte
     return img
 
 
+RED = (255, 90, 106, 255)
+AMBER = (255, 194, 75, 255)
+CYAN = (76, 201, 255, 255)
+
+
+def chip(icon_name: str, label: str, tint=MINT, size: int = 30) -> Image.Image:
+    """
+    The word the voice just said, with its icon: a pill like the app's chips, the
+    icon drawn by the app's own code (icons.py), the word in Inter.
+    """
+    import icons
+
+    fnt = font("inter.ttf", size)
+    probe = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
+    ic = round(size * 1.25)
+    pad_x, pad_y, gap = round(size * 0.6), round(size * 0.42), round(size * 0.4)
+    w = pad_x + ic + gap + round(probe.textlength(label, font=fnt)) + pad_x
+    h = ic + 2 * pad_y
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=h // 2,
+                        fill=tint[:3] + (22,), outline=tint[:3] + (110,), width=2)
+    img.alpha_composite(icons.icon(icon_name, tint, ic), (pad_x, pad_y))
+    ty = (h - (fnt.getbbox("Ag")[3] - fnt.getbbox("Ag")[1])) // 2 - fnt.getbbox("Ag")[1]
+    d.text((pad_x + ic + gap, ty), label, font=fnt, fill=INK)
+    return img
+
+
 def title(text: str, width: int, size: int = 92) -> Image.Image:
     """Un cartello grande, per l'apertura e la chiusura."""
     return subtitle(text, width, size=size, name="sora.ttf", leading=1.16)

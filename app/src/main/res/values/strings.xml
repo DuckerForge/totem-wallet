@@ -607,7 +607,9 @@
         <item quantity="one">%1$d thing to fix</item>
         <item quantity="other">%1$d things to fix</item>
     </plurals>
-    <string name="health_fix_hint">Fix these in “Delegations &amp; accounts” below. One signature.</string>
+    <string name="health_fix_hint">Each fix is one signature, with the receipt first.</string>
+    <string name="health_fix_revoke">Revoke %1$s</string>
+    <string name="health_fix_close">Reclaim the rent (+%1$s SOL)</string>
     <plurals name="health_unlimited">
         <item quantity="one">%1$d unlimited approval — %2$s can drain those tokens</item>
         <item quantity="other">%1$d unlimited approvals — %2$s can drain those tokens</item>

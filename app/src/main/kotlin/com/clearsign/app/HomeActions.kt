@@ -368,7 +368,7 @@ internal fun PnlSheet(onDismiss: () -> Unit) {
 
 /** Wallet health, reachable from the home without turning the home into a dashboard. */
 @Composable
-internal fun HealthSheet(owner: String?, onDismiss: () -> Unit) {
+internal fun HealthSheet(owner: String?, signer: SeedVaultSigner, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -379,7 +379,7 @@ internal fun HealthSheet(owner: String?, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Space.md),
         ) {
             Text(stringResource(R.string.health_title), style = HaloType.title, color = Halo.ink)
-            WalletHealthCard(owner)
+            WalletHealthCard(owner, signer)
             ForgottenMoneyCard(owner)
             androidx.compose.foundation.layout.Spacer(Modifier.size(Space.sm))
         }

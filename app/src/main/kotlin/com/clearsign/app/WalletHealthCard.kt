@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,14 +43,18 @@ import kotlinx.coroutines.withContext
 
 /** The wow card: a live security score for the connected wallet, with issues → the fix flow below. */
 @Composable
-internal fun WalletHealthCard(owner: String?, refreshKey: Int = 0) {
+internal fun WalletHealthCard(owner: String?, signer: SeedVaultSigner? = null, refreshKey: Int = 0) {
     val ctx = LocalContext.current
     if (owner == null) return
-    val health by produceState<WalletHealth?>(initialValue = null, owner, refreshKey) {
+    // After a fix the card reads the chain again, so the score moves in front of you.
+    var fixed by remember { mutableIntStateOf(0) }
+    val accounts by produceState<List<SolanaRpc.TokenAccountInfo>?>(initialValue = null, owner, refreshKey, fixed) {
         value = withContext(Dispatchers.IO) {
-            runCatching { WalletHealth.of(owner, SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner, force = refreshKey > 0)) }.getOrNull()
+            runCatching { SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner, force = refreshKey > 0 || fixed > 0) }.getOrNull()
         }
     }
+    val health = accounts?.let { WalletHealth.of(owner, it) }
+    var action by remember { mutableStateOf<HygieneAction?>(null) }
     val h = health
     val color = when (h?.band) {
         WalletHealth.Band.GREAT -> Halo.mint; WalletHealth.Band.OK -> Halo.cyan
@@ -69,9 +75,11 @@ internal fun WalletHealthCard(owner: String?, refreshKey: Int = 0) {
                         },
                         fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink,
                     )
+                    // A frozen account is reported but not counted: "things to fix" promised a fix it cannot have.
+                    val toFix = h?.issues?.filter { it.kind != HealthIssue.Kind.FROZEN }?.sumOf { it.count } ?: 0
                     if (h != null) Text(
-                        if (h.isClean) stringResource(R.string.health_clean) else h.issues.sumOf { it.count }.let { n -> pluralStringResource(R.plurals.health_issues, n, n) },
-                        fontFamily = Inter, fontSize = 12.sp, color = if (h.isClean) Halo.mint else color,
+                        if (toFix == 0) stringResource(R.string.health_clean) else pluralStringResource(R.plurals.health_issues, toFix, toFix),
+                        fontFamily = Inter, fontSize = 12.sp, color = if (toFix == 0) Halo.mint else color,
                     )
                 }
             }
@@ -92,12 +100,30 @@ internal fun WalletHealthCard(owner: String?, refreshKey: Int = 0) {
                     }
                 }
             }
-            // The hint is about the issues that have a fix. With only a frozen
-            // account to report there is nothing to send anybody to.
-            if (h != null && h.issues.any { it.kind != HealthIssue.Kind.FROZEN }) {
-                Text(stringResource(R.string.health_fix_hint), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+            // The fixes, here. The card used to send you to another card "below", which on the
+            // health sheet did not exist: "1 thing to fix" and nothing that fixed it.
+            val list = accounts
+            if (signer != null && list != null) {
+                list.filter { it.hasActiveDelegate }.forEach { a ->
+                    GhostButton(stringResource(R.string.health_fix_revoke, TokenSymbols.symbol(a.mint)), Modifier.fillMaxWidth(), HIcon.UNLOCK, tint = Halo.amber) {
+                        action = HygieneAction.Revoke(a)
+                    }
+                }
+                val empties = list.filter { it.isClosableBy(owner) }.take(10)
+                if (empties.isNotEmpty()) {
+                    GhostButton(stringResource(R.string.health_fix_close, fmtSol(empties.sumOf { it.lamports }, 4)), Modifier.fillMaxWidth(), HIcon.TRASH, tint = Halo.cyan) {
+                        action = HygieneAction.Close(empties)
+                    }
+                }
+                if (h != null && h.issues.any { it.kind != HealthIssue.Kind.FROZEN }) {
+                    Text(stringResource(R.string.health_fix_hint), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
+                }
             }
         }
+    }
+    val a = action
+    if (a != null && signer != null) {
+        HygieneSheet(a, signer, owner, onDismiss = { done -> action = null; if (done) fixed++ })
     }
 }
 

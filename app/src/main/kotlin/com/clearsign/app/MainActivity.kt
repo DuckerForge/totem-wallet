@@ -605,7 +605,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
         if (showBridgeHistory) {
             BridgeHistorySheet { showBridgeHistory = false }
         }
-        if (showHealth) HealthSheet(owner) { showHealth = false }
+        if (showHealth) HealthSheet(owner, signer) { showHealth = false }
         if (showPnl) PnlSheet { showPnl = false }
         if (showGift && owner != null) GiftSheet(signer, owner) { showGift = false }
         if (showReceive && first != null) ReceiveSheet(first.pubkeyBase58, first.label, onTap = { showReceive = false; showTap = true }) { showReceive = false }
@@ -644,7 +644,7 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
                 }
 
                 // ---- Wallet health (the score) --------------------------------
-                WalletHealthCard(owner)
+                WalletHealthCard(owner, signer)
                 ForgottenMoneyCard(owner)
 
                 // ---- Delegations & accounts (the one-tap fixes) ---------------

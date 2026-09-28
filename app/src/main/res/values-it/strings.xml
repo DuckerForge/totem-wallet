@@ -607,7 +607,9 @@
         <item quantity="one">%1$d cosa da sistemare</item>
         <item quantity="other">%1$d cose da sistemare</item>
     </plurals>
-    <string name="health_fix_hint">Correggi in «Deleghe e account» qui sotto. Una firma sola.</string>
+    <string name="health_fix_hint">Ogni correzione è una firma, con la ricevuta prima.</string>
+    <string name="health_fix_revoke">Revoca %1$s</string>
+    <string name="health_fix_close">Recupera l\'affitto (+%1$s SOL)</string>
     <plurals name="health_unlimited">
         <item quantity="one">%1$d approvazione illimitata — %2$s può drenare quei token</item>
         <item quantity="other">%1$d approvazioni illimitate — %2$s può drenare quei token</item>

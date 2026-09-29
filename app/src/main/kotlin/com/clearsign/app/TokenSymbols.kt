@@ -54,6 +54,8 @@ object TokenSymbols {
     fun isKnown(mint: String): Boolean = known.containsKey(mint) || learned.containsKey(mint)
     fun name(mint: String): String? = names[mint]
     fun image(mint: String): String? = knownImages[mint] ?: images[mint]
+    /** The logo we fixed for this mint, whatever list the coin came from. */
+    fun canonicalImage(mint: String): String? = knownImages[mint]
     fun isNft(mint: String): Boolean = mint in nfts
 
     /**

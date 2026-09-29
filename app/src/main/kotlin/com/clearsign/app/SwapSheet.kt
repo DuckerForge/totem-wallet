@@ -2,6 +2,7 @@
 
 package com.clearsign.app
 
+import com.clearsign.core.Spare
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +32,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,14 +80,22 @@ private sealed interface SwapState {
         val ultraRequestId: String? = null,
         val ultraSlippageBps: Int = 0,
         val gasless: Boolean = false,
+        /** The amount asked for, in the paying coin's smallest units. */
+        val raw: Long = 0L,
     ) : SwapState
     data object Signing : SwapState
-    data class Done(val signature: String) : SwapState
+    data class Done(
+        val signature: String,
+        /** It was the spare change swap. */
+        val spare: Boolean = false,
+        /** The most SOL the wallet can hold once this swap lands, when it spent SOL; null otherwise. */
+        val solLeft: Long? = null,
+    ) : SwapState
     data class Error(val message: String) : SwapState
 }
 
 @Composable
-internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? = null, sellMint: String? = null, onDismiss: () -> Unit) {
+internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? = null, sellMint: String? = null, spare: Boolean = false, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -117,14 +127,46 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
         to = if (real == POPULAR[1].mint) POPULAR[0] else POPULAR[1]
     }
     var amount by remember { mutableStateOf("") }
+    // This swap empties the spare change jar into stORE: signed and counted as such.
+    var spareMode by remember { mutableStateOf(false) }
+    // The jar's amount as startSpare set it: any other amount is an ordinary swap.
+    var spareRaw by remember { mutableLongStateOf(0L) }
     var quote by remember { mutableStateOf<Jupiter.Quote?>(null) }
     var safety by remember { mutableStateOf<com.clearsign.core.TokenSafety?>(null) }
     var checking by remember { mutableStateOf(false) }
     var quoting by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
     var editingPct by remember { mutableStateOf(false) }
-    // A fresher quote that goes somewhere else. Offered, never applied behind your back.
-    var newRoute by remember { mutableStateOf<SwapState.Review?>(null) }
+    // A fresher quote that goes somewhere else, with the review it was fetched for. Offered only
+    // there, never applied behind your back: shown on another review it would sign an old trade.
+    var newRoute by remember { mutableStateOf<Pair<SwapState.Review, SwapState.Review>?>(null) }
+
+    /**
+     * The same sheet, turned into the spare change swap: SOL to stORE, the jar as the amount.
+     * [solLeft] caps the balance right after a swap that spent SOL, which a fresh read may not show yet.
+     */
+    fun startSpare(solLeft: Long? = null) {
+        if (state is SwapState.Building || state is SwapState.Signing) return
+        newRoute = null
+        state = SwapState.Building
+        scope.launch {
+            val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(Spare.STORE_MINT)) }.getOrNull()?.get(Spare.STORE_MINT) }
+            val balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), owner) }.getOrNull() }
+            // Something else took the sheet meanwhile: this answer is for a screen that is gone.
+            if (state != SwapState.Building) return@launch
+            // Three different reasons, three different sentences: "not enough SOL" was said for all of them.
+            if (t == null || balance == null) { state = SwapState.Error(ctx.getString(R.string.spare_unreachable)); return@launch }
+            val raw = Spare.movable(SpareJar.free(), minOf(balance, solLeft ?: balance), SpareJar.RESERVE)
+            if (raw <= 0) { state = SwapState.Error(ctx.getString(R.string.spare_cannot)); return@launch }
+            from = POPULAR[0]
+            to = PickToken.of(t)
+            spareRaw = raw
+            spareMode = true
+            amount = fmtUnits(raw, 9)
+            state = SwapState.Form
+        }
+    }
+    LaunchedEffect(spare) { if (spare) startSpare() }
 
     val currency = Settings.currency.value
     LaunchedEffect(owner, currency) {
@@ -160,6 +202,14 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     val fromBalance = owned.firstOrNull { it.mint == from.mint }?.balance ?: 0L
     val rawIn = parseRaw(amount, from.decimals)
 
+    // Spare mode is the jar's amount of SOL into stORE and nothing else: turned around, pointed at
+    // another coin or given another amount, it is an ordinary swap again, counted as one.
+    LaunchedEffect(from.mint, to.mint, rawIn) {
+        // Read now, not from the composition that launched this: startSpare may have set them since.
+        val now = parseRaw(amount, from.decimals)
+        if (spareMode && (from.mint != Jupiter.SOL_MINT || to.mint != Spare.STORE_MINT || now != spareRaw)) spareMode = false
+    }
+
     /**
      * Quote, transaction, receipt, in one place. Written once because it happens twice: on
      * Review, and every fifteen seconds after while you look. A quote goes stale, and so does
@@ -178,10 +228,33 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
         if (b == null) SwapState.Error(ctx.getString(R.string.swap_build_failed))
         else SwapState.Review(
             b.tx, b.analyzed, b.outUi, b.outSymbol, b.quote, b.pair,
-            at = b.at, ultraRequestId = b.ultraRequestId, ultraSlippageBps = b.ultraSlippageBps, gasless = b.gasless,
+            at = b.at, ultraRequestId = b.ultraRequestId, ultraSlippageBps = b.ultraSlippageBps, gasless = b.gasless, raw = raw,
         )
     } catch (e: Exception) {
         SwapState.Error(e.message ?: ctx.getString(R.string.swap_build_failed))
+    }
+
+    /**
+     * Signs and sends; a swap that lands feeds the spare change jar, or empties it when it is the
+     * spare swap. Held or sent anyway, the same: the jar is booked once the chain has it.
+     */
+    suspend fun send(s: SwapState.Review): SwapState {
+        val spareSwap = spareMode && s.raw == spareRaw && s.quote.inMint == Jupiter.SOL_MINT && s.quote.outMint == Spare.STORE_MINT
+        // Read before the send: the list is from when the sheet opened, before this swap.
+        val solBefore = if (s.quote.inMint == Jupiter.SOL_MINT) owned.firstOrNull { it.mint == Jupiter.SOL_MINT }?.balance else null
+        return when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = if (spareSwap) "spare_store" else "swap", ultraRequestId = s.ultraRequestId)) {
+            is WalletActions.Result.Sent -> {
+                if (spareSwap || SpareJar.on.value) {
+                    val q = s.quote
+                    SpareJar.whenLanded(ctx, r.signature, landed = s.ultraRequestId != null, spare = if (spareSwap) s.raw else 0L) { c ->
+                        if (spareSwap) SpareJar.taken(c, s.raw) else SpareJar.count(c, q)
+                    }
+                }
+                val solLeft = solBefore?.let { (it - s.quote.inAmount - s.analyzed.receipt.feeLamports).coerceAtLeast(0) }
+                SwapState.Done(r.signature, spare = spareSwap, solLeft = solLeft)
+            }
+            is WalletActions.Result.Failed -> SwapState.Error(r.message)
+        }
     }
 
     /**
@@ -200,7 +273,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
         val next = buildReview(fresh, raw) as? SwapState.Review ?: return@LaunchedEffect
         val sameShape = next.quote.routeLabels == s.quote.routeLabels &&
             next.analyzed.receipt.distributions.size == s.analyzed.receipt.distributions.size
-        if (sameShape) state = next else newRoute = next
+        if (sameShape) state = next else newRoute = s to next
     }
 
     // Debounced quote whenever the inputs change.
@@ -260,6 +333,10 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
             }
 
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Said before the amount and the receipt: this SOL is the jar's, on its way into stORE.
+                if (spareMode && (state is SwapState.Form || state is SwapState.Building || state is SwapState.Review)) {
+                    Banner(stringResource(R.string.spare_mode), Halo.mint, HIcon.COINS)
+                }
                 when (val s = state) {
                     SwapState.Form, SwapState.Building -> {
                         // FROM
@@ -358,7 +435,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                     // The coin was graded on the form, where you picked it. Saying
                     // it again here is the same sentence twice on one screen.
                     is SwapState.Review -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        newRoute?.let { n ->
+                        newRoute?.takeIf { it.first === s }?.second?.let { n ->
                             Column(
                                 Modifier.fillMaxWidth().clip(rs(14)).background(Halo.amber.copy(alpha = 0.10f))
                                     .border(1.dp, Halo.amber.copy(alpha = 0.45f), rs(14)).padding(14.dp),
@@ -383,7 +460,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                     }
                     SwapState.Signing -> Working(stringResource(R.string.theme_unlock_signing))
                     is SwapState.Done -> {
-                        Banner(stringResource(R.string.swap_done), Halo.mint, HIcon.CHECK)
+                        Banner(stringResource(if (s.spare) R.string.spare_done else R.string.swap_done), Halo.mint, HIcon.CHECK)
                         Text(s.signature, fontFamily = Mono, fontSize = 11.sp, color = Halo.muted, maxLines = 2)
                     }
                     is SwapState.Error -> Banner(s.message, Halo.red, HIcon.WARNING)
@@ -419,10 +496,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             GhostButton(stringResource(R.string.swap_anyway), tint = Halo.muted) {
                                 state = SwapState.Signing
                                 scope.launch {
-                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap", ultraRequestId = s.ultraRequestId)) {
-                                        is WalletActions.Result.Sent -> SwapState.Done(r.signature)
-                                        is WalletActions.Result.Failed -> SwapState.Error(r.message)
-                                    }
+                                    state = send(s)
                                 }
                             }
                         } else if (s.analyzed.receipt.blocksApproval) { Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK); Spacer(Modifier.height(8.dp)); GhostButton(stringResource(R.string.back)) { state = SwapState.Form } }
@@ -430,16 +504,20 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             HoldToConfirm(stringResource(R.string.swap_hold, s.outUi, s.outSym)) {
                                 state = SwapState.Signing
                                 scope.launch {
-                                    state = when (val r = WalletActions.signAndSendRaw(ctx, signer, owner, s.tx, s.analyzed.receipt, kind = "swap", ultraRequestId = s.ultraRequestId)) {
-                                        is WalletActions.Result.Sent -> SwapState.Done(r.signature)
-                                        is WalletActions.Result.Failed -> SwapState.Error(r.message)
-                                    }
+                                    state = send(s)
                                 }
                             }
                             Spacer(Modifier.height(8.dp)); GhostButton(stringResource(R.string.back)) { state = SwapState.Form }
                         }
                     }
-                    is SwapState.Done -> PrimaryButton(stringResource(R.string.done), danger = false) { onDismiss() }
+                    is SwapState.Done -> {
+                        // The jar is full: one more swap, read and signed like any other.
+                        if (!s.spare && SpareJar.ready()) {
+                            GhostButton(stringResource(R.string.spare_move, fmtUnits(SpareJar.free(), 9)), Modifier.fillMaxWidth(), HIcon.COINS, tint = Halo.mint) { startSpare(s.solLeft) }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        PrimaryButton(stringResource(R.string.done), danger = false) { onDismiss() }
+                    }
                     is SwapState.Error -> GhostButton(stringResource(R.string.back)) { state = SwapState.Form }
                     else -> {}
                 }

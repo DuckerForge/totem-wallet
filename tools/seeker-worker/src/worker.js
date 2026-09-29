@@ -631,9 +631,38 @@ async function publishChain(env) {
   await fbPut(env, "chain", JSON.stringify(out));
 }
 
+/**
+ * The Market's ranked list, for phones CoinGecko refuses: it blocks whole
+ * networks with a 403 (a home network, 29 Sep 2026). Asked once every ten
+ * minutes for everyone. If it refuses us too the last list stays, and the
+ * phone stops trusting it by its `at` and falls back to Jupiter.
+ *
+ * The ECB's rates of the day go to their own node, `fx`: every phone needs one
+ * to show euros, and it should not have to download the list to get it, nor
+ * lose it when CoinGecko refuses. Four calls: two reads, two writes.
+ */
+async function publishMarket(env) {
+  const fxr = await fetch("https://api.frankfurter.dev/v1/latest?base=USD").catch(() => null);
+  const rates = fxr && fxr.ok ? ((await fxr.json().catch(() => null)) || {}).rates || null : null;
+  if (rates && typeof rates === "object") {
+    await fbPut(env, "fx", JSON.stringify({ at: Date.now(), rates })).catch(() => {});
+  }
+  const r = await fetch(
+    "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h",
+    { headers: { Accept: "application/json", "User-Agent": "totem-wallet-worker" } },
+  ).catch(() => null);
+  const arr = r && r.ok ? await r.json().catch(() => null) : null;
+  const keep = ["id", "symbol", "name", "image", "current_price", "market_cap", "market_cap_rank", "price_change_percentage_24h", "total_volume"];
+  const coins = Array.isArray(arr) ? arr.map((c) => Object.fromEntries(keep.map((k) => [k, c[k] ?? null]))) : [];
+  // Only a real list replaces the one every phone reads.
+  if (!coins.length) return;
+  await fbPut(env, "market", JSON.stringify({ at: Date.now(), coins })).catch(() => {});
+}
+
 async function warm(env) {
   if (!fbOn(env)) return;
   await publishChain(env).catch(() => {});
+  await publishMarket(env).catch(() => {});
   const raw = await env.SEEKER.get("crowd");
   if (!raw) return;
   const crowd = JSON.parse(raw);
@@ -653,7 +682,7 @@ async function warm(env) {
 }
 
 /** Quante facce guardare e quante rileggerne, per stare sotto le cinquanta chiamate. */
-const WARM_LOOK = 12;
+const WARM_LOOK = 8;   // 12 before the market list and the rates took four calls of the fifty
 const WARM_MAX = 5;
 /** La sveglia che scalda invece di scansionare, sfasata di cinque minuti. */
 const WARM_CRON = "5-59/10 * * * *";

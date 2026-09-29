@@ -525,7 +525,9 @@ internal fun PrimaryButton(label: String, danger: Boolean, enabled: Boolean = tr
     val src = remember { MutableInteractionSource() }
     Row(
         Modifier.pressScale(src).then(if (danger) mod.border(1.dp, Halo.red, shape) else mod.background(Brush.linearGradient(listOf(Halo.fillFrom, Halo.fillTo)), alpha = if (enabled) 1f else 0.45f))
-            .clickable(interactionSource = src, indication = null, enabled = enabled) { onClick() },
+            .clickable(interactionSource = src, indication = null, enabled = enabled) { onClick() }
+            // Sized to its label, it needs room around it: "Try again" touched both edges.
+            .then(if (fillWidth) Modifier else Modifier.padding(horizontal = 24.dp)),
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { HaloIcon(icon, fg, 20.dp); Spacer(Modifier.width(10.dp)) }

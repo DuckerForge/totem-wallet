@@ -107,7 +107,16 @@ class MintExtensionsTest {
     @Test fun onAVerifiedIssuerItIsADisclosedProperty() {
         val s = assessToken(facts(MintExtensions(permanentDelegate = true), verified = true))
         assertFalse(s.bad)
-        assertTrue(SafetyFlag.ISSUER_CONTROLLED in s.flags)
+        assertEquals(listOf(SafetyFlag.ISSUER_SEIZE), s.flags)
+        assertEquals(72, s.score)
+    }
+
+    /** PYUSD's shape: freeze, mint and seize. Each power named once. */
+    @Test fun everyIssuerPowerIsSaidOnce() {
+        val pyusd = facts(MintExtensions(permanentDelegate = true), verified = true).copy(canMint = true, canFreeze = true)
+        val s = assessToken(pyusd)
+        assertFalse(s.bad)
+        assertEquals(listOf(SafetyFlag.ISSUER_CONTROLLED, SafetyFlag.ISSUER_SEIZE), s.flags)
     }
 
     @Test fun aHoneypotShapeIsRefused() {

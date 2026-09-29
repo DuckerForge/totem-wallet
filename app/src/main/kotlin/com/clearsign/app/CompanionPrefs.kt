@@ -47,6 +47,13 @@ object CompanionPrefs {
     fun spotY(ctx: Context): Int = p(ctx).getInt("y", -1)
     fun setSpot(ctx: Context, x: Int, y: Int) = p(ctx).edit().putInt("x", x).putInt("y", y).apply()
 
+    /**
+     * What the bubble's notification says. Android needs the line to keep the bubble alive;
+     * on, it carries the numbers too. Off by default: nobody asked for them there.
+     */
+    fun notif(ctx: Context): Boolean = p(ctx).getBoolean("notif", false)
+    fun setNotif(ctx: Context, on: Boolean) = p(ctx).edit().putBoolean("notif", on).apply()
+
     /** Come back on its own when the app opens. */
     fun autoStart(ctx: Context): Boolean = p(ctx).getBoolean("auto", false)
     fun setAutoStart(ctx: Context, on: Boolean) = p(ctx).edit().putBoolean("auto", on).apply()

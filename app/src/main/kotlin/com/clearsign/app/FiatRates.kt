@@ -34,17 +34,33 @@ object FiatRates {
         else c.inputStream.bufferedReader().use { JSONObject(it.readText()) }.also { c.disconnect() }
     } catch (e: Exception) { Log.w(TAG, "fetch failed: ${e.message}"); null }
 
-    /** SOL spot in several currencies: currency → price. */
+    /**
+     * SOL spot in several currencies: currency → price. CoinGecko first; when it refuses (it
+     * blocks whole networks with a 403), Jupiter's SOL price times the ECB rate.
+     */
     fun spot(currencies: List<String>): Map<String, Double> {
-        val o = get("$BASE/simple/price?ids=solana&vs_currencies=${currencies.joinToString(",") { it.lowercase() }}")?.optJSONObject("solana") ?: return emptyMap()
-        return currencies.mapNotNull { c -> o.optDouble(c.lowercase()).takeIf { !it.isNaN() }?.let { c to it } }.toMap()
+        // One SOL is one SOL: nobody is asked, and no rate service knows SOL anyway.
+        val one = if ("SOL" in currencies) mapOf("SOL" to 1.0) else emptyMap()
+        val ask = currencies - "SOL"
+        if (ask.isEmpty()) return one
+        get("$BASE/simple/price?ids=solana&vs_currencies=${ask.joinToString(",") { it.lowercase() }}")?.optJSONObject("solana")?.let { o ->
+            val m = ask.mapNotNull { c -> o.optDouble(c.lowercase()).takeIf { !it.isNaN() }?.let { c to it } }.toMap()
+            if (m.isNotEmpty()) return m + one
+        }
+        val sol = runCatching { Prices.usd(listOf(com.clearsign.core.NATIVE_SOL_MINT))[com.clearsign.core.NATIVE_SOL_MINT] }.getOrNull() ?: return one
+        return ask.mapNotNull { c -> Prices.frankfurter(c)?.let { c to sol * it } }.toMap() + one
     }
 
     /** Token spot prices by mint (best effort; unknown tokens are simply absent). */
     fun tokenSpot(mints: List<String>, currency: String): Map<String, Double> {
         val todo = mints.filter { it != com.clearsign.core.NATIVE_SOL_MINT }.distinct()
         if (todo.isEmpty()) return emptyMap()
-        val o = get("$BASE/simple/token_price/solana?contract_addresses=${todo.joinToString(",")}&vs_currencies=${currency.lowercase()}") ?: return emptyMap()
+        val o = get("$BASE/simple/token_price/solana?contract_addresses=${todo.joinToString(",")}&vs_currencies=${currency.lowercase()}")
+            ?: return runCatching {
+                // Same fallback as [spot]: Jupiter in dollars, the ECB for the rest, SOL's own price for SOL.
+                val fx = (if (currency == "SOL") Prices.usdTo("SOL") else Prices.frankfurter(currency)) ?: return emptyMap()
+                Prices.usd(todo).mapValues { it.value * fx }
+            }.getOrDefault(emptyMap())
         val out = HashMap<String, Double>()
         for (m in todo) o.optJSONObject(m)?.optDouble(currency.lowercase())?.takeIf { !it.isNaN() }?.let { out[m] = it }
         return out

@@ -191,7 +191,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         Themes.load(this)
-        Settings.load(this)
+        Settings.load(this); SpareJar.load(this)
         Pro.load(this)
         // Hand the radio back and forth as the tap screen arms and disarms. Started here, not in
         // onResume: `lifecycleScope` lives until destroy and `repeatOnLifecycle` never returns,

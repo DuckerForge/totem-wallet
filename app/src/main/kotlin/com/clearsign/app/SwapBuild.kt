@@ -61,11 +61,16 @@ internal object SwapBuild {
             Jupiter.swapTransaction(priced, owner, feeAccount) ?: Jupiter.swapTransaction(priced, owner, null)
         } ?: return null
         val analyzed = withContext(Dispatchers.IO) {
-            ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, owner, null, requireSim = false)
+            // The coin bought, watched by mint: on a first buy its account is opened by this very
+            // transaction, and without it the receipt showed SOL leaving and nothing arriving.
+            ReceiptEngine.analyze(
+                ctx, BlocklistScanner(ctx), tx, owner, null, requireSim = false,
+                expectMints = listOf(to.mint).filter { it != Jupiter.SOL_MINT },
+            )
         }
         return SwapBuilt(
             tx = tx,
-            analyzed = tidy(ctx, analyzed, owner),
+            analyzed = tidy(ctx, analyzed, owner, to),
             quote = priced,
             pair = SwapPair(
                 outMint = from.mint, outSymbol = from.symbol, outUi = fmtUnits(priced.inAmount, from.decimals),
@@ -86,8 +91,14 @@ internal object SwapBuild {
      * and destination stay visible and recorded; the pool gets its name and the two transfer-only
      * warnings go.
      */
-    fun tidy(ctx: Context, analyzed: ReceiptEngine.Analyzed, owner: String): ReceiptEngine.Analyzed {
+    fun tidy(ctx: Context, analyzed: ReceiptEngine.Analyzed, owner: String, to: Side? = null): ReceiptEngine.Analyzed {
         val r = analyzed.receipt
+        // Your own account for the coin you buy, opened by the swap: its rent is yours and comes
+        // back when you close it. Checked under both token programs.
+        val mine: Set<String> = if (to == null || to.mint == Jupiter.SOL_MINT) emptySet() else runCatching {
+            val o = Base58.decode(owner); val m = Base58.decode(to.mint)
+            listOf(WalletTx.TOKEN_PROGRAM, WalletTx.TOKEN_2022).map { Base58.encode(Pda.associatedTokenAddress(o, m, it)) }.toSet()
+        }.getOrDefault(emptySet())
         // Short, because this name is read under a circle on a map and at the head
         // of a row. The full route lives one line up, in the summary.
         val pool = ctx.getString(R.string.swap_pool_short)
@@ -99,8 +110,9 @@ internal object SwapBuild {
                 distributions = r.distributions.map { d ->
                     when {
                         d.label != null -> d
-                        // An account this transaction opens. Not your token account for the coin, that one belongs
-                        // to you; these belong to the route, and "Account for CATE" put one wrong name on two accounts.
+                        d.isNewAccount && d.address in mine -> d.copy(label = ctx.getString(R.string.swap_your_account, to!!.symbol))
+                        // Any other account this transaction opens belongs to the route: "Account for CATE" once put
+                        // one wrong name on two accounts.
                         d.isNewAccount -> d.copy(label = ctx.getString(R.string.swap_new_account))
                         d.address == owner -> d
                         else -> d.copy(label = pool)

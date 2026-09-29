@@ -101,7 +101,9 @@ internal fun WalletHero(
         else runCatching { BalanceCurve.of(ctx, o, v) }.getOrDefault(emptyList())
     }
     var oreOpen by remember { mutableStateOf(false) }
-    if (oreOpen && owner != null) OreSheet(owner, signer) { changed -> oreOpen = false; if (changed) refreshKey++ }
+    var spareOpen by remember { mutableStateOf(false) }
+    if (oreOpen && owner != null) OreSheet(owner, signer, onSpare = { oreOpen = false; spareOpen = true }) { changed -> oreOpen = false; if (changed) refreshKey++ }
+    if (spareOpen && owner != null) SwapSheet(signer, owner, spare = true) { spareOpen = false; refreshKey++ }
     var defiOpen by remember { mutableStateOf<DefiPosition?>(null) }
     defiOpen?.let { d -> DefiSheet(d, currency) { defiOpen = null } }
     var picked by remember { mutableStateOf<Holding?>(null) }
@@ -289,8 +291,11 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
     // loaded. One composition per logo, not two, and nothing to swap.
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         initials()
-        if (image != null) coil.compose.AsyncImage(
-            model = image, contentDescription = null,
+        // SOL and USDC keep one logo everywhere: CoinGecko's list and Jupiter's "Wrapped SOL" each
+        // brought their own picture, and the one in the followed row kept changing with the source.
+        val src = TokenSymbols.canonicalImage(mint) ?: image
+        if (src != null) coil.compose.AsyncImage(
+            model = src, contentDescription = null,
             modifier = Modifier.matchParentSize().clip(rs(999)),
         )
     }

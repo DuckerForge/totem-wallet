@@ -15,6 +15,8 @@ object Prices {
     private const val JUP_PRICE = "https://lite-api.jup.ag/price/v3?ids="
     private const val WSOL = "So11111111111111111111111111111111111111112"
     private const val FX_TTL_MS = 15 * 60_000L
+    /** How old the worker's rates may be. The ECB publishes once a working day. */
+    private const val FX_ARCHIVE_MS = 36 * 3600_000L
 
     @Volatile private var fxCache: Triple<String, Double, Long>? = null
 
@@ -62,8 +64,20 @@ object Prices {
         return v
     }
 
-    private fun frankfurter(currency: String): Double? =
-        get("https://api.frankfurter.app/latest?from=USD&to=$currency")?.optJSONObject("rates")?.optDouble(currency)?.takeIf { !it.isNaN() && it > 0 }
+    /**
+     * One dollar in [currency], from the ECB via Frankfurter. Its old host (`api.frankfurter.app`)
+     * now answers 301 to another host, which a plain connection does not follow.
+     */
+    internal fun frankfurter(currency: String): Double? {
+        if (currency == "USD") return 1.0
+        // The worker writes the day's rates for every phone, every ten minutes. Older than a day
+        // and a half means it stopped: the ECB is asked directly.
+        Archive.read("fx", 10 * 60_000L)
+            ?.takeIf { System.currentTimeMillis() - it.optLong("at", 0L) < FX_ARCHIVE_MS }
+            ?.optJSONObject("rates")?.optDouble(currency)?.takeIf { !it.isNaN() && it > 0 }
+            ?.let { return it }
+        return get("https://api.frankfurter.dev/v1/latest?base=USD&symbols=$currency")?.optJSONObject("rates")?.optDouble(currency)?.takeIf { !it.isNaN() && it > 0 }
+    }
 
     private fun viaCoinGecko(currency: String): Double? {
         val sol = runCatching { FiatRates.spot(listOf("USD", currency)) }.getOrDefault(emptyMap())

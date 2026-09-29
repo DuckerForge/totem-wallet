@@ -102,13 +102,19 @@ class CompanionService : Service() {
         super.onCreate()
         alive = true
         Themes.load(this); Settings.load(this)
-        startForeground(NOTIF_ID, notification())
+        // Always foreground while it runs: locked, the overlay is gone and nothing else keeps
+        // the process up. If a restart from the background is refused here, onStartCommand
+        // tries again once the bubble is on screen.
+        runCatching { startForeground(NOTIF_ID, notification()) }
         wm = getSystemService(WindowManager::class.java)
         attach()
         refresh()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Every startForegroundService owes a startForeground, even to a bubble already up:
+        // On or auto start on a running bubble crashed the app a few seconds later.
+        runCatching { startForeground(NOTIF_ID, notification()) }
         when (intent?.action) {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACTION_HIDE -> hide()
@@ -116,6 +122,8 @@ class CompanionService : Service() {
             // The theme changed under it. The bubble paints its own bitmap and reads the
             // palette once at start, so without this it kept the old colours until it died.
             ACTION_REPAINT -> { Themes.load(this); paintFace() }
+            // The notification setting changed: the startForeground above already reposted it.
+            ACTION_NOTIF -> Unit
         }
         return START_STICKY
     }
@@ -153,6 +161,7 @@ class CompanionService : Service() {
         repost()
     }
 
+    /** The foreground notification with what it should say now. Never cancelled: it keeps the service alive. */
     private fun repost() {
         runCatching { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification()) }
     }
@@ -626,8 +635,9 @@ class CompanionService : Service() {
         val ctx = this
         val p = Halo.palette
         paintFace()
-        // The notification line follows the bubble: same numbers, no second truth.
-        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification()) }
+        // With numbers on, the notification line follows the bubble: same numbers, no second
+        // truth. Off, its one quiet line never changes, so it is not posted again every minute.
+        if (CompanionPrefs.notif(ctx)) repost()
 
         val pos = last.pos
         val move = last.posPct
@@ -696,8 +706,9 @@ class CompanionService : Service() {
     /**
      * The notification a foreground service must have, as small as Android allows: lowest
      * importance (no sound, no status-bar icon, a collapsed line at the bottom of the shade),
-     * secret on the lock screen, deferred until the bubble has been up a while, and its one
-     * line carries the bubble's numbers, a status rather than a nag. Swipeable on Android 14+.
+     * secret on the lock screen, deferred until the bubble has been up a while. Its one line
+     * carries the bubble's numbers only if [CompanionPrefs.notif] says so, otherwise it just
+     * says the bubble is on. Swipeable on Android 14+.
      */
     private fun notification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
@@ -717,7 +728,13 @@ class CompanionService : Service() {
         val b = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(if (hidden) getString(R.string.comp_hidden) else statusLine())
+            .setContentText(
+                when {
+                    hidden -> getString(R.string.comp_hidden)
+                    CompanionPrefs.notif(this) -> statusLine()
+                    else -> getString(R.string.comp_quiet_line)
+                },
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
@@ -750,6 +767,7 @@ class CompanionService : Service() {
         const val ACTION_HIDE = "com.clearsign.app.COMPANION_HIDE"
         const val ACTION_SHOW = "com.clearsign.app.COMPANION_SHOW"
         const val ACTION_REPAINT = "com.clearsign.app.COMPANION_REPAINT"
+        const val ACTION_NOTIF = "com.clearsign.app.COMPANION_NOTIF"
 
         /**
          * True while the bubble is on screen. Asked before sending it anything: starting the
@@ -763,6 +781,12 @@ class CompanionService : Service() {
         fun repaint(ctx: Context) {
             if (!alive) return
             runCatching { ctx.startService(Intent(ctx, CompanionService::class.java).setAction(ACTION_REPAINT)) }
+        }
+
+        /** Tell a running bubble the notification setting changed. Does nothing if it is not running. */
+        fun renotify(ctx: Context) {
+            if (!alive) return
+            runCatching { ctx.startService(Intent(ctx, CompanionService::class.java).setAction(ACTION_NOTIF)) }
         }
 
         /**

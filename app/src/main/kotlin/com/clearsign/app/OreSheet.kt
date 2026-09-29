@@ -75,7 +75,7 @@ private const val SIGN_MARGIN_S = 15.0
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (changed: Boolean) -> Unit) {
+internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Unit = {}, onDismiss: (changed: Boolean) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var view by remember { mutableStateOf<OreMiner.View?>(null) }
@@ -234,6 +234,16 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onDismiss: (change
                                         else review("ore_claim", ixs)
                                     }
                                     Chunky(stringResource(R.string.ore_dig), HIcon.SPARK, Modifier.weight(1f)) { digging = true }
+                                }
+                                // The spare change of the wallet's swaps, on its way into stORE.
+                                val spareOn by SpareJar.on
+                                if (spareOn && SpareJar.jar.longValue > 0) {
+                                    val jar by SpareJar.jar
+                                    Text(
+                                        stringResource(R.string.spare_ore_line, fmtUnits(jar, 9), fmtUnits(com.clearsign.core.Spare.MOVE_AT, 9)),
+                                        fontFamily = Inter, fontSize = 12.sp, color = Halo.muted,
+                                    )
+                                    if (SpareJar.ready()) GhostButton(stringResource(R.string.spare_move, fmtUnits(SpareJar.free(), 9)), Modifier.fillMaxWidth(), HIcon.COINS, tint = Halo.mint) { onSpare() }
                                 }
                             } else {
                                 OutlinedTextField(

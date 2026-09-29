@@ -61,6 +61,7 @@ internal fun SettingsScreen(signer: SeedVaultSigner, owner: String?, tools: @Com
             tools()
             ConnectionsCard()
             ProtectionsCard()
+            SpareCard()
         }
 
         SettingsGroup(stringResource(R.string.set_g_agent), stringResource(R.string.set_g_agent_sub), HIcon.SPARK) {
@@ -444,6 +445,38 @@ private fun WebCheckCard() {
                 }
             }
             Text(stringResource(R.string.webcheck_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp)
+        }
+    }
+}
+
+/** Spare change into stORE: counted on every SOL swap, moved only when you press the button. */
+@Composable
+private fun SpareCard() {
+    val ctx = LocalContext.current
+    val on by SpareJar.on
+    val jar by SpareJar.jar
+    val moved by SpareJar.moved
+    GlassCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(34.dp).clip(rs(10)).background(Halo.mint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) { HaloIcon(HIcon.COINS, Halo.mint, 18.dp) }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.spare_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink)
+                    Text(
+                        if (on) stringResource(R.string.spare_on, fmtUnits(jar, 9), fmtUnits(moved, 9)) else stringResource(R.string.spare_off),
+                        fontFamily = Inter, fontSize = 12.sp, color = if (on) Halo.mint else Halo.muted,
+                    )
+                }
+                Text(
+                    if (on) stringResource(R.string.watch_disable) else stringResource(R.string.watch_enable),
+                    fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = if (on) Halo.muted else Halo.mint,
+                    modifier = Modifier.clip(rs(10)).background((if (on) Halo.muted else Halo.mint).copy(alpha = 0.12f)).clickable {
+                        SpareJar.setOn(ctx, !on); Haptics.tick(ctx)
+                    }.padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
+            Text(stringResource(R.string.spare_note), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp)
         }
     }
 }

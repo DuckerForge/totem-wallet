@@ -431,6 +431,17 @@
     <string name="kind_setup">impostazione</string>
     <string name="kind_ore_dig">scavo ORE</string>
     <string name="kind_ore_claim">incasso ORE</string>
+    <string name="kind_spare_store">spiccioli in stORE</string>
+    <string name="spare_title">Spiccioli in stORE</string>
+    <string name="spare_on">Acceso. Nel salvadanaio: %1$s SOL. Già in stORE: %2$s SOL.</string>
+    <string name="spare_off">Spento. Gli swap non mettono niente da parte.</string>
+    <string name="spare_note">Ogni swap fatto dal foglio Swap con SOL da un lato si arrotonda ai 0,005 SOL successivi, e la differenza si conta. Non si muove niente: il SOL resta nel tuo wallet. A 0,02 SOL, Totem propone uno swap in stORE, cioè ORE in stake col programma di ORE, che prende una parte dei suoi riacquisti. Leggi il receipt e firmi, come ogni swap.</string>
+    <string name="spare_move">Metti %1$s SOL di spiccioli in stORE</string>
+    <string name="spare_done">Spiccioli in stORE.</string>
+    <string name="spare_cannot">Non resta abbastanza SOL per muovere gli spiccioli.</string>
+    <string name="spare_ore_line">Spiccioli: %1$s SOL. A %2$s SOL possono diventare stORE.</string>
+    <string name="spare_mode">Spiccioli del salvadanaio, verso stORE.</string>
+    <string name="spare_unreachable">Non riesco a leggere il saldo o a trovare stORE. Riprova tra poco.</string>
     <string name="ledger_failed">non passata</string>
     <string name="ledger_failed_body">La catena ha rifiutato questa transazione dopo che il nodo l\'aveva presa. Non si è mosso niente. È stata pagata solo la commissione di rete.</string>
     <string name="kind_theme">tema</string>
@@ -690,6 +701,7 @@
     <string name="swap_pct_clear">Togli</string>
     <string name="swap_pool_short">Jupiter</string>
     <string name="swap_new_account">Conto nuovo</string>
+    <string name="swap_your_account">Il tuo conto %1$s, rent che torna se lo chiudi</string>
     <string name="swap_live">Il prezzo si aggiorna da solo. Se cambia la strada te lo chiedo prima.</string>
     <string name="swap_route_changed">Jupiter ha trovato una strada diversa, con altri conti di mezzo. Darebbe %1$s %2$s. Quella qui sotto resta valida finché non tocchi il pulsante.</string>
     <string name="swap_route_take">Prendi la strada nuova</string>
@@ -990,6 +1002,8 @@
     <string name="tab_market">Mercato</string>
     <string name="market_sub">Tutte le monete, per capitalizzazione</string>
     <string name="market_by_cap">Classifica per capitalizzazione</string>
+    <string name="market_src_saved">CoinGecko non risponde: la lista salvata %1$s. I prezzi possono essere vecchi.</string>
+    <string name="market_src_jupiter">CoinGecko non risponde: solo monete Solana, prezzi da Jupiter.</string>
     <string name="market_search">Cerca fra tutte le monete</string>
     <string name="market_qty_title">Quanto ne hai. Vale anche se sta su un altro portafoglio o su un exchange: qui il portafoglio non lo vede, e questo numero glielo dici tu.</string>
     <string name="whatif_title">E se fosse grande come…</string>
@@ -1052,6 +1066,10 @@
     <string name="safe_few_holders">Non ce l\'ha ancora quasi nessuno.</string>
     <string name="safe_unverified">Non è nell\'elenco verificato di Jupiter.</string>
     <string name="safe_issuer">Ha un emittente che può congelarla o stamparne altra. Normale per una stablecoin, diverso dal tenere SOL.</string>
+    <string name="safe_issuer_mint">Chi la emette può ancora stamparne altra. Ti fidi dell\'emittente, cosa che tenere SOL non ti chiede.</string>
+    <string name="safe_issuer_freeze">Chi la emette può congelare il tuo saldo. Ti fidi dell\'emittente, cosa che tenere SOL non ti chiede.</string>
+    <string name="safe_issuer_seize">Chi la emette può toglierla dal tuo portafoglio. Normale per una stablecoin regolamentata.</string>
+    <string name="safe_protocol_minted">La stampa un programma, non una persona: nasce quando qualcuno mette in stake e si brucia quando lo ritira. Nessuno può congelarla. Ti fidi del codice del programma.</string>
     <string name="safe_blocked">Non c\'è modo di rivenderla. Totem non costruisce lo scambio.</string>
     <string name="safe_checking">Sto controllando la moneta…</string>
     <!-- ricevi / invia: i due modi di passare una richiesta -->
@@ -1644,6 +1662,10 @@
     <string name="comp_bubble">La bolla</string>
     <string name="comp_auto">Torna da sola</string>
     <string name="comp_auto_sub">Ogni volta che apri Totem, la bolla si accende.</string>
+    <string name="comp_notif">Numeri anche nelle notifiche</string>
+    <string name="comp_notif_sub">Salute e agente nella notifica della bolla. Spento, dice solo che la bolla è attiva. Android vuole quella riga per tenere viva la bolla.</string>
+    <string name="comp_quiet_line">La bolla è attiva.</string>
+    <string name="comp_notif_perm">Le notifiche di Totem sono spente. Accendile nelle impostazioni del telefono.</string>
     <string name="comp_face">Cosa dice il cerchietto</string>
     <string name="comp_face_agent">Agente</string>
     <string name="comp_face_health">Salute</string>

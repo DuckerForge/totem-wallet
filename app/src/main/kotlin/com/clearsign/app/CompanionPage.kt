@@ -65,6 +65,16 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
         var size by remember { mutableIntStateOf(CompanionPrefs.size(ctx)) }
         var coin by remember { mutableStateOf(CompanionPrefs.coin(ctx)) }
         var auto by remember { mutableStateOf(CompanionPrefs.autoStart(ctx)) }
+        // Android 13+ shows no notification without the permission: the switch says what you see.
+        fun notifAllowed() = android.os.Build.VERSION.SDK_INT < 33 ||
+            androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        var notif by remember { mutableStateOf(CompanionPrefs.notif(ctx) && notifAllowed()) }
+        var notifDenied by remember { mutableStateOf(false) }
+        fun setNotif(on: Boolean) { notif = on; CompanionPrefs.setNotif(ctx, on); CompanionService.renotify(ctx) }
+        val askNotif = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
+            notifDenied = !ok
+            if (ok) setNotif(true)
+        }
         var canDraw by remember { mutableStateOf(CompanionService.canRun(ctx)) }
         val shows = remember { mutableStateOf(listOf("total", "agent", "health", "coin").associateWith { CompanionPrefs.show(ctx, it) }) }
         var coins by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -136,6 +146,18 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                                 Text(stringResource(R.string.comp_auto_sub), style = HaloType.small, color = Halo.muted)
                             }
                             Switch(checked = auto, onCheckedChange = { auto = it; CompanionPrefs.setAutoStart(ctx, it) })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.comp_notif), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink)
+                                Text(stringResource(R.string.comp_notif_sub), style = HaloType.small, color = Halo.muted)
+                                if (notifDenied) Text(stringResource(R.string.comp_notif_perm), style = HaloType.small, color = Halo.amber)
+                            }
+                            // No restart: a bubble that is off stays off, a running one rewrites its line.
+                            Switch(checked = notif, onCheckedChange = { on ->
+                                if (on && !notifAllowed()) askNotif.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                else { notifDenied = false; setNotif(on) }
+                            })
                         }
                     }
                 }

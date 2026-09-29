@@ -1,6 +1,9 @@
 package com.clearsign.app
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -69,7 +72,22 @@ object Market {
     private const val FILE = "market_top.json"
     @Volatile private var file: java.io.File? = null
 
+    /**
+     * Where the list on screen came from when it is not CoinGecko's own answer: null when it is.
+     * CoinGecko blocks whole networks with a 403, so the screen says what it is showing instead.
+     */
+    enum class Source { SAVED, JUPITER }
+    // Snapshot state, not plain fields: a refresh that fails over a list on screen changes only
+    // these, and the screen has to redraw to say so.
+    var source: Source? by mutableStateOf<Source?>(null)
+        private set
+    /** When the list on screen was priced: for [Source.SAVED], when it was saved. */
+    var savedAt: Long by mutableStateOf(0L)
+        private set
+    @Volatile private var app: android.content.Context? = null
+
     fun warm(ctx: android.content.Context) {
+        app = ctx.applicationContext
         val f = java.io.File(ctx.filesDir, FILE).also { file = it }
         if (top.isNotEmpty() || !f.exists()) return
         val age = System.currentTimeMillis() - f.lastModified()
@@ -83,6 +101,9 @@ object Market {
     }
 
     private fun save() {
+        // Only CoinGecko's own list: a saved one written back would look new at the next start,
+        // and Jupiter's is not the ranked list.
+        if (source != null) return
         val f = file ?: return
         runCatching { f.writeText(JSONArray().apply { top.forEach { put(toJson(it)) } }.toString()) }
     }
@@ -95,6 +116,8 @@ object Market {
      * and a refresh of page one replaces the head without throwing away what was read below it.
      */
     fun more(): List<Coin> {
+        // Under a saved or Jupiter list, page two would be glued to a head of another age.
+        if (source != null) return top
         val page = top.size / PAGE + 1
         if (page > MAX_PAGES) return top
         val arr = getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=$page&price_change_percentage=24h")
@@ -110,22 +133,91 @@ object Market {
     /** Ten pages is a thousand coins, which is further down than anyone scrolls on a phone. */
     private const val MAX_PAGES = 10
 
+    /** When the prices on screen were last fetched, whoever gave them. */
+    @Volatile private var pricedAt = 0L
+
     /** The first [PAGE] by market cap. Cached for two minutes: this is a free API. */
     fun top(force: Boolean = false): List<Coin> {
         val now = System.currentTimeMillis()
         if (!force && top.isNotEmpty() && now - topAt < TTL_MS) return top
-        val arr = getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=1&price_change_percentage=24h")
-            ?: return top
-        val head = parse(arr)
-        if (head.isNotEmpty()) {
-            // Page one refreshed in place: the tail below it stays, or scrolling past the
-            // hundredth coin and pulling to refresh would silently take the rest away.
-            val fresh = head.mapTo(HashSet()) { it.id }
-            top = head + top.drop(head.size).filterNot { it.id in fresh }
+        // The archive first: the worker asks CoinGecko once every ten minutes for every phone,
+        // so ten thousand phones are one caller, not ten thousand. The phone asks CoinGecko
+        // itself only when the archive is missing or stale.
+        val head = archived()?.let { parse(it) }?.takeIf { it.isNotEmpty() }
+            ?: getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=1&price_change_percentage=24h")?.let { parse(it) }.orEmpty()
+        if (head.isEmpty()) {
+            // Nobody gave a ranked list. Jupiter's list is priced again (if that fails too, it is
+            // said as saved); any other list on screen stays, said as saved; with nothing on
+            // screen, the last saved list at any age (said as such), else Jupiter's list.
+            // Jupiter's rows are keyed by mint: while they are on screen, Jupiter is asked again
+            // every time, even after one failure marked them saved.
+            val jupiterRows = top.firstOrNull()?.let { it.id == it.mint } == true
+            when {
+                source == Source.JUPITER || jupiterRows -> {
+                    val again = fromJupiter()
+                    if (again.isNotEmpty()) { top = again; pricedAt = now }
+                    else if (source != Source.SAVED) { source = Source.SAVED; savedAt = pricedAt.takeIf { it > 0 } ?: topAt }
+                }
+                top.isNotEmpty() -> if (source == null) { source = Source.SAVED; savedAt = pricedAt.takeIf { it > 0 } ?: topAt }
+                else -> top = saved().ifEmpty { fromJupiter().also { if (it.isNotEmpty()) pricedAt = now } }
+            }
+            topAt = now
+            return top
         }
+        // Page one refreshed in place: the tail below it stays, or scrolling past the hundredth
+        // coin and pulling to refresh would silently take the rest away. Not under a saved or
+        // Jupiter list: that tail is as old as the list, and nothing would say so any more.
+        val keepTail = source == null
+        source = null
+        pricedAt = now
+        val fresh = head.mapTo(HashSet()) { it.id }
+        top = if (keepTail) head + top.drop(head.size).filterNot { it.id in fresh } else head
         topAt = now
         save()
         return top
+    }
+
+    /** The same CoinGecko page, fetched by the worker for everyone and kept in the archive. */
+    private fun archived(): JSONArray? {
+        val o = Archive.read("market", 2 * 60_000L) ?: return null
+        if (System.currentTimeMillis() - o.optLong("at", 0L) > 25 * 60_000L) return null
+        return o.optJSONArray("coins")?.takeIf { it.length() > 0 }
+    }
+
+    /** The list saved on disk, however old. */
+    private fun saved(): List<Coin> {
+        val f = file?.takeIf { it.exists() } ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(f.readText())
+            (0 until arr.length()).mapNotNull { fromJson(arr.optString(it)) }
+        }.getOrDefault(emptyList()).also { if (it.isNotEmpty()) { source = Source.SAVED; savedAt = f.lastModified() } }
+    }
+
+    /**
+     * Jupiter's popular list as coins, by its own market caps. Keyed by mint, so charts and
+     * buying work; no global rank, and no BTC or ETH. Not saved: it is not the ranked list.
+     *
+     * That list is kept a day, and on disk without market caps: after a restart it came back
+     * empty, otherwise with prices up to a day old shown as live. So every price is asked
+     * again, and a coin with no price now is left out.
+     */
+    private fun fromJupiter(): List<Coin> {
+        val ctx = app ?: return emptyList()
+        val list = runCatching { JupiterTokens.top(ctx) }.getOrDefault(emptyList())
+        if (list.isEmpty()) return emptyList()
+        // No cap anywhere means the disk copy: the rows are read again, one call for the hundred.
+        val rows = if (list.any { (it.mcap ?: 0.0) > 0 }) list
+            else runCatching { JupiterTokens.byMints(list.map { it.mint }) }.getOrDefault(emptyMap()).let { m -> list.map { m[it.mint] ?: it } }
+        val px = runCatching { Prices.quotes(rows.map { it.mint }) }.getOrDefault(emptyMap())
+        return rows.mapNotNull { t ->
+            val q = px[t.mint] ?: return@mapNotNull null
+            val m = t.mcap?.takeIf { it > 0 } ?: return@mapNotNull null
+            // The cap follows the price it was counted at: same supply, today's price.
+            val cap = t.usd?.takeIf { it > 0 }?.let { m * q.usd / it } ?: m
+            Coin(t.mint, t.symbol.uppercase(), t.name.ifEmpty { t.symbol }, t.icon, q.usd, cap, null, q.change24h, t.mint)
+        }
+            .sortedByDescending { it.marketCap }
+            .also { if (it.isNotEmpty()) { source = Source.JUPITER; savedAt = System.currentTimeMillis() } }
     }
 
     fun toJson(c: Coin): String = org.json.JSONObject().put("id", c.id).put("symbol", c.symbol).put("name", c.name).put("image", c.image)

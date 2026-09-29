@@ -20,6 +20,20 @@ enum class SafetyFlag {
      * design, an issuer stands behind them. Worth saying, most people do not know Circle can freeze their stablecoin, but disclosed, not a scam signal.
      */
     ISSUER_CONTROLLED,
+    /** A verified coin whose issuer can still mint more, and nothing else. */
+    ISSUER_MINT,
+    /** A verified coin whose issuer can freeze balances, and nothing else. */
+    ISSUER_FREEZE,
+    /**
+     * A verified coin with a Token-2022 permanent delegate: its issuer can move or burn your
+     * balance. PYUSD and USDG work this way; the power is named, not folded into freeze and mint.
+     */
+    ISSUER_SEIZE,
+    /**
+     * A liquid staking token: minted by its stake pool program when someone stakes, burned when
+     * they unstake, and nobody can freeze it. A live mint authority is how it works, not a person.
+     */
+    PROTOCOL_MINTED,
     /** The creator can still mint more of it, diluting what you hold. */
     CAN_MINT,
     /** One non-pool wallet holds enough to crater the price on its own. */
@@ -39,7 +53,7 @@ enum class SafetyFlag {
     /**
      * Someone can take this token out of your wallet whenever they like: the Token-2022
      * permanent delegate. On an anonymous coin it is the whole scam in one field and no second
-     * wallet protects you; on a verified issuer's token it is how a regulated stablecoin works, so it is graded like freeze and mint.
+     * wallet protects you; on a verified issuer's token it is how a regulated stablecoin works, and it reads as [ISSUER_SEIZE].
      */
     SEIZABLE,
     /** A program of the creator's choosing runs on every transfer, and can block sells. */
@@ -72,7 +86,24 @@ data class TokenFacts(
     val sellable: Boolean? = null,
     /** What the mint account itself says it can do, read from the chain. The registry reports "Token-2022" and stops; the powers that empty a wallet after the purchase live here. */
     val ext: MintExtensions = MintExtensions.NONE,
+    /** One of [LiquidStake.MINTS]. */
+    val liquidStake: Boolean = false,
 )
+
+/**
+ * Liquid staking tokens whose mint authority is their stake pool program and whose freeze
+ * authority is empty, checked on chain 29 Sep 2026.
+ */
+object LiquidStake {
+    val MINTS = setOf(
+        "storenSbvkfzircixnaosc5CbzNZVrHJ6S3EKrS1yqR", // stORE, regolith-labs/ore-lst
+        "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", // mSOL
+        "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", // JitoSOL
+        "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1", // bSOL
+        "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v", // JupSOL
+        "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm", // INF
+    )
+}
 
 data class TokenSafety(val score: Int, val band: SafetyBand, val flags: List<SafetyFlag>) {
     val bad: Boolean get() = band == SafetyBand.BAD
@@ -93,15 +124,24 @@ fun assessToken(f: TokenFacts): TokenSafety {
     // Ceilings, worst first. Applied after the bonuses so they stay ceilings.
     var cap = 100
     fun cap(limit: Int, flag: SafetyFlag) {
-        flags += flag
+        // The ceiling always applies; the line is said once.
+        if (flag !in flags) flags += flag
         if (limit < cap) cap = limit
     }
 
     if (f.sellable == false) cap(6, SafetyFlag.NO_WAY_OUT)
     // The same on-chain fact means two things: on an anonymous coin a live authority is the
     // classic rug, on a verified one it is how a centrally-issued token works, and calling USDC dangerous teaches people to ignore the warning that matters.
-    if (f.verified && (f.canFreeze || f.canMint)) {
-        cap(72, SafetyFlag.ISSUER_CONTROLLED)
+    if (f.liquidStake && f.canMint && !f.canFreeze) {
+        // Said, not capped: the program mints against stake, and there is no one to freeze you.
+        flags += SafetyFlag.PROTOCOL_MINTED
+    } else if (f.verified && (f.canFreeze || f.canMint)) {
+        // Name only the power that is live: "can freeze it" was said of coins nobody can freeze.
+        cap(72, when {
+            f.canFreeze && f.canMint -> SafetyFlag.ISSUER_CONTROLLED
+            f.canMint -> SafetyFlag.ISSUER_MINT
+            else -> SafetyFlag.ISSUER_FREEZE
+        })
     } else {
         if (f.canFreeze) cap(38, SafetyFlag.CAN_FREEZE)
         if (f.canMint) cap(38, SafetyFlag.CAN_MINT)
@@ -119,7 +159,7 @@ fun assessToken(f: TokenFacts): TokenSafety {
         // Same fact, two meanings, exactly as with freeze and mint above: PYUSD
         // and EURC need this to exist at all, an anonymous coin uses it to burn
         // your balance seconds after you buy.
-        if (f.verified) cap(72, SafetyFlag.ISSUER_CONTROLLED) else cap(8, SafetyFlag.SEIZABLE)
+        if (f.verified) cap(72, SafetyFlag.ISSUER_SEIZE) else cap(8, SafetyFlag.SEIZABLE)
     }
     if (f.ext.defaultFrozen && !f.verified) cap(12, SafetyFlag.DEFAULT_FROZEN)
     if (f.ext.transferHook && !f.verified) cap(20, SafetyFlag.TRANSFER_HOOK)

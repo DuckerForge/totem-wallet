@@ -13,8 +13,8 @@ import kotlinx.coroutines.withContext
 /**
  * Dollars in the viewer's currency. The market is read in dollars because CoinGecko, Jupiter
  * and GeckoTerminal all answer in USD; the portfolio already counted in the currency chosen
- * in Settings and the Market did not, two units on one screen. The rate is the ratio between
- * SOL's price in the two currencies, a number the app already asks for, kept half an hour.
+ * in Settings and the Market did not, two units on one screen. The rate is the ECB's for a
+ * currency and SOL's own price when counting in SOL, kept half an hour.
  * Until it arrives amounts are written in dollars with the dollar sign: the number stays true, only the unit changes later.
  */
 @Immutable
@@ -45,9 +45,14 @@ internal data class Fx(val cur: String, val rate: Double) {
         /** Bloccante: chiamare su IO. Se nessuno risponde restano i dollari. */
         fun fetch(cur: String): Fx {
             cached(cur)?.let { return it }
-            val r = runCatching { FiatRates.spot(listOf("USD", cur)) }.getOrNull()
-                ?.let { m -> m[cur]?.div(m["USD"] ?: return@let null) }
-                ?.takeIf { it > 0 && it.isFinite() } ?: return usd
+            val r = when (cur) {
+                // Counting in SOL is a price, not a currency rate: the price feed knows it, the ECB does not.
+                "SOL" -> runCatching { Prices.usdTo("SOL") }.getOrNull()
+                // The ECB rate first: a currency rate is not a crypto question, and CoinGecko can refuse.
+                else -> runCatching { Prices.frankfurter(cur) }.getOrNull()
+                    ?: runCatching { FiatRates.spot(listOf("USD", cur)) }.getOrNull()
+                        ?.let { m -> m[cur]?.div(m["USD"] ?: return@let null) }
+            }?.takeIf { it > 0 && it.isFinite() } ?: return usd
             cache[cur] = System.currentTimeMillis() to r
             return Fx(cur, r)
         }

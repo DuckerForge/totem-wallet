@@ -238,6 +238,18 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 ),
             )
         }
+        // Not CoinGecko's own list: said above it, so an old price is never read as today's.
+        if (q.length < 2 && ranked.isNotEmpty()) Market.source?.let { src ->
+            item {
+                Text(
+                    when (src) {
+                        Market.Source.SAVED -> stringResource(R.string.market_src_saved, android.text.format.DateUtils.getRelativeTimeSpanString(Market.savedAt).toString())
+                        Market.Source.JUPITER -> stringResource(R.string.market_src_jupiter)
+                    },
+                    style = HaloType.small, color = Halo.amber,
+                )
+            }
+        }
         when (marketState(loading, ranked.isEmpty(), q, searching, shown.isEmpty())) {
             // Six placeholder rows: the page already has its shape while the list arrives.
             MarketState.LOADING -> items(6) { PlaceholderRow() }

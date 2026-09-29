@@ -76,7 +76,7 @@ internal fun LedgerScreen() {
             FilterLabel(stringResource(R.string.ledger_kind))
             ChipRow(
                 listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all_kinds)) +
-                    listOf("tx", "send", "swap", "agent", "order", "gift", "ore_dig", "ore_claim", "blink", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
+                    listOf("tx", "send", "swap", "agent", "order", "gift", "ore_dig", "ore_claim", "spare_store", "blink", "burn", "envelope", "theme", "revoke", "close", "message", "signin").map { it to kindLabel(ctx, it) },
                 kind,
             ) { kind = it }
 
@@ -151,7 +151,7 @@ internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>
 @Composable
 private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
-    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "swap" -> HIcon.SWAP; "blink" -> HIcon.SPARK; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
+    val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "swap" -> HIcon.SWAP; "blink" -> HIcon.SPARK; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; "spare_store" -> HIcon.COINS; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
     // The row opens the receipt and says so: contained, pressable, with the chevron.
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -249,6 +249,7 @@ internal fun kindLabel(ctx: android.content.Context, k: String): String = when (
     // which is the one thing they are not.
     "swap" -> ctx.getString(R.string.kind_swap); "blink" -> ctx.getString(R.string.kind_blink); "setup" -> ctx.getString(R.string.kind_setup)
     "ore_dig" -> ctx.getString(R.string.kind_ore_dig); "ore_claim" -> ctx.getString(R.string.kind_ore_claim)
+    "spare_store" -> ctx.getString(R.string.kind_spare_store)
     else -> ctx.getString(R.string.kind_tx)
 }
 

@@ -44,6 +44,10 @@ internal fun safetyLabel(flag: SafetyFlag): String = stringResource(
         SafetyFlag.NO_WAY_OUT -> R.string.safe_no_way_out
         SafetyFlag.CAN_FREEZE -> R.string.safe_can_freeze
         SafetyFlag.ISSUER_CONTROLLED -> R.string.safe_issuer
+        SafetyFlag.ISSUER_MINT -> R.string.safe_issuer_mint
+        SafetyFlag.ISSUER_FREEZE -> R.string.safe_issuer_freeze
+        SafetyFlag.ISSUER_SEIZE -> R.string.safe_issuer_seize
+        SafetyFlag.PROTOCOL_MINTED -> R.string.safe_protocol_minted
         SafetyFlag.CAN_MINT -> R.string.safe_can_mint
         SafetyFlag.WHALE -> R.string.safe_whale
         SafetyFlag.DEV_HEAVY -> R.string.safe_dev_heavy

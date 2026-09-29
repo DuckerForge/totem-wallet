@@ -69,7 +69,54 @@ class TokenSafetyTest {
             verified = true, organic = "medium", canMint = true, canFreeze = false,
             topHoldersPct = 59.2, devMints = 1, holders = 46_004, liquidityUsd = 694_349.0, sellable = true,
         )
-        assertEquals(listOf(SafetyFlag.ISSUER_CONTROLLED), assessToken(skr).flags)
+        assertEquals(listOf(SafetyFlag.ISSUER_MINT), assessToken(skr).flags)
+    }
+
+    @Test
+    fun `stORE is minted by its program, not by an issuer`() {
+        val store = TokenFacts(
+            verified = true, organic = "medium", canMint = true, canFreeze = false,
+            holders = 12_000, liquidityUsd = 900_000.0, sellable = true, liquidStake = true,
+        )
+        val s = assessToken(store)
+        assertEquals(listOf(SafetyFlag.PROTOCOL_MINTED), s.flags)
+        assertEquals(SafetyBand.GOOD, s.band)
+    }
+
+    @Test
+    fun `a liquid staking token that can be frozen is graded like any issuer`() {
+        val odd = TokenFacts(verified = true, canMint = true, canFreeze = true, liquidStake = true)
+        assertEquals(SafetyFlag.ISSUER_CONTROLLED, assessToken(odd).flags.first())
+    }
+
+    @Test
+    fun `the staking shortcut comes from the fixed list, not from the facts`() {
+        // Identical facts, told apart only by the mint: anything off the list is an issuer.
+        val facts = TokenFacts(
+            verified = true, organic = "medium", canMint = true, canFreeze = false,
+            holders = 12_000, liquidityUsd = 900_000.0, sellable = true,
+        )
+        fun grade(mint: String) = assessToken(facts.copy(liquidStake = mint in LiquidStake.MINTS))
+        assertEquals(listOf(SafetyFlag.PROTOCOL_MINTED), grade("storenSbvkfzircixnaosc5CbzNZVrHJ6S3EKrS1yqR").flags)
+        val offList = grade("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+        assertEquals(listOf(SafetyFlag.ISSUER_MINT), offList.flags)
+        assertTrue(offList.score <= 72, "score was ${offList.score}")
+    }
+
+    @Test
+    fun `an unverified coin that can mint keeps its low ceiling`() {
+        val s = assessToken(
+            TokenFacts(verified = false, organic = "high", canMint = true, holders = 50_000, liquidityUsd = 2_000_000.0, sellable = true),
+        )
+        assertEquals(listOf(SafetyFlag.CAN_MINT, SafetyFlag.UNVERIFIED), s.flags)
+        assertTrue(s.score <= 38, "score was ${s.score}")
+        assertEquals(SafetyBand.BAD, s.band)
+    }
+
+    @Test
+    fun `freeze only names freeze`() {
+        val f = TokenFacts(verified = true, canFreeze = true, holders = 5_000, liquidityUsd = 300_000.0, sellable = true)
+        assertEquals(listOf(SafetyFlag.ISSUER_FREEZE), assessToken(f).flags)
     }
 
     @Test

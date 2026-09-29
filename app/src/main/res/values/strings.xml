@@ -431,6 +431,17 @@
     <string name="kind_setup">setup</string>
     <string name="kind_ore_dig">ORE dig</string>
     <string name="kind_ore_claim">ORE claim</string>
+    <string name="kind_spare_store">spare change to stORE</string>
+    <string name="spare_title">Spare change in stORE</string>
+    <string name="spare_on">On. In the jar: %1$s SOL. Already in stORE: %2$s SOL.</string>
+    <string name="spare_off">Off. Swaps leave nothing aside.</string>
+    <string name="spare_note">Every swap you make from the Swap sheet with SOL on one side is rounded up to the next 0.005 SOL, and the difference is counted. Nothing moves yet: the SOL stays in your wallet. At 0.02 SOL, Totem offers one swap into stORE, ORE staked through ORE\'s own program, which earns a share of its buybacks. You read the receipt and sign it, like any swap.</string>
+    <string name="spare_move">Put %1$s SOL of spare change in stORE</string>
+    <string name="spare_done">Spare change in stORE.</string>
+    <string name="spare_cannot">Not enough SOL left to move the spare change.</string>
+    <string name="spare_ore_line">Spare change: %1$s SOL. At %2$s SOL it can become stORE.</string>
+    <string name="spare_mode">Spare change from the jar, into stORE.</string>
+    <string name="spare_unreachable">Could not read the balance or find stORE. Try again in a moment.</string>
     <string name="ledger_failed">did not go through</string>
     <string name="ledger_failed_body">The chain refused this transaction after the node had taken it. Nothing moved. Only the network fee was paid.</string>
     <string name="kind_theme">theme</string>
@@ -690,6 +701,7 @@
     <string name="swap_pct_clear">Remove</string>
     <string name="swap_pool_short">Jupiter</string>
     <string name="swap_new_account">New account</string>
+    <string name="swap_your_account">Your %1$s account, rent back when you close it</string>
     <string name="swap_live">The price refreshes on its own. If the road changes I ask you first.</string>
     <string name="swap_route_changed">Jupiter found a different road, through other accounts. It would give %1$s %2$s. The one below stays valid until you press the button.</string>
     <string name="swap_route_take">Take the new road</string>
@@ -990,6 +1002,8 @@
     <string name="tab_market">Market</string>
     <string name="market_sub">Every coin, by market cap</string>
     <string name="market_by_cap">Ranked by market cap</string>
+    <string name="market_src_saved">CoinGecko did not answer: the list saved %1$s. Prices may be old.</string>
+    <string name="market_src_jupiter">CoinGecko did not answer: Solana coins only, prices from Jupiter.</string>
     <string name="market_search">Search every coin</string>
     <string name="market_qty_title">How much you have. It counts even if it sits in another wallet or on an exchange: this wallet cannot see it, and this number is how you tell it.</string>
     <string name="whatif_title">What if it were as big as…</string>
@@ -1052,6 +1066,10 @@
     <string name="safe_few_holders">Almost nobody holds it yet.</string>
     <string name="safe_unverified">Not on Jupiter\'s verified list.</string>
     <string name="safe_issuer">It has an issuer who can freeze it or mint more. Normal for a stablecoin, different from holding SOL.</string>
+    <string name="safe_issuer_mint">Its issuer can still mint more. You are trusting the issuer, which holding SOL does not ask of you.</string>
+    <string name="safe_issuer_freeze">Its issuer can freeze your balance. You are trusting the issuer, which holding SOL does not ask of you.</string>
+    <string name="safe_issuer_seize">Its issuer can take it out of your wallet. Normal for a regulated stablecoin.</string>
+    <string name="safe_protocol_minted">Minted by a program, not by a person: it appears when someone stakes and is burned when they unstake. Nobody can freeze it. You are trusting the program\'s code.</string>
     <string name="safe_blocked">There is no way to sell this back. Totem will not build the swap.</string>
     <string name="safe_checking">Checking the coin…</string>
     <!-- receive / send: the two ways to hand over a request -->
@@ -1614,8 +1632,8 @@
     <string name="blink_hold">Hold to sign</string>
     <string name="blink_done">Done.</string>
     <string name="blink_truth">A Blink is an API that hands you a transaction. Totem reads and simulates it like any other before the fingerprint. Nothing is signed by opening the link.</string>
-    <string name="ctap_open">Exchange contacts by touch</string>
-    <string name="ctap_title">Contacts by touch</string>
+    <string name="ctap_open">Exchange contacts with a tap</string>
+    <string name="ctap_title">Contacts with a tap</string>
     <string name="ctap_sub">Two phones, back to back, twice.</string>
     <string name="ctap_how">Show yours, they read it; then they show theirs, you read it. Each card is signed by the phone that shows it: the contact you save was declared by a phone that was here.</string>
     <string name="ctap_name">Name to show</string>
@@ -1626,8 +1644,8 @@
     <string name="ctap_got">Received: %1$s, signature checked.</string>
     <string name="ctap_bad">This card does not hold: the signature does not match. Not saved.</string>
     <string name="ctap_save">Save as trusted contact</string>
-    <string name="ctap_saved">Saved, verified by touch.</string>
-    <string name="ctap_verified">verified by touch</string>
+    <string name="ctap_saved">Saved, verified with a tap.</string>
+    <string name="ctap_verified">verified with a tap</string>
     <string name="ctap_truth">What travels is an address, a name and a signature. No key, no money. The check proves a phone that was here declared that address; it does not tell you who holds the phone.</string>
     <string name="bridge_short">Bridge</string>
     <string name="home_customize">Choose the circles</string>
@@ -1644,6 +1662,10 @@
     <string name="comp_bubble">The bubble</string>
     <string name="comp_auto">Come back on its own</string>
     <string name="comp_auto_sub">Every time Totem opens, the bubble comes up.</string>
+    <string name="comp_notif">Numbers in the notifications too</string>
+    <string name="comp_notif_sub">The health and the agent in the bubble\'s notification. Off, it only says the bubble is on. Android needs that line to keep the bubble running.</string>
+    <string name="comp_quiet_line">The bubble is on.</string>
+    <string name="comp_notif_perm">Notifications are off for Totem. Turn them on in the phone settings.</string>
     <string name="comp_face">What the small circle says</string>
     <string name="comp_face_agent">Agent</string>
     <string name="comp_face_health">Health</string>

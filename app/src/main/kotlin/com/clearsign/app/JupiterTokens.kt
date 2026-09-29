@@ -55,6 +55,7 @@ object JupiterTokens {
             token2022 = token2022, topHoldersPct = topHoldersPct, devPct = devPct, devMints = devMints,
             holders = holders, liquidityUsd = liquidity, sellable = sellable,
             ext = ext ?: TokenExtensions.cached(mint) ?: com.clearsign.core.MintExtensions.NONE,
+            liquidStake = mint in com.clearsign.core.LiquidStake.MINTS,
         )
     }
 

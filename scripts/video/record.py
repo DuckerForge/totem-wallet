@@ -41,9 +41,12 @@ Uso:
 
 from __future__ import annotations
 
+import html
+import re
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PKG = "com.clearsign.app"
@@ -73,27 +76,98 @@ def key(name: str) -> None:
     sh("shell", "input", "keyevent", f"KEYCODE_{name.upper()}")
 
 
+def dump() -> str:
+    """The screen as uiautomator reads it now: the focused window only, visible nodes only."""
+    sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
+    return sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
+
+
+_BOUNDS = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+
+
+def nodes(xml: str) -> list[dict]:
+    """
+    Every node of a dump in document order: text and content-desc unescaped, box, centre,
+    clickable, enabled, and the index of its parent. Empty when the dump is not XML.
+    """
+    a, b = xml.find("<hierarchy"), xml.rfind("</hierarchy>")
+    if a < 0 or b < 0:
+        return []
+    # A control character in some app's text is not XML and would sink the whole read.
+    body = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]|&#(?:[0-8]|1[124-9]|2\d|3[01]);", "", xml[a:b + len("</hierarchy>")])
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError:
+        return []
+    out: list[dict] = []
+
+    def walk(el: ET.Element, parent: int) -> None:
+        for child in el:
+            if child.tag != "node":
+                continue
+            m = _BOUNDS.fullmatch(child.get("bounds", ""))
+            box = tuple(int(v) for v in m.groups()) if m else (0, 0, 0, 0)
+            out.append({"i": len(out), "parent": parent,
+                        "text": child.get("text", ""), "desc": child.get("content-desc", ""),
+                        "box": box, "xy": ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2),
+                        "clickable": child.get("clickable") == "true",
+                        "enabled": child.get("enabled") != "false"})
+            walk(child, len(out) - 1)
+
+    walk(root, -1)
+    return out
+
+
+def find_all(label: str, xml: str | None = None) -> list[dict]:
+    """
+    The nodes whose text is [label], or failing that whose content-desc is. The label can
+    be written the way the dump writes it ("Review &amp; sign") or plainly.
+    """
+    ns = nodes(dump() if xml is None else xml)
+    want = html.unescape(label)
+    return [n for n in ns if n["text"] == want] or [n for n in ns if n["desc"] == want]
+
+
+def find_re(pattern: str, xml: str | None = None) -> list[tuple[re.Match, dict]]:
+    """The nodes whose text matches [pattern], with the match."""
+    out = []
+    for n in nodes(dump() if xml is None else xml):
+        m = re.search(pattern, n["text"])
+        if m:
+            out.append((m, n))
+    return out
+
+
+def enabled(ns: list[dict], node: dict) -> bool:
+    """Whether [node] can be pressed: the first clickable node from it upwards decides."""
+    j = node["i"]
+    while j >= 0:
+        if not ns[j]["enabled"]:
+            return False
+        if ns[j]["clickable"]:
+            return True
+        j = ns[j]["parent"]
+    return node["enabled"]
+
+
+def wait_for(check, timeout: float, every: float = 0.4):
+    """Ask [check] until it answers something, or [timeout] seconds pass. Returns the answer or None."""
+    end = time.time() + timeout
+    while True:
+        got = check()
+        if got:
+            return got
+        if time.time() >= end:
+            return None
+        time.sleep(every)
+
+
 def find(label: str, last: bool = False) -> tuple[int, int] | None:
     """Il centro della scritta [label] sullo schermo, adesso. None se non c'e'."""
-    sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
-    xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
-    look = xml.rfind if last else xml.find
-    i = look(f'text="{label}"')
-    if i < 0:
-        i = look(f'content-desc="{label}"')
-        if i < 0:
-            return None
-    j = xml.find('bounds="[', i)
-    if j < 0:
+    hit = find_all(label)
+    if not hit:
         return None
-    raw = xml[j + 9: xml.find('"', j + 9)]
-    try:
-        a, b = raw.split("][")
-        x1, y1 = (int(v) for v in a.split(","))
-        x2, y2 = (int(v) for v in b.rstrip("]").split(","))
-    except ValueError:
-        return None
-    return (x1 + x2) // 2, (y1 + y2) // 2
+    return (hit[-1] if last else hit[0])["xy"]
 
 
 # When the current take started, for the ("at", ...) steps.
@@ -104,18 +178,61 @@ SEEN: dict[str, tuple[int, int]] = {}
 
 def scan(labels: list[str]) -> None:
     """One screen read for several labels: each lookup costs seconds, one read costs one."""
-    sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
-    xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
+    xml = dump()
     for label in labels:
-        i = xml.find(f'text="{label}"')
-        j = xml.find('bounds="[', i) if i >= 0 else -1
-        if j < 0:
+        hit = find_all(label, xml)
+        if hit:
+            SEEN[label] = hit[0]["xy"]
+        else:
             SEEN.pop(label, None)
-            continue
-        a, b = xml[j + 9: xml.find('"', j + 9)].split("][")
-        x1, y1 = (int(v) for v in a.split(","))
-        x2, y2 = (int(v) for v in b.rstrip("]").split(","))
-        SEEN[label] = ((x1 + x2) // 2, (y1 + y2) // 2)
+
+
+# Sheets with no X of their own, told by what they say: a drag down from high up closes
+# them. ORE, a wallet page from Scout, the empty account fix, the agent's rules. The ORE
+# sheet draws its own status bar, so the old tap on the veil at 600,110 landed inside it.
+SWIPE_SHUT = (
+    "one round a minute", 'text="Emptiest squares now:"', 'text="Tap the squares below"', "Hold to dig",
+    'text="WHAT THEY HOLD RIGHT NOW"', "Tap the star to follow", "You follow this wallet.",
+    'text="Close empty account"', 'text="Revoke delegation"', 'text="Burn token"',
+    "What the agent may sign without you", 'text="YOUR OWN RULES"', 'text="Load a file"',
+    'text="Ask me above"', 'text="Per move"', 'text="Per day"',
+)
+# A coin opened from the market: no Back label and no X, system back is the way out. Told
+# by words only that sheet has, the what-if too for when it is scrolled down.
+COIN_SHEET = ('text="Save and follow"', 'text="Tell me when it moves"',
+              "What if it were as big as", "Arithmetic, not a forecast")
+# The numbered list of "Your defenses" under its title: only that sheet has both.
+DEFENSES = re.compile(r'text="\d+\. [^"]+"')
+
+
+def shut_sheet() -> None:
+    swipe(600, 500, 600, 2400)
+
+
+def _close_one(xml: str) -> bool:
+    """Close the top thing once, by its own way out. False when there was nothing to close."""
+    at = find_all("Back", xml) if 'text="Back"' in xml else []
+    if at:
+        tap(*at[0]["xy"])
+    elif any(m in xml for m in SWIPE_SHUT):
+        shut_sheet()
+    elif "active wallets watched" in xml:
+        # Scout's arrow, by its description. A page scrolled away still has it: it sits above the list.
+        arrow = find_all("Back", xml)
+        tap(*(arrow[0]["xy"] if arrow else (93, 205)))
+    elif any(m in xml for m in COIN_SHEET):
+        # A coin opened from the market has no Back label: every scene after it stayed
+        # stuck there. System back only here, anywhere else it leaves the app and locks it.
+        key("back")
+    elif ('text="Your defenses"' in xml and DEFENSES.search(xml)) or 'text="Tap to be paid"' in xml:
+        # Two more sheets with no X; certainly open when this is on screen.
+        key("back")
+    elif 'content-desc="Close"' in xml:
+        # The sheets' own X (swap, receive): tapping it never leaves the app.
+        tap(*[n for n in nodes(xml) if n["desc"] == "Close"][0]["xy"])
+    else:
+        return False
+    return True
 
 
 def do(step: tuple) -> None:
@@ -125,7 +242,8 @@ def do(step: tuple) -> None:
         return
     if kind == "at":
         # ("at", T, "text", label[, hint, "left"|"right"]) taps [label] at T seconds into the
-        # take; ("at", T, "swipe", x1, y1, x2, y2) swipes then. Looking a label up costs two
+        # take; ("at", T, "swipe", x1, y1, x2, y2[, ms]) swipes then, 300 ms unless said. A
+        # swipe of D ms keeps the take busy about D + 0.5 s. Looking a label up costs two
         # to four seconds, so it is looked up first and the tap waits for its second: the
         # screen changes on the word, not four seconds after it. A label out of a sideways
         # row is brought in by swiping the row where [hint] sits.
@@ -167,33 +285,18 @@ def do(step: tuple) -> None:
         elif pos is not None:
             tap(*pos)
         else:
-            swipe(*step[3:7])
+            # The duration too: without it every drag was a 300 ms fling.
+            swipe(*step[3:8])
         return
     if kind == "close":
         # Chiudere «quello che c'e' sopra» non e' un punto sullo schermo: in alto a
         # sinistra la home ha l'interruttore della luce e Scout ha la freccia, e toccare
         # li' alla cieca cambiava tema a ogni scena. Si guarda prima cosa c'e'.
-        sh("shell", "uiautomator", "dump", "/sdcard/ui.xml", timeout=30)
-        xml = sh("shell", "cat", "/sdcard/ui.xml", timeout=30)
-        at = find("Back") if 'text="Back"' in xml else None
-        if at is not None:
-            tap(*at)
-        elif "active wallets watched" in xml or "Tap the star to follow" in xml:
-            # Una pagina scrollata ha la freccia fuori schermo: prima si risale.
-            for _ in range(6):
-                swipe(600, 700, 600, 2100, 200)
-                time.sleep(0.5)
-            tap(93, 205)
-        elif "one round a minute" in xml:
-            # Un ModalBottomSheet si chiude toccando il velo sopra di lui.
-            tap(600, 110)
-        elif 'content-desc="Close"' in xml:
-            # The sheets' own X (swap, receive): tapping it never leaves the app.
-            tap(*find("Close"))
-        elif 'text="Save and follow"' in xml:
-            # A coin opened from the market has no Back label: every scene after it stayed
-            # stuck there. System back only here, anywhere else it leaves the app and locks it.
-            key("back")
+        # A few passes: Back on a review only goes back to its form, the X comes after.
+        for _ in range(3):
+            if not _close_one(dump()):
+                return
+            time.sleep(1.2)
         return
     if kind == "seek":
         # Scorre finche' la scritta non compare. Un tocco su un'intestazione che apre e

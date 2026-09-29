@@ -29,4 +29,6 @@ Write a payment request on an NFC sticker, stick it to a counter, and anyone can
 
 And ORE: the agent can dig from its budget, under the same limits, and bring the gains home.
 
+Every swap puts a little SOL aside. When there is enough, you tap once, and it becomes staked ORE.
+
 Receipt before signature. Everywhere. Totem.

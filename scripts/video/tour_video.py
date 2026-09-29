@@ -118,12 +118,12 @@ SCENES: list[tuple[str, float, str, str, tuple[float, callable] | None]] = [
     ("receipt", 16.8, "01 · receipt before signature", "Simulated on chain before you sign.", record.AUTO["receipt"]),
     ("risks", 27.4, "01 · receipt before signature", "Risks first. A severe one is never signed.", (25.0, lambda: [])),
     ("keys", 46.0, "01 · receipt before signature", "The key never leaves the Seed Vault.", (8.0, lambda: [])),
-    ("agent", 48.4, "02 · the agent", "Its own budget. Your limits, your key, your rules.", (30.0, steps_agent)),
+    ("agent", 48.9, "02 · the agent", "Its own budget. Your limits, your key, your rules.", (30.0, steps_agent)),
     ("watch", 76.7, "03 · watch it work", "Charts, thoughts and a voice, live.", (18.0, steps_watch)),
     ("scout", 92.3, "04 · Scout", "What the other Seekers buy and hold.", record.AUTO["crowd"]),
     ("bubble", 126.4, "05 · bubble and widget", "Always in view, over every app.", (18.0, steps_bubble)),
     ("market", 141.3, "06 · market", "Every coin, and what if it were as big as another.", record.AUTO["market"]),
-    ("bridge", 157.6, "07 · bridge and private send", "Over two hundred chains, through RocketX.", (24.0, steps_bridge)),
+    ("bridge", 158.1, "07 · bridge and private send", "Over two hundred chains, through RocketX.", (24.0, steps_bridge)),
     ("health", 175.6, "08 · wallet health", "Approvals, rent, forgotten fees.", record.AUTO["health"]),
     ("nfc", 191.9, "09 · NFC", "A sticker on the counter. Tap to pay.", (22.0, steps_nfc)),
     ("ore", 211.6, "10 · ORE", "Dig ORE. The same receipt, the same limits.", record.AUTO["ore"]),
@@ -136,7 +136,7 @@ SCENES: list[tuple[str, float, str, str, tuple[float, callable] | None]] = [
 # Takes timed on the voice. Each prep walks to the screens off camera, reads where every
 # button is, puts things back, and returns taps at fixed seconds: the screen changes on
 # the word. Seconds are take time; the scene starts at TIMED_START, plus the offset the
-# pull measured (T1), so film = T + scene begin - 3.0. Nothing here signs: every take
+# pull measured (T1), so film = T + scene begin - START. Nothing here signs: every take
 # stops at a receipt or a hold button, and no fingerprint is ever asked mid-take.
 # ---------------------------------------------------------------------------
 TIMED_START = 3.0
@@ -1329,7 +1329,7 @@ CUES: dict[str, list[tuple[str, str, str, tuple]]] = {
                ("widget", "WIDGET", "a widget", M),
                ("balance", "WALLET", "your balance", M),
                ("health", "SHIELD_LOCK", "wallet health", M),
-               ("sell or stop", "SWAP", "sell or stop", A)],
+               ("sell or stop", "SWAP", "start or stop, from anywhere", A)],
     "market": [("ranked by size", "CHART", "ranked by size", M),
                ("follow the ones", "STAR", "follow", M),
                ("get told", "MEGAPHONE", "told when they move", M),
@@ -1337,25 +1337,26 @@ CUES: dict[str, list[tuple[str, str, str, tuple]]] = {
                ("as big as", "CHART", "as big as that one", M)],
     "bridge": [("sol or usdc", "COINS", "SOL or USDC", M),
                ("200 chains", "BRIDGE", "200+ chains", M),
-               ("another address", "MASK", "no line between them", C),
+               ("another address", "MASK", "Private, here on Solana", C),
                ("protected", "SHIELD_LOCK", "protected from bots", M)],
     "health": [("one score", "SHIELD_LOCK", "one score", M),
-               ("approvals", "INFINITY", "approvals still open", A),
+               ("approvals", "INFINITY", "approvals it can revoke", M),
                ("empty accounts", "TRASH", "rent in empty accounts", M),
                ("one signature", "SIGN", "one signature", M),
-               ("pool fees", "COINS", "forgotten pool fees", M)],
+               ("pool fees", "COINS", "Orca, Raydium, Meteora checked", M)],
     "nfc": [("nfc sticker", "NFC", "an NFC sticker", M),
             ("pay by touching", "NFC", "tap to pay", M),
             ("phone to phone", "NFC", "phone to phone", M),
             ("a proof", "QR", "a signed proof", M),
-            ("no network", "CHECK", "no network needed", M)],
+            ("another phone", "CHECK", "no network needed", M)],
     "ore": [("or", "GEM", "ORE", C),
-            ("dig", "DOWNLOAD", "it digs", M),
+            ("dig", "AGENT", "the agent digs", M),
             ("same limits", "LOCK", "same limits", M),
             ("gains home", "WALLET", "gains come home", M)],
     "spare": [("puts a little", "COINS", "a little set aside", M),
               ("tap once", "HOLD", "one tap into stORE", M),
               ("staked", "GEM", "staked ORE: stORE", C)],
+    "close": [("everywhere", "SHIELD_LOCK", "every swap, send and trade", M)],
 }
 CHIP_EARLY = 0.2   # a chip lands just before its word, like the scenes do
 
@@ -1377,6 +1378,10 @@ def chips_for(key: str, begin: float, end: float, ws: list[dict]) -> list[tuple[
 # Where each take gets to the point: every phone take starts at TIMED_START, and the build
 # adds the offset measured on its clip. watch is drawn.py's, which has its own lead (2.5).
 START = {key: TIMED_START for key in SESSION}
+# These two begin 0.5 s later than their words would put them, so the scene before
+# finishes its sentence. The take skips the same 0.5 s and stays on the voice.
+START["agent"] = TIMED_START + 0.5
+START["bridge"] = TIMED_START + 0.5
 
 
 def measure_offset(clip: Path, at: float) -> float | None:

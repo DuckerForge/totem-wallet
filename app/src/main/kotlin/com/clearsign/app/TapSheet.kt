@@ -111,7 +111,9 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(stringResource(R.string.tap_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
-                    Text(stringResource(R.string.tap_sub), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
+                    // "Back to back" is about two phones: over the sticker it said the wrong thing.
+                    // Two lines in both modes, so the chips below do not move when the mode changes.
+                    Text(stringResource(if (sticker) R.string.tap_sub_sticker else R.string.tap_sub), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, minLines = 2)
                 }
             }
 

@@ -49,8 +49,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clearsign.core.AgentMode
@@ -69,6 +71,21 @@ private fun symbolOf(mint: String): String = when (mint) {
     NATIVE_SOL_MINT, AgentPolicy.WSOL -> "SOL"
     AgentPolicy.USDC -> "USDC"
     else -> shorten(mint, 4)
+}
+
+/**
+ * The status bar's height, for a sheet tall enough to reach it. The sheet is its own
+ * window and gets no insets, so `statusBarsPadding` is zero there: read from resources,
+ * as OreSheet does. Put it before `verticalScroll`, so scrolled rows stop under the bar.
+ */
+@Composable
+internal fun sheetStatusBar(): Dp {
+    val ctx = LocalContext.current
+    val density = LocalDensity.current
+    return remember(density) {
+        val id = ctx.resources.getIdentifier("status_bar_height", "dimen", "android")
+        with(density) { (if (id > 0) ctx.resources.getDimensionPixelSize(id) else 0).toDp() }
+    }
 }
 
 /** Set the cap, the days and the preset, then fund it with one Seed Vault approval. */
@@ -102,9 +119,11 @@ internal fun NewEnvelopeSheet(owner: String, signer: SeedVaultSigner, onDone: ()
     val scope = rememberCoroutineScope()
 
     val scroll = rememberScrollState()
+    val statusBar = sheetStatusBar()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        // Full height once the balance is in: the title and the sliders stay clear of the clock.
         Column(
-            Modifier.fillMaxWidth().verticalScroll(scroll).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(top = statusBar).verticalScroll(scroll).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(stringResource(R.string.env_new_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)
@@ -513,9 +532,11 @@ internal fun RulesSheet(policy: AgentPolicy, session: SessionWallet.Session, own
     // even with the cap off, saying what was left of a cap that was not there.
     val dailyCap = if (dailyOn) (daily * cap).toLong() else session.capLamports
 
+    val statusBar = sheetStatusBar()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
+        // Always full height: the title and the scrolled rows stay clear of the clock.
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(top = statusBar).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(stringResource(R.string.agent_rules_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Halo.ink)

@@ -563,13 +563,15 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
     // The same coin with its price found again, for everything below that does the arithmetic.
     val priced = if (price != null && coin.priceUsd == null) coin.copy(priceUsd = price) else coin
 
+    val statusBar = sheetStatusBar()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
+        // Full height with the chart: the name and price stay clear of the clock.
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(top = statusBar).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -598,7 +600,12 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                             Haptics.tick(ctx); onSaved()
                         },
                     contentAlignment = Alignment.Center,
-                ) { HaloIcon(if (starred) HIcon.STAR_FILLED else HIcon.STAR, if (starred) Halo.amber else Halo.muted, 19.dp) }
+                ) {
+                    HaloIcon(
+                        if (starred) HIcon.STAR_FILLED else HIcon.STAR, if (starred) Halo.amber else Halo.muted, 19.dp,
+                        description = stringResource(if (starred) R.string.a11y_unfollow else R.string.a11y_follow),
+                    )
+                }
             }
 
             Text(stringResource(R.string.market_qty_title), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)

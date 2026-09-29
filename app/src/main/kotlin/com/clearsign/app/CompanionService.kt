@@ -119,9 +119,10 @@ class CompanionService : Service() {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACTION_HIDE -> hide()
             ACTION_SHOW -> show()
-            // The theme changed under it. The bubble paints its own bitmap and reads the
-            // palette once at start, so without this it kept the old colours until it died.
-            ACTION_REPAINT -> { Themes.load(this); paintFace() }
+            // The theme, or the page's face, size, coin or rows, changed under it. The bubble
+            // paints its own bitmap and reads the palette once at start, so without this it
+            // kept the old colours until it died.
+            ACTION_REPAINT -> { Themes.load(this); reread() }
             // The notification setting changed: the startForeground above already reposted it.
             ACTION_NOTIF -> Unit
         }
@@ -159,6 +160,34 @@ class CompanionService : Service() {
         attach()
         refresh()
         repost()
+    }
+
+    /**
+     * The page's choices, taken in place: size, face, coin, rows. Stopping and starting the
+     * service for each chip made the bubble blink out on screen. Hidden, there is nothing to
+     * redraw; [show] builds it from the same prefs.
+     */
+    private fun reread() {
+        val r = root ?: return
+        val px = dp(CompanionPrefs.size(this).toFloat())
+        bubble?.let { b ->
+            if (b.layoutParams?.width != px) {
+                b.layoutParams = FrameLayout.LayoutParams(px, px)
+                params?.let { lp -> runCatching { wm.updateViewLayout(r, lp) } }
+            }
+        }
+        // What the new face can say from memory, so it does not open on "…" or on the old coin.
+        val face = CompanionPrefs.face(this)
+        if (face == CompanionPrefs.Face.TOTAL && last.walletTotal == null) {
+            Settings.watchWallet(this)?.let { Portfolio.cached(it, Settings.currency.value) }
+                ?.let { v -> last = last.copy(walletTotal = compact(v.total, v.currency)) }
+        }
+        if (face == CompanionPrefs.Face.COIN) {
+            val sym = CompanionPrefs.coin(this)?.let { TokenSymbols.symbol(it) }
+            if (sym != last.coinSymbol) last = last.copy(coinSymbol = sym, coinChange = null)
+        }
+        startSpinner()
+        refresh()
     }
 
     /** The foreground notification with what it should say now. Never cancelled: it keeps the service alive. */
@@ -560,9 +589,15 @@ class CompanionService : Service() {
 
     // ---- data --------------------------------------------------------------
 
+    private var readSeq = 0
+
     private fun refresh() {
         if (root == null) return
         render()
+        // A newer read supersedes one still in flight: two chips in a row started two reads,
+        // and the slower one landed last with the numbers of the face just left. Not cancelled,
+        // only ignored: cancelling it mid widget refresh erased the widget's total.
+        val seq = ++readSeq
         scope.launch {
             val ctx = this@CompanionService
             val trading = TraderLoop.config(ctx).on
@@ -596,6 +631,7 @@ class CompanionService : Service() {
                 runCatching { Prices.quotes(listOf(mint))[mint] }.getOrNull()?.let { q -> TokenSymbols.symbol(mint) to q.change24h }
             } else null
 
+            if (seq != readSeq) return@launch
             last = Shot(
                 health = health, trading = trading, open = if (trading) opens.size else null,
                 pos = pos, posValue = posValue,
@@ -777,7 +813,7 @@ class CompanionService : Service() {
         @Volatile
         private var alive = false
 
-        /** Tell a running bubble to read the palette again. Does nothing if it is not running. */
+        /** Tell a running bubble to read the palette and its prefs again. Does nothing if it is not running. */
         fun repaint(ctx: Context) {
             if (!alive) return
             runCatching { ctx.startService(Intent(ctx, CompanionService::class.java).setAction(ACTION_REPAINT)) }
@@ -791,8 +827,8 @@ class CompanionService : Service() {
 
         /**
          * Start a running bubble again, so it comes back built in the language just chosen: its
-         * words are read once, at creation. The pause is the one [CompanionPage] needs too, a start
-         * that lands before the stop has finished is swallowed with it.
+         * words are read once, at creation. The pause matters: a start that lands before the stop
+         * has finished is swallowed with it.
          */
         fun relaunch(ctx: Context) {
             if (!alive) return

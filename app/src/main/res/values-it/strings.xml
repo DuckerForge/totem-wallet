@@ -969,6 +969,7 @@
     <string name="tap_aid_desc">Avvicina due telefoni per chiedere un pagamento</string>
     <string name="tap_title">Fatti pagare col tocco</string>
     <string name="tap_sub">Schiena contro schiena: i due retri si guardano.</string>
+    <string name="tap_sub_sticker">Un adesivo che scrivi una volta e lasci sul banco.</string>
     <string name="tap_waiting">Aspetto l\'altro telefono…</string>
     <string name="tap_done">Hanno letto la richiesta</string>
     <string name="tap_amount">Quanto</string>

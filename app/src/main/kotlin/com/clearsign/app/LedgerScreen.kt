@@ -51,9 +51,14 @@ internal fun LedgerScreen() {
     val months by produceState(initialValue = emptyList<String>(), version) { value = withContext(Dispatchers.IO) { Ledger.months(ctx) } }
     var month by remember { mutableStateOf<String?>(null) }   // null = all
     var kind by remember { mutableStateOf<String?>(null) }
-    val entries by produceState(initialValue = emptyList<LedgerEntry>(), version, month) {
-        value = withContext(Dispatchers.IO) { if (month == null) Ledger.all(ctx) else Ledger.month(ctx, month!!) }
+    // Null until the first read returns. An empty list here drew "Nothing yet" at every
+    // visit, over a ledger that has entries. A second visit starts from the last full read.
+    val loaded by produceState(initialValue = lastRead?.takeIf { it.first == version }?.second, version, month) {
+        val m = month
+        value = withContext(Dispatchers.IO) { if (m == null) Ledger.all(ctx) else Ledger.month(ctx, m) }
+            .also { if (m == null) lastRead = version to it }
     }
+    val entries = loaded.orEmpty()
     val shown = remember(entries, kind) { if (kind == null) entries else entries.filter { it.kind == kind } }
     var selected by remember { mutableStateOf<LedgerEntry?>(null) }
     var showExport by remember { mutableStateOf(false) }
@@ -63,7 +68,12 @@ internal fun LedgerScreen() {
         Column(Modifier.padding(horizontal = 20.dp).padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             PageHeader(
                 stringResource(R.string.tab_receipts),
-                if (shown.isEmpty()) stringResource(R.string.ledger_empty_sub) else stringResource(R.string.ledger_count, shown.size),
+                // An empty line while reading keeps the header at its height.
+                when {
+                    loaded == null -> ""
+                    shown.isEmpty() -> stringResource(R.string.ledger_empty_sub)
+                    else -> stringResource(R.string.ledger_count, shown.size)
+                },
                 HIcon.RECEIPT,
             ) {
                 if (shown.isNotEmpty()) HaloChip(stringResource(R.string.export_btn), HIcon.DOWNLOAD, Halo.mint) { showExport = true }
@@ -108,7 +118,9 @@ internal fun LedgerScreen() {
             }
         }
 
-        if (shown.isEmpty()) {
+        if (loaded == null) {
+            // Still reading: nothing, rather than a claim the disk has not made.
+        } else if (shown.isEmpty()) {
             Box(Modifier.padding(horizontal = 20.dp)) { EmptyState(HIcon.RECEIPT, stringResource(R.string.ledger_empty_sub), stringResource(R.string.ledger_empty)) }
         } else {
             val grouped = remember(shown) { shown.groupBy { dayKey(it.at) } }
@@ -131,6 +143,9 @@ internal fun LedgerScreen() {
     // filter, so "Sep 2026 + Gift" said three rows and wrote out all of September.
     if (showExport) ExportSheet(shown, month) { showExport = false }
 }
+
+/** The last full read and the ledger version it saw, so a second visit draws at once. */
+private var lastRead: Pair<Int, List<LedgerEntry>>? = null
 
 /** Sums for a period, in tokens and in fiat. */
 internal class Totals(val out: Map<String, Double>, val inn: Map<String, Double>, val fee: Long, val fiatOut: Double, val unpriced: Int) {

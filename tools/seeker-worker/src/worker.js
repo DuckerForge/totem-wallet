@@ -640,6 +640,10 @@ async function publishChain(env) {
  * The ECB's rates of the day go to their own node, `fx`: every phone needs one
  * to show euros, and it should not have to download the list to get it, nor
  * lose it when CoinGecko refuses. Four calls: two reads, two writes.
+ *
+ * From Cloudflare CoinGecko often answers 429 and CoinPaprika's shared quota is
+ * spent (checked 29 Sep 2026): the phones then ask on their own, each with its
+ * own quota.
  */
 async function publishMarket(env) {
   const fxr = await fetch("https://api.frankfurter.dev/v1/latest?base=USD").catch(() => null);
@@ -682,7 +686,7 @@ async function warm(env) {
 }
 
 /** Quante facce guardare e quante rileggerne, per stare sotto le cinquanta chiamate. */
-const WARM_LOOK = 8;   // 12 before the market list and the rates took four calls of the fifty
+const WARM_LOOK = 7;   // 12 before the market list and the rates took five calls of the fifty
 const WARM_MAX = 5;
 /** La sveglia che scalda invece di scansionare, sfasata di cinque minuti. */
 const WARM_CRON = "5-59/10 * * * *";

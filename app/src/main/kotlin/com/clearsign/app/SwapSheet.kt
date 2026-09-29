@@ -69,6 +69,8 @@ private val POPULAR = listOf(
 private sealed interface SwapState {
     data object Form : SwapState
     data object Building : SwapState
+    /** startSpare is reading stORE and the balance: the form it will replace is not drawn meanwhile. */
+    data object SpareLoading : SwapState
     data class Review(
         val tx: ByteArray, val analyzed: ReceiptEngine.Analyzed, val outUi: String, val outSym: String,
         val quote: Jupiter.Quote,
@@ -99,7 +101,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var state by remember { mutableStateOf<SwapState>(SwapState.Form) }
+    // Opened for the jar, it starts loading: a first frame of the SOL to USDC form flashed by.
+    var state by remember { mutableStateOf<SwapState>(if (spare) SwapState.SpareLoading else SwapState.Form) }
 
     // The wallet's own assets, named and priced exactly like the home screen.
     var owned by remember { mutableStateOf<List<PickToken>>(emptyList()) }
@@ -146,14 +149,15 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
      * [solLeft] caps the balance right after a swap that spent SOL, which a fresh read may not show yet.
      */
     fun startSpare(solLeft: Long? = null) {
+        // SpareLoading passes on purpose: it is the state the sheet opens in for the jar.
         if (state is SwapState.Building || state is SwapState.Signing) return
         newRoute = null
-        state = SwapState.Building
+        state = SwapState.SpareLoading
         scope.launch {
             val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(Spare.STORE_MINT)) }.getOrNull()?.get(Spare.STORE_MINT) }
             val balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), owner) }.getOrNull() }
             // Something else took the sheet meanwhile: this answer is for a screen that is gone.
-            if (state != SwapState.Building) return@launch
+            if (state != SwapState.SpareLoading) return@launch
             // Three different reasons, three different sentences: "not enough SOL" was said for all of them.
             if (t == null || balance == null) { state = SwapState.Error(ctx.getString(R.string.spare_unreachable)); return@launch }
             val raw = Spare.movable(SpareJar.free(), minOf(balance, solLeft ?: balance), SpareJar.RESERVE)
@@ -169,8 +173,11 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     LaunchedEffect(spare) { if (spare) startSpare() }
 
     val currency = Settings.currency.value
+    // False until the portfolio answers: "Available: 0 SOL" while it loads read as "you cannot afford this".
+    var ownedLoaded by remember { mutableStateOf(false) }
     LaunchedEffect(owner, currency) {
-        val view = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull() ?: return@LaunchedEffect
+        val view = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull()
+        if (view == null) { ownedLoaded = true; return@LaunchedEffect }
         val holdings = view.holdings.filter { !it.isNft && it.raw > 0 }
         // Jupiter names and prices the ones DAS could not describe, and gives us
         // their decimals — which is what a "to" token needs to be swappable at all.
@@ -179,6 +186,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
             // Native SOL is held under our placeholder mint; trade it as wrapped SOL.
             if (h.mint == com.clearsign.core.NATIVE_SOL_MINT) PickToken.of(h).copy(mint = Jupiter.SOL_MINT) else PickToken.of(h)
         }
+        ownedLoaded = true
         owned.firstOrNull { it.mint == from.mint }?.let { from = it }
     }
 
@@ -334,10 +342,11 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
 
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Said before the amount and the receipt: this SOL is the jar's, on its way into stORE.
-                if (spareMode && (state is SwapState.Form || state is SwapState.Building || state is SwapState.Review)) {
+                if (state is SwapState.SpareLoading || (spareMode && (state is SwapState.Form || state is SwapState.Building || state is SwapState.Review))) {
                     Banner(stringResource(R.string.spare_mode), Halo.mint, HIcon.COINS)
                 }
                 when (val s = state) {
+                    SwapState.SpareLoading -> Working(stringResource(R.string.swap_building))
                     SwapState.Form, SwapState.Building -> {
                         // FROM
                         Column(Modifier.fillMaxWidth().clip(rs(18)).background(Halo.cardSoft).haloBorder(rs(18)).padding(14.dp)) {
@@ -354,7 +363,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                                 Spacer(Modifier.width(8.dp))
                                 TokenChip(from) { picking = Side.FROM }
                             }
-                            Text(stringResource(R.string.send_available, fmtUnits(fromBalance, from.decimals) + " " + from.symbol), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular)
+                            Text(stringResource(R.string.send_available, if (ownedLoaded) fmtUnits(fromBalance, from.decimals) + " " + from.symbol else "…"), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular)
                             // Their own row: five of these next to the balance ran
                             // off the side of the phone.
                             Row(
@@ -430,7 +439,6 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             }
                         }
                         formError?.let { Banner(it, Halo.red, HIcon.WARNING) }
-                        if (s is SwapState.Building) Working(stringResource(R.string.swap_building))
                     }
                     // The coin was graded on the form, where you picked it. Saying
                     // it again here is the same sentence twice on one screen.
@@ -480,6 +488,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                         scope.launch { state = buildReview(q, rawIn) }
                         }
                     }
+                    // Where the button was: at the end of the list it sat below the fold, and the sheet looked frozen.
+                    SwapState.Building -> BuildingBar(stringResource(R.string.swap_building))
                     is SwapState.Review -> {
                         // A route the node says will fail is nearly always a stale price, and the fix is a new
                         // quote. The hold is gone in that case: signing pays a fee for a transaction that does nothing.
@@ -558,6 +568,19 @@ private fun CustomPercentSheet(current: Int, onSave: (Int) -> Unit, onDismiss: (
                 GhostButton(stringResource(R.string.swap_pct_clear), tint = Halo.muted) { onSave(0) }
             }
         }
+    }
+}
+
+/** The Review button's place and size while the receipt is built, so the bar does not jump. */
+@Composable
+private fun BuildingBar(message: String) {
+    Row(
+        Modifier.fillMaxWidth().height(54.dp).clip(rs(16)).background(Halo.cardSoft).haloBorder(rs(16)),
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(message, fontFamily = Inter, fontSize = 14.sp, color = Halo.muted)
+        Spacer(Modifier.width(6.dp))
+        BlinkCaret(Halo.mint, 14.dp, 6.dp)
     }
 }
 

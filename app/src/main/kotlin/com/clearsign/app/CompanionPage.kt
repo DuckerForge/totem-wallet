@@ -88,7 +88,9 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                 (held + followed).distinctBy { it.first }.take(12)
             }
         }
-        fun restart() { if (CompanionService.canRun(ctx)) { CompanionService.stop(ctx); scope.launch { kotlinx.coroutines.delay(300); CompanionService.start(ctx) } } }
+        // A running bubble redraws in place; one that is off stays off. Stopping and
+        // starting it made it blink out at every chip, and started it when it was off.
+        fun repaint() = CompanionService.repaint(ctx)
 
         Column(
             Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Halo.ground2, Halo.ground))).statusBarsPadding().navigationBarsPadding()
@@ -178,7 +180,7 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                             Text(
                                 stringResource(label), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = if (on) Halo.ink else Halo.muted,
                                 modifier = Modifier.clip(rs(999)).background(if (on) Halo.mint.copy(alpha = 0.16f) else Halo.cardSoft).border(1.dp, if (on) Halo.mint else Halo.stroke, rs(999))
-                                    .clickable { face = f; CompanionPrefs.setFace(ctx, f); tick++; restart() }.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    .clickable { face = f; CompanionPrefs.setFace(ctx, f); tick++; repaint() }.padding(horizontal = 12.dp, vertical = 7.dp),
                             )
                         }
                     }
@@ -186,7 +188,7 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(44, 54, 66).forEach { s ->
                             ModeChip(if (s == 44) stringResource(R.string.comp_size_s) else if (s == 54) stringResource(R.string.comp_size_m) else stringResource(R.string.comp_size_l), s == size, Halo.cyan, Modifier.weight(1f)) {
-                                size = s; CompanionPrefs.setSize(ctx, s); restart()
+                                size = s; CompanionPrefs.setSize(ctx, s); repaint()
                             }
                         }
                     }
@@ -202,7 +204,7 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                     listOf("agent" to R.string.comp_row_agent, "health" to R.string.comp_row_health).forEach { (k, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(label), style = HaloType.body, color = Halo.ink, modifier = Modifier.weight(1f))
-                            Switch(checked = shows.value[k] == true, onCheckedChange = { on -> CompanionPrefs.setShow(ctx, k, on); shows.value = shows.value + (k to on); restart() })
+                            Switch(checked = shows.value[k] == true, onCheckedChange = { on -> CompanionPrefs.setShow(ctx, k, on); shows.value = shows.value + (k to on); repaint() })
                         }
                     }
                 }
@@ -219,7 +221,7 @@ internal fun CompanionPage(owner: String?, onDismiss: () -> Unit) {
                             Text(
                                 sym, fontFamily = Mono, fontSize = 12.sp, color = if (on) Halo.ink else Halo.muted,
                                 modifier = Modifier.clip(rs(999)).background(if (on) Halo.cyan.copy(alpha = 0.16f) else Halo.cardSoft).border(1.dp, if (on) Halo.cyan else Halo.stroke, rs(999))
-                                    .clickable { coin = mint; CompanionPrefs.setCoin(ctx, mint); tick++; restart() }.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    .clickable { coin = mint; CompanionPrefs.setCoin(ctx, mint); tick++; repaint() }.padding(horizontal = 12.dp, vertical = 7.dp),
                             )
                         }
                     }

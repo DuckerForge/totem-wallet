@@ -969,6 +969,7 @@
     <string name="tap_aid_desc">Hold two phones together to ask for a payment</string>
     <string name="tap_title">Tap to be paid</string>
     <string name="tap_sub">Back to back: the two phones face away from each other.</string>
+    <string name="tap_sub_sticker">A sticker you write once and leave on the counter.</string>
     <string name="tap_waiting">Waiting for the other phone…</string>
     <string name="tap_done">They read the request</string>
     <string name="tap_amount">How much</string>

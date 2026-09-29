@@ -144,7 +144,8 @@ object Market {
         // so ten thousand phones are one caller, not ten thousand. The phone asks CoinGecko
         // itself only when the archive is missing or stale.
         val head = archived()?.let { parse(it) }?.takeIf { it.isNotEmpty() }
-            ?: getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=1&price_change_percentage=24h")?.let { parse(it) }.orEmpty()
+            ?: getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=1&price_change_percentage=24h")?.let { parse(it) }?.takeIf { it.isNotEmpty() }
+            ?: paprika()?.let { parse(it) }.orEmpty()
         if (head.isEmpty()) {
             // Nobody gave a ranked list. Jupiter's list is priced again (if that fails too, it is
             // said as saved); any other list on screen stays, said as saved; with nothing on
@@ -183,6 +184,40 @@ object Market {
         if (System.currentTimeMillis() - o.optLong("at", 0L) > 25 * 60_000L) return null
         return o.optJSONArray("coins")?.takeIf { it.length() > 0 }
     }
+
+    /**
+     * CoinPaprika's first hundred, in CoinGecko's shape, for networks CoinGecko refuses. Asked by
+     * the phone itself: from Cloudflare its shared quota is spent (29 Sep 2026). Its ids become
+     * CoinGecko's where the two differ, so the mint map and the lookups keep working; its images
+     * are not served to apps, so [parse] takes the logo already seen for the coin.
+     */
+    private fun paprika(): JSONArray? {
+        val arr = fetch("https://api.coinpaprika.com/v1/tickers?limit=$PAGE")?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return null
+        val out = JSONArray()
+        for (i in 0 until arr.length()) {
+            val c = arr.optJSONObject(i) ?: continue
+            val slug = c.optString("id").substringAfter('-')
+            val q = c.optJSONObject("quotes")?.optJSONObject("USD")
+            if (slug.isEmpty() || q == null) continue
+            out.put(JSONObject()
+                .put("id", PAPRIKA_TO_GECKO[slug] ?: slug)
+                .put("symbol", c.optString("symbol").lowercase())
+                .put("name", c.optString("name").ifEmpty { slug })
+                .put("current_price", q.opt("price"))
+                .put("market_cap", q.opt("market_cap"))
+                .put("market_cap_rank", c.optInt("rank"))
+                .put("price_change_percentage_24h", q.opt("percent_change_24h"))
+                .put("total_volume", q.opt("volume_24h")))
+        }
+        return out.takeIf { it.length() > 0 }
+    }
+
+    /** CoinPaprika's slug to CoinGecko's id, for the top coins whose two names differ. */
+    private val PAPRIKA_TO_GECKO = mapOf(
+        "binance-coin" to "binancecoin", "xrp" to "ripple", "lido-staked-ether" to "staked-ether",
+        "wrapped-liquid-staked-ether-20" to "wrapped-steth", "avalanche" to "avalanche-2", "near-protocol" to "near",
+        "cryptocom-chain" to "crypto-com-chain", "polygon" to "matic-network",
+    )
 
     /** The list saved on disk, however old. */
     private fun saved(): List<Coin> {
@@ -338,7 +373,8 @@ object Market {
                 id = id,
                 symbol = o.optString("symbol").uppercase(),
                 name = o.optString("name").ifEmpty { id },
-                image = o.optString("image").takeIf { it.isNotEmpty() },
+                // The worker's CoinPaprika list has no images: the logo seen last for the same coin.
+                image = o.optString("image").takeIf { it.isNotEmpty() && it != "null" } ?: knownImage(id),
                 priceUsd = o.optDouble("current_price").takeIf { !it.isNaN() },
                 marketCap = o.optDouble("market_cap").takeIf { !it.isNaN() },
                 rank = o.optInt("market_cap_rank").takeIf { it > 0 },
@@ -349,6 +385,17 @@ object Market {
         }
         return out
     }
+
+    /** A logo already seen for [id]: the list on screen, else the list saved on disk. */
+    private fun knownImage(id: String): String? {
+        top.firstOrNull { it.id == id }?.image?.let { return it }
+        val saved = imagesOnDisk ?: runCatching {
+            val arr = JSONArray(file?.readText() ?: return null)
+            (0 until arr.length()).mapNotNull { fromJson(arr.optString(it)) }.mapNotNull { c -> c.image?.let { c.id to it } }.toMap()
+        }.getOrDefault(emptyMap()).also { imagesOnDisk = it }
+        return saved[id]
+    }
+    @Volatile private var imagesOnDisk: Map<String, String>? = null
 
     private fun getArray(url: String): JSONArray? = fetch(url)?.let { runCatching { JSONArray(it) }.getOrNull() }
     private fun getObject(url: String): JSONObject? = fetch(url)?.let { runCatching { JSONObject(it) }.getOrNull() }

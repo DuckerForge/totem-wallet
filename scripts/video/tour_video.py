@@ -1198,16 +1198,11 @@ def prep_spare() -> list[tuple]:
     record.tap(*tile)
     time.sleep(2.5)
     button = _need(SPARE_BUTTON)
-    record.shut_sheet()
-    time.sleep(1.5)
-    # The home keeps its scroll across tabs: the tile is where it was read.
-    _go(("tap", TABS["settings"], TAB_Y), ("wait", 1.5))
-    _wallet_safety()
-    card = _bring("Spare change in stORE", 900, 1700)
+    # The take opens on the ORE sheet with the jar's line in view: a still Settings screen at
+    # the start wrote no frames, and screenrecord began five seconds late (29 Sep). The round
+    # countdown ticks every second, so this one records from the first second.
     _see("button", button)
-    _see("spare card", card)
-    return [("at", 5.6, "xy", TABS["wallet"], TAB_Y), ("at", 6.3, "xy", *tile),
-            ("at", 8.4, "xy", *button), ("wait", 5.0)]
+    return [("at", 8.4, "xy", *button), ("wait", 5.0)]
 
 
 def prep_close() -> list[tuple]:

@@ -66,6 +66,15 @@ def padded(clip: Path, need: float, start: float, work: Path) -> Path:
     if have >= need - 0.05:
         return clip
     out = work / f"pad_{clip.stem}.mp4"
+    if voice.duration(clip) < 0.5:
+        # A still take: screenrecord writes a frame only when the screen changes, so a screen
+        # that never moved is one frame with no duration, and tpad on it never finished.
+        png = work / f"still_{clip.stem}.png"
+        run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(clip), "-frames:v", "1", str(png))
+        run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", "30", "-i", str(png),
+            "-t", f"{need + 0.3:.2f}", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+            "-pix_fmt", "yuv420p", str(out))
+        return out
     run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(clip),
         "-vf", f"tpad=stop_mode=clone:stop_duration={need - have + 0.3:.2f}",
         "-an", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", str(out))

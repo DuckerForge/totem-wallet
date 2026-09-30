@@ -45,8 +45,8 @@ android {
         applicationId = "com.clearsign.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.1"
         buildConfigField("String", "HELIUS_RPC_URL", "\"$heliusRpcUrl\"")
         buildConfigField("String", "SCAN_RPC_URL", "\"$scanUrl\"")
         buildConfigField("String", "ALCHEMY_RPC_URL", "\"$alchemyRpcUrl\"")

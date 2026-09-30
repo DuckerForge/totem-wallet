@@ -1413,7 +1413,7 @@ CUES: dict[str, list[tuple[str, str, str, tuple]]] = {
                ("widget", "WIDGET", "a widget", M),
                ("balance", "WALLET", "your balance", M),
                ("health", "SHIELD_LOCK", "wallet health", M),
-               ("sell or stop", "SWAP", "start or stop, from anywhere", A)],
+               ("sell or stop", "SWAP", "sell or stop, from anywhere", A)],
     "market": [("ranked by size", "CHART", "ranked by size", M),
                ("follow the ones", "STAR", "follow", M),
                ("get told", "MEGAPHONE", "told when they move", M),

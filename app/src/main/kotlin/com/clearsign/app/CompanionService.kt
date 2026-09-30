@@ -617,7 +617,7 @@ class CompanionService : Service() {
                 val inCoins = opens.sumOf { runCatching { quote(it) }.getOrNull() ?: 0L }
                 posValue = pos?.let { runCatching { quote(it) }.getOrNull() }
                 if (free != null) {
-                    total = free + inCoins
+                    total = free + inCoins + SessionActions.deposits(ctx)
                     diff = total - funded + s.harvestedLamports
                 }
             }

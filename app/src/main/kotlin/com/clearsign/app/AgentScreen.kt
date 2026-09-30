@@ -73,6 +73,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
 
     var balance by remember(refresh, session?.pubkey) { mutableStateOf<Long?>(null) }
     var invested by remember(refresh, session?.pubkey) { mutableStateOf<Long?>(null) }
+    var deposits by remember(refresh, session?.pubkey) { mutableStateOf(0L) }
     var busy by remember { mutableStateOf<String?>(null) }
     var note by remember { mutableStateOf<String?>(null) }
     var showNew by remember { mutableStateOf(false) }
@@ -95,6 +96,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         // over would be called the result, and the minute the agent bought
         // anything it would look like it had lost the money.
         invested = Positions.open(ctx).sumOf { p -> runCatching { SessionActions.quoteValue(ctx, p) }.getOrNull() ?: 0L }
+        deposits = SessionActions.deposits(ctx)
     }
 
     fun closeNow() {
@@ -157,7 +159,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             // The money, in the order a person asks: how much is here, how did
             // it go, and the three numbers behind that.
             val inCoins = invested ?: 0L
-            val total = (balance ?: 0L) + inCoins
+            // The coins' account rent counts too: it comes back when they are sold and the account closed.
+            val total = (balance ?: 0L) + inCoins + deposits
             val diff = if (balance == null) null else total - session.fundedLamports + session.harvestedLamports
             val open = remember(refresh) { Positions.open(ctx) }
             val openCount = open.size

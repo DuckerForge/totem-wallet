@@ -190,6 +190,18 @@ object SessionActions {
     }
 
     /* What the whole holding would fetch in lamports right now, or null. */
+    /**
+     * The rent held by the budget's token accounts. It is the budget's own money, back as SOL when
+     * an empty account is closed, so it belongs in what the budget is worth: left out, a coin bought
+     * on a 0.005 slice showed the whole budget at -7.5% the moment it landed (30 Sep).
+     */
+    suspend fun deposits(ctx: Context): Long {
+        val s = SessionWallet.current(ctx) ?: return 0L
+        return withContext(Dispatchers.IO) {
+            runCatching { SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), s.pubkey).sumOf { it.lamports } }.getOrDefault(0L)
+        }
+    }
+
     suspend fun quoteValue(ctx: Context, pos: Positions.Position): Long? {
         val s = SessionWallet.current(ctx) ?: return null
         val raw = heldRaw(ctx, s.pubkey, force = true)?.get(pos.mint) ?: return null

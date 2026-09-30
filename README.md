@@ -4,6 +4,8 @@
 
 Built for **Clock In, the Solana Mobile hackathon** (deadline 8 October 2026). Android native, Jetpack Compose, Seed Vault, Mobile Wallet Adapter. Public page: https://duckerforge.github.io/apex/
 
+**See it:** [the deck](https://duckerforge.github.io/totem-wallet/) · [the demo film, 3:54](https://github.com/DuckerForge/totem-wallet/releases/download/v1.1-clockin/totem-tour.mp4) · [the signed APK 1.1](https://github.com/DuckerForge/totem-wallet/releases/download/v1.1-clockin/TotemWallet-v1.1-clockin.apk), Android 12 or newer.
+
 > The `apex/` path in the URL, the `web/apex` folder and the `clearsign.*` keys in `local.properties` keep older names on purpose. The page path is baked into verified Android App Links and into gift links already handed out, and the property keys are read by the build. Renaming them breaks working things for nothing.
 
 ---

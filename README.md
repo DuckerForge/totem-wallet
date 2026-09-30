@@ -71,4 +71,4 @@ The user's keys stay in the Seed Vault. The agent has its own small wallet, fund
 
 ## Documentation
 
-`docs/` holds the internal notes: how the agent gate works, the demo script, the hackathon plan, the pitch. Most are in Italian.
+`docs/` holds the demo script, the voice tracks and the notes on Scout.

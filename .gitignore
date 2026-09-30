@@ -70,3 +70,8 @@ __pycache__/
 # It stays inside the APK, because the fallback scan and the live feed's size label read
 # it. Regenerate it with the tools in tools/seeker-worker: see SEEKER-SCOUT.md.
 app/src/main/assets/seekers.txt
+
+# Working notes, local only
+CLAUDE.md
+docs/DA-FARE-*.md
+docs/presentazione.html

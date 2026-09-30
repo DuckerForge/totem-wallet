@@ -9,7 +9,7 @@ set -euo pipefail
 MODE="${1:-honest}"
 TARGET="${2:-}"
 WALLET="${3:-DEM0ownerWa11etF0rTests0n1yNotARea1Key111jQ}"
-ADB="${ADB:-/home/oliver/Android/Sdk/platform-tools/adb}"
+ADB="${ADB:-adb}"
 [ -n "$TARGET" ] && ADB="$ADB -s $TARGET"
 
 URL=$(MODE="$MODE" WALLET="$WALLET" python3 - <<'PY'

@@ -16,7 +16,7 @@ WALLET="${APEX_WALLET:-DEM0ownerWa11etF0rTests0n1yNotARea1Key111jQ}"
 DEST="${APEX_DEST:-4wBqpZM9xaSheZzJSMawUKKwhdpChKbZ5eu5ky4Vigw}"
 AMOUNT="${APEX_AMOUNT:-0.000001}"
 export APEX_TARGET="${APEX_TARGET:-adb-SM02E305271773-7jJhXi._adb-tls-connect._tcp}"
-export APEX_ADB="${APEX_ADB:-/home/oliver/Android/Sdk/platform-tools/adb}"
+export APEX_ADB="${APEX_ADB:-adb}"
 
 python3 scripts/apex_agent/cli.py wallet "$WALLET" mainnet >/dev/null
 

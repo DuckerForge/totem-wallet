@@ -94,7 +94,7 @@
       return;
     }
     $('amount').hidden = false;
-    $('amount').innerHTML = ((lamports - FEE) / 1e9).toFixed(5).replace(/0+$/, '').replace(/\.$/, '') + ' <small>SOL</small>';
+    showAmount($('amount'), ((lamports - FEE) / 1e9).toFixed(5).replace(/0+$/, '').replace(/\.$/, ''), 'SOL');
     $('state').textContent = T('Se hai Apex, aprilo dal link e basta. Altrimenti:',
                                'If you have Apex, just open the link with it. Otherwise:');
     $('claim').hidden = false;

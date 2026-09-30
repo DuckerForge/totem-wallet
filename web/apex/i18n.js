@@ -10,8 +10,18 @@ function shorten(s, n = 4) {
 }
 
 function brand(sub) {
-  document.getElementById('brand').innerHTML =
-    '<img src="../icon.png" alt=""><div><b>Apex</b><span>' + sub + '</span></div>';
+  const el = document.getElementById('brand');
+  const img = document.createElement('img'); img.src = '../icon.png'; img.alt = '';
+  const name = document.createElement('b'); name.textContent = 'Apex';
+  const line = document.createElement('span'); line.textContent = sub;
+  const box = document.createElement('div'); box.append(name, line);
+  el.replaceChildren(img, box);
+}
+
+// An amount and its unit, as text: both can come from the link.
+function showAmount(el, amount, unit) {
+  const u = document.createElement('small'); u.textContent = unit;
+  el.replaceChildren(document.createTextNode(amount + ' '), u);
 }
 
 // Base58 (Bitcoin alphabet), because the gift key travels that way.

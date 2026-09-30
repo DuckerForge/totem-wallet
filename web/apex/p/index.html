@@ -55,7 +55,7 @@
 
   if (amount) {
     $('amount').hidden = false;
-    $('amount').innerHTML = amount + ' <small>' + unit + '</small>';
+    showAmount($('amount'), amount, unit);
   } else {
     $('title').textContent = T('Il tuo indirizzo per essere pagato', 'An address to pay');
   }

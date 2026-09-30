@@ -28,6 +28,8 @@ import org.json.JSONObject
  */
 object SessionWallet {
     private const val PREFS = "apex_session"
+    /** The budget key, sealed, in [SealedStore]. */
+    private const val SEED_FILE = "budget_seed"
     private const val KEY_ALIAS = "apex_session_aes"
     private const val CURVE = "Ed25519"
 
@@ -86,6 +88,9 @@ object SessionWallet {
     @Volatile var preparedPubkey: String? = null
         private set
 
+    /** Budgets made before [SealedStore] kept the sealed key in prefs; moved on first read. */
+    @Volatile private var keyMoved = false
+
     fun prepare(): Pair<ByteArray, String> {
         val seed = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val spec = EdDSAPrivateKeySpec(seed, EdDSANamedCurveTable.getByName(CURVE))
@@ -100,8 +105,8 @@ object SessionWallet {
         val (seed, pubkey) = prepared ?: prepare()
         val now = System.currentTimeMillis()
         val session = Session(pubkey, capLamports, 0L, now, now + days.coerceIn(1, 90) * 86_400_000L, note)
+        SealedStore.write(ctx, SEED_FILE, seal(seed))
         prefs(ctx).edit()
-            .putString("seed", seal(seed))
             .putString("pubkey", pubkey)
             .putLong("cap", capLamports)
             .putLong("funded", 0L)
@@ -117,6 +122,7 @@ object SessionWallet {
     fun current(ctx: Context): Session? {
         val p = prefs(ctx)
         val pub = p.getString("pubkey", null) ?: return null
+        if (!keyMoved) keyMoved = SealedStore.migrate(ctx, p, "seed", SEED_FILE) != null
         // Migration: budgets topped up before the cap tracked funding kept limits sized for
         // the old amount. Fixed once, on first read.
         val cap0 = p.getLong("cap", 0L)
@@ -192,6 +198,7 @@ object SessionWallet {
     }.getOrNull()
 
     fun forget(ctx: Context) {
+        SealedStore.delete(ctx, SEED_FILE)
         prefs(ctx).edit().clear().apply()
         runCatching { TraderLoop.reset(ctx) }
         runCatching { Positions.clear(ctx) }
@@ -268,7 +275,7 @@ object SessionWallet {
 
     /** Sign a transaction message with the envelope key. No biometrics: we hold it. */
     fun sign(ctx: Context, message: ByteArray): ByteArray? {
-        val seed = open(prefs(ctx).getString("seed", null) ?: return null) ?: return null
+        val seed = open(SealedStore.migrate(ctx, prefs(ctx), "seed", SEED_FILE) ?: return null) ?: return null
         val spec = EdDSAPrivateKeySpec(seed, EdDSANamedCurveTable.getByName(CURVE))
         val engine = EdDSAEngine(java.security.MessageDigest.getInstance("SHA-512"))
         engine.initSign(EdDSAPrivateKey(spec))

@@ -165,23 +165,28 @@ object MoneyLinks {
     }.getOrDefault(emptyList())
 
     private fun remember(ctx: Context, gift: Gift, seed: ByteArray) {
-        val list = all(ctx) + gift
-        save(ctx, list)
-        prefs(ctx).edit().putString("seed_" + gift.pubkey, Secrets.seal(seed)).apply()
+        SealedStore.write(ctx, "gift_" + gift.pubkey, Secrets.seal(seed))
+        save(ctx, all(ctx) + gift)
     }
 
     /** Drop a gift that never left: the send failed, so the key holds nothing. */
     private fun forget(ctx: Context, pubkey: String) {
         save(ctx, all(ctx).filterNot { it.pubkey == pubkey })
-        prefs(ctx).edit().remove("seed_$pubkey").apply()
+        dropKey(ctx, pubkey)
     }
 
     internal fun seedOf(ctx: Context, pubkey: String): ByteArray? =
-        prefs(ctx).getString("seed_$pubkey", null)?.let { Secrets.open(it) }
+        SealedStore.migrate(ctx, prefs(ctx), "seed_$pubkey", "gift_$pubkey")?.let { Secrets.open(it) }
+
+    /** Gifts made before [SealedStore] may still have the sealed key in prefs. */
+    private fun dropKey(ctx: Context, pubkey: String) {
+        SealedStore.delete(ctx, "gift_$pubkey")
+        prefs(ctx).edit().remove("seed_$pubkey").apply()
+    }
 
     fun markClaimed(ctx: Context, pubkey: String) {
         save(ctx, all(ctx).map { if (it.pubkey == pubkey) it.copy(claimedAt = System.currentTimeMillis()) else it })
-        prefs(ctx).edit().remove("seed_$pubkey").apply()
+        dropKey(ctx, pubkey)
     }
 
     private fun save(ctx: Context, list: List<Gift>) {

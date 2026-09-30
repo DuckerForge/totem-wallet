@@ -24,6 +24,7 @@ object LedgerJson {
         } })
         .put("att", e.attestation ?: JSONObject.NULL).put("attSig", e.attestationSig ?: JSONObject.NULL)
         .put("note", e.note).put("tags", JSONArray(e.tags))
+        .apply { e.why?.let { w -> put("why", JSONObject().put("k", w.key).put("a", JSONArray(w.args))) } }
 
     private fun leg(l: Leg) = JSONObject().put("mint", l.mint).put("sym", l.symbol).put("dec", l.decimals).put("raw", l.rawAmount)
 
@@ -41,13 +42,16 @@ object LedgerJson {
             fiat[cur] = FiatSnapshot(cur, s.optDouble("sol"), prices, s.optLong("at"), s.optString("src", "spot"))
         } }
         val tags = o.optJSONArray("tags")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: emptyList()
+        val why = o.optJSONObject("why")?.let { w ->
+            com.clearsign.core.Refusals.Text(w.optString("k"), w.optJSONArray("a")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: emptyList())
+        }
         return LedgerEntry(
             id = o.optString("id"), groupId = o.optString("gid"), at = o.optLong("at"), kind = o.optString("kind", "tx"),
             dApp = o.optString("dApp"), host = str("host"), pkg = str("pkg"), cluster = str("cluster"), wallet = o.optString("wallet"),
             signature = str("sig"), sent = o.optBoolean("sent"), txIndex = o.optInt("txi"), txCount = o.optInt("txn", 1),
             outflows = legs("out"), inflows = legs("in"), feeLamports = o.optLong("fee"), feePaidByMe = o.optBoolean("feeMine", true),
             counterparties = cps, primaryRecipient = str("to"), recipientLabel = str("toLabel"), risks = risks, fiat = fiat,
-            attestation = str("att"), attestationSig = str("attSig"), note = o.optString("note"), tags = tags,
+            attestation = str("att"), attestationSig = str("attSig"), note = o.optString("note"), tags = tags, why = why,
         )
     }
 }

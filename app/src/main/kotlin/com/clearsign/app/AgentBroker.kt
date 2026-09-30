@@ -133,7 +133,7 @@ object AgentBroker {
         return when (decision) {
             is Decision.Refuse -> {
                 Log.i(TAG, "refused: ${decision.reason}")
-                record(ctx, receipt, session.pubkey, job, "refused", null, false, decision.reason)
+                record(ctx, receipt, session.pubkey, job, "refused", null, false, decision.reason, decision.text)
                 AgentLink.noteAction(ctx, ctx.getString(R.string.agent_last_refused, what))
                 notify(ctx, ctx.getString(R.string.agent_notif_refused), decision.reason, null)
                 Verdict.Refused(decision.reason, Verdict.Refused.By.COLLAR).explained()
@@ -271,14 +271,14 @@ object AgentBroker {
     }.getOrNull()
 
     /** Every decision is a ledger row: host says how it went (auto / asked / refused). */
-    fun record(ctx: Context, r: Receipt, envelope: String, job: Job, how: String, txSig: String?, sent: Boolean, note: String?) {
+    fun record(ctx: Context, r: Receipt, envelope: String, job: Job, how: String, txSig: String?, sent: Boolean, note: String?, why: com.clearsign.core.Refusals.Text? = null) {
         val at = System.currentTimeMillis()
         val entry = LedgerRecorder.fromReceipt(
             at = at, kind = "agent", dApp = job.agent, host = how, pkg = "link", cluster = job.cluster, wallet = envelope,
             r = r, signature = txSig, sent = sent, txIndex = 0, txCount = 1, groupId = LedgerRecorder.newId(),
             attestation = null, attestationSig = null,
         )
-        LedgerRecorder.record(ctx, if (note != null) entry.copy(note = note) else entry)
+        LedgerRecorder.record(ctx, if (note != null) entry.copy(note = note, why = why) else entry)
     }
 
     /**

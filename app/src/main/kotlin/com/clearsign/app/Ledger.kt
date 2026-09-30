@@ -57,6 +57,8 @@ data class LedgerEntry(
     val fiat: Map<String, FiatSnapshot> = emptyMap(),
     val attestation: String? = null, val attestationSig: String? = null,
     val note: String = "", val tags: List<String> = emptyList(),
+    /** The collar's refusal as key and arguments, so the row can be said in today's language. See [com.clearsign.core.Refusals]. */
+    val why: com.clearsign.core.Refusals.Text? = null,
 ) {
     val ym: String get() = Ledger.yearMonth(at)
     val hasValue: Boolean get() = outflows.isNotEmpty() || inflows.isNotEmpty()

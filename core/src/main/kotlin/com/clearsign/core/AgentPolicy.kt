@@ -76,8 +76,56 @@ sealed class Decision(val code: String) {
     class Ask(code: String, val reason: String) : Decision(code) {
         override fun toString() = "Ask($code: $reason)"
     }
-    class Refuse(code: String, val reason: String) : Decision(code) {
+    /** [text] is the reason as a sentence key and its arguments, set when the collar wrote it, so a stored refusal can be said again in another language. */
+    class Refuse(code: String, val reason: String, val text: Refusals.Text? = null) : Decision(code) {
         override fun toString() = "Refuse($code: $reason)"
+    }
+}
+
+/**
+ * The collar's own refusals as keys and arguments. A refusal stored as a sentence stays in the
+ * language of that moment: rows written on 19 Sep in Italian showed in Italian under an English
+ * app. One table says each sentence in both languages and reads either one back, so old rows
+ * that only have the sentence can be said again too. Reasons from the intent check and the
+ * risk engine are not here: they are theirs, and stay as written.
+ */
+object Refusals {
+    data class Text(val key: String, val args: List<String> = emptyList())
+
+    private val SAID = mapOf(
+        "paused" to ("l'agente è in pausa" to "the agent is paused"),
+        "expired" to ("la paghetta è scaduta" to "the budget has expired"),
+        "read_only" to ("l'agente è in sola lettura" to "the agent is read-only"),
+        "vault_takes" to ("toccherebbe il tuo conto principale" to "it would take from your main account"),
+        "vault_writable" to ("il tuo conto principale è modificabile da questa transazione" to "your main account is writable in this transaction"),
+        "rate" to ("ritmo superato: {0} operazioni nell'ultima ora" to "rate exceeded: {0} transactions in the last hour"),
+        // With the route first: read back, the plain form would swallow it.
+        "destination_route" to ("{0} non è fra i destinatari ammessi (rotta: {1})" to "{0} is not an allowed destination (route: {1})"),
+        "destination" to ("{0} non è fra i destinatari ammessi" to "{0} is not an allowed destination"),
+        "asset_out" to ("{0} non è fra gli asset ammessi" to "{0} is not an allowed asset"),
+        "rate_quality" to ("non è uno scambio: scambia {0} SOL e riceve l'equivalente di {1} SOL" to "this is not an exchange: swaps {0} SOL and gets back the equivalent of {1} SOL"),
+    )
+
+    /** The sentence in [locale], or null for a key this table does not know. */
+    fun say(t: Text, locale: String): String? {
+        val (itText, enText) = SAID[t.key] ?: return null
+        var s = if (locale == "it") itText else enText
+        t.args.forEachIndexed { i, a -> s = s.replace("{$i}", a) }
+        return s
+    }
+
+    private val READ = SAID.flatMap { (key, pair) -> listOf(pair.first, pair.second).map { key to pattern(it) } }
+
+    private fun pattern(template: String): Regex {
+        val parts = template.split(Regex("\\{\\d}"))
+        return Regex("^" + parts.joinToString("(.+?)") { Regex.escape(it) } + "$")
+    }
+
+    /** A stored sentence back to its key, in either language, or null when it is not one of these. */
+    fun read(note: String): Text? {
+        val s = note.trim()
+        for ((key, re) in READ) re.find(s)?.let { m -> return Text(key, m.groupValues.drop(1)) }
+        return null
     }
 }
 
@@ -133,11 +181,15 @@ object PolicyEngine {
         routeIsOurs: Boolean = false,
     ): Decision {
         val it = locale == "it"
+        fun refuse(code: String, key: String, vararg args: String): Decision.Refuse {
+            val t = Refusals.Text(key, args.toList())
+            return Decision.Refuse(code, Refusals.say(t, locale) ?: key, t)
+        }
 
         // 1. Not running.
-        if (policy.mode == AgentMode.OFF) return Decision.Refuse("paused", if (it) "l'agente è in pausa" else "the agent is paused")
-        if (now > policy.expiresAt) return Decision.Refuse("expired", if (it) "la paghetta è scaduta" else "the budget has expired")
-        if (policy.mode == AgentMode.READ_ONLY) return Decision.Refuse("read_only", if (it) "l'agente è in sola lettura" else "the agent is read-only")
+        if (policy.mode == AgentMode.OFF) return refuse("paused", "paused")
+        if (now > policy.expiresAt) return refuse("expired", "expired")
+        if (policy.mode == AgentMode.READ_ONLY) return refuse("read_only", "read_only")
 
         // What the transaction is, read once: the rules below all need it, and so
         // does the drain exemption immediately after.
@@ -176,16 +228,16 @@ object PolicyEngine {
         if (vault != null) {
             val vaultDeltas = receipt.deltas.filter { d -> d.owner == vault }
             if (vaultDeltas.any { d -> d.rawAmount < 0 }) {
-                return Decision.Refuse("vault_touched", if (it) "toccherebbe il tuo conto principale" else "it would take from your main account")
+                return refuse("vault_touched", "vault_takes")
             }
             if (vault in writableKeys && vaultDeltas.none { d -> d.rawAmount > 0 }) {
-                return Decision.Refuse("vault_touched", if (it) "il tuo conto principale è modificabile da questa transazione" else "your main account is writable in this transaction")
+                return refuse("vault_touched", "vault_writable")
             }
         }
 
         // 4. A loop, or an injected "do it again".
         if (history.txLastHour >= policy.maxTxPerHour) {
-            return Decision.Refuse("rate", if (it) "ritmo superato: ${policy.maxTxPerHour} operazioni nell'ultima ora" else "rate exceeded: ${policy.maxTxPerHour} transactions in the last hour")
+            return refuse("rate", "rate", policy.maxTxPerHour.toString())
         }
 
         // 5. An exchange pays a pool, not a wallet, so the destination list only governs transfers.
@@ -203,14 +255,13 @@ object PolicyEngine {
                 // to make a sale pass would be guessing a program id into a safety list.
                 val swapShaped = outs.isNotEmpty() && ins.any { d -> outs.none { o -> o.mint == d.mint } }
                 val seen = if (!swapShaped) "" else programs.filter { p -> p !in AgentPolicy.BASE_PROGRAMS }.take(2).joinToString(", ") { short(it) }
-                val extra = if (seen.isEmpty()) "" else if (it) " (rotta: $seen)" else " (route: $seen)"
-                return Decision.Refuse("destination", (if (it) "${short(a)} non è fra i destinatari ammessi" else "${short(a)} is not an allowed destination") + extra)
+                return if (seen.isEmpty()) refuse("destination", "destination", short(a)) else refuse("destination", "destination_route", short(a), seen)
             }
         }
 
         // 6. Assets: nothing unlisted leaves, and buying something new is the human's call.
         for (d in outs) if (!allowedMint(policy, d)) {
-            return Decision.Refuse("asset_out", if (it) "${d.symbol} non è fra gli asset ammessi" else "${d.symbol} is not an allowed asset")
+            return refuse("asset_out", "asset_out", d.symbol)
         }
         for (d in ins) if (!allowedMint(policy, d)) {
             return Decision.Ask("asset_in", if (it) "vuole acquistare ${d.symbol}, un token non in lista" else "wants to acquire ${d.symbol}, a token not on the list")
@@ -253,7 +304,7 @@ object PolicyEngine {
             val swapped = (total - rent - receipt.feeLamports).coerceAtLeast(1L)
 
             if (back < swapped / 2) {
-                return Decision.Refuse("rate_quality", if (it) "non è uno scambio: scambia ${sol(swapped)} SOL e riceve l'equivalente di ${sol(back)} SOL" else "this is not an exchange: swaps ${sol(swapped)} SOL and gets back the equivalent of ${sol(back)} SOL")
+                return refuse("rate_quality", "rate_quality", sol(swapped), sol(back))
             }
             // Getting out of a coin pays the spread and the impact, and that is
             // often more than a tenth. Asking here is the same as refusing: the

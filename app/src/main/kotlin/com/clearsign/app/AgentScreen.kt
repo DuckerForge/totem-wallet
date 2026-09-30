@@ -535,7 +535,7 @@ private fun RecentMoves(refresh: Int) {
                             } + agentHow(ctx, e.host),
                             fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, maxLines = 1,
                         )
-                        if (refused && e.note.isNotBlank()) Text(e.note, fontFamily = Inter, fontSize = 10.5.sp, color = Halo.red, maxLines = 2, lineHeight = 14.sp)
+                        if (refused && e.note.isNotBlank()) Text(refusalNote(ctx, e), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.red, maxLines = 2, lineHeight = 14.sp)
                     }
                     Text(
                         android.text.format.DateUtils.getRelativeTimeSpanString(e.at, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString(),
@@ -545,6 +545,17 @@ private fun RecentMoves(refresh: Int) {
             }
         }
     }
+}
+
+/**
+ * Why a move was stopped, in the language the app speaks now. The collar's own refusals are
+ * said again from their key; rows older than the key are read back from the sentence. An
+ * unanswered question is always the same sentence, so it comes from today's strings.
+ */
+private fun refusalNote(ctx: android.content.Context, e: LedgerEntry): String {
+    if (e.host == "expired") return ctx.getString(R.string.agent_ask_timeout)
+    val t = e.why ?: com.clearsign.core.Refusals.read(e.note) ?: return e.note
+    return com.clearsign.core.Refusals.say(t, deviceLocaleTag()) ?: e.note
 }
 
 /**

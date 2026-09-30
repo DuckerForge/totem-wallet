@@ -454,4 +454,24 @@ class AgentPolicyTest {
         val dd = home(comingHome(0.085), h = SpendHistory(0L, 20))
         assertTrue(dd is Decision.Refuse && dd.code == "rate", dd.toString())
     }
+
+    /** A refusal carries its key, and the key says it in the other language with the same words. */
+    @Test fun aRefusalCanBeSaidAgainInAnotherLanguage() {
+        val d = decide(transferTo(stranger, 0.001))
+        assertTrue(d is Decision.Refuse && d.text != null, d.toString())
+        val r = d as Decision.Refuse
+        assertEquals(r.reason, Refusals.say(r.text!!, "en"))
+        assertEquals("Atta…XXXX non è fra i destinatari ammessi", Refusals.say(r.text!!, "it"))
+    }
+
+    /** Rows written before the key only have the sentence. The one from 19 Sep, read back and said in English. */
+    @Test fun anOldItalianRefusalIsReadBack() {
+        val t = Refusals.read("FSbz…JhrT non è fra i destinatari ammessi (rotta: JUP6…TaV4)")
+        assertEquals(Refusals.Text("destination_route", listOf("FSbz…JhrT", "JUP6…TaV4")), t)
+        assertEquals("FSbz…JhrT is not an allowed destination (route: JUP6…TaV4)", Refusals.say(t!!, "en"))
+        assertEquals(Refusals.Text("destination", listOf("FSbz…JhrT")), Refusals.read("FSbz…JhrT non è fra i destinatari ammessi"))
+        assertEquals(Refusals.Text("rate_quality", listOf("0.0312", "0.0001")), Refusals.read("non è uno scambio: scambia 0.0312 SOL e riceve l'equivalente di 0.0001 SOL"))
+        assertEquals(Refusals.Text("paused"), Refusals.read("l'agente è in pausa"))
+        assertEquals(null, Refusals.read("the simulation failed (Custom 6025)"))
+    }
 }

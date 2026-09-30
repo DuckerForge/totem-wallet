@@ -91,6 +91,9 @@ object SessionActions {
         val r: Pair<Boolean, String> = when {
             v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
                 Positions.remove(ctx, pos.mint)
+                // The coin's account is empty now: closed at once, its rent back in the budget, as the
+                // loop does after its own sales. A sale by hand left it open, rent and all (30 Sep).
+                SessionWallet.current(ctx)?.pubkey?.let { me -> runCatching { closeEmpty(ctx, me) } }
                 val m = ctx.getString(R.string.trader_sold_you, pos.symbol)
                 AgentTrace.say(m, AgentTrace.Kind.ACTED)
                 true to m

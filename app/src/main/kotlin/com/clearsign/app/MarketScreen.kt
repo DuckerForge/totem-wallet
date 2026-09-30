@@ -451,16 +451,19 @@ private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
     Text(stringResource(R.string.whatif_note), style = HaloType.small, color = Halo.muted, lineHeight = 15.sp)
 }
 
-/** A market cap in three characters and a unit: 1,2 Mld$, 340 M$, 52 k$. */
+/** A market cap in three characters and a unit: 1.2 B$ (1,2 Mld$ in Italian), 340 M$, 52 k$. */
 internal fun fmtCap(v: Double, cur: String = "USD"): String {
     // The symbol sticks to the scale when it is a sign ("128 k$", "128 k€") and stands
     // apart when it is a word: "128 kSOL" does not read.
     val sym = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)
     fun s(scale: String) = if (sym.length > 1) "$scale $sym" else "$scale$sym"
-    val l = java.util.Locale.getDefault()
+    // The app's language, not the phone's: "Mld" was written in every language, so an English
+    // app said "61.1 Mld€" (30 Sep, the film).
+    val l = AppLocale.applied() ?: java.util.Locale.getDefault()
+    val billion = if (l.language == "it") "Mld" else "B"
     return when {
         v >= 1e12 -> String.format(l, "%.2f " + s("T"), v / 1e12)
-        v >= 1e9 -> String.format(l, "%.1f " + s("Mld"), v / 1e9)
+        v >= 1e9 -> String.format(l, "%.1f " + s(billion), v / 1e9)
         v >= 1e6 -> String.format(l, "%.0f " + s("M"), v / 1e6)
         v >= 1e3 -> String.format(l, "%.0f " + s("k"), v / 1e3)
         else -> String.format(l, "%.0f " + sym, v)

@@ -584,6 +584,20 @@ private fun BuildingBar(message: String) {
     }
 }
 
+/**
+ * An amount that shrinks instead of wrapping. In a half-width column "0.049674575 SOL" broke
+ * into "0.04967457" and "5 SOL", and the second line read as five SOL (30 Sep, the film).
+ */
+@Composable
+private fun OneLineAmount(text: String, color: Color) {
+    var size by remember(text) { mutableStateOf(15.sp) }
+    Text(
+        text, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = size, color = color, style = Tabular,
+        maxLines = 1, softWrap = false,
+        onTextLayout = { r -> if (r.hasVisualOverflow && size.value > 10f) size = size * 0.9f },
+    )
+}
+
 /** What the swap does, in trade terms: logos, rate, route, our fee, price impact. */
 @Composable
 private fun SwapSummary(from: PickToken, to: PickToken, q: Jupiter.Quote) {
@@ -591,12 +605,12 @@ private fun SwapSummary(from: PickToken, to: PickToken, q: Jupiter.Quote) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TokenLogo(from.mint, from.symbol, from.icon, 34.dp)
             Column(Modifier.weight(1f)) {
-                Text(fmtUnits(q.inAmount, from.decimals) + " " + from.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.ink, style = Tabular)
+                OneLineAmount(fmtUnits(q.inAmount, from.decimals) + " " + from.symbol, Halo.ink)
                 Text(stringResource(R.string.swap_you_pay), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
             }
             HaloIcon(HIcon.CHEVRON_RIGHT, Halo.mint, 18.dp)
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                Text(fmtUnits(q.outAmount, to.decimals) + " " + to.symbol, fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Halo.mint, style = Tabular)
+                OneLineAmount(fmtUnits(q.outAmount, to.decimals) + " " + to.symbol, Halo.mint)
                 Text(stringResource(R.string.swap_you_get), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
             }
             TokenLogo(to.mint, to.symbol, to.icon, 34.dp)

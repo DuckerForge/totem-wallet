@@ -140,8 +140,9 @@ SCENES: list[tuple[str, float, str, str, tuple[float, callable] | None]] = [
 # stops at a receipt or a hold button, and no fingerprint is ever asked mid-take.
 # ---------------------------------------------------------------------------
 TIMED_START = 3.0
-# The shooting order: one session, same clock. watch is drawn (drawn.py), not shot here.
-SESSION = ["intro", "receipt", "risks", "keys", "agent", "scout", "bubble", "market",
+# The shooting order: one session, same clock. watch needs a running agent that holds a coin;
+# without one, drawn.py draws it instead.
+SESSION = ["intro", "receipt", "risks", "keys", "agent", "watch", "scout", "bubble", "market",
            "bridge", "health", "nfc", "ore", "spare", "close"]
 
 REVIEW = "Review &amp; sign"   # the dump writes the & escaped
@@ -685,6 +686,67 @@ def _after_agent() -> None:
         _go(("tap", TABS["agent"], TAB_Y), ("wait", 1.5))
         record.tap(*_need("Pro"))
         PRO_TAPPED.clear()
+
+
+VOICE_TAPPED: list[bool] = []  # prep switched the page's voice off so the take can switch it on
+
+
+def prep_watch() -> list[tuple]:
+    # The live page of a running agent that holds a coin: it opens on "watch it work", the chart
+    # and its three lines are there for "charts" and "entry, target, stop", the thoughts come up
+    # on "what it is thinking", the voice is switched on on "a voice". This prep starts nothing,
+    # buys nothing, sells nothing: with the loop off or no coin held it stops, and drawn.py's
+    # scene is the one to use. "Look now" and the coin's chips are never tapped.
+    VOICE_TAPPED.clear()
+    _fresh("agent")
+    xml = record.dump()
+    if not _has(xml, "Stop the agent"):
+        raise RuntimeError("prep: the loop is off. Start it from Agent, or keep drawn.py's scene")
+    if not _has(xml, "POSITIONS"):
+        raise RuntimeError("prep: the agent holds no coin, so the page would have no chart")
+    link = _need("Watch it work", xml)
+    record.tap(*link)
+    time.sleep(3.0)
+    xml = record.dump()
+    if not _has(xml, "WHAT IT IS THINKING"):
+        raise RuntimeError("prep: the live page did not open")
+    if _has(xml, "Voice on"):
+        record.tap(*_need("Voice on", xml))
+        VOICE_TAPPED.append(True)
+        time.sleep(1.0)
+        xml = record.dump()
+    # The thoughts brought up to mid-screen, when they start below it. The chip is read after
+    # the same drag, since it moves with them.
+    think = _y("WHAT IT IS THINKING", xml) or 0
+    lift = min(1100, think - 900) if think > 1500 else 0
+    drag = (600, 2100, 600, 2100 - lift, 1600)
+    if lift:
+        record.swipe(*drag)
+        time.sleep(1.5)
+        xml = record.dump()
+    voice = _need("Voice off", xml)
+    _close_sheets()
+    # A tab change starts the page over at the top, where the link was found.
+    _go(("tap", TABS["wallet"], TAB_Y), ("wait", 1.0), ("tap", TABS["agent"], TAB_Y), ("wait", 2.0))
+    _see("link", link)
+    _see("thoughts", f"y {think}, lift {lift}")
+    _see("voice", voice)
+    steps = [("at", 5.9, "xy", *link)]
+    if lift:
+        steps.append(("at", 13.1, "swipe", *drag))
+    return steps + [("at", 16.3, "xy", *voice), ("wait", 5.0)]
+
+
+def _after_watch() -> None:
+    """The voice back as it was, then the page closed."""
+    if VOICE_TAPPED:
+        VOICE_TAPPED.clear()
+    else:
+        xml = record.dump()
+        if _has(xml, "Voice on"):
+            record.tap(*_need("Voice on", xml))
+            time.sleep(1.0)
+    _close_sheets()
 
 
 ADDRESS = r"^[1-9A-HJ-NP-Za-km-z]{2,8}…[1-9A-HJ-NP-Za-km-z]{2,8}$"
@@ -1271,12 +1333,12 @@ def _close_sheets() -> None:
 
 # seconds of take, prep; the durations of the plan's section 2
 TIMED = {"intro": (22.0, prep_intro), "receipt": (17.0, prep_receipt), "risks": (25.0, prep_risks),
-         "keys": (8.0, prep_keys), "agent": (35.0, prep_agent), "scout": (40.0, prep_scout),
+         "keys": (8.0, prep_keys), "agent": (35.0, prep_agent), "watch": (22.0, prep_watch), "scout": (40.0, prep_scout),
          "bubble": (22.0, prep_bubble), "market": (22.0, prep_market), "bridge": (25.0, prep_bridge),
          "health": (23.0, prep_health), "nfc": (26.0, prep_nfc), "ore": (14.0, prep_ore),
          "spare": (14.0, prep_spare), "close": (14.0, prep_close)}
 # Put back after the take, or after the prep in --dry.
-AFTER = {"agent": _after_agent, "bubble": _after_bubble, "market": _after_market}
+AFTER = {"agent": _after_agent, "watch": _after_watch, "bubble": _after_bubble, "market": _after_market}
 
 
 # What the voice says, as it says it: (phrase in the take, app icon, chip label, tint).
@@ -1376,7 +1438,7 @@ def chips_for(key: str, begin: float, end: float, ws: list[dict]) -> list[tuple[
 
 
 # Where each take gets to the point: every phone take starts at TIMED_START, and the build
-# adds the offset measured on its clip. watch is drawn.py's, which has its own lead (2.5).
+# adds the offset measured on its clip. A watch drawn by drawn.py has its own lead (2.5).
 START = {key: TIMED_START for key in SESSION}
 # These two begin 0.5 s later than their words would put them, so the scene before
 # finishes its sentence. The take skips the same 0.5 s and stays on the voice.
@@ -1530,7 +1592,9 @@ def build(lay: cut.Layout) -> Path:
         off = take_offset(clip)
         if off:
             print(f"  {key}: offset {off:+.2f} s")
-        start = max(0.0, START.get(key, 2.5) + off)
+        # A drawn watch has no offset file and drawn.py's own lead.
+        lead = 2.5 if key == "watch" and not _offset_file(clip).exists() else START.get(key, 2.5)
+        start = max(0.0, lead + off)
         out = BUILD / f"scene_{key}_{lay.name}.mp4"
         # A scene is redone only when something it is made of changed: twelve scenes
         # at phone resolution take twenty minutes, and a fix usually touches one.
@@ -1576,11 +1640,6 @@ def main(argv: list[str]) -> int:
         if not keys:
             print("say which takes: --record all, or some of: " + " ".join(SESSION))
             return 2
-        if "watch" in keys:
-            print("watch is drawn by drawn.py, not shot here")
-            keys = [k for k in keys if k != "watch"]
-            if not keys:
-                return 2
         unknown = [k for k in keys if k not in TIMED]
         if unknown:
             print("unknown: " + " ".join(unknown) + "\ntakes: " + " ".join(SESSION))

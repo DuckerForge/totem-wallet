@@ -94,6 +94,24 @@ class PositionsTest {
         assertEquals(10_005_000L, p.costLamports)
     }
 
+    /**
+     * The first buy of a coin opens its account, and that rent comes back when the account is
+     * closed. The numbers of 30 Sep, read on chain: 0.006658 left the budget, 0.001488 of it the
+     * CYBERLEEK account's rent; the coin came back at 0.005149. That is -0.5%, not the -22.7%
+     * that sold it at the stop on the first tick.
+     */
+    @Test fun theRentOfANewAccountIsNotPartOfTheCost() {
+        val leek = "ApZuxdpzLeek11111111111111111111111111111111"
+        val rent = d(env, NATIVE_SOL_MINT, "SOL", 9, 1_488_440L)
+        val r = receipt(
+            outs = listOf(d(env, NATIVE_SOL_MINT, "SOL", 9, -6_657_795L)),
+            ins = listOf(d(env, leek, "CYBERLEEK", 9, 465_785_072_055L)),
+        ).copy(distributions = listOf(com.clearsign.core.RecipientShare("6J5gZEa1Ata", null, TrustLevel.NEW, rent, 0.22, isNewAccount = true)))
+        val p = Positions.fromReceipt(r, env, 30, 15)!!
+        assertEquals(6_657_795L - 1_488_440L + 5_000L, p.costLamports)
+        assertNull(p.verdict(5_148_551.0 / p.units), "a flat coin is not at its stop")
+    }
+
     @Test fun aPlainTransferIsNotAPosition() {
         val r = receipt(
             outs = listOf(d(env, NATIVE_SOL_MINT, "SOL", 9, -10_000_000L)),

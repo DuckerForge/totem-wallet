@@ -191,11 +191,16 @@ object Positions {
         val leg = got.singleOrNull() ?: return null
         val units = leg.rawAmount / Math.pow(10.0, leg.decimals.toDouble())
         if (units <= 0) return null
+        // The rent of the accounts this buy opened is a deposit, not a price: it comes back when
+        // the empty account is closed after the sale. Counted as cost, a new coin on a small slice
+        // started under its own stop: CYBERLEEK flat at -0.3% was sold on the first tick "at the
+        // stop, -22.7%", 0.001488 of rent in 0.006658 (30 Sep, read on chain).
+        val rent = receipt.distributions.filter { it.isNewAccount }.sumOf { kotlin.math.abs(it.delta.rawAmount) }
         return Position(
             mint = leg.mint, symbol = leg.symbol, decimals = leg.decimals, units = units, owner = owner,
             // The network fee came out of the budget too, so it is part of what
             // this position has to earn back before it is actually in profit.
-            costLamports = paid + receipt.feeLamports,
+            costLamports = (paid - rent).coerceAtLeast(1L) + receipt.feeLamports,
             openedAt = at, takeProfitPct = takeProfitPct, stopLossPct = stopLossPct,
         )
     }

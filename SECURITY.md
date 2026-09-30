@@ -16,7 +16,7 @@ Triage of the Clock In security audit on commit `255b498`.
 | Solana secret key written to SharedPreferences (2) | Fixed. The key was already sealed with the Keystore; it now lives in a no-backup file (see above). |
 | Variable written into the page as HTML (`web/apex`) | Fixed. The payment page also wrote the amount from the link as HTML, which the scan did not flag; both now go in as text. |
 | `init_if_needed` reinitialization (2), arbitrary CPI | Removed. They were in `reputation/`, an Anchor program never deployed and not used by the app. |
-| Dependency vulnerabilities (7) | Came with `reputation/Cargo.lock`, removed with it. |
+| Dependency vulnerabilities (7) | Open. The likely source, `reputation/Cargo.lock`, is removed; the next audit run will show what is left. |
 | Java native deserialization (16) | False positive. No `ObjectInputStream`, `readObject` or other Java serialization exists in the code. |
 | Server-side request forgery, `tools/seeker-worker/src/worker.js` | False positive. The fetched URL comes from the worker's own environment, and only an allowlist of read-only RPC methods is forwarded. |
 | Exported components without a permission (5) | By design: the launcher, the Mobile Wallet Adapter endpoint, the gift link handler, the agent deep link and the widget must be reachable. The NFC service requires `BIND_NFC_SERVICE`. Every request is simulated first; the main wallet always needs the fingerprint, and the budget signs alone only within its limits. |

@@ -117,7 +117,8 @@ object Refusals {
     private val READ = SAID.flatMap { (key, pair) -> listOf(pair.first, pair.second).map { key to pattern(it) } }
 
     private fun pattern(template: String): Regex {
-        val parts = template.split(Regex("\\{\\d}"))
+        // Both braces escaped: the JVM takes a bare "}", Android's ICU engine throws on it (30 Sep, crash on open).
+        val parts = template.split(Regex("\\{\\d\\}"))
         return Regex("^" + parts.joinToString("(.+?)") { Regex.escape(it) } + "$")
     }
 

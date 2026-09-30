@@ -6,9 +6,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The TLV walk over a Token-2022 mint, byte by byte rather than against a live mint: the
- * parser must be right about a coin nobody has seen, and the two ways to be wrong are opposite
- * and both expensive. Miss a permanent delegate and the agent buys a coin the creator can burn; invent one and an honest coin is called a scam.
+ * Token-2022 mint TLV parsing on hand-built bytes, not live mints. Both errors are costly: a
+ * missed permanent delegate lets the agent buy a coin the creator can burn, a false one flags
+ * a clean coin as a scam.
  */
 class MintExtensionsTest {
 
@@ -45,7 +45,7 @@ class MintExtensionsTest {
         assertTrue(e.any)
     }
 
-    /** The field exists on plenty of honest mints, holding nobody. */
+    /** Plenty of clean mints carry the field set to the zero key. */
     @Test fun anEmptyPermanentDelegateIsNobody() {
         assertFalse(readMintExtensions(mint(12 to zeros(32))).permanentDelegate)
     }
@@ -96,14 +96,13 @@ class MintExtensionsTest {
         TokenFacts(verified = verified, token2022 = true, holders = 5_000, liquidityUsd = 900_000.0, sellable = true, ext = ext)
 
     @Test fun aSeizableCoinIsRefusedHoweverGoodItLooks() {
-        // Deep liquidity, thousands of holders, a live quote back to SOL. None of
-        // it matters: somebody else can empty the position at will.
+        // Deep liquidity, many holders, a live sell quote: still bad, the delegate can empty the position.
         val s = assessToken(facts(MintExtensions(permanentDelegate = true)))
         assertTrue(s.bad, s.toString())
         assertTrue(SafetyFlag.SEIZABLE in s.flags)
     }
 
-    /** PYUSD and EURC need exactly this power. Calling them scams teaches people to ignore us. */
+    /** PYUSD and EURC legitimately hold this power; flagging them would train people to ignore warnings. */
     @Test fun onAVerifiedIssuerItIsADisclosedProperty() {
         val s = assessToken(facts(MintExtensions(permanentDelegate = true), verified = true))
         assertFalse(s.bad)

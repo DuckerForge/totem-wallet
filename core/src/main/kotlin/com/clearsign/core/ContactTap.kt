@@ -6,10 +6,9 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 /**
- * A contact handed over by touch. One phone offers its address, a name, and a signature over
- * both with its attestation key; the other checks the signature against the key inside and
- * saves the contact as verified by touch. It proves the phone physically here declared this
- * address as its own, not who holds the phone.
+ * A contact handed over by touch: one phone offers its address, a name and a signature over both
+ * from its attestation key; the other verifies it and saves the contact as verified by touch.
+ * Proves the phone present claimed this address, not who holds it.
  * `apex-contact:<address>?n=<name>&t=<millis>&k=<key b64url>&s=<sig b64url>`
  */
 object ContactTap {

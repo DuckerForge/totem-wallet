@@ -46,10 +46,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
 /**
- * Totem's Mobile Wallet Adapter endpoint, the phone as a Ledger: dApps start a local
- * association (solana-wallet://) that Android routes here, every request becomes a plain
- * receipt from the real bytes, and the Seed Vault signs only after the person approves
- * what they actually see.
+ * Totem's Mobile Wallet Adapter endpoint. dApps start a local association (solana-wallet://)
+ * that Android routes here; each request becomes a receipt from the real bytes, and the Seed
+ * Vault signs only after the user approves it.
  */
 private const val TAG = "ClearSign-MWA"
 
@@ -147,10 +146,10 @@ class MobileWalletAdapterActivity : ComponentActivity() {
     private fun onMain(block: () -> Unit) = runOnUiThread(block)
 
     /**
-     * Hand control back to the dApp from the Done screen. dApps start us with startActivityForResult,
-     * so despite `singleTask` this activity usually lives inside the dApp's task, and moveTaskToBack()
-     * hid the dApp too. Session closed (the common case, RN `transact()` closes right after the
-     * response): finish, and the dApp shows. Session open: background only when we own the task; otherwise wait for it to end (finishSoon), and only an explicit tap finishes.
+     * Hand control back to the dApp from the Done screen. dApps use startActivityForResult, so
+     * despite `singleTask` we usually live in the dApp's task and moveTaskToBack() hides it too.
+     * Session closed (usual, RN `transact()` closes right after the response): finish. Session
+     * open: move to back only if we own the task, else wait for it to end; a tap finishes.
      */
     fun backToDapp(explicit: Boolean = false) {
         if (ui !is MwaUi.Done) return
@@ -173,7 +172,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
     /** True once the dApp has closed the MWA session (no further requests can arrive). */
     private var sessionOver = false
 
-    /** Let the Done screen breathe before the session end closes the task. */
+    /** Keep the Done screen up briefly before the session end closes the task. */
     private fun finishSoon() {
         sessionOver = true
         lifecycleScope.launch {
@@ -359,9 +358,7 @@ class MobileWalletAdapterActivity : ComponentActivity() {
                     val label = acc.label ?: getString(R.string.app_name)
                     if (signIn == null) request.completeWithAuthorize(acc.pubkeyBytes, label, null, null)
                     else request.completeWithAuthorize(AuthorizedAccount(acc.pubkeyBytes, label, null, null, null), null, null, signIn)
-                    // The other half of the auth token bargain. The dApp keeps the
-                    // token; from here on the wallet keeps a record of who holds
-                    // one, so it can be taken back.
+                    // Record which dApp holds an auth token, so it can be revoked.
                     val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
                     runCatching {
                         Connections.remember(
@@ -385,9 +382,8 @@ class MobileWalletAdapterActivity : ComponentActivity() {
             Log.i(TAG, "onReauthorizeRequest from ${request.identityName}")
             val dApp = identityOf(request.identityName, request.identityUri, request.iconRelativeUri)
             val id = Connections.idOf(dApp.host, callerPackage, dApp.name)
-            // Coming back on an old token. This used to be answered yes without
-            // looking at anything, which made "disconnect" a word with nothing
-            // behind it. Revoked means it asks you again, in front of you.
+            // Reauthorize on an old token: decline if revoked, so "disconnect" really
+            // disconnects and the dApp has to ask again.
             if (!Connections.allowed(this@MobileWalletAdapterActivity, id)) {
                 Log.i(TAG, "reauthorize declined: $id was revoked")
                 request.completeWithDecline()
@@ -608,9 +604,8 @@ sealed interface MwaUi {
         val onApprove: () -> Unit,
         val onDecline: () -> Unit,
         /**
-         * Why the agent could not do this on its own, in the collar's own words ("it would exceed
-         * the daily cap of 0.047 SOL"): the first thing a person needs on this screen. It used to
-         * be appended to a risk row's detail, the one place nobody reads first.
+         * Why the agent needs approval, in the collar's words ("it would exceed the daily cap of
+         * 0.047 SOL"). Shown at the top, not inside a risk row.
          */
         val askedWhy: String? = null,
     ) : MwaUi {

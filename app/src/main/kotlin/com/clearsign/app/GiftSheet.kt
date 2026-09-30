@@ -43,9 +43,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 /**
- * Giving money to someone with no wallet yet, or whose address you do not know: behind a link.
- * The honest part is on screen: the link carries the key, so the first to open it takes the
- * money. In exchange it works with anybody, over any messenger, with no address.
+ * Send money as a link, to someone with no wallet or no known address. The link carries the
+ * key, so whoever opens it first takes the money; the sheet says so.
  */
 @Composable
 internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> Unit) {
@@ -57,9 +56,9 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
     var link by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // The gift hands real money to a key in a link. You see it first, like everywhere else.
+    // Funding the link's key moves real money: receipt first.
     var review by remember { mutableStateOf<ReceiptEngine.Analyzed?>(null) }
-    // Taking a gift back is money moving too: the same receipt, the same hold.
+    // Reclaiming moves money too: same receipt, same hold.
     var reclaim by remember { mutableStateOf<Pair<MoneyLinks.Gift, ReceiptEngine.Analyzed>?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     val gifts = remember(refresh) { MoneyLinks.all(ctx) }
@@ -77,7 +76,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
                     stringResource(R.string.gift_title), fontFamily = Sora, fontWeight = FontWeight.Bold,
                     fontSize = 19.sp, color = Halo.ink, modifier = Modifier.weight(1f),
                 )
-                // A way out that does not depend on knowing you can swipe a sheet down.
+                // Close button: not everyone knows a sheet swipes down.
                 Box(
                     Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999)).clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
@@ -140,7 +139,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
 
                 if (busy && review == null) Working(stringResource(R.string.gift_creating))
 
-                // Gifts nobody has taken yet are still yours: this is the way back.
+                // Unclaimed gifts can be reclaimed from here.
                 val open = gifts.filter { it.open }
                 if (open.isNotEmpty()) {
                     Text(stringResource(R.string.gift_open), fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Halo.muted)
@@ -194,8 +193,7 @@ internal fun GiftSheet(signer: SeedVaultSigner, owner: String, onDismiss: () -> 
         }
     }
 
-    // What you are about to sign, over everything, on its own. Not appended to
-    // the bottom of the form the way it used to be: see PayOverlay.
+    // Receipt full-screen over the form: see PayOverlay.
     review?.let { r ->
         PayOverlay(
             title = stringResource(R.string.gift_title),

@@ -54,20 +54,18 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /**
- * The interface's common language: what says "tappable", what says "only read", and the pieces
- * every page uses alike. No network and no app state, only shape, color and motion in
- * `HaloTheme`'s tones; every animation is read in draw or `graphicsLayer`, never in composition.
- * Two rules: a chevron is a promise, only what opens something carries one and everything that
- * opens something does; the living edge belongs to cards, only `GlassCard` carries the flowing gradient.
+ * Shared UI pieces: what reads as tappable, what reads as display-only. No network or app state,
+ * only shape, color and motion from `HaloTheme`; animations are read in draw or `graphicsLayer`,
+ * never in composition. Rules: a chevron if and only if the thing opens something; only
+ * `GlassCard` gets the living gradient edge.
  */
 
-// ---- l'orlo ------------------------------------------------------------------------
+// ---- the living edge ---------------------------------------------------------------
 
 /**
- * One phase for every living border. Each card had its own infinite animation read in
- * composition: on palettes with `livingStroke` every `GlassCard` recomposed sixty times a
- * second and allocated a brush per frame, forever. `HaloRoot` moves one number per frame
- * and the borders read it in draw.
+ * One phase for every living border. Per-card infinite animations read in composition made every
+ * `GlassCard` recompose 60 times a second and allocate a brush per frame. `HaloRoot` advances one
+ * number per frame and the borders read it in draw.
  */
 object LivingStroke {
     val phase = mutableFloatStateOf(0f)
@@ -114,9 +112,8 @@ fun Modifier.haloBorder(shape: Shape, width: Dp = 1.dp, color: Color? = null, li
 // ---- what you touch ----------------------------------------------------------------
 
 /**
- * The treatment of everything tappable, once: contained surface, no edge unless asked,
- * shrinks a touch under the finger and veils in ink while it stays. No ripple: invisible
- * on these dark grounds, while a box changing shape is visible. The veil is read in draw,
+ * Common treatment for anything tappable: filled surface, no edge unless asked, shrinks slightly
+ * and tints while pressed. No ripple: invisible on these dark grounds. The tint is read in draw,
  * so a press does not recompose the row.
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -133,8 +130,7 @@ fun Modifier.tappable(
 ): Modifier {
     val pressed by src.collectIsPressedAsState()
     val pressT = animateFloatAsState(if (pressed) 1f else 0f, tween(120), label = "press")
-    // The press in the accent, not in ink: a grey wash under a finger says the surface got
-    // dirty, the accent says the app answered.
+    // Press tint in the accent; a grey wash looked like dirt.
     val ink = Halo.mint
     return this
         .pressScale(src, down)
@@ -218,10 +214,7 @@ fun RoundIconButton(icon: HIcon, tint: Color = Halo.muted, spinning: Boolean = f
 
 // ---- what you only read ------------------------------------------------------------
 
-/**
- * The panel that is only read: a step below the card, thin edge, no chevron, no press. A
- * chevron here would be a lie.
- */
+/** Display-only panel: a step below the card, thin edge, no chevron, no press. */
 @Composable
 fun SoftPanel(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Composable ColumnScope.() -> Unit) {
     Column(
@@ -230,7 +223,7 @@ fun SoftPanel(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Comp
     )
 }
 
-// ---- il chip ------------------------------------------------------------------------
+// ---- chip ---------------------------------------------------------------------------
 
 /**
  * One chip for the whole app. Off, a light action in [tint]; [selected], a filter or a mode
@@ -275,7 +268,7 @@ fun HaloChip(
     }
 }
 
-// ---- le intestazioni ------------------------------------------------------------------
+// ---- headers --------------------------------------------------------------------------
 
 /**
  * A page header, the same for the five tabs: a 22 sp title, a subtitle, an icon tile or a
@@ -312,7 +305,7 @@ fun PageHeader(
     }
 }
 
-// ---- gli stati vuoti -------------------------------------------------------------------
+// ---- empty states ----------------------------------------------------------------------
 
 /** The empty state that says what to do: an icon, a title, a line, and an action if needed. */
 @Composable
@@ -340,7 +333,7 @@ fun EmptyLine(icon: HIcon, text: String) {
     }
 }
 
-// ---- l'interruttore -------------------------------------------------------------------
+// ---- switch ---------------------------------------------------------------------------
 
 /** A title, a line under it, and the switch in the house colors. */
 @Composable

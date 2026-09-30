@@ -47,25 +47,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /*
- * The buys as they happen, one line each, like a room people talk in. The ranking says
- * what the crowd is doing; this says who just did what, and it fills the silence, since
- * a coin needs three buyers before the ranking names it. Each line carries the ordinary
- * swap sheet: receipt, collar, hold to sign. Nothing here buys by itself. [feed] comes
- * from the page: reading the cached file here once showed a "live" feed seven hours old.
+ * Live buys, one line each. The ranking needs three buyers before it names a coin; this shows
+ * every buy as it lands. Each line opens the normal swap sheet (receipt, collar, hold to sign);
+ * nothing buys on its own. [feed] comes from the page: the cached file can be hours old.
  */
-/**
- * The two sources merged, off the main thread. It lived inside the card, and inside a
- * lazy list that re-ran the whole thing, network warm included, on every scroll back.
- */
+/** Both sources merged, off the main thread. Kept out of the card so the lazy list doesn't rerun it on scroll. */
 internal suspend fun crowdEvents(ctx: Context, feed: SeekerFeed.Feed?): List<CrowdBuy> =
     withContext(Dispatchers.IO) {
-        // Both sources, not one or the other. The published feed is the long
-        // memory; anything this phone caught itself while the feed was still
-        // filling up is just as real. Same purchase seen twice is one line.
+        // Published feed plus what this phone caught while the feed was still filling.
+        // A purchase seen by both is one line.
         val got = (feed?.events.orEmpty() + SeekerScan.events(ctx))
             .distinctBy { Triple(it.wallet, it.mint, it.at) }
             .sortedByDescending { it.at }
-        // Same reason as the feed: an address is not a name.
+        // Resolve symbols from the token list, as the feed does.
         runCatching { JupiterTokens.warm(got.map { it.mint }) }
         got.map { e -> e.copy(symbol = JupiterTokens.cached(e.mint)?.symbol ?: e.symbol) }
     }
@@ -86,9 +80,7 @@ internal fun CrowdFeed(
     onBuy: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
-    // The ages tick on their own rather than waiting for new data. The page hands
-    // this a fresh feed every minute, but an identical feed is an equal one and
-    // recomposes nothing, so on a quiet stretch "1m" would sit there saying 1m.
+    // Tick the ages every 30 s: an unchanged feed recomposes nothing, so "1m" would never move.
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -97,9 +89,8 @@ internal fun CrowdFeed(
         }
     }
 
-    // The same wallet round-tripping the same coin is one line, not four: a bot churning
-    // USDe every few minutes filled the screen with itself. The newest move per wallet and
-    // coin survives, the rest fold into it with a count.
+    // One line per wallet and coin, newest move shown, the rest folded in with a count.
+    // Otherwise a bot churning USDe every few minutes fills the screen.
     val rows = remember(events) {
         events.orEmpty()
             .groupBy { it.wallet to it.mint }
@@ -108,18 +99,15 @@ internal fun CrowdFeed(
             .sortedByDescending { it.last().at }
     }
     val fresh = rows.firstOrNull()?.let { now - it.last().at < 5 * 60_000L } == true
-    // One row open at a time. Two open rows is an accordion, and it also means two
-    // quotes running against Jupiter for coins nobody is looking at any more.
+    // One row open at a time, so only one Jupiter quote runs.
     var openRow by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(openMint) { openMint?.let { openRow = it } }
 
-    // No card around it and no title above it: as its own tab the frame boxed the whole
-    // screen, the title repeated the lit word in the bar, and the rows had a third of the height.
+    // No card or title: as its own tab, the frame boxed the screen and the title repeated the tab bar.
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         run {
-            // The list says something whatever happens. Vanishing read as broken, and it
-            // moved the switch bar under the reader's thumb. Waiting and quiet
-            // are different facts, so they get different words.
+            // Always show something: an empty space looks broken and shifts the tab bar.
+            // Waiting and empty get different text.
             if (events == null) {
                 ScouterWait()
                 return@Column
@@ -138,8 +126,7 @@ internal fun CrowdFeed(
                 Box(if (first) Modifier.staggeredEntrance(i, key = id) else Modifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         FeedRow(e, moves, now, mine, onWallet = { onWallet(e.wallet) }) { openRow = if (mine) null else e.mint }
-                        // The terminal, under the row that made you want it. Nobody
-                        // leaves the feed to trade any more.
+                        // The buy panel opens under its row, so trading doesn't leave the feed.
                         if (mine) FeedBuyPanel(e.mint, e.symbol, moves, owner, signer) { openRow = null }
                     }
                 }
@@ -153,7 +140,7 @@ internal fun CrowdFeed(
     }
 }
 
-/** A dot that breathes while the crowd is moving. */
+/** Pulsing dot for a live feed. */
 @Composable
 private fun LiveDot() {
     val t = rememberInfiniteTransition(label = "live")
@@ -169,13 +156,11 @@ private fun LiveDot() {
 @Composable
 private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean, onWallet: () -> Unit, onOpen: () -> Unit) {
     val whale = e.tier == SeekerTier.WHALE
-    // A sale reads red whoever made it: the size of the wallet matters less than
-    // the direction when somebody is on the way out.
+    // Sales are red whatever the tier: direction matters more than wallet size.
     val tint = if (e.sell) Halo.red else if (whale) Halo.amber else Halo.cyan
     val ctx = LocalContext.current
     val name = remember(e.wallet) { SeekerCrowd.nickname(e.wallet) }
-    // The colour alone never said which of the two this was. The size does, and it
-    // is the only whale score worth having: how much this wallet is actually holding.
+    // Show how much the wallet holds: color alone doesn't say whale or dolphin.
     val size = remember(e.wallet) { SeekerScan.sizeOf(ctx, e.wallet) }
     Row(
         Modifier.fillMaxWidth().clip(rs(Radius.row))
@@ -184,9 +169,8 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The level, on the left, where a reading belongs. It used to sit next to
-        // the coin name, where "balena · 97 SOL" read as if they had bought 97 of
-        // the coin — the number was right and in exactly the wrong place.
+        // Wallet size on the left: next to the coin name, "balena · 97 SOL" read as if
+        // 97 of the coin had been bought.
         Box(
             Modifier.size(42.dp).clickable { onWallet(); Haptics.tick(ctx) },
             contentAlignment = Alignment.Center,
@@ -202,8 +186,7 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
                     fontSize = if (size != null) 10.5.sp else 13.sp, color = tint, style = Tabular,
                 )
             }
-            // The coin as a badge on the buyer: who, and what, in one object. A third
-            // column for the logo would have squeezed the sentence that matters.
+            // Coin logo as a badge on the buyer; a separate column would squeeze the text.
             Box(
                 Modifier.align(Alignment.BottomEnd).size(20.dp).clip(rs(999)).background(Halo.card)
                     .border(1.dp, Halo.cardSoft, rs(999)),
@@ -221,8 +204,7 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
             )
             Text(
                 stringResource(
-                    // "spent" on a sale said the opposite of what happened: money
-                    // came out of the coin, it did not go into it.
+                    // Sales get their own wording: "spent" would say the opposite.
                     if (e.sell) R.string.feed_meta_sell else R.string.feed_meta2,
                     stringResource(if (whale) R.string.feed_whale else R.string.feed_dolphin),
                     sol(e.solSpent), ago(e.at, now),
@@ -231,10 +213,8 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
                 color = if (e.sell) Halo.red.copy(alpha = 0.8f) else if (whale) Halo.amber.copy(alpha = 0.85f) else Halo.muted,
                 style = Tabular, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            // The round trip, when we watched both ends. "Took out 10.28 SOL" is half a sentence; if
-            // the same wallet's buy is in this window the two numbers together are what anyone wants
-            // to know. Written only with both sides: guessing at a position opened before the window
-            // would be worse than staying quiet.
+            // Round trip, only when both the buy and the sale are in the window. No guessing at
+            // a position opened before it.
             val paid = moves.filter { !it.sell }.sumOf { it.solSpent }
             val took = moves.filter { it.sell }.sumOf { it.solSpent }
             val times = moves.size
@@ -246,9 +226,7 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
                     color = if (pct >= 0) Halo.mint else Halo.red,
                 )
             } else if (times > 1) {
-                // Said once, quietly: this wallet has been in and out of this coin
-                // several times in the window. That is a fact about the wallet, and
-                // usually the most useful one on the row.
+                // In and out of this coin several times in the window: often the most useful fact here.
                 Text(
                     stringResource(R.string.feed_churn, times),
                     fontFamily = Inter, fontSize = 10.5.sp, color = Halo.amber, maxLines = 1,
@@ -256,26 +234,23 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
             }
         }
         Spacer(Modifier.width(6.dp))
-        // Follow this wallet: from now on what it buys goes to the agent as a
-        // candidate, through the gates. A star, because that is what following
-        // looks like everywhere else, and it stays lit so the list says who.
+        // Follow: this wallet's buys become agent candidates, still through the gates.
+        // The star stays lit on followed wallets.
         var followed by remember(e.wallet) { mutableStateOf(Follows.has(ctx, e.wallet)) }
         Box(
             Modifier.size(30.dp).clip(rs(999))
                 .background(if (followed) Halo.amber.copy(alpha = 0.16f) else Halo.cardSoft)
                 .clickable {
                     followed = Follows.toggle(ctx, e.wallet)
-                    // Following now means two things, and the second one is the
-                    // one the star looks like it promises: the phone tells you.
+                    // Following also turns on notifications for this wallet.
                     FollowWatch.sync(ctx)
                     Haptics.tick(ctx)
                 },
             contentAlignment = Alignment.Center,
         ) { HaloIcon(if (followed) HIcon.STAR_FILLED else HIcon.STAR, if (followed) Halo.amber else Halo.muted, 15.dp) }
         Spacer(Modifier.width(6.dp))
-        // The word and the color must agree. Both buttons were mint, and mint here means go: a
-        // "sold" row with a green "Look" next to a "bought" row with a green "Buy" looked like a
-        // bug. Buying what somebody just sold is not a one-tap offer, so only a buy is green.
+        // Word and color must agree: mint means go, so only a buy is green. Buying what
+        // someone just sold isn't a one-tap offer.
         val go = !open && !e.sell
         val pill = if (go) Halo.mint else Halo.muted
         Box(
@@ -292,7 +267,7 @@ private fun FeedRow(e: CrowdBuy, moves: List<CrowdBuy>, now: Long, open: Boolean
     }
 }
 
-/** The wallet's size inside a 38dp circle: thousands become "8k", the order of magnitude is the whole message. */
+/** Wallet size for the small circle: thousands become "8k". */
 private fun compact(v: Double): String = when {
     v >= 1000 -> String.format("%.0fk", v / 1000)
     v >= 100 -> String.format("%.0f", v)
@@ -315,11 +290,9 @@ private fun ago(at: Long, now: Long): String {
 
 
 /**
- * The second before the crowd arrives. Grey text saying "looking" was truthful and
- * forgettable; a radar was the wrong instrument, this page fills from the top down. So a
- * tube: scanlines and a bar rolling down like an old set before the picture locks, the
- * look the terminal receipt and the CRT switch already own. Drawn, not loaded, and
- * nothing in it shaped like a number, because there is no data yet.
+ * Loading state: scanlines and a bar rolling down like an old CRT before the picture locks,
+ * matching the terminal receipt and the CRT switch. Drawn, not loaded, and nothing number-like
+ * in it since there is no data yet.
  */
 @Composable
 private fun ScouterWait() {
@@ -336,8 +309,7 @@ private fun ScouterWait() {
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            // The lines of the raster. Three pixels apart is where it stops
-            // looking like a texture and starts looking like a screen.
+            // Raster lines 3 px apart; tighter reads as texture, not a screen.
             var y = 0f
             while (y < size.height) {
                 drawLine(
@@ -348,8 +320,7 @@ private fun ScouterWait() {
                 )
                 y += 3f
             }
-            // The bar, and it does not wrap: it leaves the bottom and comes back
-            // at the top, which is what an unlocked picture actually does.
+            // The bar leaves the bottom and re-enters at the top, like an unlocked picture.
             val band = size.height * 0.34f
             val edge = -band + roll * (size.height + band)
             drawRect(
@@ -360,8 +331,7 @@ private fun ScouterWait() {
                 topLeft = androidx.compose.ui.geometry.Offset(0f, edge - band),
                 size = androidx.compose.ui.geometry.Size(size.width, band),
             )
-            // The beam itself: a hot line with a softer one under it, because a
-            // single hairline reads as a divider and not as light.
+            // Bright line over a softer one: a single hairline reads as a divider.
             drawLine(
                 Halo.cyan.copy(alpha = 0.30f),
                 androidx.compose.ui.geometry.Offset(0f, edge + 2f),

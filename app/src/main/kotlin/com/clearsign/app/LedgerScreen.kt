@@ -51,8 +51,8 @@ internal fun LedgerScreen() {
     val months by produceState(initialValue = emptyList<String>(), version) { value = withContext(Dispatchers.IO) { Ledger.months(ctx) } }
     var month by remember { mutableStateOf<String?>(null) }   // null = all
     var kind by remember { mutableStateOf<String?>(null) }
-    // Null until the first read returns. An empty list here drew "Nothing yet" at every
-    // visit, over a ledger that has entries. A second visit starts from the last full read.
+    // Null until the first read returns, so "Nothing yet" never flashes over a full ledger.
+    // A second visit starts from the last full read.
     val loaded by produceState(initialValue = lastRead?.takeIf { it.first == version }?.second, version, month) {
         val m = month
         value = withContext(Dispatchers.IO) { if (m == null) Ledger.all(ctx) else Ledger.month(ctx, m) }
@@ -78,9 +78,8 @@ internal fun LedgerScreen() {
             ) {
                 if (shown.isNotEmpty()) HaloChip(stringResource(R.string.export_btn), HIcon.DOWNLOAD, Halo.mint) { showExport = true }
             }
-            // Two rows of chips that both began with "All", one under the other and
-            // both selected at the start, are impossible to tell apart. Each says
-            // what it filters, and each "All" names its own thing.
+            // Two chip rows both starting with a selected "All" look identical: label each
+            // row, and make each "All" name what it covers.
             FilterLabel(stringResource(R.string.ledger_period))
             ChipRow(listOf<Pair<String?, String>>(null to stringResource(R.string.ledger_all_months)) + months.map { it to monthLabel(it) }, month) { month = it }
             FilterLabel(stringResource(R.string.ledger_kind))
@@ -119,7 +118,7 @@ internal fun LedgerScreen() {
         }
 
         if (loaded == null) {
-            // Still reading: nothing, rather than a claim the disk has not made.
+            // Still reading: draw nothing.
         } else if (shown.isEmpty()) {
             Box(Modifier.padding(horizontal = 20.dp)) { EmptyState(HIcon.RECEIPT, stringResource(R.string.ledger_empty_sub), stringResource(R.string.ledger_empty)) }
         } else {
@@ -139,8 +138,7 @@ internal fun LedgerScreen() {
         }
     }
     selected?.let { e -> ReceiptDetailSheet(e) { selected = null } }
-    // What you see is what you export: passing `entries` here ignored the kind
-    // filter, so "Sep 2026 + Gift" said three rows and wrote out all of September.
+    // Export `shown`, not `entries`: `entries` ignores the kind filter.
     if (showExport) ExportSheet(shown, month) { showExport = false }
 }
 
@@ -168,7 +166,7 @@ private fun LedgerRow(e: LedgerEntry, currency: String, onTap: () -> Unit) {
     val ctx = LocalContext.current
     val icon = when (e.kind) { "signin" -> HIcon.LOGIN; "message" -> HIcon.PEN; "theme" -> HIcon.GEM; "revoke" -> HIcon.KEY; "close" -> HIcon.TRASH; "burn" -> HIcon.TRASH; "envelope" -> HIcon.HOURGLASS; "send" -> HIcon.SEND; "swap" -> HIcon.SWAP; "blink" -> HIcon.SPARK; "agent" -> if (e.host == "refused" || e.host == "expired") HIcon.BLOCK else HIcon.AGENT; "order" -> HIcon.HOURGLASS; "gift" -> HIcon.GIFT; "spare_store" -> HIcon.COINS; else -> if (e.sent) HIcon.SEND else HIcon.SIGN }
     val danger = e.risks.any { it.severity == "DANGER" }
-    // The row opens the receipt and says so: contained, pressable, with the chevron.
+    // The row opens the receipt: contained, pressable, with a chevron.
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().tappable(src, rs(14), fill = Halo.card, border = if (danger) Halo.red.copy(alpha = 0.5f) else null, onClick = onTap).padding(12.dp),
@@ -235,7 +233,7 @@ internal fun AnalyticsCard(a: Analytics) {
                     }
                 }
             }
-            // The whole of it, as one picture.
+            // Share the total P&L as one image.
             val ctx = LocalContext.current
             GhostButton(stringResource(R.string.pnl_card_share), Modifier.fillMaxWidth(), HIcon.SHARE, tint = Halo.cyan) {
                 PnlCard.share(
@@ -260,8 +258,7 @@ internal fun kindLabel(ctx: android.content.Context, k: String): String = when (
     "signin" -> ctx.getString(R.string.kind_signin); "message" -> ctx.getString(R.string.kind_message); "theme" -> ctx.getString(R.string.kind_theme)
     "revoke" -> ctx.getString(R.string.kind_revoke); "close" -> ctx.getString(R.string.kind_close); "burn" -> ctx.getString(R.string.kind_burn); "envelope" -> ctx.getString(R.string.kind_envelope); "send" -> ctx.getString(R.string.kind_send)
     "agent" -> ctx.getString(R.string.kind_agent); "gift" -> ctx.getString(R.string.kind_gift); "order" -> ctx.getString(R.string.kind_order)
-    // A swap, a Blink and a setup used to fall through to "signed for a dApp",
-    // which is the one thing they are not.
+    // Swap, Blink and setup must not fall through to "signed for a dApp".
     "swap" -> ctx.getString(R.string.kind_swap); "blink" -> ctx.getString(R.string.kind_blink); "setup" -> ctx.getString(R.string.kind_setup)
     "ore_dig" -> ctx.getString(R.string.kind_ore_dig); "ore_claim" -> ctx.getString(R.string.kind_ore_claim)
     "spare_store" -> ctx.getString(R.string.kind_spare_store)
@@ -281,9 +278,8 @@ internal fun monthLabel(ym: String): String = runCatching {
 private fun dayKey(at: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(at))
 
 /**
- * A token amount, with as many decimals as its size deserves. Six for everything, with the
- * thousands separator swapped for a space, read "80 779.072631" for eighty thousand SKR: four
- * digits of noise, grouped as nobody groups. The grouping belongs to the reader's language.
+ * A token amount, decimals scaled to its size, grouped per the reader's locale. A flat six
+ * decimals showed "80 779.072631" for 80k SKR: four digits of noise.
  */
 internal fun fmtUi(v: Double): String {
     val a = kotlin.math.abs(v)
@@ -303,9 +299,9 @@ internal fun fmtFiat(v: Double, cur: String): String =
     else String.format(Locale.getDefault(), "%,.2f", v) + " " + (runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur))
 
 /**
- * The price of one coin, not the same kind of number as a total. Two decimals fit what a
- * holding is worth and fail what one unit costs: most of what the agent buys trades at four
- * zeros after the point, and "0,00 €" is not a price. Decimals follow the size, down to eight.
+ * Unit price of a coin. Two decimals suit totals, not unit prices: most coins the agent buys
+ * trade at four zeros after the point and would show "0,00 €". Decimals follow the size, up
+ * to eight.
  */
 internal fun fmtPrice(v: Double, cur: String): String {
     val symbol = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)

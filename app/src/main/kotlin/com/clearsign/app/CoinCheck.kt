@@ -10,11 +10,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The last question before the money moves: does the internet know something the numbers do
- * not (a team that rugged before, an exploit two hours old). One coin, once, for everybody: it
- * runs on the coin already chosen, after the gates, and the verdict goes to the shared archive
- * ([Shared]), so a thousand phones pay twice, not a thousand times. It can only say no. Unknown
- * never blocks: no key, no network, no answer, a non-Anthropic model all mean [Verdict.Unknown].
+ * Last check before buying: does the web know something the numbers don't (a team that rugged
+ * before, a fresh exploit). Runs once on the chosen coin, after the gates, and the verdict goes
+ * to the shared archive ([Shared]) so other phones skip the search. Veto only. No key, no
+ * network, no answer or a non-Anthropic model all give [Verdict.Unknown], which never blocks.
  */
 object CoinCheck {
     private const val TAG = "Apex-CoinCheck"
@@ -26,19 +25,18 @@ object CoinCheck {
     }
 
     /**
-     * Everybody's verdict, and why a no and a yes weigh differently. The answer sits in the archive
-     * (`/clearsign/coin/<mint>`), read without a key. Phones write those rows and a modified APK
-     * writes what it wants: a false STOP costs one purchase, a false "clean" buys the scam for
-     * everyone. So a STOP counts from anyone, a "clean" only from [MIN_CLEAN] installs, and even then
-     * the other gates run on the phone. Signed by a random per-install id, never the wallet: "budget X checked mint Y" would announce the buy.
+     * Shared verdicts in the archive (`/clearsign/coin/<mint>`), readable without a key. Any phone
+     * or modified APK can write, and a false "clean" costs more than a false STOP, so a STOP counts
+     * from anyone and "clean" only from [MIN_CLEAN] installs; the other gates still run. Keyed by
+     * a random per-install id, never the wallet, which would announce the buy.
      */
     object Shared {
         private const val PREFS = "apex_coincheck"
 
-        /** Quante installazioni diverse servono per credere a un «pulita». */
+        /** Distinct installs needed before a "clean" is trusted. */
         const val MIN_CLEAN = 2
 
-        /** A "clean" ages fast: a coin can rot later. */
+        /** A "clean" expires fast: a coin can turn bad later. */
         const val CLEAN_TTL_MS = 6L * 3600_000
 
         /** A scam stays a scam. */
@@ -48,14 +46,14 @@ object CoinCheck {
         sealed class Say {
             data class Stop(val reason: String) : Say()
             object Clean : Say()
-            /** Nobody knows yet, or not enough: up to us. */
+            /** No verdict yet, or too few: search ourselves. */
             object Ask : Say()
         }
 
         /**
-         * The archive row, read. Pure, so a test can hand it what the database really holds.
+         * Parse an archive row; pure, so tests can feed it real rows.
          * Shape: `{"v": {"<id>": {"s": 0|1, "w": "reason", "at": 123}}}`, `s` 1 for a stop.
-         * Anything unreadable counts as nothing: a broken row is not a verdict.
+         * Unreadable entries are ignored.
          */
         fun read(row: JSONObject?, now: Long): Say {
             val v = row?.optJSONObject("v") ?: return Say.Ask
@@ -74,7 +72,7 @@ object CoinCheck {
             return if (clean >= MIN_CLEAN) Say.Clean else Say.Ask
         }
 
-        /** The number that tells this install apart, and says nothing about who it is. */
+        /** Random per-install id, not linked to the wallet. */
         fun id(ctx: Context): String {
             val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             p.getString("id", null)?.let { return it }
@@ -84,9 +82,8 @@ object CoinCheck {
         }
 
         /**
-         * How long an archive answer holds before asking again. Without it a coin at the top of
-         * the list was reread every hunt: 1,200 reads a day per phone, two gigabytes a day at
-         * ten thousand people on an archive that gives ten a month. Half an hour is fresher than needed.
+         * In-memory cache of archive answers. Without it a top-listed coin was reread every hunt:
+         * 1,200 reads a day per phone, 2 GB a day at 10k users on an archive with 10 GB a month.
          */
         private const val MEM_TTL_MS = 30L * 60_000
         /** A "nobody knows" is rechecked sooner: somebody is about to write it. */
@@ -121,9 +118,8 @@ object CoinCheck {
         }
 
         /**
-         * Leave the verdict for the next ones, through the worker: the key that writes to the
-         * archive lives there and must not end up in the APK. If it fails nothing happens; the
-         * next phone pays its own search.
+         * Publish our verdict via the worker, which holds the archive write key (never in the APK).
+         * Failure is harmless: the next phone runs its own search.
          */
         fun publish(ctx: Context, mint: String, stop: Boolean, why: String) {
             forget(mint)
@@ -142,15 +138,13 @@ object CoinCheck {
     }
 
     /**
-     * Ask the model, with web search, whether there is public reason not to buy [symbol]
-     * ([mint]). One word then a reason: cheap to parse, hard to get wrong. Unparseable is
-     * Unknown, not Ok: a verdict we could not read is not a verdict.
+     * Ask the model, with web search, for a public reason not to buy [symbol] ([mint]).
+     * The answer is one word then a reason, easy to parse; anything else is Unknown, not Ok.
      */
     suspend fun verdict(ctx: Context, symbol: String, mint: String): Verdict = withContext(Dispatchers.IO) {
         if (!Settings.webCheck.value) return@withContext Verdict.Unknown
 
-        // Everybody's answer first: free, wakes no service, and works for whoever has no
-        // key; without it a keyless phone had none of this net. See [Shared].
+        // Shared archive first: free, no worker call, and works without an API key. See [Shared].
         when (val said = Shared.say(mint)) {
             is Shared.Say.Stop -> {
                 Log.i(TAG, "$symbol: stop dall'archivio")
@@ -207,8 +201,7 @@ object CoinCheck {
         }.trim()
         Log.i(TAG, "$symbol: $searches searches, answer starts '" + text.take(24) + "'")
 
-        // Paid once, left for everyone. A verdict that could not be read is not
-        // published: it is not a verdict.
+        // Share the verdict. Unparseable answers are not published.
         return@withContext when {
             text.startsWith("STOP", true) -> {
                 val why = text.removePrefix("STOP").removePrefix("stop").trim().trim('—', '-', ':', ' ').ifBlank { symbol }
@@ -236,7 +229,7 @@ object CoinCheck {
         c.disconnect()
         text?.let { JSONObject(it) }
     } catch (e: Exception) {
-        // Never log the body: it carries the key's neighbourhood.
+        // Log the exception class only, never anything near the key.
         Log.w(TAG, "POST failed: ${e.javaClass.simpleName}")
         null
     }

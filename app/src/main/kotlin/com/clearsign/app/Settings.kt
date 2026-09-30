@@ -28,10 +28,7 @@ object Settings {
     /** Global text-size multiplier (0.85–1.30). Applied via LocalDensity.fontScale. */
     val textScale = mutableStateOf(1f)
 
-    /**
-     * Your own slice of the balance, kept between trades. A quarter, a half and three quarters
-     * are somebody else's idea; this is the one you set once and press. Zero: not set.
-     */
+    /** The user's own swap percentage, next to 25/50/75. Zero: not set. */
     val swapCustomPct = mutableStateOf(0)
 
     /**
@@ -41,22 +38,18 @@ object Settings {
     val webCheck = mutableStateOf(false)
 
     /**
-     * The Agent tab with everything on it. Off, three questions: is it working, what does it
-     * hold, what did it do. On, also the model, the collar's numbers, lane and targets, the
-     * shadow book, the live trace, the bridge to a computer. One switch, remembered.
+     * Full Agent tab. Off: status, holdings, history. On: also the model, the collar's limits,
+     * lane and targets, shadow book, live trace and the computer bridge.
      */
     val agentPro = mutableStateOf(false)
 
-    /** Whether the holdings card on Home is unrolled. Remembered, because a list
-     *  somebody has deliberately closed should stay closed tomorrow morning. */
+    /** Whether Home's holdings card is expanded. Persisted, so a closed list stays closed. */
     val walletOpen = mutableStateOf(true)
 
     /**
-     * The node this phone talks to Solana with, when the person brings their own. The app ships
-     * with one compiled in, the publisher's, shared by every install: fine while they are few.
-     * With the agent on a phone makes thousands of calls a day and a thousand phones make
-     * millions, and the publisher's node runs out for everyone at once, including whoever is
-     * only looking at a balance. Empty means the compiled one.
+     * The user's own RPC node; empty means the compiled one. The compiled node is shared by every
+     * install, and with the agent on one phone makes thousands of calls a day: a thousand phones
+     * would exhaust it for everyone.
      */
     val rpcUrl = mutableStateOf("")
 
@@ -76,10 +69,7 @@ object Settings {
         walletOpen.value = p.getBoolean(KEY_WALLET_OPEN, true)
     }
 
-    /**
-     * Only https, and only a URL that stands up: a misspelled node would switch the chain off
-     * for whoever typed it, without saying why.
-     */
+    /** https only, with a length check: a mistyped node would silently cut off the chain. */
     fun setRpcUrl(ctx: Context, url: String) {
         val v = url.trim().takeIf { it.startsWith("https://") && it.length > 12 }.orEmpty()
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_RPC, v.ifEmpty { null }).apply()
@@ -87,10 +77,7 @@ object Settings {
         applyRpc()
     }
 
-    /**
-     * The own node if there is one, else the compiled one. The pool knows which is own: first
-     * in line, with the compiled one behind as fallback.
-     */
+    /** Own node if set, else the compiled one. The pool puts the own node first, compiled as fallback. */
     private fun applyRpc() {
         val own = rpcUrl.value.takeIf { it.isNotBlank() }
         Rpc.ownNode = own
@@ -162,8 +149,8 @@ object Settings {
     }
 
     /**
-     * Guest: the phone in somebody else's hands. Amounts covered, spending actions off. In
-     * memory only: the door asks the print on every return, so a restart ends it.
+     * Guest mode: amounts hidden, spending off. Memory only, so a restart ends it; the lock
+     * asks for the fingerprint on every return anyway.
      */
     val guest = mutableStateOf(false)
 
@@ -177,14 +164,10 @@ object Settings {
         homeActionsTick.value++
     }
     val homeActionsTick = mutableStateOf(0)
-    // The bridge in place of the link. The link asks somebody for money and is used when there
-    // is somebody on the other side: a thing that happens, not a thing you do. The bridge you do
-    // alone, and it is the only way this wallet takes money out of Solana. Customize brings the
-    // link back: same nine actions, only the front page changes.
-    // WIDGET and not AGENT: the agent already has one of the five tabs along the bottom, and a
-    // shortcut that only switches tab spends a slot to say what the tab bar already says. The
-    // bubble and the widget were two taps down inside More, and they are the parts of Totem that
-    // live outside Totem, so the front page is where someone would look for them.
+    // BRIDGE instead of the payment link: the link needs someone on the other side, the bridge
+    // is done alone and is the only way money leaves Solana here. Customize brings the link back.
+    // WIDGET instead of AGENT: the agent already has a tab, and the bubble and widget live
+    // outside the app, so the home screen is where people look for them.
     val DEFAULT_HOME_ACTIONS = listOf("SEND", "RECEIVE", "SWAP", "SCAN", "CROWD", "BRIDGE", "WIDGET")
 
     /** Priority fee for the transactions we build ourselves, in micro‑lamports per compute unit. 0 = none. */

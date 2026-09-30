@@ -10,10 +10,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * What the model may reach for: five tools, and not one signs. They build bytes and hand
- * them to [AgentBroker], the only place that decides and the only place holding the budget
- * key. A jailbroken prompt, a poisoned web page or a hallucination can at worst produce a
- * transaction the collar then refuses. The model is a proposer.
+ * The model's tools. None signs: they build bytes and hand them to [AgentBroker], which alone
+ * decides and holds the budget key. A jailbreak, a poisoned page or a hallucination can at
+ * worst produce a transaction the collar refuses.
  */
 object BrainTools {
 
@@ -43,8 +42,7 @@ object BrainTools {
             ),
         )
         .put(tool("harvest", "Send the budget's gains home to the Seed Vault account. Money only ever moves towards the owner, so this needs no approval.", JSONObject()))
-        // Executing a trade without being able to look at the market is not a
-        // trader, it is a button. These three read and never sign.
+        // Market reads, so the model can look before it trades. These three never sign.
         .put(
             tool(
                 "market_search",
@@ -110,10 +108,9 @@ object BrainTools {
         .put(tool("pause", "Stop the agent. After this nothing is signed until the person turns it back on. Use it the moment the user asks you to stop, or if you suspect something is wrong.", JSONObject()))
 
     /**
-     * The candidate list, gated and ranked. The model reads a shortlist well and picks a coin
-     * from memory terribly: its training data is a year stale and every ticker it remembers has
-     * since been minted by somebody else. The shortlist is built here from live data, by rules
-     * tuned against real trades; the model's job starts after.
+     * The candidate list, gated and ranked from live data by rules tuned on real trades. The
+     * model picks well from a shortlist and badly from memory: its training data is a year
+     * stale and remembered tickers have since been reminted by others.
      */
     private suspend fun marketScan(ctx: Context, risk: String, limit: Int): JSONObject {
         val r = risk.trim().lowercase().replace(" ", "")
@@ -137,8 +134,7 @@ object BrainTools {
                     .put("notes", JSONArray(p.notes)),
             )
         }
-        // What was thrown out is half the answer: it is the difference between
-        // "nothing found" and "forty coins looked at, most of them freezable".
+        // Report the rejects too: "nothing found" vs "40 looked at, most freezable".
         val out = JSONObject().put("risk", gate.name).put("looked_at", res.looked).put("picks", picks)
             .put("rejected", JSONObject().apply { res.rejected.forEach { (why, n) -> put(why, n) } })
         if (res.picks.isEmpty()) {
@@ -156,10 +152,9 @@ object BrainTools {
     // ---- the loop, switched on from the conversation -------------------------
 
     /**
-     * Turn the loop on and hand back the numbers it will actually use. The slice is not what the
-     * model asked for: it derives from the collar, since a move above the silent threshold needs
-     * a fingerprint and nobody is there. Returning the derived figure stops the model promising a
-     * size the phone will never sign.
+     * Start the loop and return the numbers it will actually use. The slice comes from the
+     * collar, not the model's request: above the silent threshold a trade needs a fingerprint
+     * and nobody is there. Returning it stops the model promising a size the phone won't sign.
      */
     private fun startTrading(ctx: Context, args: JSONObject): JSONObject {
         val s = SessionWallet.current(ctx) ?: return JSONObject().put("error", "There is no budget to trade with. The person has to create one in the Agent tab first.")
@@ -193,8 +188,7 @@ object BrainTools {
             .put("checks_holdings_every_seconds", TraderLoop.EXIT_EVERY_MS / 1000)
             .put("hunts_every_seconds", TraderLoop.HUNT_EVERY_MS / 1000)
             .put("app_can_be_closed", true)
-        // Two honest limits, both of which the person will otherwise discover the
-        // expensive way. The model is told to say them, not to bury them.
+        // Limits the user would otherwise learn the expensive way; the model must state them.
         val warn = ArrayList<String>()
         if (slice <= 40_000L) warn += "The slice is tiny; network fees will be a large share of every move."
         warn += "The slice is set by the silent threshold, not by you: anything bigger needs their fingerprint, and nobody is there to give it."
@@ -264,9 +258,7 @@ object BrainTools {
         hits.take(5).forEach { t ->
             val sellable = withContext(Dispatchers.IO) { runCatching { Jupiter.sellableBack(t.mint, t.decimals, t.usd) }.getOrNull() }
             val safety = com.clearsign.core.assessToken(t.facts(sellable))
-            // Jupiter says whether it is tradeable and whether it is a trap. It
-            // does not say what it is, and proposing a purchase without that is
-            // guessing with a straight face.
+            // Jupiter covers tradeability and traps, not what the coin is: ask CoinGecko.
             val gecko = withContext(Dispatchers.IO) { runCatching { CoinGecko.byMint(t.mint) }.getOrNull() }
             out.put(
                 JSONObject()
@@ -313,8 +305,8 @@ object BrainTools {
         val view = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull()
             ?: return JSONObject().put("error", "Could not read the account right now.")
         val coins = JSONArray()
-        // Eight, by value. The free model tiers meter tokens per minute, and a
-        // full holdings dump was spending most of a minute's budget on dust.
+        // Top eight by value: free tiers meter tokens per minute, and a full dump spent
+        // most of that budget on dust.
         view.main.filter { it.raw > 0 }.sortedByDescending { it.fiat ?: 0.0 }.take(8).forEach { h ->
             coins.put(
                 JSONObject().put("symbol", h.symbol).put("amount", h.ui)
@@ -408,9 +400,8 @@ object BrainTools {
         val dst = resolve(to) ?: return JSONObject().put("error", "I do not know a coin called \"" + to + "\". Try market_search to find its mint address.")
         val inMint = src.first
         val outMint = dst.first
-        // The one thing checked before the money leaves, and the only reason a
-        // coin is turned down here: a token Jupiter cannot route back to SOL is
-        // a purchase with no exit, and no cap protects you from that.
+        // The only refusal here: no Jupiter route back to SOL means no exit, and no cap
+        // protects against that.
         val grade = safetyOf(outMint)
         if (grade != null && com.clearsign.core.SafetyFlag.NO_WAY_OUT in grade.flags) {
             return JSONObject().put(
@@ -429,8 +420,7 @@ object BrainTools {
             .put("agent", agent).put("reason", reason)
         grade?.let { intent.put("safety", it.score).put("safetyBand", it.band.name) }
         val verdict = judge(ctx, tx, intent, agent, built.ultraRequestId)
-        // Whatever the grade found that was not fatal travels back with the verdict,
-        // so the model has to say it out loud instead of quietly buying.
+        // Non-fatal grade flags go back with the verdict so the model has to mention them.
         grade?.takeIf { it.flags.isNotEmpty() }?.let {
             verdict.put("coin_safety", it.score).put("coin_warnings", JSONArray(it.flags.map { f -> f.name }))
                 .put("tell_the_user", "Repeat these warnings about " + symbol(outMint) + " in plain words.")
@@ -453,7 +443,7 @@ object BrainTools {
         return JSONObject().put("mode", "OFF").put("note", "nothing will be signed until the person turns it back on")
     }
 
-    /** The one door. Everything the model proposes goes through the judge. */
+    /** Every model proposal goes through [AgentBroker] here. */
     private suspend fun judge(ctx: Context, tx: ByteArray, intent: JSONObject, agent: String, ultraRequestId: String? = null): JSONObject {
         val job = AgentBroker.Job(
             id = LedgerRecorder.newId(), tx = tx, intentJson = intent.toString(),
@@ -471,10 +461,7 @@ object BrainTools {
         )
     }
 
-    /**
-     * A shortcut, no longer a gate: the coins whose mint and decimals we can answer without a
-     * round trip. Anything else goes through [resolve].
-     */
+    /** Coins whose mint and decimals are known without a round trip. Anything else goes through [resolve]. */
     private val KNOWN = mapOf(
         "SOL" to (AgentPolicy.WSOL to 9),
         "WSOL" to (AgentPolicy.WSOL to 9),
@@ -489,9 +476,8 @@ object BrainTools {
         KNOWN[name.uppercase()] ?: KNOWN.values.firstOrNull { it.first == name }
 
     /**
-     * A symbol, a name or a mint, turned into (mint, decimals). Anything in Jupiter's registry
-     * can be named. Where several coins share a ticker a verified one wins: a ticker is not a
-     * name, and anybody can mint "BONK" this morning.
+     * A symbol, name or mint resolved to (mint, decimals) via Jupiter's registry. On a shared
+     * ticker a verified coin wins: anyone can mint a new "BONK".
      */
     private suspend fun resolve(name: String): Pair<String, Int>? {
         val q = name.trim()

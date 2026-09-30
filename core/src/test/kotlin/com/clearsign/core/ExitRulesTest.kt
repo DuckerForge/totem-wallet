@@ -4,12 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The five rules, over price series written by hand.
- *
- * Written as series rather than single prices because that is the only way a
- * trailing rule can be wrong in an interesting way: it needs a past.
- */
+/** The five exit rules over hand-written price series: a trailing rule needs a history to test. */
 class ExitRulesTest {
 
     private val hour = 3_600_000L
@@ -22,16 +17,10 @@ class ExitRulesTest {
         return leg
     }
 
-    /**
-     * Each rule wins in its own world, and that is the whole reason to run all of
-     * them. The first version of this test asserted that the trail always beats a
-     * fixed target on a run; it failed, and it was the test that was wrong.
-     */
+    /** The trail beats the fixed target on a long run; the next test is the reverse. Neither always wins. */
     @Test fun theTrailWinsWhenItKeepsGoing() {
-        // Up and up: the fixed target sells at the first +30% and watches the rest.
-        // The last step has to give back more than the trail's own distance, or
-        // the leg is still open and there is nothing to compare. The first version
-        // of this test ended at 1800, which is only 10% off the peak.
+        // Steady rise: the fixed target sells at the first +30%. The last step must drop more
+        // than the trail distance or the leg stays open (1800, only 10% off the peak, would not).
         val keepsGoing = listOf(1_100.0, 1_300.0, 1_600.0, 2_000.0, 1_650.0)
         val fixed = run(ExitRule.Fixed("t", 30, 15), keepsGoing)
         val trail = run(ExitRule.Trailing("tr", 15), keepsGoing)
@@ -85,7 +74,7 @@ class ExitRulesTest {
         assertTrue(leg.open)
     }
 
-    // ---- the costs, which are what make this honest --------------------------
+    // ---- costs ---------------------------------------------------------------
 
     @Test fun theRoundTripPaysFeesAndRent() {
         val size = 30_000_000L                       // 0.03 SOL
@@ -96,7 +85,7 @@ class ExitRulesTest {
         assertEquals(free - 2 * 5_000L - 2_040_000L, real, "and the costs are two fees plus the account rent")
     }
 
-    /** The case from this morning: on a small slice the rent eats the trade. */
+    /** On a small slice the account rent eats most of the trade. */
     @Test fun onASmallSliceTheRentIsMostOfTheTrade() {
         val slice = 7_800_000L                       // the old 0.0078 SOL slice
         val leg = PaperLeg("f", 1_000.0, 1_150.0, 0L, closedAt = hour, exitLamports = 1_150.0)

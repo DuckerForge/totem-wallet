@@ -48,26 +48,23 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * The coin, drawn properly. The sheet carried the swap button's eighty-pixel line, right for
- * "am I buying into a crash" and wrong for "what is this coin doing": a line hides the range
- * inside each bar. Here candles with wicks, volume, the scale, a crosshair under the finger.
- * Two sources: on Solana the busiest GeckoTerminal pool (what DexTools and DexScreener read),
- * elsewhere CoinGecko OHLC. Timeframes are named after the range covered, never a candle size. Nothing to draw, nothing drawn.
+ * Full coin chart: candles with wicks, volume, scale, a crosshair under the finger. On Solana
+ * the busiest GeckoTerminal pool (what DexTools and DexScreener read), elsewhere CoinGecko
+ * OHLC. Timeframes are named by the range covered, never the candle size. Draws nothing
+ * without data.
  */
 @Composable
 internal fun CoinChart(coin: Market.Coin, mint: String?) {
     val ctx = LocalContext.current
-    // The chart is in dollars because the source answers in dollars. What is written is
-    // converted here, scale included: a coin read in euros cannot have a dollar axis, or the
-    // line under the finger says a number that exists nowhere.
+    // The source is in USD. Every label, scale included, is converted to the display
+    // currency here, or the crosshair would show a number found nowhere else.
     val fx = rememberFx()
     var span by remember(coin.key) { mutableStateOf(Gecko.Span.HOURS) }
     var candles by remember(coin.key) { mutableStateOf<List<Gecko.Candle>>(emptyList()) }
     var loading by remember(coin.key) { mutableStateOf(true) }
     var pool by remember(coin.key) { mutableStateOf<Gecko.Pool?>(null) }
-    // Which vendor answered, decided at every load, never remembered. The mint arrives after
-    // the sheet opens, so anything settled at first composition would settle on "no mint" and
-    // every Solana coin would be drawn from the market with its pool unread.
+    // Which source answered, decided at every load: the mint arrives after the sheet opens,
+    // so a choice made at first composition would skip the pool for every Solana coin.
     var fromPool by remember(coin.key) { mutableStateOf(mint != null) }
     var cursor by remember(coin.key) { mutableStateOf<Int?>(null) }
 
@@ -86,8 +83,7 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
         } else {
             emptyList()
         }
-        // No pool, or a pool too young to have filled this span. The market
-        // knows the coin by name, and a chart from one level up beats no chart.
+        // No pool, or one too young to fill this span: fall back to the market chart.
         val days = span.cgDays
         if (got.isEmpty() && days != null && coin.id != mint) {
             got = withContext(Dispatchers.IO) { runCatching { Market.ohlc(coin.id, days) }.getOrDefault(emptyList()) }
@@ -96,12 +92,9 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
         fromPool = viaPool
         loading = false
 
-        // The other spans, fetched behind the first one. Switching span used to start from
-        // nothing every time: pace() holds each foreground call 900 ms and the round trip
-        // follows, so the same chart was paid for three times over. Gecko's background lane
-        // already widens its own gap and stands down three seconds behind anything in
-        // front, so this cannot slow down what the user is looking at, and series() caches
-        // for thirty minutes, which outlasts the visit.
+        // Prefetch the other spans so switching is instant (pace() holds each foreground
+        // call 900 ms). Gecko's background lane yields 3 s to foreground calls, so this does
+        // not slow the visible chart; series() caches 30 min.
         if (mint != null && viaPool) {
             withContext(Dispatchers.IO) {
                 for (other in Gecko.Span.entries) {
@@ -112,8 +105,7 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
         }
     }
 
-    // Only the spans the source can honestly draw. A coin with a mint can be
-    // read candle by candle; one without is whatever CoinGecko's ranges give.
+    // Only spans the source can draw: pool candles with a mint, CoinGecko's ranges without.
     val spans = if (mint != null) Gecko.Span.entries.toList() else Gecko.Span.entries.filter { it.cgDays != null }
     LaunchedEffect(mint) { if (span !in spans) span = Gecko.Span.HOURS }
 
@@ -125,17 +117,15 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
 
     GlassCard {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // The head of the card is the price now or, with a finger on the chart, the candle under
-            // it: one line doing two jobs, so the eye never leaves the chart. Fixed height: a header
-            // that grows by a row shoves the picture down while you read it.
+            // Header: the current price, or the candle under the finger. Fixed height, so the
+            // chart does not jump while touched.
             Box(Modifier.fillMaxWidth().height(46.dp)) {
                 if (at == null) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                // The market price before the candle: the candle is one pool's and may be an hour old, the
-                                // price on top is what the row behind this sheet just showed. Two numbers for the same coin
-                                // on one screen are an error, even when both are true.
+                                // The market price, not the last candle: the candle is one pool's and may be an hour
+                                // old, and the header must match the row behind this sheet.
                                 (coin.priceUsd ?: last)?.let { fx.price(it) } ?: stringResource(R.string.market_no_price),
                                 fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 21.sp, color = Halo.ink, maxLines = 1,
                             )
@@ -146,9 +136,7 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
                                 )
                             }
                         }
-                        // Which vendor drew this. Not a detail: one of them is
-                        // one pool on this chain and the other is every exchange
-                        // there is, and they do not have to agree.
+                        // Source label: one pool on this chain vs all exchanges, which can disagree.
                         Text(
                             stringResource(if (fromPool) R.string.chart_src_pool else R.string.chart_src_market),
                             fontFamily = Inter, fontSize = 10.sp, color = Halo.muted,
@@ -198,9 +186,7 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
                 }
             }
 
-            // What the price is standing on. A chart with no depth under it is
-            // the oldest trap on this chain: a line that looks like a market and
-            // is two thousand dollars deep.
+            // Pool liquidity under the price: a normal-looking chart can have $2k of depth.
             val p = pool
             val stats = buildList {
                 if (p != null) {
@@ -234,10 +220,8 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
                 }
             }
 
-            // The whole thing, where nothing else is drawn: depth, holders and every pool are a
-            // website's job. The site is the one the number came from, not the famous one: the pool id
-            // is GeckoTerminal's, and DexTools given a foreign code opens something rather than saying
-            // "not found". So the link opens exactly the pool drawn above.
+            // Link out for depth, holders and other pools. GeckoTerminal, not DexTools: the pool id
+            // is GeckoTerminal's, and DexTools opens some other page for a foreign id.
             val url = p?.let { "https://www.geckoterminal.com/solana/pools/${it.id}" }
                 ?: coin.id.takeIf { it != mint && it != coin.mint }?.let { "https://www.coingecko.com/en/coins/$it" }
             if (url != null) {
@@ -255,9 +239,8 @@ internal fun CoinChart(coin: Market.Coin, mint: String?) {
 }
 
 /**
- * The picture: candles, their volume, the scale, the crosshair. Candles down to about two
- * pixels a bar, a filled line below that: a year of daily bars across three hundred points
- * is a dithering pattern, and reads better as the line it has become.
+ * Candles, volume, scale and crosshair. Candles down to about two pixels a bar, a filled
+ * line below that: a year of daily bars in 300 points is noise as candles.
  */
 @Composable
 private fun Candles(
@@ -294,9 +277,8 @@ private fun Candles(
 
     Canvas(
         Modifier.fillMaxWidth().height(196.dp)
-            // Touch to read a candle, slide to read the next one. The gesture
-            // gives up the moment it turns vertical, or the chart would eat the
-            // scroll of the sheet it is sitting in.
+            // Touch and slide to read candles. Released once the drag turns vertical, so the
+            // sheet still scrolls.
             .pointerInput(candles.size) {
                 val n = candles.size
                 awaitEachGesture {
@@ -333,8 +315,7 @@ private fun Candles(
         fun y(v: Double) = (priceH - ((v - bottom) / range * priceH)).toFloat().coerceIn(0f, priceH)
         fun x(i: Int) = plotW * (i + 0.5f) / n
 
-        // Four prices down the side. Without them the picture has a shape and no
-        // size, and every coin looks like every other coin.
+        // Four price labels on the side, so the shape has a scale.
         for (k in 0..3) {
             val v = bottom + range * k / 3.0
             val gy = y(v)
@@ -376,8 +357,7 @@ private fun Candles(
             }
         }
 
-        // Where it is now, written on the scale, so the last candle has a number
-        // and not only a height.
+        // Current price marked on the scale.
         val lastY = y(candles.last().close)
         drawLine(tint.copy(alpha = 0.5f), Offset(0f, lastY), Offset(plotW, lastY), strokeWidth = 1f * density, pathEffect = dash)
         run {
@@ -388,8 +368,7 @@ private fun Candles(
             drawText(lay, topLeft = Offset(px + 3f * density, py + 2f * density))
         }
 
-        // Three times along the bottom: the same shape means one thing over five
-        // hours and another over a year.
+        // Three time labels along the bottom.
         listOf(0, n / 2, n - 1).distinct().forEachIndexed { k, i ->
             val lay = tm.measure(stamp(candles[i].at, span), axis)
             val tx = when (k) {
@@ -400,8 +379,7 @@ private fun Candles(
             drawText(lay, topLeft = Offset(tx, size.height - timeH + 2f * density))
         }
 
-        // The crosshair: the candle under the finger, said twice — once on the
-        // price scale and once on the clock.
+        // Crosshair: the candle under the finger, labeled on both axes.
         cursor?.let { ci ->
             val c = candles.getOrNull(ci) ?: return@let
             val cx = x(ci)
@@ -426,7 +404,7 @@ private fun Candles(
     }
 }
 
-/** The gutter the prices are written in. Wide enough for eight decimals, which is what the coins people follow here cost. */
+/** Width of the price gutter: room for eight decimals, which memecoin prices need. */
 private val AXIS_W = 58.dp
 
 /** A number for the scale: as many decimals as the price needs, and no currency on it. */

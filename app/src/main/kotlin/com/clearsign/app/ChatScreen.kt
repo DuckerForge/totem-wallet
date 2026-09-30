@@ -64,18 +64,15 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The conversation with the agent, as a page: it sits over everything, tab bar included,
- * somewhere you go rather than something you peek at, and a page owns its insets (the sheet
- * ended at 96% and the keyboard could push the composer off). The answer streams, the first
- * word in a second; a proposal comes back as a receipt card with its verdict in color; a
- * strip at the top says what the agent does and holds, so you never leave to check it is alive.
+ * Chat with the agent, as a full page over the tab bar. A page owns its insets: as a sheet,
+ * the keyboard could push the composer off. Answers stream; a proposal comes back as a
+ * receipt card with its verdict in color; a top strip shows what the agent does and holds.
  */
 @Composable
 internal fun ChatScreen(onClose: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Read back from disk, so closing the page is not the same as burning the
-    // transcript. See [ChatHistory] for why it is a local file and not a server.
+    // Loaded from disk, so closing the page keeps the transcript. See [ChatHistory] for why it is local.
     val turns = remember { mutableStateListOf<Brain.Turn>().apply { addAll(ChatHistory.load(ctx)) } }
     var draft by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
@@ -101,9 +98,8 @@ internal fun ChatScreen(onClose: () -> Unit) {
         ChatHistory.save(ctx, turns.toList())
         thinking = true
         scope.launch {
-            // Only the recent turns go to the model. The whole transcript stays
-            // on screen, but re-sending an afternoon of it on every message is
-            // how a free tier's per-minute allowance disappears into nothing.
+            // Only recent turns go to the model: resending the whole transcript each message
+            // burns a free tier's per-minute quota.
             val r = Brain.ask(ctx, ChatHistory.context(turns.toList()), "Apex chat") { partial -> live = partial }
             live = null
             when (r) {
@@ -174,9 +170,8 @@ internal fun ChatScreen(onClose: () -> Unit) {
             error?.let { e -> item { Banner(e, Halo.red, HIcon.WARNING) } }
         }
 
-        // Suggestions come back whenever the field is empty, exactly when you want one. Grouped:
-        // "what do I look at" and "what do I do" are different questions, and nine chips in a row
-        // were nine things to read.
+        // Suggestions show whenever the field is empty, grouped (look, do, agent) rather than
+        // nine chips in a row.
         if (turns.isNotEmpty() && draft.isBlank()) {
             val asked = false
             Box(Modifier.fillMaxWidth()) {
@@ -211,8 +206,7 @@ internal fun ChatScreen(onClose: () -> Unit) {
         }
 
         Row(
-            // The row is as tall as the field wants, bounded. Forcing 86dp and stretching the field put
-            // the box taller than its line and sliced the placeholder along the bottom. Let it measure itself.
+            // Let the field measure its own height, bounded: forcing 86dp clipped the placeholder.
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -238,10 +232,7 @@ internal fun ChatScreen(onClose: () -> Unit) {
     if (showBrain) BrainSheet { showBrain = false; configured = Brain.configured(ctx) }
 }
 
-/**
- * One line answering "is this thing alive" without leaving the chat: the loop's state with
- * its breathing dot, what the budget can spend, how many coins it holds. Tap opens the trace.
- */
+/** Status strip: loop state, what the budget can spend, coins held. Tap opens the trace. */
 @Composable
 private fun StatusStrip(open: Boolean, onToggle: () -> Unit) {
     val ctx = LocalContext.current
@@ -293,7 +284,7 @@ private fun StatusStrip(open: Boolean, onToggle: () -> Unit) {
     }
 }
 
-/** What the agent is doing, line by line. Shared with the Agent tab's Pro view: "is it alive" is asked from both. */
+/** Live trace of the agent, line by line. Also used by the Agent tab's Pro view. */
 @Composable
 internal fun AgentConsole() {
     val ctx = LocalContext.current
@@ -319,8 +310,7 @@ internal fun AgentConsole() {
         if (lines.isEmpty()) {
             Text(stringResource(if (on) R.string.trace_idle else R.string.live_off), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
         }
-        // The last six, oldest at the top, so the newest line is the one nearest
-        // the caret and the eye lands on it.
+        // Last six, oldest on top, so the newest sits next to the caret.
         val shown = lines.takeLast(6)
         shown.forEachIndexed { i, line ->
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -357,10 +347,7 @@ private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
 /** A group of suggestions: its label, its colour, and the questions in it. */
 private data class OpenerGroup(val label: Int, val tint: Color, val items: List<Int>)
 
-/**
- * The openers in three groups: what to look at, what to do, the agent itself. The last flips
- * with the state: while the loop runs, "start working on your own" can do nothing.
- */
+/** Openers in three groups: look, do, the agent. The agent group follows the loop state (no "start" while it runs). */
 @Composable
 private fun openerGroups(): List<OpenerGroup> {
     val ctx = LocalContext.current
@@ -375,9 +362,7 @@ private fun openerGroups(): List<OpenerGroup> {
 @Composable
 private fun TurnRow(t: Brain.Turn) {
     when (t.role) {
-        // The bubble is as wide as the words, up to a limit. `fillMaxWidth(0.85f)`
-        // took 85% of the screen for "vendi tutto" too, so five short messages
-        // read as five identical slabs and the conversation lost its shape.
+        // Bubble as wide as its text, capped: `fillMaxWidth(0.85f)` made short messages identical slabs.
         "user" -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Box(
                 Modifier.widthIn(max = 300.dp).clip(rs(16)).background(Halo.mint.copy(alpha = 0.14f))
@@ -387,9 +372,7 @@ private fun TurnRow(t: Brain.Turn) {
             }
         }
         "assistant" -> AssistantBubble(t.text, live = false)
-        // A receipt is for a decision about money. Everything else a tool did is
-        // one quiet line: "Ho eseguito positions" was arriving as a full card with
-        // a border, as loud as a signature, for having read a list.
+        // Receipt cards only for signing decisions; any other tool call is one quiet line.
         "tool" -> if (t.verdict in SIGNED_VERDICTS) ReceiptCard(t) else ToolLine(t)
     }
 }
@@ -408,9 +391,8 @@ private fun AssistantBubble(text: String, live: Boolean) {
 }
 
 /**
- * A proposal and what became of it, as a receipt. In this order: did it happen, what was it,
- * why not. The verdict is the color, the claim the title, the judge's reason the line under
- * it. The signature is there for whoever wants to look.
+ * A proposal and its outcome, as a receipt: verdict as the color, the claim as the title, the
+ * collar's reason under it, and the signature for whoever wants it.
  */
 @Composable
 private fun ReceiptCard(t: Brain.Turn) {
@@ -449,8 +431,7 @@ private fun ReceiptCard(t: Brain.Turn) {
             sig?.let { Text(shorten(it, 6), fontFamily = Mono, fontSize = 10.sp, color = Halo.muted) }
         }
         (said ?: simulated)?.let { Text(it, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Halo.ink, lineHeight = 18.sp) }
-        // What the network says will happen, when it differs from the claim: the
-        // judge judges this, and a person should be able to judge the judge.
+        // The simulated effect, when it differs from the claim: that is what the collar judged.
         if (said != null && simulated != null && simulated != said) {
             Text(simulated, fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp)
         }
@@ -482,9 +463,8 @@ private fun ToolLine(t: Brain.Turn) {
 }
 
 /**
- * The little markdown a model writes anyway, rendered instead of printed: the prompt asks for
- * none and every model produces some (`**Borsello di spesa**` arrived with its asterisks).
- * Two marks only, `**bold**` and a leading `- ` as a bullet; anything else stays as written.
+ * Renders the markdown models write despite the prompt: only `**bold**` and a leading `- `
+ * bullet. Anything else stays as written.
  */
 private fun lite(text: String): androidx.compose.ui.text.AnnotatedString = androidx.compose.ui.text.buildAnnotatedString {
     val clean = text.replace(Regex("(?m)^\\s*[-*]\\s+"), "· ")
@@ -502,7 +482,7 @@ private fun lite(text: String): androidx.compose.ui.text.AnnotatedString = andro
     }
 }
 
-/** Three dots, while it is away reading the market. */
+/** Typing dots while the agent works. */
 @Composable
 private fun TypingDots() {
     val t = rememberInfiniteTransition(label = "typing")

@@ -45,10 +45,9 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * The bridge: SOL or USDC to another chain through RocketX. Pick the chain, paste the
- * address there, type the amount; quotes come in and the best deposit route is chosen;
- * Continue opens the order and hands the deposit address to the ordinary Send, same
- * receipt and fingerprint as any payment. The line under the button says what this is not.
+ * The bridge: SOL or USDC to another chain through RocketX. Pick the chain, paste the address,
+ * type the amount; the best deposit route is picked from the quotes. Continue opens the order
+ * and hands the deposit address to the ordinary Send (same receipt and fingerprint).
  */
 @Composable
 internal fun BridgeSheet(
@@ -65,15 +64,14 @@ internal fun BridgeSheet(
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var networks by remember { mutableStateOf<List<RocketX.Network>>(emptyList()) }
-    // Solana as a landing: read once on IO. [RocketX.home] the first time is a
-    // network call, and it used to be made in composition, on the main thread.
+    // Solana as the landing chain, read once on IO: the first [RocketX.home] is a network call.
     var home by remember { mutableStateOf<RocketX.Network?>(null) }
     var usdc by remember { mutableStateOf(false) }
     var target by remember { mutableStateOf<RocketX.Network?>(null) }
     /**
-     * Private means Solana on both sides: the bridge's own machinery (quote, order, deposit,
-     * receipt, signature) with the same chain on both shores. RocketX calls them Privacy Route
-     * and Monero Rails, `walletLess` routes like every one this app already pays.
+     * Private means Solana on both sides, through the bridge's usual flow (quote, order, deposit,
+     * receipt, signature). RocketX calls these Privacy Route and Monero Rails, `walletLess`
+     * routes like every one this app already pays.
      */
     var private by remember { mutableStateOf(startPrivate) }
     var sameCoin by remember { mutableStateOf(true) }
@@ -87,13 +85,11 @@ internal fun BridgeSheet(
     var picked by remember { mutableStateOf(0) }
     // The number the order really brought, when worse than the quote.
     var worse by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-    // The order already open and waiting for an answer. Without this a second tap
-    // on "accept" opened a second order at RocketX and paid that one while the
-    // screen showed the first.
+    // The order already open and awaiting an answer, so a second tap on "accept" pays it
+    // instead of opening another.
     var pending by remember { mutableStateOf<RocketX.Order?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    // The amount below which nobody accepts. It comes from the refused quote, not
-    // from us: it depends on the price of the moment and changes hour to hour.
+    // The minimum no route accepts below, from the refused quote: it moves with the price.
     var minAmount by remember { mutableStateOf<Double?>(null) }
     // The same number, known before trying. See [RocketX.PROBE].
     var floor by remember { mutableStateOf<Pair<Double, Double?>?>(null) }
@@ -103,8 +99,7 @@ internal fun BridgeSheet(
     LaunchedEffect(Unit) {
         networks = withContext(Dispatchers.IO) { runCatching { RocketX.networks() }.getOrDefault(emptyList()) }
         home = withContext(Dispatchers.IO) { runCatching { RocketX.home() }.getOrNull() }
-        // Start from Ethereum, not from RocketX's first, which is Bitcoin: on a
-        // bridge from Solana the first is the one used most.
+        // Default to Ethereum, not RocketX's first (Bitcoin): from Solana it is the most used.
         target = RocketX.popular(networks).firstOrNull() ?: networks.firstOrNull()
     }
 
@@ -117,10 +112,9 @@ internal fun BridgeSheet(
     }
 
     /**
-     * The minimum asked at opening, not after a refusal, and only for the private send: there
-     * every route is private and shares one floor, so under it the page empties and nothing
-     * moves. On a normal bridge there is no minimum to write (measured: Relay takes a
-     * thousandth of a SOL) and announcing one would invent a ban.
+     * Probe the minimum at opening, only for the private send: every route there shares one
+     * floor, and below it nothing moves. A normal bridge has no minimum worth showing
+     * (measured: Relay takes a thousandth of a SOL).
      */
     LaunchedEffect(private, usdc) {
         floor = null
@@ -144,8 +138,7 @@ internal fun BridgeSheet(
         delay(500)
         quoting = true
         val answer = withContext(Dispatchers.IO) {
-            // The shore resolves inside IO here too: [RocketX.home] goes to the
-            // network the first time, and blocked the drawing from here.
+            // On IO here too: the first [RocketX.home] hits the network.
             val t = (if (private) RocketX.home() else target) ?: return@withContext null
             // Private: same coin and same chain on both sides.
             val to = if (private) fromMint else if (usdc && sameCoin) toToken?.contract else null
@@ -153,12 +146,10 @@ internal fun BridgeSheet(
         } ?: RocketX.Quotes(emptyList(), null, null)
         quotes = answer.list.filter { it.walletLess }
         minAmount = answer.minAmount?.takeIf { quotes.isEmpty() }
-        // The minimum a fresh answer just said beats the one asked at opening: the
-        // same number, half an hour later.
+        // A fresh minimum replaces the one probed at opening.
         minAmount?.let { floor = it to answer.minUsd }
         quoting = false
-        // "No route, try another amount" sent people guessing a number the answer
-        // already held. When the no is about the amount, say the amount.
+        // When the refusal is about the amount, show the minimum instead of "no route".
         if (quotes.isEmpty()) {
             error = minAmount?.let { ctx.getString(R.string.bridge_min, minText(it), fromSym) }
                 ?: ctx.getString(R.string.bridge_no_route)
@@ -187,13 +178,11 @@ internal fun BridgeSheet(
             if (!private) {
             Text(stringResource(R.string.bridge_to), style = HaloType.label, color = Halo.muted)
             if (networks.isEmpty()) Text(stringResource(R.string.w_analyzing), style = HaloType.small, color = Halo.muted)
-            // Eight chains in front and a search for the rest: [ChainPickerSheet] says
-            // why. All two hundred and seven used to sit here in a row.
+            // Eight chains in front, search for the rest (see [ChainPickerSheet]).
             var pickChain by remember { mutableStateOf(false) }
             val popular = remember(networks) { RocketX.popular(networks) }
-            // The chosen chain stays in the front row even when it is not among the eight: a chain that
-            // vanishes from the screen after you picked it is the fastest way to lose track of where the
-            // money is going.
+            // The chosen chain stays in the front row even when not among the eight, so the
+            // destination never drops off the screen.
             val chips = remember(popular, target) { (popular + listOfNotNull(target)).distinctBy { it.id } }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 chips.forEach { n ->
@@ -251,9 +240,8 @@ internal fun BridgeSheet(
                 colors = pickerField(), shape = rs(12),
             )
 
-            // The minimum, said before the amount is typed, with dollars next to it: that is the number
-            // that stands still. The SOL figure moves with the price, and without the dollars the app
-            // seems unable to make up its mind.
+            // The minimum, shown before the amount is typed, with dollars next to it: the USD
+            // figure holds still while the SOL one moves with the price.
             floor?.let { (m, usd) ->
                 Text(
                     if (usd == null) stringResource(R.string.bridge_floor, minText(m), fromSym)
@@ -276,8 +264,7 @@ internal fun BridgeSheet(
 
             if (quoting) Text(stringResource(R.string.bridge_quoting), style = HaloType.small, color = Halo.muted)
             error?.let { Banner(it, Halo.amber, HIcon.WARNING) }
-            // The minimum is not just news, it is a figure to put in the field: copying
-            // it by hand from a notice is work the phone can do, and by hand a digit goes wrong.
+            // Tapping the minimum fills the field, so nobody copies it by hand.
             minAmount?.let { m ->
                 Row {
                     SmallChip(stringResource(R.string.bridge_use_min, minText(m), fromSym), HIcon.PEN, tint = Halo.mint) {
@@ -286,9 +273,7 @@ internal fun BridgeSheet(
                     }
                 }
             }
-            // Three routes, and the chosen one is the one that goes. Three were shown and the button
-            // always took the first: a decorative list, and on a page where every row means a different
-            // amount arriving, three fake choices are worse than one real one.
+            // Up to three routes; the selected one is the one used.
             quotes.take(3).forEachIndexed { i, q ->
                 val best = i == picked
                 Column(
@@ -301,11 +286,9 @@ internal fun BridgeSheet(
                         Text(q.exchange + " · " + q.keyword.lowercase().replaceFirstChar { it.uppercase() }, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
                         Text(String.format(Locale.ROOT, "%.6f", q.toAmount).trimEnd('0').trimEnd('.') + " " + (if (private || (usdc && sameCoin)) fromSym else landing?.native ?: ""), fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (best) Halo.mint else Halo.ink)
                     }
-                    // What the road costs you, whole and in money. The line below said only the declared fees,
-                    // less than half the bill: on one SOL they are 0.86 $ while 1.10 go missing between
-                    // departure and arrival, the rest being the exchange inside the route, seen only by
-                    // subtracting. This line is that subtraction. Only where the coin is the same on both
-                    // shores (private send, USDC to USDC): subtracting SOL from ETH means nothing.
+                    // Full cost of the route: amount in minus amount out. Declared fees are under half of
+                    // it (on 1 SOL: 0.86 $ declared, another 1.10 $ lost in the route's swap). Only when the
+                    // coin is the same on both sides (private send, USDC to USDC).
                     val sameUnit = private || (usdc && sameCoin)
                     val cost = if (sameUnit && amt != null && amt > 0 && q.toAmount > 0) amt - q.toAmount else null
                     if (cost != null && cost > 0) {
@@ -322,8 +305,7 @@ internal fun BridgeSheet(
                             color = if (pctCost > 5) Halo.red else if (pctCost > 2) Halo.amber else Halo.mint,
                         )
                     }
-                    // The declared fees: under the total they are a detail, alone
-                    // they are all that is known.
+                    // Declared fees: a detail under the total, the only figure without one.
                     Text(
                         stringResource(
                             if (cost != null && cost > 0) R.string.bridge_quote_of_which else R.string.bridge_quote_line,
@@ -360,24 +342,19 @@ internal fun BridgeSheet(
                     val deposit = order?.depositAddress
                     when {
                         order == null || deposit == null -> error = ctx.getString(R.string.bridge_open_failed)
-                        // The quote said this route needs a memo and the order carried none. A deposit without its
-                        // memo on a chain that needs one arrives credited to nobody; the quote itself says so, and
-                        // that field was never read.
+                        // The route needs a memo and the order has none: the deposit would be credited to nobody.
                         q.memoRequired && order.memo.isNullOrBlank() ->
                             error = ctx.getString(R.string.bridge_memo_missing)
-                        // The quote is not the order. Time passes between the number you saw and the order, and a
-                        // route can move; we signed on a figure seen earlier. The app already does this right on
-                        // sales: if the real one is worse beyond a threshold, both numbers are said and an answer
-                        // awaited. Under two percent nobody is stopped.
+                        // The order can come out worse than the quote seen earlier. Beyond 2%, show both
+                        // numbers and wait for an answer, as sales do.
                         order.toAmount > 0 && q.toAmount > 0 && order.toAmount < q.toAmount * 0.98 && worse == null -> {
                             worse = q.toAmount to order.toAmount
                             pending = order
                         }
                         else -> {
-                            // The deposit is a payment like any other: Send, receipt, print. A memo, when the route wants one, rides in the transaction.
+                            // The deposit is an ordinary payment: Send, receipt, print. A required memo goes in the transaction.
                             val toSym = if (private || (usdc && sameCoin)) fromSym else t.native
-                            // What arrives is what the order says, not the quote: the
-                            // order is the deal. The quote fills in only when the order did not say.
+                            // What arrives is what the order says; the quote only fills in when it is silent.
                             val lands = order.toAmount.takeIf { it > 0 } ?: q.toAmount
                             RocketX.remember(
                                 ctx,
@@ -392,9 +369,8 @@ internal fun BridgeSheet(
                                 toAmount = lands, toSymbol = toSym, network = t.name, toAddress = dest,
                                 exchange = order.exchange.ifBlank { q.exchange }, minutes = q.minutes, explorer = t.explorer,
                             )
-                            // The final destination goes on the receipt. What is signed is a payment to RocketX, so the
-                            // receipt showed the deposit address and never where the money ends up: the one thing that
-                            // counts was invisible at signing.
+                            // Put the final destination on the receipt: what is signed is only a payment to
+                            // RocketX's deposit address.
                             pending = null
                             val tail = if (dest.length > 10) dest.take(6) + "…" + dest.takeLast(6) else dest
                             onSend(
@@ -415,9 +391,7 @@ internal fun BridgeSheet(
                 style = HaloType.small, color = Halo.muted, lineHeight = 15.sp,
             )
 
-            // The bridges already opened have a page of their own. Three sat here with a button that
-            // asked the status and wrote one word: a stuck bridge is checked on the destination chain's
-            // explorer or taken to RocketX with the order number, and neither was anywhere.
+            // Past bridges have their own page, with explorer links and order numbers for stuck ones.
             val past = remember { RocketX.bridges(ctx) }
             if (past.isNotEmpty()) {
                 GhostButton(stringResource(R.string.bridge_past_all, past.size), Modifier.fillMaxWidth(), HIcon.HISTORY, tint = Halo.cyan) { onHistory() }
@@ -427,11 +401,7 @@ internal fun BridgeSheet(
     }
 }
 
-/**
- * The minimum, rounded up. Rounded down it lands back under the minimum and the route says
- * no a second time with the same notice: the only rounding that counts here is the one on
- * the right side of the threshold.
- */
+/** The minimum, rounded up: rounded down it falls under the minimum and the route refuses again. */
 internal fun minText(v: Double): String {
     val up = kotlin.math.ceil(v * 10_000.0) / 10_000.0
     return String.format(Locale.getDefault(), "%.4f", up).trimEnd('0').trimEnd { !it.isDigit() }

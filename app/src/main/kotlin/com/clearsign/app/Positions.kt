@@ -7,11 +7,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * What the agent holds and what it paid, in lamports. [AnalyticsEngine] works out a
- * FIFO P&L from the ledger in euros, and the euro snapshot can arrive late or not at
- * all for a trade signed inside a short-lived worker; a position with no cost is one no
- * stop-loss can protect. SOL is what we paid with and sell back into, so this needs no
- * exchange rate and no network call.
+ * What the agent holds and what it paid, in lamports. [AnalyticsEngine]'s euro P&L can miss the
+ * snapshot for a trade signed in a short-lived worker, and a stop-loss needs a cost. SOL is what
+ * we pay with and sell into, so no exchange rate or network call is needed.
  */
 object Positions {
     private const val PREFS = "apex_positions"
@@ -30,11 +28,8 @@ object Positions {
         val decimals: Int,
         val units: Double,
         /**
-         * The budget that bought it. Without this the book outlived the key: a budget was
-         * closed with coins inside, a new one made, and its first tick tried to sell 1214
-         * LEVERCAT the new key never held. The collar read the empty simulation as lying and
-         * the loop repeated the refusal eighty-four times over sixteen hours, buying nothing
-         * either. A holding belongs to the key that can sign for it.
+         * The budget key that bought it. Without it a new budget inherits the old one's rows
+         * and keeps trying to sell coins it never held.
          */
         val owner: String = "",
         /** What left the budget to buy it, fees included. The denominator of every exit. */
@@ -60,9 +55,8 @@ object Positions {
         val lastError: String? = null,
     ) {
         /**
-         * When it is worth trying again: three tries at the normal pace, then a doubling wait up
-         * to six hours. A coin that cannot be sold usually stays so for a while, and retrying
-         * every ninety seconds only buries the reason.
+         * Next retry: three tries at the normal pace, then a doubling wait up to six hours.
+         * An unsellable coin usually stays that way for a while.
          */
         val readyAt: Long get() = if (fails < 3) 0L else lastTryAt + retryDelay(fails)
         /** Price per whole token, in lamports. Null when the position is empty. */
@@ -98,9 +92,8 @@ object Positions {
     private fun ownerNow(ctx: Context): String? = SessionWallet.current(ctx)?.pubkey
 
     /**
-     * A row is this agent's business when the budget that bought it is the one that exists
-     * now. A row from before positions carried an owner has no claim either way: shown, and
-     * left for [reconcile] to adopt or drop against the chain.
+     * Rows bought by the current budget. Rows from before positions had an owner are shown
+     * and left for [reconcile] to adopt or drop.
      */
     private fun mine(p: Position, owner: String?) = p.owner.isEmpty() || p.owner == owner
 
@@ -118,11 +111,7 @@ object Positions {
         prefs(ctx).edit().putString(KEY, arr.toString()).apply()
     }
 
-    /**
-     * Record a buy. Adding to a mint we already hold merges into one average rather than
-     * two lots: the loop sells a whole holding at once, so two entry prices would only be a
-     * way to disagree with ourselves about what we paid.
-     */
+    /** Record a buy. A repeat buy of a held mint merges into one average: the loop sells whole holdings. */
     fun add(ctx: Context, p: Position) {
         val list = stored(ctx).toMutableList()
         val i = list.indexOfFirst { it.mint == p.mint && it.owner == p.owner && !it.closing }
@@ -133,7 +122,7 @@ object Positions {
                 costLamports = old.costLamports + p.costLamports,
                 takeProfitPct = p.takeProfitPct, stopLossPct = p.stopLossPct,
                 triggerOrder = p.triggerOrder ?: old.triggerOrder,
-                // Money went in again, so whatever went wrong last time is history.
+                // New money in: reset the failure state.
                 fails = 0, lastError = null,
             )
         } else {
@@ -162,11 +151,9 @@ object Positions {
     fun setTrigger(ctx: Context, mint: String, order: String?) = edit(ctx, mint) { it.copy(triggerOrder = order) }
 
     /**
-     * Say something about a position without calling it a failed sale. [noteFailure] bumps
-     * the retry counter and pushes the row into the slow lane, right for a sale that did not
-     * work and wrong for "Jupiter will not take an order this small", which is a fact to
-     * read, not something to retry. [noteFailure] returns the run of failures, so the caller
-     * can speak once instead of every ninety seconds.
+     * Set a message without counting a failure, for facts like "Jupiter won't take an order this
+     * small". [noteFailure] bumps the retry counter and returns the failure run, so the caller
+     * can report once instead of every tick.
      */
     fun note(ctx: Context, mint: String, why: String?) = edit(ctx, mint) { it.copy(lastError = why) }
 
@@ -179,9 +166,8 @@ object Positions {
     fun clear(ctx: Context) = prefs(ctx).edit().remove(KEY).apply()
 
     /**
-     * Read a buy out of the receipt just signed. The receipt is what the simulation said
-     * would happen, not what the model claimed. A swap that paid SOL for exactly one other
-     * token is a buy; anything else this store cannot describe, and leaves alone.
+     * Read a buy from the signed receipt (the simulation, not the model's claim). Only a swap
+     * of SOL for exactly one other token counts; anything else returns null.
      */
     fun fromReceipt(receipt: Receipt, owner: String, takeProfitPct: Int, stopLossPct: Int, at: Long = System.currentTimeMillis()): Position? {
         fun isSol(m: String) = m == NATIVE_SOL_MINT || m == com.clearsign.core.AgentPolicy.WSOL
@@ -191,10 +177,9 @@ object Positions {
         val leg = got.singleOrNull() ?: return null
         val units = leg.rawAmount / Math.pow(10.0, leg.decimals.toDouble())
         if (units <= 0) return null
-        // The rent of the accounts this buy opened is a deposit, not a price: it comes back when
-        // the empty account is closed after the sale. Counted as cost, a new coin on a small slice
-        // started under its own stop: CYBERLEEK flat at -0.3% was sold on the first tick "at the
-        // stop, -22.7%", 0.001488 of rent in 0.006658 (30 Sep, read on chain).
+        // Rent for accounts this buy opened is a deposit, refunded when the account closes.
+        // Counted as cost, a small buy starts below its stop: 0.001488 rent on 0.006658
+        // read as -22.7% on the first tick (30 Sep, on chain).
         val rent = receipt.distributions.filter { it.isNewAccount }.sumOf { kotlin.math.abs(it.delta.rawAmount) }
         return Position(
             mint = leg.mint, symbol = leg.symbol, decimals = leg.decimals, units = units, owner = owner,
@@ -206,10 +191,9 @@ object Positions {
     }
 
     /**
-     * Keep the book in step with the chain, for every move the collar signed whoever
-     * proposed it: a buy opens or grows a position, a sale shrinks or closes it. Done here
-     * rather than in the loop, so a coin sold by hand from the chat leaves no ghost for the
-     * stop-loss to watch.
+     * Update the book for every signed move, whoever proposed it: a buy opens or grows a
+     * position, a sale shrinks or closes it. Done here, not in the loop, so a coin sold by
+     * hand from the chat leaves no stale row for the stop-loss.
      */
     fun applyReceipt(ctx: Context, receipt: Receipt, owner: String, takeProfitPct: Int, stopLossPct: Int) {
         fromReceipt(receipt, owner, takeProfitPct, stopLossPct)?.let { add(ctx, it); return }
@@ -220,7 +204,7 @@ object Positions {
             val pos = held[leg.mint] ?: continue
             val sold = -leg.rawAmount / Math.pow(10.0, leg.decimals.toDouble())
             val left = pos.units - sold
-            // A hair left over is dust from rounding, not a position.
+            // Under 2% left is rounding dust.
             if (left <= pos.units * 0.02) { remove(ctx, leg.mint); continue }
             val share = left / pos.units
             edit(ctx, leg.mint) {
@@ -229,17 +213,16 @@ object Positions {
         }
     }
 
-    // ---- keeping the book honest --------------------------------------------
+    // ---- reconciling with the chain -----------------------------------------
 
     /** What [reconcile] decided: what stays, and what was never really there. */
     data class Reconciled(val keep: List<Position>, val gone: List<Position>, val changed: Boolean)
 
     /**
-     * Put the book next to the chain and believe the chain. A simulation is a promise about one
-     * moment; since then a budget can close, an order fill, a coin be sold from the chat, and a stale
-     * row is an agent trying to sell what it does not have. [onChain] is raw units held by [owner],
-     * [parkedMints] the coins inside a live Trigger order, [liveByMint] Jupiter's active orders (null
-     * when not asked). Four outcomes: not our budget, ignore; coins on chain, adopt at the chain's amount; no coins but a live order, parked; neither, off the list with the reason.
+     * Align the book with the chain; the chain wins. [onChain] is raw units held by [owner],
+     * [parkedMints] coins inside a live Trigger order, [liveByMint] Jupiter's active orders (null
+     * when not asked). Another budget's row goes; coins on chain are kept at the chain's amount;
+     * no coins but a live order means parked; neither means gone.
      */
     fun reconcile(book: List<Position>, owner: String, onChain: Map<String, Long>, parkedMints: Set<String>, liveByMint: Map<String, String>? = null): Reconciled {
         val keep = ArrayList<Position>()
@@ -253,16 +236,14 @@ object Positions {
                 // entry and would sell at a target never reached. Only shrink, cost down with it.
                 val units = minOf(p.units, held)
                 val shrunk = units < p.units * 0.999
-                // The coins are in the wallet, so no order holds them. The key goes only once Jupiter
-                // confirms the order is gone: an accepted cancel that never landed once left coins in
-                // escrow and the row keyless, unreachable.
+                // Coins in the wallet, so no order holds them. Drop the order key only once Jupiter
+                // confirms it gone: an accepted cancel can fail to land, leaving coins in escrow.
                 val stale = liveByMint != null && p.triggerOrder != null && p.triggerOrder !in liveByMint.values
                 val fixed = p.copy(
                     owner = owner, parked = false,
                     units = if (shrunk) units else p.units,
                     costLamports = if (shrunk && p.units > 0) (p.costLamports * (units / p.units)).toLong() else p.costLamports,
-                    // The coins are still here, so nothing was sold, so a row left
-                    // half closed by a tick that died is just a row.
+                    // Coins still here, nothing sold: clear a closing flag left by a dead tick.
                     closing = false,
                     triggerOrder = if (stale) null else p.triggerOrder,
                 )

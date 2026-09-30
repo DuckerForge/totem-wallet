@@ -6,11 +6,9 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * The conversation, kept between openings. It lived in a `remember` and was gone when the sheet
- * closed, and the transcript is the audit trail: every tool the model ran leaves a line saying
- * what it tried and what Totem decided. On disk and nowhere else: a wallet whose claim is that
- * nothing leaves the phone does not ship this to a server, and the budget key exists here only.
- * Filed per wallet, so switching accounts does not show another one's conversation.
+ * The chat, persisted across openings. The transcript is the audit trail: every tool the
+ * model ran leaves a line with what it tried and what Totem decided. Stored on the phone
+ * only, never on a server, and filed per wallet so switching accounts hides the other chat.
  */
 object ChatHistory {
     private const val DIR = "chat"
@@ -18,10 +16,7 @@ object ChatHistory {
     /** Kept on disk. Old turns are history, not context. */
     private const val KEEP = 120
 
-    /**
-     * How much of it the model gets back. Free tiers meter tokens per minute, and re-sending an
-     * afternoon of conversation on every message spends that on nothing. Recent turns carry the thread.
-     */
+    /** Turns sent back to the model. Free tiers meter tokens per minute, so only recent ones. */
     const val CONTEXT_TURNS = 16
 
     private fun file(ctx: Context, wallet: String?): File {

@@ -51,11 +51,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The home-screen "Wallet health" widget: a score ring, the SOL balance with its value and
- * the top thing to fix, from the same engine as the in-app card, in the user's theme.
- * Values are cached in prefs so it draws instantly; data refreshes when stale, from the
- * Watchtower worker, on foreground, and on the widget's own refresh tap. Two layouts:
- * narrow shows ring and balance, wide adds the reclaimable rent and the alert line.
+ * Home-screen "Wallet health" widget: score ring, SOL balance and value, top thing to fix, from
+ * the same engine as the in-app card, in the user's theme. Values are cached in prefs so it draws
+ * instantly; refreshed when stale, by the Watchtower worker, on foreground and on its refresh tap.
+ * Five sizes, see the companion.
  */
 class HealthWidget : GlanceAppWidget() {
 
@@ -85,13 +84,9 @@ class HealthWidget : GlanceAppWidget() {
         }
         val open = androidx.glance.appwidget.action.actionStartActivity(Intent(ctx, MainActivity::class.java))
 
-        // On the card colour, not the page's: a launcher is dark too, and the widget used to
-        // melt into it. The ring carries the brand gradient.
-        //
-        // The corner is the system's, not a number of ours. Android clips a widget to its own
-        // radius, so a 22 dp rectangle inside that clip left a rim of the launcher's default
-        // widget background showing all the way round: the halo. Asking for the same radius
-        // makes our panel and the clip one shape.
+        // Card colour, not page colour: launchers are dark too and the widget blended in.
+        // System corner radius: Android clips widgets to it, and our own 22 dp left a rim of the
+        // launcher's default widget background all around.
         Column(
             GlanceModifier.fillMaxSize().background(p.card)
                 .cornerRadius(android.R.dimen.system_app_widget_background_radius)
@@ -107,8 +102,7 @@ class HealthWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.width(10.dp))
                     Column(GlanceModifier.defaultWeight()) {
                         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            // The eyebrow names the app and the score in one breath:
-                            // the number is already in the ring, the word was not.
+                            // App name and "health"; the ring already shows the number.
                             Text(
                                 (ctx.getString(R.string.app_name) + "  ·  " + ctx.getString(R.string.widget_health)).uppercase(),
                                 style = TextStyle(color = ColorProvider(p.muted), fontSize = 9.sp, fontWeight = FontWeight.Bold),
@@ -259,10 +253,9 @@ class HealthWidget : GlanceAppWidget() {
 }
 
 /**
- * The widget's own refresh tap. The work is not done here: a widget tap is a broadcast with ten
- * seconds to live, and this refresh makes four network calls in a row (token accounts, balance,
- * price, rate). It happened, 18 Sep 2026, on the home screen: `am_anr ... Broadcast of Intent {
- * dat=glance-action:/… }`. So this only enqueues; WorkManager has the time, and repaints when done.
+ * Widget refresh tap. Only enqueues: a tap is a broadcast with 10 s to live, and the refresh makes
+ * four network calls in a row (token accounts, balance, price, rate). Inline it hit an ANR:
+ * `am_anr ... Broadcast of Intent { dat=glance-action:/… }`.
  */
 class RefreshHealthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
@@ -287,11 +280,9 @@ object HealthWidgetData {
     private const val PREFS = "clearsign_widget"
 
     /**
-     * When the snapshot is too old to redraw and the chain is asked. It was fifteen minutes, and
-     * the widget wakes every half hour, so every wake reread everything: ten calls, forty-eight
-     * times a day, more than an idle agent, for people who never touched the agent. Two hours,
-     * because this is a number glanced at on the home screen, and it refreshes anyway on app
-     * open, after every agent move, and on every Watchtower round.
+     * Snapshot age before the widget refetches. At 15 min, with the widget waking every 30, each
+     * wake made ten calls, 48 times a day, more than an idle agent. It also refreshes on app open,
+     * after every agent move and on every Watchtower round.
      */
     private const val STALE_MS = 2 * 3600_000L
 
@@ -331,9 +322,8 @@ object HealthWidgetData {
         val ctx = AppLocale.localized(context)
         val p = SessionWallet.policy(ctx) ?: return null
         val h = SessionWallet.history(ctx)
-        // While the loop is running, what it is doing beats what it is allowed to
-        // do: "2 open, sold BONK +31%" tells you more from a lock screen than a
-        // mode and a daily cap. Both surfaces read this line, so they agree.
+        // While the loop runs, show what it is doing ("2 open, sold BONK +31%") rather than
+        // mode and cap. Widget and bubble share this line.
         if (TraderLoop.config(ctx).on) {
             val open = Positions.open(ctx).size
             val last = TraderLoop.lastNote(ctx) ?: ctx.getString(R.string.trader_idle)
@@ -365,9 +355,8 @@ object HealthWidgetData {
         val ctx = AppLocale.localized(context)
         val owner = Settings.watchWallet(ctx) ?: return@withContext
         val rpc = SolanaRpc.urlFor(null)
-        // A node that did not answer is not a wallet with nothing in it: the lenient reader made a
-        // failed call an empty list, the score became 100, "all clean" overwrote a true snapshot on
-        // the home screen. Keep what we had and try later.
+        // A failed call is not an empty wallet: read leniently it scored 100 and "all clean"
+        // replaced a real snapshot. Keep the old one and retry later.
         val accounts = runCatching { SolanaRpc.tokensOf(rpc, owner) }.getOrNull() ?: return@withContext
         val health = WalletHealth.of(owner, accounts)
         val lamports = runCatching { SolanaRpc.getBalance(rpc, owner) }.getOrNull() ?: load(ctx)?.lamports ?: 0L

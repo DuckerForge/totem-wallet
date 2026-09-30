@@ -40,11 +40,8 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 /**
- * The chains: eight in front, the rest behind a search. The first version put all two
- * hundred and seven pills on the page: not a choice, a wall, and you end up picking whatever
- * is under your thumb (live: EVMOS EVM NETWORK, which nobody wanted), in RocketX's order,
- * Robinhood Chain third. Here [RocketX.POPULAR] in front, the rest alphabetical with a
- * search: alphabetical is the one order where you already know where to look.
+ * Chain picker: [RocketX.POPULAR] first, the rest alphabetical behind a search. All 207
+ * chains as pills in RocketX's order was a wall, and people tapped whatever was under the thumb.
  */
 @Composable
 internal fun ChainPickerSheet(
@@ -59,8 +56,7 @@ internal fun ChainPickerSheet(
     val popular = remember(all) { RocketX.popular(all) }
     val rest = remember(all, popular) { (all - popular.toSet()).sortedBy { it.name.lowercase(Locale.ROOT) } }
     val q = query.trim().lowercase(Locale.ROOT)
-    // While searching, the split between the usual and the rest is gone: whoever
-    // types three letters wants one list of things containing them.
+    // While searching, show one flat list of matches.
     val hits = remember(q, all) {
         if (q.isEmpty()) emptyList()
         else (popular + rest).filter { it.name.lowercase(Locale.ROOT).contains(q) || it.native.lowercase(Locale.ROOT).contains(q) || it.short.lowercase(Locale.ROOT).contains(q) }
@@ -104,7 +100,7 @@ private fun SectionLabel(text: String) {
     Text(text.uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
 }
 
-/** One row: the name as the people living there call it, and the coin you pay with up there. */
+/** One row: the chain's display name and its native gas coin. */
 @Composable
 private fun ChainRow(n: RocketX.Network, on: Boolean, onClick: () -> Unit) {
     Row(
@@ -119,10 +115,7 @@ private fun ChainRow(n: RocketX.Network, on: Boolean, onClick: () -> Unit) {
     }
 }
 
-/**
- * "BITCOIN Network" and "APTOS MAINNET" are database row names: all caps on a long list
- * shouts, and "Network", "Chain" and "Mainnet" repeat on half the entries and distinguish nothing.
- */
+/** Tidy RocketX names ("BITCOIN Network", "APTOS MAINNET"): drop the generic suffix, title-case all caps. */
 internal fun chainLabel(n: RocketX.Network): String {
     val bare = n.name
         .replace(Regex("(?i)\\s+(network|chain|mainnet)$"), "")

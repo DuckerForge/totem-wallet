@@ -11,11 +11,10 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /**
- * What puts the trader back on its feet. A foreground service is the right host for the loop
- * but not immortal: memory pressure kills it, a reboot ends it, and a stop-loss would quietly
- * go unwatched. Two guards: [Keeper], a fifteen-minute worker asking "is it still running",
- * and [BootReceiver], resuming at first unlock (not direct-boot aware, the settings are encrypted
- * until then). Both only start the service; the decision to trade is [TraderLoop.config].
+ * Restarts the trader. The loop's foreground service can die (memory pressure, reboot), leaving
+ * a stop-loss unwatched. Two guards: [Keeper], a 15-minute worker checking it runs, and
+ * [BootReceiver] at first unlock (not direct-boot aware: settings are encrypted until then).
+ * Both only start the service; whether to trade is [TraderLoop.config].
  */
 object TraderKeeper {
     private const val WORK = "apex-trader-keeper"
@@ -41,7 +40,7 @@ object TraderKeeper {
     class Keeper(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
         override suspend fun doWork(): Result {
             val ctx = AppLocale.localized(applicationContext)
-            // A budget past its day closes itself: sell, close, bring home, say the account.
+            // An expired budget closes itself: sell, close accounts, sweep home, log it.
             SessionWallet.current(ctx)?.takeIf { it.expired }?.let {
                 val owner = Settings.watchWallet(ctx)
                 if (owner != null) {

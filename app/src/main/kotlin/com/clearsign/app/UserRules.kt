@@ -8,16 +8,16 @@ import java.io.File
 import java.util.Locale
 
 /**
- * The person's own rules, in their own words, in a file they wrote: coins they never touch, a
- * floor on holders, a rule about age. Plain Markdown, read by whichever model the person pays
- * for; the chat gets it as standing instructions, the loop asks one question per coin about to
- * be bought. The rules can only close doors: caps, destination list and vault are out of reach, a file saying "buy everything" buys nothing more. As in [CoinCheck], unknown never blocks.
+ * The user's trading rules, a Markdown file they wrote (coins to avoid, holder floor, age).
+ * Read by the user's configured model: the chat gets them as standing instructions, the loop
+ * asks once per coin before buying. Rules can only forbid; caps, destination list and vault
+ * are out of their reach. As in [CoinCheck], unknown never blocks.
  */
 object UserRules {
     private const val FILE = "agent_rules.md"
     private const val PREFS = "apex_rules"
 
-    /** A serious page of rules, and small enough not to eat a free tier's minute on every question. */
+    /** A full page of rules, small enough to stay inside a free tier's per-minute limit on each question. */
     const val MAX_CHARS = 12_000
 
     fun get(ctx: Context): String? = runCatching {
@@ -66,7 +66,7 @@ object UserRules {
             "\n\nThe person's own rules, in their words. They apply on top of everything above and can only forbid: nothing here raises a limit or authorises anything the collar does not allow. When one of these rules stops a move, say so and quote the rule.\n"
         }) + "---\n" + rules.trim() + "\n---"
 
-    /** What the judge is told about its job. The coin itself is the user message. */
+    /** System prompt for the per-coin rules check; the coin goes in the user message. */
     fun judgeSystem(rules: String, italian: Boolean): String =
         "You are the last check before an automated wallet spends real money on a Solana coin. " +
             "Below are the wallet owner's own trading rules. Judge the one coin described in the user message " +
@@ -78,7 +78,7 @@ object UserRules {
             "If a rule is unclear, OK. Do not guess, do not add advice, do not explain an OK.\n\n" +
             "The owner's rules:\n---\n" + rules.trim() + "\n---"
 
-    /** The coin as lines a model can read and a person could check. Pure, so the test sees exactly what leaves the phone. */
+    /** The coin as plain lines for the model. Pure, so the test sees exactly what leaves the phone. */
     fun facts(t: Candidate, notes: List<String>, lane: String, sliceLamports: Long): String {
         fun money(v: Double?) = v?.let { String.format(Locale.ROOT, "$%,.0f", it) } ?: "unknown"
         fun pct(v: Double?) = v?.let { String.format(Locale.ROOT, "%+.1f%%", it) } ?: "unknown"
@@ -117,7 +117,7 @@ object UserRules {
         object Unknown : Verdict()
     }
 
-    /** One line in, one verdict out. Anything unreadable is Unknown, not Ok: a verdict we could not read is not a verdict. */
+    /** Parse the one-line reply. Anything unreadable is Unknown, never Ok. */
     fun parse(text: String?, fallbackReason: String = ""): Verdict {
         val t = text?.trim().orEmpty()
         return when {

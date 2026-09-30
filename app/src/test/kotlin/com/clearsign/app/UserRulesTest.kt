@@ -20,7 +20,7 @@ class UserRulesTest {
         assertTrue(UserRules.parse("") is UserRules.Verdict.Unknown)
     }
 
-    /** What leaves the phone about a coin: numbers a person could check, nothing invented. */
+    /** The facts sent to the model are the coin's own numbers, nothing invented. */
     @Test fun theFactsAreTheCoinsOwnNumbers() {
         val c = Candidate(
             mint = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol = "Bonk", name = "Bonk", decimals = 5,
@@ -46,7 +46,7 @@ class UserRulesTest {
         assertTrue(f.contains("price 1h: unknown, 24h: unknown"), f)
     }
 
-    /** The chat block and the judge brief both carry the rules and the one promise: they only forbid. */
+    /** Both the chat block and the rules-check prompt carry the rules and say they can only forbid. */
     @Test fun bothBriefsCarryTheRulesAndThePromise() {
         val rules = "Mai monete sotto 500 detentori."
         val chat = UserRules.chatBlock(rules, italian = true)

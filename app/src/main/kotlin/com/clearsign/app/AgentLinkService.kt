@@ -21,11 +21,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The agent's hands on the phone while the app is closed. Two jobs keep the service up: the
- * link, polling the bridge for work from an agent on a computer and handing each job to
- * [AgentBroker]; and the trader, [TraderLoop] on its own clock. A foreground service, not a
- * worker: fifteen minutes is WorkManager's floor, and a stop-loss that looks every fifteen minutes
- * is not one. The permanent notification is the right trade and the kill switch: Pause, Stop trading, Revoke.
+ * Runs the agent while the app is closed. Two jobs keep it up: the link (polls the bridge for jobs
+ * from an agent on a computer, hands each to [AgentBroker]) and [TraderLoop] on its own clock.
+ * A foreground service, not a worker: WorkManager's 15 min floor is too slow for a stop-loss.
+ * The persistent notification is the kill switch: Pause, Stop trading, Revoke.
  */
 class AgentLinkService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -77,8 +76,7 @@ class AgentLinkService : Service() {
             var greeted = false
             var backoff = 3_000L
             while (isActive) {
-                // No bridge linked is not a reason to shut down any more: the
-                // trader may be the only thing this service is holding up.
+                // No linked bridge is fine: the trader may be the only job keeping the service up.
                 val link = AgentLink.current(this@AgentLinkService) ?: run {
                     if (!TraderLoop.config(this@AgentLinkService).on) stopSelf()
                     return@launch
@@ -97,7 +95,7 @@ class AgentLinkService : Service() {
                 val verdict = runCatching { AgentBroker.handle(this@AgentLinkService, job) }
                     .getOrElse { e -> Log.e(TAG, "broker failed", e); AgentBroker.Verdict.Refused(e.message ?: "error") }
                 withContext(Dispatchers.IO) { AgentLink.report(link, job.id, verdict) }
-                // The collar's summary may have moved (spend, mode): tell the bridge.
+                // The policy summary may have changed (spend, mode): tell the bridge.
                 withContext(Dispatchers.IO) { AgentLink.hello(this@AgentLinkService, link) }
                 refreshNotification()
             }
@@ -172,8 +170,7 @@ class AgentLinkService : Service() {
                     action(if (paused) ACTION_RESUME else ACTION_PAUSE, 1),
                 ).build(),
             )
-        // Stopping the trading is a different thing from pausing the agent, and
-        // from the lock screen it has to be one tap, not a trip into the app.
+        // Stop trading is separate from Pause, and one tap from the lock screen.
         if (trading) b.addAction(Notification.Action.Builder(null, getString(R.string.trader_stop_action), action(ACTION_TRADE_STOP, 3)).build())
         else if (link != null) b.addAction(Notification.Action.Builder(null, getString(R.string.agent_revoke), action(ACTION_REVOKE, 2)).build())
         return b.build()

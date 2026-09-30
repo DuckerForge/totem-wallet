@@ -119,11 +119,9 @@ object Ledger {
     fun month(ctx: Context, ym: String): List<LedgerEntry> = synchronized(lock) { readMonth(ctx, ym) }
 
     /**
-     * The names this wallet has carried. A row stores the app's name as it was when it signed,
-     * which is right for a dApp and wrong for us: those rows were signed by this same app under
-     * an older name, and a ledger that says "Velum" next to an entry made by Totem reads like a
-     * third party was involved. Rendering maps them to the name on the screen today; what is on
-     * disk is left alone, because the file is the record.
+     * Names this wallet has carried. A row stores the signer's name at signing time, right for a
+     * dApp but not for us: old rows say "Velum" and would read as a third party. Rendering maps
+     * them to today's name; the file on disk is the record and stays as is.
      */
     private val OURS = setOf("Totem", "Velum", "Apex", "ClearSign", "Seeker Wallet")
 

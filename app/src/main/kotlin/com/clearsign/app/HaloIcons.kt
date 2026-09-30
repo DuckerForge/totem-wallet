@@ -39,7 +39,7 @@ enum class HIcon {
     SEAL,
     // brand: the carrier pigeon in a shield
     PIGEON,
-    /** The widget: a screen with one tile set down on it, which is what a widget is. */
+    /** The widget: a screen with one tile on it. */
     WIDGET,
     // swap: two arrows
     SWAP,
@@ -49,13 +49,13 @@ enum class HIcon {
     SCOUT,
     /** The market: a line that has been going up, or one that has been going down. */
     CHART, CHART_DOWN,
-    /** The agent: a small head with an antenna. Something that thinks, in a box you can see. */
+    /** The agent: a small head with an antenna. */
     AGENT,
     /** A bridge: two piers and the arc between them. */
     BRIDGE,
     // navigation / ledger
     RECEIPT, SETTINGS, FILTER, DOWNLOAD, TAG, NOTE, CALENDAR, PDF,
-    // refresh: three quarters of an arc with a tip. HISTORY is a clock and said something else.
+    // refresh: three quarters of an arc with a tip (HISTORY is the clock).
     REFRESH,
 }
 
@@ -159,7 +159,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 line(5.5f, 21f, 18.5f, 21f)
             }
             HIcon.SEAL -> {
-                // A wax seal with an eye: look first, then seal.
+                // A wax seal with an eye.
                 val inner = if (tint == Halo.ground) Halo.mint else Halo.ground
                 path(fill = true) { moveTo(22.50f, 12.00f); quadTo(22.50f, 12.00f, 21.86f, 13.05f); quadTo(21.21f, 14.10f, 21.34f, 15.33f); quadTo(21.46f, 16.56f, 20.42f, 17.22f); quadTo(19.39f, 17.89f, 18.97f, 19.05f); quadTo(18.55f, 20.21f, 17.32f, 20.36f); quadTo(16.10f, 20.51f, 15.22f, 21.38f); quadTo(14.34f, 22.24f, 13.17f, 21.84f); quadTo(12.00f, 21.45f, 10.83f, 21.84f); quadTo(9.66f, 22.24f, 8.78f, 21.38f); quadTo(7.90f, 20.51f, 6.68f, 20.36f); quadTo(5.45f, 20.21f, 5.03f, 19.05f); quadTo(4.61f, 17.89f, 3.58f, 17.22f); quadTo(2.54f, 16.56f, 2.66f, 15.33f); quadTo(2.79f, 14.10f, 2.14f, 13.05f); quadTo(1.50f, 12.00f, 2.14f, 10.95f); quadTo(2.79f, 9.90f, 2.66f, 8.67f); quadTo(2.54f, 7.44f, 3.58f, 6.78f); quadTo(4.61f, 6.11f, 5.03f, 4.95f); quadTo(5.45f, 3.79f, 6.68f, 3.64f); quadTo(7.90f, 3.49f, 8.78f, 2.62f); quadTo(9.66f, 1.76f, 10.83f, 2.16f); quadTo(12.00f, 2.55f, 13.17f, 2.16f); quadTo(14.34f, 1.76f, 15.22f, 2.62f); quadTo(16.10f, 3.49f, 17.32f, 3.64f); quadTo(18.55f, 3.79f, 18.97f, 4.95f); quadTo(19.39f, 6.11f, 20.42f, 6.78f); quadTo(21.46f, 7.44f, 21.34f, 8.67f); quadTo(21.21f, 9.90f, 21.86f, 10.95f); close() }
                 s.drawCircle(inner, 7.6f * u, p(12f, 12f))
@@ -168,8 +168,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 s.drawCircle(tint, 2.2f * u, p(12f, 12f))
             }
             HIcon.PIGEON -> {
-                // A carrier pigeon inside a shield: it delivers exactly what it
-                // was handed, and the shield is what checks it first.
+                // A carrier pigeon inside a shield.
                 path(close = true) {
                     moveTo(4f, 10.2f); quadTo(12f, 8.2f, 20f, 10.2f)
                     cubicTo(20.4f, 15.4f, 17f, 19.6f, 12f, 21.6f)
@@ -263,8 +262,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.CHECK -> poly(5f, 12.5f, 10f, 17.5f, 19.5f, 7f)
             HIcon.WARNING -> { path { moveTo(12f, 3.5f); lineTo(21.5f, 20f); lineTo(2.5f, 20f); close() }; line(12f, 9.5f, 12f, 14f); dot(12f, 17f, 1.1f) }
             HIcon.PEN -> { path { moveTo(4f, 20f); lineTo(8f, 20f); lineTo(19.5f, 8.5f); lineTo(15.5f, 4.5f); lineTo(4f, 16f); close() }; line(13f, 7f, 17f, 11f) }
-            // The paper plane was 18 points and next to Receive, which takes 15, looked
-            // like another size. Now it sits in the same box as the others.
+            // Same 15-point box as Receive, so the two match in size.
             HIcon.SEND -> { path { moveTo(4.5f, 11.5f); lineTo(19.5f, 4.5f); lineTo(14.5f, 19.5f); lineTo(11.6f, 13f); close() }; line(11.6f, 13f, 19.5f, 4.5f) }
             HIcon.SIGN -> {
                 path { moveTo(14f, 3f); lineTo(7f, 3f); quadTo(5.5f, 3f, 5.5f, 4.5f); lineTo(5.5f, 19.5f); quadTo(5.5f, 21f, 7f, 21f); lineTo(17f, 21f); quadTo(18.5f, 21f, 18.5f, 19.5f); lineTo(18.5f, 7.5f); close() }
@@ -280,18 +278,15 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             HIcon.CHEVRON_DOWN -> poly(6f, 9f, 12f, 15f, 18f, 9f)
             HIcon.CHEVRON_LEFT -> poly(15f, 6f, 9f, 12f, 15f, 18f)
             HIcon.MORE -> { dot(6f, 12f, 1.6f); dot(12f, 12f, 1.6f); dot(18f, 12f, 1.6f) }
-            // A screen, and one tile set down in its corner. The pigeon was standing in for this
-            // and read as a duck, which is a fair thing to say about a pigeon at 20 dp.
+            // A screen with one tile in its corner.
             HIcon.WIDGET -> {
                 poly(4.5f, 4.5f, 19.5f, 4.5f, 19.5f, 19.5f, 4.5f, 19.5f, close = true)
                 poly(7.5f, 7.5f, 13f, 7.5f, 13f, 13f, 7.5f, 13f, close = true, fill = true)
             }
             HIcon.CLOSE -> { line(6.5f, 6.5f, 17.5f, 17.5f); line(17.5f, 6.5f, 6.5f, 17.5f) }
             HIcon.SEARCH -> { circle(10.5f, 10.5f, 6.2f); line(15.1f, 15.1f, 20.5f, 20.5f) }
-            // The search lens with what the crowd is doing drawn inside it. It used to be its
-            // own Canvas in the home row, in a box three points wider than every other icon and
-            // filling nine tenths of it where the others fill two thirds: next to Send it read
-            // as a different size, because it was one. Here it is on the same grid as the rest.
+            // The search lens with the crowd's line inside, on the same grid as the rest so it
+            // matches Send in size.
             HIcon.SCOUT -> {
                 s.drawCircle(tint.copy(alpha = 0.10f), 6.2f * u, p(10.5f, 10.5f))
                 circle(10.5f, 10.5f, 6.2f)
@@ -308,8 +303,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 arc(6.4f, 12f, 11.8f, -60f, 120f)
             }
             HIcon.HOLD -> { circle(12f, 12f, 8f); circle(12f, 12f, 3.2f, fill = true) }
-            // The one gesture everybody already knows for "keep an eye on this".
-            // Drawn rather than borrowed: the whole icon set is one hand.
+            // The usual "follow this" star, drawn in the set's own stroke.
             HIcon.STAR -> poly(12.0f, 2.8f, 14.3f, 8.8f, 20.7f, 9.2f, 15.7f, 13.2f, 17.4f, 19.4f, 12.0f, 15.9f, 6.6f, 19.4f, 8.3f, 13.2f, 3.3f, 9.2f, 9.7f, 8.8f, close = true)
             HIcon.STAR_FILLED -> poly(12.0f, 2.8f, 14.3f, 8.8f, 20.7f, 9.2f, 15.7f, 13.2f, 17.4f, 19.4f, 12.0f, 15.9f, 6.6f, 19.4f, 8.3f, 13.2f, 3.3f, 9.2f, 9.7f, 8.8f, close = true, fill = true)
             HIcon.CHART -> {
@@ -328,12 +322,8 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
                 path { moveTo(9f, 16.6f); quadTo(12f, 18.2f, 15f, 16.6f) }
             }
             HIcon.BRIDGE -> {
-                // It was a bridge: arch, piers and road, drawing the word, not the thing. At twenty-four
-                // points it read "bridge over a river", and what happens here is money crossing to another
-                // chain and something coming back: two arcs and two tips, one going, one returning. They
-                // were two colors, cyan and amber, but the eight home circles are neutral on purpose: one
-                // lit icon turns the accent into decoration. The two directions still differ within one
-                // tint: the returning one is dimmer.
+                // Money crossing to another chain and coming back: two arcs with tips, the return
+                // one dimmer. One tint, since the home row icons stay neutral.
                 path { moveTo(4.5f, 12f); quadTo(12f, 3.8f, 19.5f, 12f) }
                 poly(16.1f, 10.8f, 19.5f, 12f, 18.6f, 8.5f)
                 two(tint.copy(alpha = 0.5f)) {
@@ -352,7 +342,7 @@ private class G(val s: DrawScope, val u: Float, val tint: Color, val sw: Float) 
             }
             HIcon.HISTORY -> { arc(12f, 12f, 8f, -150f, 300f); poly(3f, 5f, 3.8f, 10f, 8.5f, 9f); line(12f, 8f, 12f, 12.5f); line(12f, 12.5f, 15.5f, 14.5f) }
             HIcon.REFRESH -> { arc(12f, 12f, 8f, -40f, 300f); line(18.1f, 6.9f, 18.6f, 2.6f); line(18.1f, 6.9f, 22.2f, 7.6f) }
-            // Two whole people, one in front: the list of them, not the exchange.
+            // Two people, one in front.
             HIcon.PEOPLE -> { circle(8.5f, 8.5f, 3.2f); path { moveTo(2.5f, 20f); quadTo(2.5f, 14.2f, 8.5f, 14.2f); quadTo(14.5f, 14.2f, 14.5f, 20f) }; circle(16.6f, 7.4f, 2.6f); path { moveTo(15.2f, 12.4f); quadTo(21.6f, 12.6f, 21.6f, 19f) } }
             HIcon.CONTACTS -> { circle(9f, 8.5f, 3.5f); path { moveTo(3f, 20f); quadTo(3f, 14f, 9f, 14f); quadTo(15f, 14f, 15f, 20f) }; arc(16f, 8.5f, 3.5f, -80f, 160f); path { moveTo(17f, 14.2f); quadTo(21f, 15f, 21f, 20f) } }
             HIcon.INFO -> { circle(12f, 12f, 8.5f); line(12f, 11f, 12f, 16.5f); dot(12f, 8f, 1.1f) }

@@ -20,10 +20,8 @@ object Pda {
     }
 
     // ---- ed25519 point decompression (RFC 8032 §5.1.3) --------------------------
-    // `BigInteger.TWO` exists from API 33 and minSdk is 31. This is an `object`: a missing field
-    // does not fail one call, it fails class initialization and everything deriving a PDA (token
-    // accounts, swap, burn, rent). On Android 12 the app would never have sent a coin; on the
-    // Seeker, API 34, it did not show.
+    // No `BigInteger.TWO`: it is API 33 and minSdk is 31. In an `object` a missing field fails
+    // class init, and with it every PDA derivation (token accounts, swap, burn, rent).
     private val TWO = BigInteger.valueOf(2)
     private val P = TWO.pow(255).subtract(BigInteger.valueOf(19))
     private val D = BigInteger.valueOf(-121665).multiply(BigInteger.valueOf(121666).modInverse(P)).mod(P)

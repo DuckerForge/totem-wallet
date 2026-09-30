@@ -65,11 +65,10 @@ object SolanaTx {
     }
 
     /**
-     * A transaction may declare at most this many signatures. The wire format allows far more,
-     * and `count * 64` on a large one overflows to a negative offset that slips past a `<= size`
-     * check and blows up inside the copy. Not arbitrary: a message cannot hold more signers than
-     * accounts, and the account list is one byte. [messageBytes] below is everything after the
-     * signature array, the bytes an ed25519 signature covers: the Seed Vault signs exactly what it is handed.
+     * Max signatures a transaction may declare. The wire format allows more, and `count * 64` can
+     * overflow to a negative offset that passes a `<= size` check. A message cannot have more
+     * signers than accounts, and the account count is one byte. [messageBytes] below is all after
+     * the signature array: the bytes an ed25519 signature covers, what the Seed Vault signs.
      */
     private const val MAX_SIGNATURES = 255
 

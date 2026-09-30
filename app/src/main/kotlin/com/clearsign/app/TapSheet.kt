@@ -46,8 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Being paid by holding two phones together. The merchant types an amount, the phone emits
- * that request over NFC and shows it as a QR for phones that cannot tap. The honest line stays on screen: this asks, it does not take.
+ * Get paid by holding two phones together. The merchant types an amount; the phone emits the
+ * request over NFC and shows it as a QR for phones that can't tap. The screen says it only
+ * requests money, it cannot take any.
  */
 @Composable
 internal fun TapSheet(address: String, onDismiss: () -> Unit) {
@@ -111,8 +112,8 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(stringResource(R.string.tap_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
-                    // "Back to back" is about two phones: over the sticker it said the wrong thing.
-                    // Two lines in both modes, so the chips below do not move when the mode changes.
+                    // "Back to back" only fits phone to phone, so the sticker mode has its own line.
+                    // minLines = 2 keeps the chips below from jumping when the mode changes.
                     Text(stringResource(if (sticker) R.string.tap_sub_sticker else R.string.tap_sub), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, minLines = 2)
                 }
             }
@@ -140,8 +141,7 @@ internal fun TapSheet(address: String, onDismiss: () -> Unit) {
 
             if (!armed) TapAnimation(active = false)
 
-            // Phone-to-phone NFC is finicky and nobody guesses the geometry: the two
-            // antennas have to overlap, which means back against back.
+            // Phone-to-phone NFC needs the antennas to overlap, i.e. back to back. Nobody guesses it.
             Text(
                 stringResource(R.string.tap_how),
                 fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,

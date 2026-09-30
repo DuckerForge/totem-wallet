@@ -55,9 +55,8 @@ data class PortfolioView(
     val others: List<Holding> get() = holdings.filter { !it.isMain }
     /** How much the priced part of the portfolio moved over 24h, in [currency] (null when nothing has a change). */
     val change24hValue: Double? get() {
-        // A coin down a hundred percent divides by zero and poisons the sum with an infinity, so the
-        // header read NaN in exactly the case this app exists for. Yesterday's price of something now
-        // worth nothing cannot be known from a percentage, so that coin is left out.
+        // A coin down 100% divides by zero and turns the sum into NaN; its old price can't be
+        // recovered from the percentage, so skip it.
         val parts = holdings.filter { h ->
             h.fiat != null && h.change24h != null && (1 + h.change24h / 100.0) > 0.0
         }
@@ -76,10 +75,8 @@ object Portfolio {
     )
 
     /**
-     * The last view loaded, kept for the process. Switching tabs throws the page's composition
-     * away, so coming back started from null: the hero drew empty, the cards sat high, and half
-     * a second later the numbers shoved everything down. A total half a second stale is not a
-     * lie; a page that jumps is broken.
+     * Last view loaded, kept for the process. Switching tabs drops the composition, and starting
+     * from null made the page jump when the numbers arrived. Half a second stale beats a jump.
      */
     @Volatile private var last: Pair<String, PortfolioView>? = null
 
@@ -108,11 +105,9 @@ object Portfolio {
         last?.takeIf { it.first == "$owner|$currency" }?.second
 
     /**
-     * The same, and it survives the app being closed. Memory fixed the jump between tabs and
-     * nothing for the one that matters more: a cold open drew the page empty, and a second later
-     * the numbers shoved everything down, every morning, the first thing anybody sees. Same
-     * lesson as the crowd archive: a cache dies with the process, a written file does not. The
-     * page opens at its real size with yesterday's truth and the network corrects it in place.
+     * The same, persisted across app restarts, or a cold open draws the page empty and the
+     * numbers shove everything down a second later. Opens at its real size with the last known
+     * values; the network corrects them in place.
      */
     fun cached(ctx: Context, owner: String?, currency: String): PortfolioView? {
         val key = "$owner|$currency"

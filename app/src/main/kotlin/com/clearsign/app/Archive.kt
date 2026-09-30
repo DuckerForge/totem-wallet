@@ -3,11 +3,9 @@ package com.clearsign.app
 import org.json.JSONObject
 
 /**
- * The shared archive, read. No key: the public branch of Firebase where the worker writes
- * facts about the world, and a read costs nobody anything but traffic. What sits here the
- * worker asks once for everyone instead of every phone for itself. Each answer is kept in
- * memory for the time the caller says; a silent archive counts as nothing and the caller
- * falls back to the chain.
+ * Shared archive: the public, keyless Firebase branch where the worker writes facts fetched
+ * once for everyone. Answers are cached in memory for as long as the caller says; a missing
+ * answer is null and the caller falls back to the chain.
  */
 object Archive {
     val available: Boolean get() = BuildConfig.ARCHIVE_URL.isNotBlank()
@@ -15,7 +13,7 @@ object Archive {
     private data class Kept(val at: Long, val body: JSONObject?)
     private val mem = java.util.concurrent.ConcurrentHashMap<String, Kept>()
 
-    /** `/clearsign/<path>.json`, ricordato per [keepMs]. Bloccante: chiamare su IO. */
+    /** `/clearsign/<path>.json`, cached for [keepMs]. Blocking: call on IO. */
     fun read(path: String, keepMs: Long): JSONObject? {
         val base = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() } ?: return null
         val now = System.currentTimeMillis()
@@ -25,8 +23,7 @@ object Archive {
                 .apply { connectTimeout = 6_000; readTimeout = 12_000; setRequestProperty("Accept", "application/json") }
             if (c.responseCode !in 200..299) null else c.inputStream.bufferedReader().use { it.readText() }
         }.getOrNull()?.takeIf { it.isNotBlank() && it.trim() != "null" }?.let { runCatching { JSONObject(it) }.getOrNull() }
-        // Even a nothing is remembered, for a fifth of the time: an archive missing
-        // that row is not asked again every round.
+        // Cache misses too, for a fifth of the time, so a missing row isn't refetched every round.
         mem[path] = Kept(if (body == null) now - keepMs + keepMs / 5 else now, body)
         return body
     }

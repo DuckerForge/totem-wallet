@@ -9,11 +9,10 @@ import java.net.URL
 import java.util.Locale
 
 /**
- * The one check the winning bots have that our gates did not. Our gates read the mint:
- * authorities, holders, liquidity, whether it can be sold. Rugcheck reads the story around
- * it: whether the pool's LP is burned, locked or pullable tomorrow, whether the token copies
- * a verified one, whether the creator rugged before. Free, no key, one call per candidate.
- * Same contract as [CoinCheck]: unknown never blocks, only a clear "no" stops, and the trace says which.
+ * Rugcheck covers what our mint-level gates miss: whether the pool's LP is burned, locked or
+ * pullable, whether the token copies a verified one, whether the creator rugged before. Free,
+ * no key, one call per candidate. Same contract as [CoinCheck]: unknown never blocks, only a
+ * clear "no" stops, and the trace says which.
  */
 object RugCheck {
     private const val TAG = "Apex-Rug"
@@ -72,8 +71,8 @@ object RugCheck {
     }
 
     /**
-     * Rugcheck names its risks in English and the name lands inside an Italian sentence. The
-     * frequent ones read in Italian; the rest stay as they came, better than guessing.
+     * Italian names for Rugcheck's frequent risks, which arrive in English and go into an
+     * Italian sentence. The rest stay as they came.
      */
     private val italianRiskNames = mapOf(
         "freeze authority still enabled" to "autorità di freeze ancora attiva",

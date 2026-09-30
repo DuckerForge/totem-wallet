@@ -60,16 +60,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Seeing what the loop sees. A full screen that never sleeps, meant to sit next to a
- * computer: one chart per coin with the three lines that matter (entry, target, stop) and
- * the price ticking against them; under that the loop's own reasoning arriving line by
- * line. Everything already exists: the lines are [AgentTrace], written by the loop, not a
- * model narrating; prices Jupiter's, history GeckoTerminal's. Nothing new leaves the phone.
+ * Live view of the trading loop: a full screen that stays on, meant to sit next to a computer. One
+ * chart per coin with entry, target and stop against the price, and the loop's reasoning below.
+ * Lines come from [AgentTrace], written by the loop (no model narrating); prices from Jupiter,
+ * history from GeckoTerminal. Nothing new leaves the phone.
  */
 @Composable
 internal fun EyesDialog(onClose: () -> Unit, onStart: () -> Unit = {}) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        // The whole point is a screen that stays on.
+        // Keep the screen on.
         val view = LocalView.current
         LaunchedEffect(view) {
             (view.parent as? DialogWindowProvider)?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -82,9 +81,8 @@ internal fun EyesDialog(onClose: () -> Unit, onStart: () -> Unit = {}) {
 internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     val ctx = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
-    // The book and the loop's settings: read once here, then only on the two-second clock on
-    // IO. No file read sits in a composition, and the ten-times-a-second clock lives inside
-    // the rings, so the page recomposes only when something changed.
+    // Positions and loop config: read once here, then on the 2 s clock on IO, never in composition.
+    // The 10 Hz clock lives inside the rings, so the page recomposes only on change.
     var open by remember { mutableStateOf(Positions.open(ctx)) }
     var cfg by remember { mutableStateOf(TraderLoop.config(ctx)) }
     var tickAt by remember { mutableStateOf(TraderLoop.lastTickAt(ctx)) }
@@ -92,8 +90,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     var spot by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var busy by remember { mutableStateOf<String?>(null) }
     var said by remember { mutableStateOf<String?>(null) }
-    // A sale the chain prices lower than Jupiter's quote: the question stays
-    // on screen with the real number until the person answers or moves on.
+    // A sale priced on chain below Jupiter's quote: keep asking, with the real number, until answered.
     var worse by remember { mutableStateOf<Pair<Positions.Position, SessionActions.Sale.Worse>?>(null) }
     // A question typed under the thoughts, answered in the same stream.
     var question by remember { mutableStateOf("") }
@@ -103,18 +100,15 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     var voice by remember { mutableStateOf(Settings.eyesVoice(ctx)) }
     val scope = rememberCoroutineScope()
 
-    // The voice: on while this screen is open and the switch is on. It reads
-    // the lines worth hearing as they land, and nothing that was already there.
+    // Voice: on while this screen is open and the switch is on. Reads only new lines.
     DisposableEffect(voice) {
         if (voice) Voice.warm(ctx)
         onDispose { Voice.stop() }
     }
     val scanning = stringResource(R.string.trace_scanning)
     /**
-     * The voice says what counts, not everything. Reading every line, it started, stopped
-     * halfway, restarted on another: a machine that stutters. Things done with money are always
-     * said, the ones you want to hear from the other room; of the rest, one line every twelve
-     * seconds, the latest. A voice silent while the screen scrolls is letting you read.
+     * Read only what counts: reading every line, the voice kept cutting itself off mid-sentence.
+     * Money moves are always read; of the rest, the latest line at most every 12 s.
      */
     LaunchedEffect(voice) {
         if (!voice) return@LaunchedEffect
@@ -151,8 +145,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
     val loopOff = stringResource(R.string.eyes_loop_off_hunt)
     val hunting = stringResource(R.string.eyes_hunting)
 
-    // One clock for the page: the book and the tick every two seconds, the
-    // prices every fifteen. The loop's own reads are its own business.
+    // One clock for the page: positions and tick every 2 s, prices every ~15 s. The loop reads on its own.
     LaunchedEffect(refresh) {
         var n = 0
         while (true) {
@@ -180,9 +173,8 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
         // The ring that leaves the middle of the screen when the loop signs.
         ActRing(acted)
 
-        // The two system bars, removed by hand because nothing in here does it: see [systemBars].
-        // The top dodged the status bar, the bottom nothing, and once the start button lived there
-        // the gesture bar cut the word in half.
+        // Insets by hand, nothing in a Dialog applies them (see [systemBars]). Without the bottom
+        // one the gesture bar cut the start button in half.
         val bars = systemBars()
         Column(
             Modifier.padding(top = bars.top, bottom = bars.bottom)
@@ -190,9 +182,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // The clock: an outer arc that drains to the next look, an inner
-                // arc to the next hunt, and the dot in the middle that breathes
-                // and swells once each time the loop looks.
+                // Outer arc: next look. Inner arc: next hunt. The dot swells on each look.
                 LoopClock(cfg.on, looked, hunted)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -217,7 +207,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
 
             Spacer(Modifier.height(10.dp))
 
-            // Sideways on the bedside table: two charts per row, the thoughts under them.
+            // Landscape: two charts per row, the thoughts below.
             val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (open.isEmpty()) {
@@ -251,9 +241,8 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.eyes_since_entry, fmtSol(pos.costLamports, 4)), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted)
                             }
-                            // Who sells this one, said plainly: an order on the chain
-                            // that fires with the phone off, or the loop alone, which
-                            // needs the phone on and the loop running.
+                            // Who sells this position: an on-chain order (works with the phone off)
+                            // or only the loop (needs the phone on and the loop running).
                             val guarded = pos.triggerOrder != null
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 HaloIcon(if (guarded) HIcon.SHIELD_LOCK else HIcon.WARNING, if (guarded) Halo.mint else Halo.amber, 12.dp)
@@ -265,7 +254,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                                     fontFamily = Inter, fontSize = 10.5.sp, color = if (guarded) Halo.mint else Halo.amber, lineHeight = 14.sp,
                                 )
                             }
-                            // Three things a person can do while watching. No more.
+                            // Sell, buy more, sell and hunt the next one.
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 SmallChip(stringResource(R.string.eyes_sell), HIcon.SWAP, tint = Halo.red) {
                                     run(sellingLabel) {
@@ -303,7 +292,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.eyes_thoughts).uppercase(), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
-                            // The voice, said in words: on or off, and where it belongs, next to the lines it reads.
+                            // Voice toggle, next to the lines it reads.
                             SmallChip(
                                 stringResource(if (voice) R.string.eyes_voice_on else R.string.eyes_voice_off), HIcon.AGENT,
                                 tint = if (voice) Halo.mint else Halo.muted,
@@ -314,7 +303,7 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                         lines.forEachIndexed { i, l -> TypedLine(l, last = i == lines.lastIndex && live == null) }
                         live?.let { TypedLine(AgentTrace.Line(System.currentTimeMillis(), it, AgentTrace.Kind.FOUND), last = true) }
                         if (AgentTrace.busy.value || asking) Caret()
-                        // Ask it something, here, in the same stream. This one costs your model's credits.
+                        // Ask the model in the same stream (uses the user's model credits).
                         if (Brain.configured(ctx)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 androidx.compose.material3.OutlinedTextField(
@@ -341,15 +330,12 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
                         }
                     }
                 }
-                // The start button just under the line you talk to it with. It was on top with two thirds
-                // of the screen empty below, then pinned to the bottom, alone in the void: the two things
-                // done here, asking and starting, sit one under the other, a finger apart.
+                // Start button right under the ask field, so both actions sit together.
                 if (!cfg.on) {
                 ArmBar(stringResource(R.string.agent_start)) { onStart() }
             } else {
-                // On, the bar did not disappear: an empty foot. And the two things needed right after a
-                // sale were missing: the three buttons live on the coin's row, so once it vanished there was
-                // no "hunt now" and no stop, up to six minutes in front of a screen with no buttons.
+                // Loop on: offer "hunt now" and stop here. The per-coin buttons go with the sale,
+                // which left up to six minutes with no controls.
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         ArmBar(stringResource(R.string.eyes_hunt_now)) {
@@ -388,10 +374,9 @@ internal fun EyesScreen(onClose: () -> Unit, onStart: () -> Unit = {}) {
 private val clock = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
 /**
- * One trace line, written as a machine would. Proportional type in a glass card read like
- * a story, and this is not telling, it is working. Monospace, a mark in front, terminal
- * grammar everybody knows: arrow a step, plus a find, x a refusal, dollar a thing done with
- * money. Only the last line types itself: retyping old ones on redraw says they are happening again.
+ * One trace line, terminal style: monospace with a sigil (> step, + found, x refused, ! warning,
+ * $ money moved). Only the last line types itself; retyping old ones on redraw looks like they
+ * happened again.
  */
 @Composable
 private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
@@ -425,15 +410,10 @@ private fun TypedLine(l: AgentTrace.Line, last: Boolean) {
     }
 }
 
-/**
- * The tube's glass: scanlines and a glow behind the console. Adds no information, which is
- * why it belongs: the lines get a place that looks like a lit instrument, not an interface
- * card. Same language as the terminal receipt and the Scout wait.
- */
+/** Scanlines behind the console, same look as the terminal receipt and the Scout wait. Decoration only. */
 @Composable
 private fun TubeGlass(modifier: Modifier) {
-    // One brush that repeats every three pixels, one rectangle: the same
-    // lines as before, eight hundred draw calls fewer per frame.
+    // One brush repeating every 3 px in one rectangle: same lines, 800 fewer draw calls per frame.
     val line = Halo.cyan.copy(alpha = 0.045f)
     val glass = remember(line) {
         Brush.verticalGradient(
@@ -460,7 +440,7 @@ private fun ActRing(acted: Int) {
 /**
  * The clock: an outer arc draining to the next look, an inner arc to the next hunt, and a
  * dot that breathes and swells each time the loop looks. The fast tick and the breathing are
- * read in draw, so the rest of the page never hears them.
+ * read in draw, so the rest of the page doesn't recompose.
  */
 @Composable
 private fun LoopClock(on: Boolean, looked: Long, hunted: Long) {
@@ -515,9 +495,7 @@ private fun Countdown(looked: Long, hunted: Long, openCount: Int, maxPositions: 
     Row {
         Text(stringResource(R.string.eyes_next_look, (lookLeft / 1000).toString()), style = HaloType.mono, color = Halo.mint)
         Spacer(Modifier.width(10.dp))
-        // Full means it does not hunt, and a countdown to the next hunt was a promise it would not
-        // keep: the loop stops on its own when the slots are taken and buys only after selling. Now
-        // it says so instead of counting down to nothing.
+        // When full the loop does not hunt (it buys only after selling), so say so instead of counting down.
         val full = openCount >= maxPositions
         if (full) Text(stringResource(R.string.eyes_full, openCount, maxPositions), style = HaloType.mono, color = Halo.amber)
         else if (hunted > 0L) Text(
@@ -536,10 +514,9 @@ private fun Caret() {
 }
 
 /**
- * The start switch, at the bottom, full width. This is the one page that watches a machine
- * work, and the button was a rectangle with a breathing border, an ordinary button in brackets.
- * Now an instrument panel: four corners instead of a closed frame, a light sweeping left to
- * right, wide letters. One color, no glow: if the button shines more than the numbers, the page has lost.
+ * The start switch, full width at the bottom, styled as an instrument panel: four corner marks
+ * instead of a frame, a light sweeping left to right, wide letters. One color, no glow, so it
+ * doesn't outshine the numbers.
  */
 @Composable
 private fun ArmBar(label: String, onStart: () -> Unit) {
@@ -562,8 +539,7 @@ private fun ArmBar(label: String, onStart: () -> Unit) {
             val w = size.width
             val h = size.height
             drawRect(Halo.mint.copy(alpha = 0.07f))
-            // The sweep: a faint band crossing and starting again. It says, without
-            // writing it, that the machine is ready and still.
+            // A faint band sweeping across on a loop: ready, idle.
             val x = w * sweep
             drawRect(
                 Brush.horizontalGradient(
@@ -600,10 +576,10 @@ private data class Bars(
 )
 
 /**
- * What the system bars take and how much screen is left. Inside a `Dialog` the normal tools
- * fail, and each failure cut the start button in half: `navigationBarsPadding()` is zero in a
- * Dialog; `LocalContext` there is a wrapper, not the Activity, so the cast failed silently; and a
- * margin shifts the column down without shortening it. So no margins: measure the real window, subtract the bars, hand the column an exact height.
+ * System bar sizes and the height left between them. In a `Dialog` the usual tools fail, each one
+ * cutting the start button in half: `navigationBarsPadding()` is zero, `LocalContext` is a wrapper
+ * so the Activity cast fails silently, and a margin shifts the column without shortening it. So:
+ * measure the real window, subtract the bars, give the column an exact height.
  */
 @Composable
 private fun systemBars(): Bars {

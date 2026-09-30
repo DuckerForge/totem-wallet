@@ -37,11 +37,9 @@ import org.json.JSONObject
 import kotlin.math.pow
 
 /**
- * The richest wallets holding this same phone. Measured, not guessed: every Seeker Genesis
- * Token on chain, resolved to its wallet, then priced. 1,252 of the 120,520 hold ten SOL or
- * more, fifteen million dollars between them, the top one two. Addresses and nothing else:
- * what the crowd is worth, never who anybody is, and a census snapshot rather than a live
- * feed, since refreshing sixty balances per card open is other people's money on decoration.
+ * Richest wallets holding a Seeker, from the census: every Seeker Genesis Token on chain,
+ * resolved to its wallet and priced. 1,252 of 120,520 hold 10 SOL or more, about $15M total,
+ * the top one $2M. Addresses only. A snapshot, since reading sixty balances per open isn't worth it.
  */
 private class Whale(val address: String, val usd: Long, val sol: Double)
 
@@ -81,8 +79,7 @@ internal fun SeekerWhalesCard(limit: Int = 8) {
             stringResource(R.string.whales_total, money(total)),
             fontFamily = Inter, fontSize = 12.sp, color = Halo.muted, lineHeight = 17.sp,
         )
-        // One open at a time: two expanded rows stop being a ranking. Survives a switch to another
-        // Scout tab, so reopening a whale does not cost the same three calls again.
+        // One open at a time. Saveable, so switching Scout tabs doesn't repeat the three calls.
         var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
         rows.take(limit).forEachIndexed { i, w ->
             WhaleRow(i + 1, w, open == w.address) { open = if (open == w.address) null else w.address }
@@ -97,19 +94,17 @@ internal class Held(val mint: String, val symbol: String, val amount: Double, va
 internal class Holdings(val top: List<Held>, val unpriced: Int)
 
 /**
- * What one wallet holds right now, priced, read by the service and shared. The census stores a
- * dollar total, so the fourth whale read "$245,846 · 13 SOL" and hid that nine tenths was one
- * memecoin. Only what somebody quotes: the unpriced tail is where the counterfeits live (three
- * mints called "USDC", two fakes). Read by the service, not the phone: the scanner key used to
- * ship in the APK and the quota was spent one user at a time; the phone's own key is the fallback for a build with no service.
+ * What one wallet holds now, priced. The census keeps only a dollar total, which can hide that
+ * most of it is one memecoin. Unpriced tokens are left out: that tail is where fakes are (three
+ * mints named "USDC", two fake). Read via the service so the scanner key stays out of the APK;
+ * the phone's own key is the fallback for builds with no service.
  */
 internal fun holdingsOf(address: String, take: Int = 3): Holdings? {
     shared(address, take)?.let { return it }
     val rpc = BuildConfig.SCAN_RPC_URL
     if (rpc.isBlank()) return null
     val accounts = runCatching { SolanaRpc.tokensOf(rpc, address) }.getOrNull() ?: return null
-    // One coin can sit in more than one account, and two halves of a holding shown
-    // as two rows would read as two different coins.
+    // A coin can sit in several accounts: sum them into one row.
     val amounts = HashMap<String, Double>()
     for (a in accounts) {
         if (a.amount <= 0L) continue
@@ -131,8 +126,7 @@ private fun WhaleRow(rank: Int, w: Whale, open: Boolean, onToggle: () -> Unit) {
     var held by remember(w.address) { mutableStateOf(heldMemo[w.address]) }
     var failed by remember(w.address) { mutableStateOf(false) }
 
-    // Read once per wallet, on the first open. Closing and opening again costs
-    // nothing, and a list of sixty costs nothing until one of them is touched.
+    // Read once per wallet, on first open, then memoized.
     LaunchedEffect(open, w.address) {
         if (!open || held != null || failed) return@LaunchedEffect
         val got = withContext(Dispatchers.IO) { holdingsOf(w.address) }
@@ -185,8 +179,7 @@ private fun WhaleRow(rank: Int, w: Whale, open: Boolean, onToggle: () -> Unit) {
                     )
                     h.top.forEach { HeldRow(it, w.usd) }
                 }
-                // Nothing quoted is a different answer from nothing held, and the
-                // difference is the one worth saying out loud.
+                // Held but unpriced is not the same as empty: say so.
                 h.unpriced > 0 -> Note(stringResource(R.string.whale_unpriced, h.unpriced))
                 else -> Note(stringResource(R.string.whale_empty))
             }
@@ -198,8 +191,7 @@ private fun WhaleRow(rank: Int, w: Whale, open: Boolean, onToggle: () -> Unit) {
                     if (followed) HIcon.STAR_FILLED else HIcon.STAR, tint = Halo.amber,
                 ) { followed = Follows.toggle(ctx, w.address); Haptics.tick(ctx) }
             }
-            // Solscan keeps its place, on a target of its own. The row itself now
-            // has a job, and one tap cannot do two things.
+            // Solscan gets its own tap target, since tapping the row toggles it.
             Row(
                 Modifier.fillMaxWidth().clip(rs(Radius.row))
                     .clickable {
@@ -262,7 +254,7 @@ private fun HeldRow(h: Held, walletUsd: Long) {
     }
 }
 
-/** Millions stay millions: a memecoin holding written out in full is thirteen digits nobody reads. */
+/** Compact amounts (k, M, B): memecoin holdings run to thirteen digits. */
 private fun amt(v: Double): String = when {
     v >= 1_000_000_000 -> String.format("%.1fB", v / 1_000_000_000)
     v >= 1_000_000 -> String.format("%.1fM", v / 1_000_000)
@@ -273,10 +265,7 @@ private fun amt(v: Double): String = when {
 
 private fun pct(v: Double): String = if (v >= 10) String.format("%.0f", v) else String.format("%.1f", v)
 
-/**
- * Thousands separated, no decimals: cents are noise here. The separator is the reader's,
- * not ours: a hand-rolled dot wrote 1.234.567 to English readers and chopped a minus sign.
- */
+/** No decimals, locale separator: a hand-rolled dot was wrong in English and dropped the minus. */
 private fun money(v: Long): String = String.format("$%,d", v)
 
 private fun fmt(v: Double): String = when {
@@ -285,22 +274,19 @@ private fun fmt(v: Double): String = when {
     else -> String.format("%.1f", v)
 }
 
-/** What each whale holds, kept for as long as the app lives: one wallet, one read. */
+/** Holdings per whale, kept for the life of the process. */
 private val heldMemo = java.util.concurrent.ConcurrentHashMap<String, Holdings>()
 
 /**
- * The service's answer, priced; null with no service or no answer. Two doors, the cheap one
- * first: the archive is a plain file on a shared store, no key, no worker woken, left there
- * by whoever opened this wallet before. Only when it has nothing, or something half a day
- * old, do we knock on the service, which reads the chain and refills the archive. A cache
- * pays only when people arrive together, and they do not; an archive does not care what time it is.
+ * The service's answer, priced; null with no service or no answer. The archive first: a plain
+ * file on shared storage, no key, no worker woken. The service, which reads the chain and
+ * refills the archive, is asked only when the archive is empty or over half a day old.
  */
 private fun shared(address: String, take: Int): Holdings? {
     val stored = BuildConfig.ARCHIVE_URL.takeIf { it.isNotBlank() }?.let { base ->
         get(base.trimEnd('/') + "/clearsign/holdings/" + address + ".json")
     }
-    // Half a day old is still worth showing. Older than that and we would rather
-    // wait for the service, which rereads the chain while it answers.
+    // Up to 12 h old is fine to show; older, wait for the service.
     if (stored != null && ageOf(stored) < 12 * 3600_000L) parse(stored, take)?.let { return it }
 
     val base = BuildConfig.CROWD_URL.takeIf { it.isNotBlank() } ?: return parse(stored ?: return null, take)
@@ -314,7 +300,7 @@ private fun get(url: String): String? = runCatching {
     if (c.responseCode !in 200..299) null else c.inputStream.bufferedReader().use { it.readText() }
 }.getOrNull()?.takeIf { it.isNotBlank() && it.trim() != "null" }
 
-/** How old the answer is, by the clock written inside it. Forever, when it cannot be read. */
+/** Age from the answer's own `at` field; Long.MAX_VALUE when unreadable. */
 private fun ageOf(body: String): Long = runCatching {
     System.currentTimeMillis() - org.json.JSONObject(body).optLong("at")
 }.getOrDefault(Long.MAX_VALUE)

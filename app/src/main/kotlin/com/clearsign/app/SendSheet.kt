@@ -119,10 +119,9 @@ internal fun SendSheet(
     deal: RocketX.Deal? = null,
     onGift: () -> Unit = {},
     /**
-     * The door to the private send, with what you already typed. The machine lives in the
-     * bridge (quote, order, deposit address) and stays there: two copies diverge at the first
-     * fix. But someone sending money opens this page, not the bridge, because "private" is an
-     * adjective on a send, so the door is here and carries address and amount across.
+     * Opens the private send with the address and amount typed so far. The logic (quote, order,
+     * deposit address) stays in the bridge, one copy; the entry point is here because people look
+     * for "private" on the send page.
      */
     onPrivate: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
@@ -135,10 +134,7 @@ internal fun SendSheet(
     var to by remember { mutableStateOf(prefillTo.orEmpty()) }
     var amount by remember { mutableStateOf(prefillAmount.orEmpty()) }
     var assets by remember { mutableStateOf<List<Asset>>(emptyList()) }
-    /**
-     * What one unit of each coin is worth in the viewer's currency, one call when the list
-     * arrives. For the coin discs: a balance without its value does not answer "which one do I send".
-     */
+    /** Fiat value of one unit of each coin, fetched once when the list arrives, so the coin discs show value too. */
     var unitFiat by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var asset by remember { mutableStateOf<Asset?>(null) }
     var formError by remember { mutableStateOf<String?>(null) }
@@ -149,17 +145,15 @@ internal fun SendSheet(
     /** A coin a request asked for, applied once the wallet's assets are known. */
     var wantedMint by remember { mutableStateOf(prefillMint) }
 
-    // A tap can land while this screen is already open: `to` was only seeded once,
-    // so without this the form sat there empty with the request already read.
+    // A tap can arrive while this screen is open; `to` is only seeded once, so apply it here.
     LaunchedEffect(prefillTo, prefillAmount, prefillMint) {
         prefillTo?.takeIf { it.isNotBlank() }?.let { to = it; tapping = false; Haptics.tick(ctx) }
         prefillAmount?.takeIf { it.isNotBlank() }?.let { amount = it }
         wantedMint = prefillMint
     }
 
-    // The coin the request named, not SOL by default: a request for ten USDC used to open on
-    // SOL with "10" in the amount, the one mistake a payment form must never make for you. If
-    // the coin is not in this wallet, say so and leave the amount empty.
+    // Select the coin the request names, not SOL: a request for 10 USDC must not open as 10 SOL.
+    // If the wallet lacks the coin, say so and clear the amount.
     LaunchedEffect(assets, wantedMint) {
         val m = wantedMint ?: return@LaunchedEffect
         if (assets.isEmpty()) return@LaunchedEffect
@@ -170,11 +164,9 @@ internal fun SendSheet(
     }
 
     /**
-     * From the bridge you arrive with things settled: no form, straight to the receipt. The
-     * bridge asked chain, address and amount, opened the order, then handed over to a page that
-     * started again and let you change what RocketX had already fixed: that deposit waits for
-     * that amount in that coin, and another one is an order that never returns. Once only: if
-     * the receipt blocks, you go back and do not loop in here.
+     * From the bridge, skip the form and go straight to the receipt. RocketX has already fixed coin,
+     * amount and deposit address; changing any of them makes an order that never completes. Once
+     * only: if the receipt blocks, going back does not loop here.
      */
     var dealStarted by remember { mutableStateOf(false) }
     LaunchedEffect(deal, asset, wantedMint) {
@@ -209,8 +201,7 @@ internal fun SendSheet(
         r.contents?.let { text ->
             val req = parseScanned(text)
             to = req.recipient
-            // What the code asked for, not just where: the amount and the coin
-            // used to be thrown away, and a merchant's QR became a bare address.
+            // Keep amount and coin from the QR too, not just the address.
             req.amount?.let { amount = fmtUi(it) }
             wantedMint = req.mint ?: com.clearsign.core.NATIVE_SOL_MINT
         }
@@ -283,8 +274,8 @@ internal fun SendSheet(
                         // Four ways to fill the address in, all the same size, all one tap.
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SmallChip(stringResource(R.string.send_paste), HIcon.PASTE) {
-                                // A payment link on the clipboard is a request, not an address: it says where, and often
-                                // how much and in what. Pasted as a bare string it failed the address check and said nothing.
+                                // A payment link on the clipboard is parsed as a request (address, amount, coin);
+                                // as a bare string it failed the address check silently.
                                 val text = clipboardText(ctx)?.trim().orEmpty()
                                 if (text.startsWith("solana:", ignoreCase = true) || text.contains('?')) {
                                     val req = parseScanned(text)
@@ -296,13 +287,11 @@ internal fun SendSheet(
                             SmallChip(stringResource(R.string.send_scan), HIcon.SCAN, tint = Halo.cyan) {
                                 Door.hold(); scanLauncher.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(true).setCaptureActivity(ScanPortraitActivity::class.java).setPrompt(""))
                             }
-                            // The radio is already listening while the app is in front. The
-                            // button does not switch it on: it gives the person a moment
-                            // where they can see that it is, and somewhere to read how.
+                            // NFC already listens while the app is in front; this only shows that it does, and how.
                             if (TapService.isSupported(ctx)) {
                                 SmallChip(stringResource(R.string.send_tap), HIcon.NFC, tint = Halo.cyan) { tapping = !tapping }
                             }
-                            // No address? Then the link is the address.
+                            // No recipient address: send a gift link instead.
                             SmallChip(stringResource(R.string.gift_chip), HIcon.GIFT, tint = Halo.mint) { onGift() }
                         }
                         if (tapping) {
@@ -330,10 +319,8 @@ internal fun SendSheet(
 
                         // ---- asset ----------------------------------------------
                         FieldLabel(stringResource(R.string.send_asset))
-                        // The coin row, readable. Under each symbol sat the raw balance with that coin's decimals,
-                        // 1.0415 next to 1000 next to 0.937878, three numbers with no common unit, and "which do I
-                        // send" is asked in money. Same decimals for all, value underneath. And the row scrolls:
-                        // the last disc was cut by the edge with nothing saying there were more; the fade says so.
+                        // Same decimals for every coin, fiat value underneath: raw per-coin decimals (1.0415, 1000,
+                        // 0.937878) don't compare. The row scrolls; the edge fade shows there are more.
                         val assetScroll = rememberScrollState()
                         Box {
                             Row(Modifier.horizontalScroll(assetScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -402,13 +389,11 @@ internal fun SendSheet(
                             )
                         }
 
-                        // Private: its own wide row under the amount. It was the fifth disc in the scrolling row
-                        // above, off screen, and the place was wrong anyway: Paste, Scan and Tap fill the address;
-                        // private says how, not where, and is decided after typing how much.
+                        // Private send gets its own row under the amount: it is about how to send, not where
+                        // (unlike Paste, Scan, Tap), and is chosen after the amount.
                         if (RocketX.enabled && deal == null) {
-                            // The private road starts from SOL or USDC and nothing else. With another coin the tag
-                            // stays and says so: this is where people learn it exists. Tapping it switches to SOL
-                            // without carrying an amount counted in another coin.
+                            // Private send starts only from SOL or USDC. With another coin the row stays (so people
+                            // find it) and says so; tapping switches to SOL without the amount typed in the other coin.
                             val mint = asset?.mint
                             val switches = mint != null && mint != com.clearsign.core.NATIVE_SOL_MINT && mint != USDC_MINT
                             // Null is SOL: that is how RocketX names a chain's native coin.
@@ -417,11 +402,9 @@ internal fun SendSheet(
                             // Start from the last minimum seen, not from empty.
                             var priv by remember(privSym) { mutableStateOf(RocketX.recallFloor(ctx, privSym)) }
                             LaunchedEffect(switches, privCoin, amount) {
-                                // Waiting half a second makes sense while typing the
-                                // amount. On opening there is nothing to wait for.
+                                // Debounce while typing; no wait on open.
                                 if (amount.isNotEmpty()) kotlinx.coroutines.delay(600)
-                                // With a coin this road does not carry the typed
-                                // amount is beside the point: only the minimum is asked.
+                                // For an unsupported coin only the minimum is asked, not the typed amount.
                                 val a = if (switches) null else amount.replace(',', '.').toDoubleOrNull()
                                 val fresh = withContext(Dispatchers.IO) {
                                     runCatching { RocketX.privately(privCoin, a) }.getOrNull()
@@ -445,8 +428,8 @@ internal fun SendSheet(
                                             (if (switches) " " + stringResource(R.string.send_private_switch) else ""),
                                         style = HaloType.small, color = Halo.muted, lineHeight = 15.sp,
                                     )
-                                    // What this amount costs on this road, now, or the minimum it takes. Until known nothing is
-                                    // written: an invented percentage sits on the screen with the face of a fact.
+                                    // Current cost for this amount, or the minimum. Nothing until known: a placeholder
+                                    // percentage would read as a fact.
                                     val p = priv
                                     val pct = p?.costPct ?: 0.0
                                     when {
@@ -460,8 +443,7 @@ internal fun SendSheet(
                                             fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.5.sp,
                                             color = if (pct > 5) Halo.red else if (pct > 2) Halo.amber else Halo.mint,
                                         )
-                                        // The minimum is said only when it matters: with an amount already above it, it is an old
-                                        // number making a show while the real cost arrives.
+                                        // Show the minimum only when the amount is below it (or the coin will switch).
                                         p?.minAmount != null && (switches || (amount.replace(',', '.').toDoubleOrNull() ?: 0.0) < p.minAmount) -> Text(
                                             p.minUsd?.let { u ->
                                                 stringResource(R.string.bridge_floor_usd, minText(p.minAmount), privSym, fmtPrice(u, "USD"))
@@ -476,9 +458,8 @@ internal fun SendSheet(
                         if (s is SendState.Analyzing) Working(stringResource(R.string.send_analyzing))
                     }
                     is SendState.Review -> {
-                        // A bridge is a swap whose returning half is on another chain, invisible to the simulation.
-                        // Passed as `pair`, the receipt draws both legs like a swap; before, only the outgoing half
-                        // showed, someone sending money away.
+                        // A bridge is a swap whose return leg is on another chain, invisible to the simulation.
+                        // Passed as `pair`, the receipt shows both legs, not just money leaving.
                         deal?.let { BridgeDealCard(it) }
                         SignReceiptBody(
                             s.analyzed.receipt, null,
@@ -541,9 +522,8 @@ internal fun SendSheet(
                     }
                     is SendState.Review -> {
                         if (s.analyzed.receipt.blocksApproval) {
-                            // The one block a person can lift themselves: sending most of a balance to an address this
-                            // phone has never seen is the shape of a drainer, and "no, that is my new wallet" is saving
-                            // it as a contact. Said here with the chip that does it, not as a red line naming a severity.
+                            // The only block the user can lift: most of a balance to an unknown address looks like
+                            // a drainer, and saving the address as a contact clears it. Offer that button here.
                             val onlyDrain = s.analyzed.receipt.risks.filter { it.severity == com.clearsign.core.Severity.DANGER }
                                 .all { it.flag == com.clearsign.core.RiskFlag.DRAINS_BALANCE }
                             if (onlyDrain) {
@@ -558,7 +538,7 @@ internal fun SendSheet(
                                 Banner(stringResource(R.string.send_blocked), Halo.red, HIcon.BLOCK)
                             }
                             Spacer(Modifier.height(8.dp))
-                            // From the bridge there is no form behind to go back to: back means dropping it.
+                            // From the bridge there is no form to go back to: back closes the sheet.
                             GhostButton(stringResource(R.string.back)) { if (deal != null) onDismiss() else state = SendState.Form }
                         } else {
                             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -583,7 +563,7 @@ internal fun SendSheet(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            // From the bridge there is no form behind to go back to: back means dropping it.
+                            // From the bridge there is no form to go back to: back closes the sheet.
                             GhostButton(stringResource(R.string.back)) { if (deal != null) onDismiss() else state = SendState.Form }
                         }
                     }
@@ -602,9 +582,8 @@ private const val SOL_RESERVE = 1_500_000L
 private suspend fun buildAndAnalyze(ctx: Context, owner: String, dest: String, asset: Asset, raw: Long, memo: String? = null): Pair<List<WalletTx.Instruction>, ReceiptEngine.Analyzed> {
     val rpc = SolanaRpc.urlFor(null)
     val ownerKey = Base58.decode(owner); val destKey = Base58.decode(dest)
-    // The address has to be a wallet. A token account or a program has a valid shape and takes
-    // the money all the same, and SOL sent to a program account is gone. Other wallets stop
-    // here; this one did not.
+    // The destination must be a wallet: a token account or program has a valid address and accepts
+    // the transfer, and SOL sent to a program account is lost.
     val destOwner = withContext(Dispatchers.IO) { SolanaRpc.getAccountInfoRaw(rpc, dest)?.owner }
     if (SendChecks.notAWallet(destOwner)) throw IllegalStateException(ctx.getString(R.string.send_not_wallet))
     val base: List<WalletTx.Instruction> = when (asset) {

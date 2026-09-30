@@ -24,8 +24,8 @@ data class HaloFonts(val display: FontFamily, val body: FontFamily, val mono: Fo
 
 /**
  * A full color palette. Every screen paints through [Halo], which forwards to the selected
- * palette, so swapping a theme is one assignment. Contrast is a contract: `PaletteContrastTest`
- * checks every palette (muted ≥ 4.5:1, accent ≥ 7:1, ink ≥ 12:1 against the ground).
+ * palette, so swapping a theme is one assignment. `PaletteContrastTest` checks every palette
+ * against the ground: muted ≥ 4.5:1, accent ≥ 7:1, ink ≥ 12:1.
  */
 data class HaloPalette(
     val id: String,
@@ -55,24 +55,19 @@ data class HaloPalette(
     /** Card hairlines flow instead of sitting still — Solana's two colours, moving. */
     val livingStroke: Boolean = false,
     /**
-     * The one big filled button. Dark themes light it with their own accents and write the
-     * page's ground on it; a light theme cannot, because a colour bright enough to fill a
-     * button is never dark enough to carry white text. So the pair travels with the palette.
+     * The big filled button and its label. Dark themes fill with their accents and write the ground
+     * on it; light themes can't, since a color bright enough to fill is too light for white text.
      */
     val fillFrom: Color = accentFill,
     val fillTo: Color = accent2,
     val onFill: Color = ground,
-    /**
-     * The little icon tile that leads almost every row. The second accent on the dark themes,
-     * where the accent has to stay rare to mean anything; the accent itself on the green ones,
-     * where the whole page is built on it.
-     */
+    /** Icon tile tint: accent2 on dark themes, where the accent must stay rare; the accent on green ones. */
     val tileTint: Color = accent2,
 ) {
     val isFree: Boolean get() = !premium
 }
 
-/** The four palettes: Halo (free) + three premium ones unlockable in SKR. */
+/** Built-in palettes; the premium ones unlock with SKR. */
 object Palettes {
     private fun p(
         id: String, nameRes: Int, ground: Long, ground2: Long, card: Long, cardSoft: Long, cardHi: Long, stroke: Long,
@@ -135,9 +130,8 @@ object Palettes {
     )
 
     /**
-     * Solana as a whole palette: violet ground, its green and purple. Free, because a theme
-     * nobody can select is one nobody can judge; it turned out to suit the link and mint screens.
-     * [flow] is the other half of the idea, Halo's colors with only the hairline moving.
+     * Solana as a palette: violet ground, its green and purple. Free so it can be tried; suits the
+     * link and mint screens. [flow] is the variant with Halo's colors and only the hairline moving.
      */
     val solana = p(
         "solana", R.string.theme_solana,
@@ -147,11 +141,7 @@ object Palettes {
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
-    /**
-     * Home, with a living edge. Every color is Halo's; the only difference is the hairline
-     * around each card, where Solana's purple and green slide past each other. A theme is
-     * allowed to change one thing.
-     */
+    /** Halo's colors plus a living edge: Solana's purple and green slide along each card's hairline. */
     val flow = p(
         "flow", R.string.theme_flow,
         ground = 0xFF070B12, ground2 = 0xFF0E131A, card = 0xFF222B33, cardSoft = 0xFF171D25, cardHi = 0xFF313B44, stroke = 0xFF1F5E4C,
@@ -170,8 +160,8 @@ object Palettes {
     )
 
     // ---- candidates -----------------------------------------------------------
-    // Four treatments of one idea, free so they can be worn on every real screen. Same ground,
-    // same neutral ladder, different color for "this is the action". The losers go once a winner is picked.
+    // Four action colors on the same ground and neutrals, free so they can be tried on every
+    // screen. Drop the losers once one is picked.
     private const val G0 = 0xFF070B12
     private const val G2 = 0xFF12161E
     private const val CS = 0xFF181D25
@@ -211,7 +201,7 @@ object Palettes {
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
-    /** The warm road the banks take: gold acts, mint stays positive. */
+    /** Gold for actions, the banking look; mint stays positive. */
     val gold = p(
         "gold", R.string.theme_gold,
         ground = G0, ground2 = G2, card = CD, cardSoft = CS, cardHi = CH, stroke = ST,
@@ -221,16 +211,10 @@ object Palettes {
     )
 
     /**
-     * White, built on Young Platform's own ramps read off their stylesheet: their greys
-     * (#F5F5F5 #EDEDED #E0E0E0), their near-black text (#131312), their green and azure. The
-     * bright ones are for fills, not for text: their #00D372 on white is 1.9:1, so what acts
-     * here is the same green further down their ramp, #005F33, which reads at 7.8:1. The
-     * surfaces carry a little of the same green: a page of pure greys next to a green button
-     * reads as two designs, and the green has nowhere to belong. The second accent is a teal
-     * and not their azure, because nearly every icon tile in this app is painted with it: a
-     * page of pale blue tiles over a green ground read as two apps stacked. The page itself
-     * stays white top to bottom and the panels are the green ones: with a tinted page the
-     * cards sat a rumour above it, and the top of every screen read as one flat sheet.
+     * Light theme on Young Platform's ramps (from their stylesheet): greys #F5F5F5 #EDEDED #E0E0E0,
+     * text #131312. Their #00D372 is 1.9:1 on white, so fill only; actions use #005F33 from the same
+     * ramp (7.8:1). White page, green-tinted panels, so cards stand off the page. accent2 is teal,
+     * not their azure: it paints most icon tiles, and pale blue tiles on green looked like two apps.
      */
     val vela = p(
         "vela", R.string.theme_vela,
@@ -243,11 +227,7 @@ object Palettes {
         fonts = HaloFonts(SoraFamily, InterFamily, JetBrainsMonoFamily),
     )
 
-    /**
-     * Vela at night: the same green on black instead of on white. Their bright green is wasted
-     * on a white page, where it can only fill; on black it can do everything, so here it is the
-     * accent itself, and the tiles are green like the rest.
-     */
+    /** Vela on black: the bright green has the contrast here to be the accent itself, tiles included. */
     val velaNight = p(
         "velanight", R.string.theme_vela_night,
         ground = 0xFF000000, ground2 = 0xFF0B0E0C, card = 0xFF1F2621, cardSoft = 0xFF161B18, cardHi = 0xFF2C352F, stroke = 0xFF415049,
@@ -263,9 +243,8 @@ object Palettes {
     fun withCustom(ctx: android.content.Context): List<HaloPalette> = all + CustomTheme.palette(ctx)
 
     /**
-     * The theme a phone starts with, and the fallback for an unknown id. Not [halo] any more:
-     * Menta is the same palette with the accent mixed back toward the card on large filled
-     * surfaces, the difference between a color and a glare on a big button.
+     * Starting theme and fallback for unknown ids. Menta rather than [halo]: same palette, but large
+     * fills mix the accent back toward the card so big buttons don't glare.
      */
     val default: HaloPalette get() = mintSoft
 
@@ -322,16 +301,15 @@ object CustomTheme {
         val ink = if (dark) 0xFFECEFF4.toInt() else 0xFF10151F.toInt()
         return HaloPalette(
             id = ID, nameRes = R.string.theme_custom,
-            // The same ladder the built-in palettes climb, measured from the user's
-            // own ground and tinted with their own accent2, so a custom theme has
-            // the same depth instead of staying flat while the others gained it.
+            // The built-ins' surface ladder, from the user's ground tinted with their accent2,
+            // so custom themes get the same depth.
             ground = Color(g), ground2 = Color(step(g, a2, 0.034f, dark)),
             card = Color(step(g, a2, 0.139f, dark)), cardSoft = Color(step(g, a2, 0.080f, dark)),
             cardHi = Color(step(g, a2, 0.210f, dark)),
             stroke = Color(mix(g.toInt(), a2.toInt(), 0.34f)),
             accent = Color(a), accent2 = Color(a2), ink = Color(ink),
-            // Lifted a quarter of the way to ink: the surfaces moved up under it.
             accentFill = androidx.compose.ui.graphics.lerp(Color(a), Color(step(g, a2, 0.139f, dark)), 0.45f),
+            // muted: lifted a quarter of the way back to ink, since the surfaces got lighter.
             muted = Color(mix(mix(ink, g.toInt(), 0.42f), ink, 0.25f)), amber = Color(0xFFFFC24B), red = Color(0xFFFF5A6A),
             redSoft = Color(0xFFFF5A6A).copy(alpha = 0.133f), accentSoft = Color(a2).copy(alpha = 0.133f),
             premium = true, grainAlpha = grain, scanlines = scanlines,
@@ -443,11 +421,9 @@ val Mono: FontFamily get() = Halo.palette.fonts.mono
 val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
 /**
- * The type scale: six roles, no invented sizes. There were 21 font sizes in the app, six
- * fractional, each picked by eye on one screen, which is what makes an interface look
- * assembled rather than designed. Sizes stay in `sp` so the text-size slider moves them
- * together; families are palette getters so a theme can change the face. Color is not here:
- * color is information, decided at the call site.
+ * The type scale: six roles, no ad-hoc sizes (there were 21, six fractional, each picked by eye).
+ * Sizes stay in `sp` so the text-size slider moves them together; families are palette getters so
+ * a theme can change the face. No color here: it is decided at the call site.
  */
 object HaloType {
     /** Captions, units, the small print inside a chip. The legibility floor. */
@@ -477,7 +453,7 @@ object HaloType {
 
 /**
  * The radius scale. Four values, each a level: a pill is a control, 10 is something inside a
- * panel, 16 a panel, 22 a card or a sheet. Pass these to [rs]; there were fifteen picked by eye.
+ * panel, 16 a panel, 22 a card or a sheet. Pass these to [rs].
  */
 object Radius {
     const val pill = 999

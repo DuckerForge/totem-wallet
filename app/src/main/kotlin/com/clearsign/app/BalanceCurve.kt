@@ -6,33 +6,29 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The shape of your money over the last month, faint behind the home actions. Nothing wrote
- * down what the wallet was worth yesterday, so this is what the coins you hold today were worth
- * on each of the last thirty days: buy something this morning and the month redraws as if you
- * always held it. Right for a shape with no axis and no figures. Each series is scaled so its
- * last point is today's value; the largest coins are looked up, the rest ride flat; kept half an hour. Under eight points, nothing.
+ * Last month's balance shape, drawn faintly behind the home actions. There is no balance history,
+ * so it is today's holdings priced over the last thirty days: fine for a shape with no axis.
+ * Each series is scaled so its last point is today's value; only the largest coins are looked
+ * up, the rest stay flat. Cached half an hour; under eight points, nothing is drawn.
  */
 object BalanceCurve {
     private const val POINTS = 30
     private const val MIN_POINTS = 8
     /**
-     * Three coins, not six. Each costs two requests to a source that refuses after five in a
-     * row, and the charts a person opened must win that argument. The largest three are almost
-     * the whole curve; the rest rides flat, which is what we honestly know about it.
+     * Each coin costs two requests to a source that refuses after five in a row, and the charts
+     * the user opens come first. The top three are almost the whole curve; the rest stays flat.
      */
     private const val TRACK_MAX = 3
     private const val TTL_MS = 30 * 60_000L
-    /** How old a written curve may be before it is worth thirteen requests to redraw it. */
+    /** Max age of the curve on disk before it is recomputed (thirteen requests). */
     private const val DISK_MS = 6 * 3600_000L
 
     private val cache = ConcurrentHashMap<String, Pair<Long, List<Double>>>()
 
     /**
-     * When the app started, and why it matters. Computing the curve from scratch costs six
-     * requests to a source that refuses after five close together and stays sore for tens of
-     * seconds; doing it at start meant doing it while the person opens rows and looks at
-     * charts, and their chart never arrived. Already written, it shows at once; if it must be
-     * computed, it waits out the first minute.
+     * A fresh computation costs six requests to a source that refuses after five in a burst and
+     * stays blocked for tens of seconds. At startup that starved the charts the user opens, so it
+     * waits out the first minute. A curve already on disk shows at once.
      */
     private val bornAt = System.currentTimeMillis()
     private const val QUIET_MS = 60_000L
@@ -41,20 +37,18 @@ object BalanceCurve {
         val key = owner + "|" + view.currency
         val now = System.currentTimeMillis()
         cache[key]?.let { (at, v) -> if (now - at < TTL_MS) return@withContext v }
-        // Written down, so it is on screen the instant the app opens. In memory only, every cold
-        // start paid thirteen requests and four seconds of pauses, and the first thing seen in
-        // the morning was the one morning it was missing. Six hours is fresh enough for a
-        // thirty-day shape, and it is scaled onto today's total before drawing.
+        // Kept on disk so it shows instantly; memory only cost thirteen requests and about four
+        // seconds per cold start. Six hours is fresh enough for a thirty-day shape, and it is
+        // scaled onto today's total before drawing.
         read(ctx, key, now)?.let { stored ->
             val anchored = anchor(stored, view.total)
             cache[key] = now to anchored
             return@withContext anchored
         }
 
-        // Everything that is yours and has a price, coins and DeFi together. Leaving the DeFi out
-        // on a mostly staked wallet had nine tenths of the total flat while a hundred dollars of
-        // coins drew the shape. A stake has no mint, only the name of what is staked, so it is
-        // matched to a coin held by that name: one lookup instead of two.
+        // Coins and DeFi together, or a mostly staked wallet draws its shape from a small slice.
+        // A stake has no mint, only the staked symbol, so it is matched to a held coin by name
+        // and shares its lookup.
         val waited = System.currentTimeMillis() - bornAt
         if (waited < QUIET_MS) kotlinx.coroutines.delay(QUIET_MS - waited)
 
@@ -77,9 +71,7 @@ object BalanceCurve {
         if (byMint.isEmpty()) return@withContext emptyList()
 
         val tracked = byMint.entries.sortedByDescending { it.value }.take(TRACK_MAX)
-        // Everything not looked up is carried at today's value, unchanged. A flat
-        // line is what we actually know about it, and it keeps the curve anchored
-        // on the real total instead of quietly shrinking the portfolio.
+        // Untracked coins are carried flat at today's value, keeping the curve on the real total.
         val flat = view.total - tracked.sumOf { it.value }
 
         val parts = ArrayList<List<Double>>(tracked.size)

@@ -65,8 +65,8 @@ internal fun safetyLabel(flag: SafetyFlag): String = stringResource(
 )
 
 /**
- * What the coin itself can do to you, next to what the transaction does: a clean transaction
- * can hand you a token whose creator can freeze it or that nobody buys back, invisible in the receipt.
+ * The coin's own risks, which the receipt can't show: a clean transaction can still buy a token
+ * its creator can freeze, or that nobody buys back.
  */
 @Composable
 internal fun SafetyCard(safety: TokenSafety, symbol: String) {
@@ -104,11 +104,9 @@ internal fun SafetyDot(safety: TokenSafety?) {
 
 
 /**
- * What you are about to receive, judged on its own. The receipt answers what the transaction
- * does, and buying a rug is an honest transaction: you pay, you receive, no risk. So when
- * something other than SOL arrives the receipt also says what it is: sellable back, freezable
- * by its creator, its pool being pulled right now. Best effort, never in the way of signing;
- * its absence means the registry was unreachable, not that the coin is fine.
+ * Risks of a non-SOL token being received, shown with the receipt, since buying a rug is a
+ * clean transaction: sellable back, freezable, pool being pulled. Best effort, never blocks
+ * signing; absent means the registry was unreachable, not that the coin is fine.
  */
 @Composable
 internal fun IncomingCoinCard(r: com.clearsign.core.Receipt, owner: String?) {
@@ -127,8 +125,7 @@ internal fun IncomingCoinCard(r: com.clearsign.core.Receipt, owner: String?) {
             val sellable = runCatching { Jupiter.sellableBack(leg.mint, leg.decimals, tok?.usd) }.getOrNull()
             val ext = tok?.let { TokenExtensions.of(leg.mint, it.token2022) }
             safety = tok?.let { com.clearsign.core.assessToken(it.facts(sellable, ext)) }
-            // The bold lane is the loosest thing the agent would ever use. If even
-            // that turns the coin down, the reason is worth saying out loud here.
+            // The bold lane is the agent's loosest; if even it rejects the coin, show why.
             shape = c?.let { com.clearsign.core.passesGate(it, com.clearsign.core.ScanGate.CAREFUL) }
         }
     }

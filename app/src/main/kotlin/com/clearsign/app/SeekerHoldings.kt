@@ -46,11 +46,10 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * What a hundred and twenty thousand Seekers hold. The picture exists for one fact: of the
- * thirty-four things this crowd holds most, seven are worth nothing (SEKR, CHAPTER2, PDT, NAMI
- * came with the phone), which is why the crowd feature counts purchases, never holdings. Numbers
- * from a random sample of the census. Typical, not average: the mean said 487 $ of USDC where the
- * person in the middle has ten, so the median is shown; the mean only decides whether a coin is worth nothing (SI, PLANK, MPLX: median zero, mean above it).
+ * What 120k Seekers hold, from a random sample of the census. Of the top 34 holdings seven are
+ * worthless (SEKR, CHAPTER2, PDT, NAMI came with the phone), which is why the crowd feature counts
+ * purchases, not holdings. [usdPer] is the median (USDC: $10, mean $487); [avg] is the mean, used
+ * only to spot worthless coins (SI, PLANK, MPLX: median zero, mean above it).
  */
 private class SeekerHolding(val symbol: String, val pct: Double, val usdPer: Double, val avg: Double)
 
@@ -99,9 +98,8 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
         HoldingsField(rows, animate)
         Legend(Halo.mint, stringResource(R.string.hold_bars_note, rows.size - free))
         Legend(Halo.muted, stringResource(R.string.hold_legend_free, free))
-        // Said out loud, or the dollars read as wrong: ten dollars of USDC next to a crowd of a
-        // hundred and twenty thousand looks like a rounding error. The mean is 487 and describes
-        // nobody. Read from the file, so it stays true when the census runs again.
+        // Spell out median vs mean, or $10 of USDC across 120k people looks like a rounding error
+        // (the mean is $487). Read from the file, so it holds after the next census.
         rows.firstOrNull { it.avg >= 1 && it.avg > it.usdPer * 3 }?.let { h ->
             Text(
                 stringResource(R.string.hold_typical, h.symbol, dollars(h.usdPer), dollars(h.avg)),
@@ -112,8 +110,7 @@ internal fun SeekerHoldingsCard(animate: Boolean = true) {
             stringResource(R.string.hold_note, free, rows.size, sample),
             fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted, lineHeight = 16.sp,
         )
-        // The half of this crowd that looks asleep: their SKR sit inside the staking program,
-        // earning, where a census of token accounts cannot see them. They are not empty.
+        // SKR in the staking program is invisible to a token-account census, so these holders look empty.
         census.staked?.let { st ->
             Box(Modifier.fillMaxWidth().height(1.dp).background(Halo.stroke))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -143,11 +140,9 @@ private fun Legend(dot: Color, text: String) {
 }
 
 /**
- * What they hold, as bars. It was a field of bubbles, pretty and unreadable: at fifteen the
- * labels sat on each other and "higher means worth more" needed a legend for the legend. A
- * bar reads untaught: longer is more people, the number on the right is the money. The free
- * things keep their dim row underneath. Each bar grows into place once, on arrival: a bar
- * that kept growing would say the number was changing.
+ * Holdings as bars: length is the share of holders, the number on the right is the money (bubbles
+ * overlapped at fifteen labels). Free coins get a dim row underneath. Bars grow in once on arrival;
+ * one still moving would suggest a changing number.
  */
 @Composable
 private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
@@ -156,25 +151,21 @@ private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
     val maxPct = (valued.maxOfOrNull { it.pct } ?: 1.0).coerceAtLeast(1.0)
 
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        // What the columns are, said once above them. "$144" next to "32%" read
-        // as a price, and it is not: it is what one holder has, on average.
+        // Column headers: without them "$144" next to "32%" read as a price, not the amount per holder.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.width(66.dp))
             Text(stringResource(R.string.hold_col_who), style = HaloType.label, color = Halo.muted, modifier = Modifier.weight(1f))
-            // One label over the two number columns together, ending where the
-            // dollars end. Over the last column alone it floated on its own.
+            // One label spanning both number columns, right-aligned with the dollars.
             Text(
                 stringResource(R.string.hold_col_each), style = HaloType.label, color = Halo.muted,
                 modifier = Modifier.width(8.dp + 36.dp + 6.dp + 44.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
             )
         }
         valued.take(9).forEachIndexed { i, h ->
-            // Grown once, on arrival. Inside the lazy list of Scout this card is
-            // thrown away when it scrolls past the top, and without the flag every
-            // bar would crawl out of zero again on the way back.
+            // Keyed reveal: in Scout's lazy list this card is disposed when scrolled off, and the
+            // bars would regrow from zero on the way back.
             val grow = if (animate) rememberReveal(key = h.symbol, durationMs = 600 + i * 70) else 1f
-            // Five dollars, not fifty. The threshold was tuned on the mean, and with the
-            // median nobody passed it: every bar was the same color.
+            // $5: the old $50 was tuned on the mean, and on the median no bar reached it.
                 val tint = if (h.usdPer >= 5) Halo.mint else Halo.cyan
             Row(
                 Modifier.fillMaxWidth().then(if (animate) Modifier.staggeredEntrance(i, key = h.symbol) else Modifier),
@@ -209,9 +200,7 @@ private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
         }
         if (gifts.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
-            // The free things, in one dim line that wraps. Named, because a row of
-            // dots carries no information at all, and dim, because that is the
-            // whole message about them.
+            // Free coins as dim, named chips on one wrapping line.
             androidx.compose.foundation.layout.FlowRow(
                 Modifier.fillMaxWidth().staggeredEntrance(valued.size.coerceAtMost(9), key = "gifts"),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -231,7 +220,7 @@ private fun HoldingsField(rows: List<SeekerHolding>, animate: Boolean = true) {
     }
 }
 
-/** Money as a person writes it: cents while they matter, none once they do not. */
+/** Cents below $100, whole dollars above. */
 private fun dollars(v: Double): String =
     if (v < 100) "$" + java.text.DecimalFormat("0.00").format(v)
     else "$" + java.text.DecimalFormat("#,##0").format(v)

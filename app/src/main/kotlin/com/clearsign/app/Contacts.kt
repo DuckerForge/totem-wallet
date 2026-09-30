@@ -42,7 +42,7 @@ object Contacts {
         prefs(ctx).edit().putString(KEY_ALLOW, o.toString()).apply()
     }
 
-    /** Contacts that came in by touch, signed by the other phone. A different kind of known. */
+    /** Contacts received by tap, signed by the other phone. */
     fun markVerified(ctx: Context, address: String) {
         val set = verified(ctx).toMutableSet(); set.add(address)
         prefs(ctx).edit().putString("verified", JSONArray(set.toList()).toString()).apply()
@@ -60,11 +60,9 @@ object Contacts {
     }
 
     /**
-     * The trust model from the local address book (empty when nothing saved, so everything reads
-     * NEW, which the receipt treats as noise). Keys that are yours count as yours: the engine
-     * compared with the main account only, and the agent's budget is another key we generated ten
-     * seconds earlier, so funding it said "never-seen recipient, brand-new wallet, check carefully",
-     * true to the letter and misleading. Crying wolf on your own wallet teaches people to ignore warnings.
+     * Your own keys, trusted by name. Compared only with the main account, funding a fresh agent
+     * budget warned "never-seen recipient, brand-new wallet": literally true, and it teaches
+     * people to ignore warnings.
      */
     private fun mine(ctx: Context): Map<String, String> = buildMap {
         runCatching { SessionWallet.current(ctx)?.pubkey }.getOrNull()?.let {

@@ -40,9 +40,9 @@ object ReceiptEngine {
         val destinations: List<String>,
         val txKeys: Set<String>?,
         /**
-         * The mints this analysis was told to expect, carried so the pre-signing recheck watches the
-         * same accounts: without it the preview saw a coin arriving and the recheck did not, and
-         * every first purchase of a coin was blocked as "the state changed".
+         * Mints this analysis was told to expect, passed on so the pre-signing recheck watches the
+         * same accounts. Otherwise the recheck misses the incoming coin and blocks every first
+         * purchase as "the state changed".
          */
         val expectMints: List<String> = emptyList(),
     )
@@ -63,9 +63,9 @@ object ReceiptEngine {
         /** Mints the caller expects to receive; see [SolanaRpc.simulateEffects]. */
         expectMints: List<String> = emptyList(),
         /**
-         * This payload comes after another in the same batch. A transaction needing an account the
-         * previous one creates fails when simulated alone, honestly: not evidence of anything wrong.
-         * Only the first of a batch is judged by its own simulation.
+         * This payload follows another in the same batch. If it needs an account the previous one
+         * creates, simulating it alone fails with nothing wrong, so only the first of a batch is
+         * judged by its own simulation.
          */
         dependent: Boolean = false,
     ): Analyzed = coroutineScope {
@@ -91,8 +91,8 @@ object ReceiptEngine {
         val destinations = decoded?.let { (it.writableKeys + loadedW).filter { k -> k != myWallet }.distinct() } ?: emptyList()
 
         val simD = async(Dispatchers.IO) { SolanaRpc.simulateEffects(rpc, payload, myWallet, destinations, txKeys, expectMints) }
-        // On-chain community reputation on the primary recipient, bounded so a slow
-        // devnet read can never hold the receipt hostage.
+        // On-chain community reputation on the primary recipient, time-bounded so a slow
+        // devnet read can't stall the receipt.
         val primaryDest = instructions.firstOrNull { it.destination != null && it.kind != com.clearsign.core.InstructionKind.ASSIGN_OWNER }?.destination
         val repD = async(Dispatchers.IO) {
             primaryDest?.let { dest -> withTimeoutOrNull(4_000) { runCatching { Reputation.fetch(dest) }.getOrNull() } }
@@ -166,20 +166,17 @@ object ReceiptEngine {
 
         val simRisk = when (outcome) {
             is SolanaRpc.SimOutcome.Ok -> null
-            // The node ran it and it errored: not a doubt, an answer. This transaction fails on chain and
-            // signing it burns a fee for nothing. Graded by [requireSim] it showed amber with "hold to
-            // swap" pressable underneath. "It ran and failed" and "I could not ask" are opposites.
+            // The node ran it and it errored: it will fail on chain and signing burns a fee for
+            // nothing. DANGER regardless of [requireSim].
             is SolanaRpc.SimOutcome.Failed -> Risk(
                 RiskFlag.SIMULATION_FAILED,
                 if (dependent) Severity.WARN else Severity.DANGER,
-                // In words when we know them, and the node's own text when we do
-                // not. Never only the JSON: nobody can act on an instruction index.
+                // Plain words for known errors, else the node's text. Never just the raw JSON.
                 com.clearsign.core.SimError.explain(outcome.err, deviceLocaleTag() == "it")
                     ?: ctx.getString(R.string.risk_sim_failed, outcome.err),
             )
-            // Not the same flag as a failure on purpose: "I could not ask" is a
-            // maybe and a retry, "it ran and failed" is an answer. Downstream the
-            // agent's collar refuses both, and the loop needs to tell them apart.
+            // Separate flag from Failed on purpose: unavailable means retry, failed is final.
+            // The agent's collar refuses both, but the loop has to tell them apart.
             SolanaRpc.SimOutcome.Unavailable -> Risk(
                 RiskFlag.SIMULATION_UNAVAILABLE,
                 Severity.WARN,

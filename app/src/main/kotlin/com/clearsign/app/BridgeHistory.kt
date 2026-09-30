@@ -40,11 +40,10 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * The bridges this phone opened, and where to look. A bridge is the one thing whose half that
- * counts is not on Solana: you sign a deposit to RocketX and wait for an amount on Base or
- * Bitcoin, while Solscan says "confirmed". So each row carries two transactions on two chains,
- * both links from RocketX (`originTransactionUrl`, `destinationTransactionUrl`), and the amount
- * is `actualAmount`. The third door is RocketX support, order number copied first. The status asks itself on open.
+ * Bridges opened from this phone. The leg that matters is off Solana: you sign a deposit to RocketX
+ * and wait for funds on Base or Bitcoin while Solscan already says "confirmed". So each row links
+ * both transactions (`originTransactionUrl`, `destinationTransactionUrl`), the amount is
+ * `actualAmount`, and RocketX support opens with the order number copied. Status refreshes on open.
  */
 @Composable
 internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
@@ -89,16 +88,13 @@ internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
                         b.toNetwork + (if (b.exchange.isNotBlank()) "  ·  " + b.exchange else ""),
                         style = HaloType.small, color = Halo.muted,
                     )
-                    // Where it was meant to arrive. The signing receipt does not have it (the
-                    // address there is the deposit's), so if it is not here it is nowhere.
+                    // Destination address. The signing receipt only has the deposit address, so this is the only copy.
                     (st?.destAddress?.takeIf { it.isNotBlank() } ?: b.toAddress).takeIf { it.isNotBlank() }?.let {
                         Text(shorten(it, 6), fontFamily = Mono, fontSize = 11.sp, color = Halo.muted)
                     }
                     Text(
                         when {
-                            // The order was opened and the deposit never signed:
-                            // nothing left this phone. It used to sit here as a
-                            // bridge that "could not be asked", for ever.
+                            // Order opened, deposit never signed: nothing left the phone, nothing to ask.
                             b.signature.isBlank() -> stringResource(R.string.bridge_unpaid)
                             !asked -> stringResource(R.string.bridge_asking)
                             st == null -> stringResource(R.string.bridge_status_none)
@@ -113,8 +109,8 @@ internal fun BridgeHistorySheet(onDismiss: () -> Unit) {
                         (st?.originUrl ?: b.signature.takeIf { it.isNotBlank() }?.let { solscanTxUrl(it, null) })?.let { url ->
                             SmallChip(stringResource(R.string.bridge_h_sent), HIcon.EXTERNAL, tint = Halo.cyan) { open(ctx, url) }
                         }
-                        // The one page in the world that proves arrival. Until it exists, offer
-                        // the address on the other chain, which at least says what it holds now.
+                        // The destination tx is the only proof of arrival. Until it exists, link the
+                        // address on the other chain.
                         val dest = st?.destUrl
                         if (dest != null) {
                             SmallChip(stringResource(R.string.bridge_h_got), HIcon.EXTERNAL, tint = Halo.mint) { open(ctx, dest) }
@@ -162,10 +158,9 @@ private fun fmtDay(ctx: android.content.Context, at: Long): String {
 }
 
 /**
- * The deal, written above the signing receipt. The receipt says what happens on Solana, 0.1
- * SOL to an address, but that address is a RocketX deposit and what you sign for, how much
- * arrives and where, is on no simulation. So it sits on top: the two legs, the full address
- * on the other side (the one number nobody can correct after), and by whose hand it passes.
+ * The bridge terms, shown above the signing receipt. The receipt only covers Solana (0.1 SOL to a
+ * RocketX deposit address); what arrives and where is not simulated. So this shows both legs, the
+ * full destination address (no fixing it afterwards) and the provider.
  */
 @Composable
 internal fun BridgeDealCard(deal: RocketX.Deal) {

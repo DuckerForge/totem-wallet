@@ -1,10 +1,10 @@
 package com.clearsign.core
 
 /**
- * What a Token-2022 mint may do to you after you bought it. The old standard could only lie
- * before the purchase; extensions reach into your wallet afterwards, and one is the engine of the
- * largest automated scam on Solana in 2026: a permanent delegate can burn or move the token out
- * of your account forever, unasked. "Is Token-2022" alone says nothing, PYUSD and EURC are built on it too; the extensions are in the mint account, and this parses them. A second wallet does not help.
+ * What a Token-2022 mint can do to you after purchase. A permanent delegate, the engine of the
+ * largest automated scam on Solana in 2026, can move or burn the token out of your account.
+ * "Is Token-2022" alone says nothing (PYUSD and EURC use it too); the extensions live in the
+ * mint account, and this parses them.
  */
 data class MintExtensions(
     /** Someone can move or burn this token out of your account, for ever, unasked. */
@@ -13,7 +13,7 @@ data class MintExtensions(
     val transferHook: Boolean = false,
     /** A cut taken by the token itself on every transfer, in basis points. */
     val transferFeeBps: Int? = null,
-    /** It cannot be transferred at all. Whatever it is, it is not tradeable. */
+    /** Non-transferable, so not tradeable. */
     val nonTransferable: Boolean = false,
     /** New accounts start frozen, so buyers can be stopped from selling by default. */
     val defaultFrozen: Boolean = false,
@@ -26,11 +26,10 @@ data class MintExtensions(
 }
 
 /**
- * Read the extensions out of a raw Token-2022 mint account. Layout, worth writing down: base
- * mint 82 bytes, padding to 165 (a token account's length, so the two can be told apart), one
- * byte of account type at 165 (1 = mint), then TLV entries from 166: u16 LE type, u16 LE
- * length, that many bytes. Shorter than 166 is a plain SPL mint and returns
- * [MintExtensions.NONE]; so does garbage, because a parser that throws turns "could not read it" into a crash.
+ * Read the extensions of a raw Token-2022 mint account. Layout: base mint 82 bytes, padding to
+ * 165 (a token account's length, to tell them apart), account type byte at 165 (1 = mint), then
+ * TLV entries from 166: u16 LE type, u16 LE length, data. Shorter than 166 is a plain SPL mint
+ * and returns [MintExtensions.NONE]; so does garbage, rather than throwing.
  */
 fun readMintExtensions(data: ByteArray): MintExtensions {
     if (data.size <= 166 || data[165].toInt() != 1) return MintExtensions.NONE

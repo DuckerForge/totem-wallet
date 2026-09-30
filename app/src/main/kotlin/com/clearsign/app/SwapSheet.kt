@@ -101,7 +101,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Opened for the jar, it starts loading: a first frame of the SOL to USDC form flashed by.
+    // Opened for the jar, start in loading, or the SOL to USDC form flashes for a frame.
     var state by remember { mutableStateOf<SwapState>(if (spare) SwapState.SpareLoading else SwapState.Form) }
 
     // The wallet's own assets, named and priced exactly like the home screen.
@@ -110,18 +110,15 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     var from by remember { mutableStateOf(POPULAR[0]) }              // SOL by default
     var to by remember { mutableStateOf(POPULAR[1]) }                // USDC by default
 
-    // Opened from the market tab with a coin in mind: that coin is what we are
-    // buying, and SOL is what we are buying it with. The registry has to answer
-    // first, because a token with no decimals cannot be swapped into.
+    // Opened from the market with a coin: buy it with SOL. Wait for the registry first,
+    // since a token without decimals cannot be swapped into.
     LaunchedEffect(buyMint) {
         val mint = buyMint ?: return@LaunchedEffect
         val t = withContext(Dispatchers.IO) { runCatching { JupiterTokens.byMints(listOf(mint)) }.getOrNull()?.get(mint) } ?: return@LaunchedEffect
         to = PickToken.of(t)
         from = POPULAR[0]
     }
-    // Opened from a coin you already hold: that coin is what you are selling.
-    // The other side goes to dollars, or to SOL when the coin *is* dollars,
-    // because a swap with the same thing on both sides is not a swap.
+    // Opened from a held coin: sell it for dollars, or for SOL when the coin is dollars.
     LaunchedEffect(sellMint) {
         val mint = sellMint ?: return@LaunchedEffect
         val real = if (mint == com.clearsign.core.NATIVE_SOL_MINT) Jupiter.SOL_MINT else mint
@@ -140,8 +137,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     var quoting by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
     var editingPct by remember { mutableStateOf(false) }
-    // A fresher quote that goes somewhere else, with the review it was fetched for. Offered only
-    // there, never applied behind your back: shown on another review it would sign an old trade.
+    // A fresher quote with a different route, tied to the review it was fetched for (on another
+    // review it would sign an old trade). Only offered, never applied silently.
     var newRoute by remember { mutableStateOf<Pair<SwapState.Review, SwapState.Review>?>(null) }
 
     /**
@@ -158,7 +155,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
             val balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), owner) }.getOrNull() }
             // Something else took the sheet meanwhile: this answer is for a screen that is gone.
             if (state != SwapState.SpareLoading) return@launch
-            // Three different reasons, three different sentences: "not enough SOL" was said for all of them.
+            // One message per reason, not "not enough SOL" for all three.
             if (t == null || balance == null) { state = SwapState.Error(ctx.getString(R.string.spare_unreachable)); return@launch }
             val raw = Spare.movable(SpareJar.free(), minOf(balance, solLeft ?: balance), SpareJar.RESERVE)
             if (raw <= 0) { state = SwapState.Error(ctx.getString(R.string.spare_cannot)); return@launch }
@@ -173,7 +170,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     LaunchedEffect(spare) { if (spare) startSpare() }
 
     val currency = Settings.currency.value
-    // False until the portfolio answers: "Available: 0 SOL" while it loads read as "you cannot afford this".
+    // False until the portfolio loads, so "Available: 0 SOL" is not shown meanwhile.
     var ownedLoaded by remember { mutableStateOf(false) }
     LaunchedEffect(owner, currency) {
         val view = runCatching { Portfolio.load(ctx, owner, currency) }.getOrNull()
@@ -190,17 +187,16 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
         owned.firstOrNull { it.mint == from.mint }?.let { from = it }
     }
 
-    // What you are buying, graded before you buy it. The receipt can only describe
-    // the transaction; it cannot tell you the coin is one you will never sell.
+    // Grade the coin before buying: the receipt describes the transaction, not whether
+    // the coin can be sold later.
     LaunchedEffect(to.mint) {
         safety = null
         checking = true
         safety = withContext(Dispatchers.IO) {
             val tok = JupiterTokens.cached(to.mint) ?: JupiterTokens.byMints(listOf(to.mint))[to.mint]
             val out = runCatching { Jupiter.sellableBack(to.mint, tok?.decimals ?: to.decimals, tok?.usd ?: to.usd) }.getOrNull()
-            // Read the mint itself before the money moves. The registry cannot see
-            // a permanent delegate, and a permanent delegate is somebody who can
-            // take this coin back out of your wallet afterwards.
+            // Read the mint itself: the registry cannot see a permanent delegate, who can
+            // take the coin back out of your wallet later.
             val ext = tok?.let { TokenExtensions.of(to.mint, it.token2022) }
             tok?.facts(out, ext)?.let { com.clearsign.core.assessToken(it) }
         }
@@ -219,10 +215,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     }
 
     /**
-     * Quote, transaction, receipt, in one place. Written once because it happens twice: on
-     * Review, and every fifteen seconds after while you look. A quote goes stale, and so does
-     * the blockhash in the transaction, so a review left open a minute showed a price that no
-     * longer existed on a transaction that would no longer land.
+     * Quote, transaction, receipt. Runs on Review and every 15 s after while the review is open:
+     * the quote and the transaction's blockhash both go stale within a minute.
      */
     suspend fun buildReview(q: Jupiter.Quote, raw: Long): SwapState = try {
         // The building itself lives in SwapBuild, shared with the feed, so the
@@ -266,11 +260,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
     }
 
     /**
-     * While the review is open the price keeps moving, so the review keeps up, with one hard
-     * limit: a new quote can come back with a different route (other pools, other accounts).
-     * Swapping that in silently turns the picture you were reading into another transaction,
-     * and on this screen that is not allowed. Prices move; the shape of what you sign does not
-     * change without you saying so.
+     * Requote while the review is open, with one limit: a quote with a different route (other
+     * pools, other accounts) is never swapped in silently, since it changes what you sign.
      */
     LaunchedEffect(state) {
         val s = state as? SwapState.Review ?: return@LaunchedEffect
@@ -331,8 +322,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                     Text(stringResource(R.string.swap_title), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Halo.ink)
                     Text(stringResource(R.string.swap_sub), fontFamily = Inter, fontSize = 12.sp, color = Halo.muted)
                 }
-                // A full-height sheet has to say how to leave it: swiping it down is
-                // not something a person should have to discover.
+                // A full-height sheet needs a visible close; swipe-down is not discoverable.
                 Box(
                     Modifier.size(34.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999))
                         .clickable { onDismiss() },
@@ -364,24 +354,21 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                                 TokenChip(from) { picking = Side.FROM }
                             }
                             Text(stringResource(R.string.send_available, if (ownedLoaded) fmtUnits(fromBalance, from.decimals) + " " + from.symbol else "…"), fontFamily = Inter, fontSize = 11.sp, color = Halo.muted, style = Tabular)
-                            // Their own row: five of these next to the balance ran
-                            // off the side of the phone.
+                            // Own row: five chips beside the balance overflow the screen.
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                // Leave SOL behind for the transaction and for the wrapped-SOL account Jupiter opens and
-                                // closes inside it: 0.00204 SOL of rent for the duration. A reserve of 0.002 was 0.00004
-                                // short, so "MAX" from SOL built a swap that failed in simulation.
+                                // Leave SOL for the fee and for the wrapped-SOL account Jupiter opens and closes inside
+                                // the swap (0.00204 SOL of rent meanwhile). With 0.002, MAX from SOL fails in simulation.
                                 val spendable = if (from.mint == Jupiter.SOL_MINT) (fromBalance - 3_000_000L).coerceAtLeast(0) else fromBalance
                                 fun slice(pct: Int) { amount = fmtUnits(spendable / 100L * pct, from.decimals) }
                                 SmallChip("25%", null) { slice(25) }
                                 SmallChip("50%", null) { slice(50) }
                                 SmallChip("75%", null) { slice(75) }
                                 SmallChip(stringResource(R.string.send_max), null) { amount = fmtUnits(spendable, from.decimals) }
-                                // Yours. Tap to use it, hold to change it, and it is
-                                // still here tomorrow.
+                                // Custom preset: tap to use, hold to change; persisted.
                                 val custom by Settings.swapCustomPct
                                 if (custom in 1..100) {
                                     SmallChip("$custom%", null, tint = Halo.mint, onLongClick = { editingPct = true }, pulse = true) { slice(custom) }
@@ -391,9 +378,8 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             }
                             Text(stringResource(R.string.swap_from_hint), fontFamily = Inter, fontSize = 10.5.sp, color = Halo.muted)
                         }
-                        // Turn the trade around. The amount you were quoted becomes the
-                        // amount you are paying, which is what you meant if you picked
-                        // the two coins in the wrong order.
+                        // Flip the trade: the quoted amount becomes the amount paid, for coins picked
+                        // in the wrong order.
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Box(
                                 Modifier.size(38.dp).clip(rs(999)).background(Halo.card).haloBorder(rs(999))
@@ -421,9 +407,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             }
                         }
                         if (checking) Text(stringResource(R.string.safe_checking), fontFamily = Inter, fontSize = 11.5.sp, color = Halo.muted)
-                        // What the thing you are buying has been doing. A name and a
-                        // number with no shape behind them is the part of a swap that
-                        // feels like a coin toss, and a line fixes it for nothing.
+                        // A sparkline of the coin being bought.
                         Box(
                             Modifier.fillMaxWidth().clip(rs(16)).background(Halo.ground.copy(alpha = 0.5f))
                                 .haloBorder(rs(16)).padding(14.dp),
@@ -440,8 +424,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                         }
                         formError?.let { Banner(it, Halo.red, HIcon.WARNING) }
                     }
-                    // The coin was graded on the form, where you picked it. Saying
-                    // it again here is the same sentence twice on one screen.
+                    // The coin's grade is already on the form; not repeated here.
                     is SwapState.Review -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         newRoute?.takeIf { it.first === s }?.second?.let { n ->
                             Column(
@@ -488,11 +471,11 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                         scope.launch { state = buildReview(q, rawIn) }
                         }
                     }
-                    // Where the button was: at the end of the list it sat below the fold, and the sheet looked frozen.
+                    // In the button's place: at the end of the list it fell below the fold.
                     SwapState.Building -> BuildingBar(stringResource(R.string.swap_building))
                     is SwapState.Review -> {
-                        // A route the node says will fail is nearly always a stale price, and the fix is a new
-                        // quote. The hold is gone in that case: signing pays a fee for a transaction that does nothing.
+                        // A route the node says will fail is almost always a stale price: offer a new quote
+                        // and no hold, since signing would pay a fee for nothing.
                         val willFail = s.analyzed.receipt.risks.any {
                             it.flag == com.clearsign.core.RiskFlag.SIMULATION_FAILED && it.severity == com.clearsign.core.Severity.DANGER
                         }
@@ -501,8 +484,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
                             Spacer(Modifier.height(8.dp))
                             PrimaryButton(stringResource(R.string.swap_retry), danger = false) { state = SwapState.Form }
                             Spacer(Modifier.height(8.dp))
-                            // Kept, small and last: a simulation can be wrong about
-                            // state that is about to change, and it is your money.
+                            // Kept, small and last: the simulation can be wrong about state about to change.
                             GhostButton(stringResource(R.string.swap_anyway), tint = Halo.muted) {
                                 state = SwapState.Signing
                                 scope.launch {
@@ -537,10 +519,7 @@ internal fun SwapSheet(signer: SeedVaultSigner, owner: String, buyMint: String? 
 }
 
 
-/**
- * Pick your own slice, once. A slider, not a number field: this is a phone, the useful
- * values are round, and nobody wants a keyboard for "a third of it".
- */
+/** Set a custom slice. A slider, not a number field: the useful values are round. */
 @Composable
 private fun CustomPercentSheet(current: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit) {
     var pct by remember { mutableStateOf((if (current in 1..100) current else 10).toFloat()) }
@@ -584,10 +563,7 @@ private fun BuildingBar(message: String) {
     }
 }
 
-/**
- * An amount that shrinks instead of wrapping. In a half-width column "0.049674575 SOL" broke
- * into "0.04967457" and "5 SOL", and the second line read as five SOL (30 Sep, the film).
- */
+/** An amount that shrinks instead of wrapping: a wrapped "0.04967457" / "5 SOL" reads as five SOL. */
 @Composable
 private fun OneLineAmount(text: String, color: Color) {
     var size by remember(text) { mutableStateOf(15.sp) }

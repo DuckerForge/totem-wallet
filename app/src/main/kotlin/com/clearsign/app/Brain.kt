@@ -11,11 +11,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The model, talking to the wallet through five tools it cannot abuse. Two shapes: the
- * Anthropic Messages API and any endpoint speaking the OpenAI chat format (OpenRouter,
- * DeepSeek, a model on your own machine). No SDK, both are a POST with a JSON body. What
- * leaves the phone: the conversation, balances and addresses. What never leaves: any key.
- * The model proposes, [AgentBroker] decides, the Seed Vault is untouchable either way.
+ * The chat model, reaching the wallet only through its tools. Anthropic Messages or any OpenAI-style
+ * chat endpoint (OpenRouter, DeepSeek, a local model); no SDK, both are a JSON POST. Leaves the
+ * phone: the conversation, balances, addresses; never a key. The model proposes, [AgentBroker]
+ * decides, the Seed Vault is out of reach either way.
  */
 object Brain {
     private const val TAG = "Velum-Brain"
@@ -92,11 +91,10 @@ object Brain {
     }
 
     /**
-     * POST with `stream: true` and read server-sent events until the turn ends. Two dialects,
-     * one reader: Anthropic sends typed blocks (`content_block_start` / `_delta` / `_stop`) and
-     * tool arguments as partial JSON; OpenAI-shaped endpoints send `choices[0].delta` with
-     * `content` and `tool_calls[]` by index, then `[DONE]`. Both reassemble into the message
-     * the non-streaming answer would have carried, so the rest of the loop cannot tell.
+     * POST with `stream: true` and read SSE until the turn ends. Anthropic sends typed blocks
+     * (`content_block_start` / `_delta` / `_stop`) with tool arguments as partial JSON; OpenAI-style
+     * endpoints send `choices[0].delta` with `content` and `tool_calls[]` by index, then `[DONE]`.
+     * Both are rebuilt into the non-streaming message shape, so the loop sees no difference.
      */
     private fun stream(url: String, body: JSONObject, cfg: Secrets.Model, onText: (String) -> Unit): Streamed {
         val c = try {
@@ -231,10 +229,7 @@ object Brain {
 
     // ---- the prompt ------------------------------------------------------------
 
-    /**
-     * Built from the live policy, so there is one knob: change the rules and the model's brief
-     * changes with them. It is told the truth: it cannot sign, and a refusal is final.
-     */
+    /** Built from the live policy, so it follows rule changes. Says the model cannot sign and refusals are final. */
     fun systemPrompt(ctx: Context): String {
         val s = SessionWallet.current(ctx)
         val p = SessionWallet.policy(ctx)
@@ -292,7 +287,7 @@ object Brain {
         return sb.append(ownRules(ctx, italian)).toString()
     }
 
-    /** The person's own rules, last, after the truths they cannot override. Empty when there is no file. */
+    /** The user's own rules, after the fixed ones they cannot override. Empty when there is no file. */
     private fun ownRules(ctx: Context, italian: Boolean): String =
         UserRules.get(ctx)?.let { UserRules.chatBlock(it, italian) } ?: ""
 
@@ -319,10 +314,7 @@ object Brain {
         return JSONObject().put("model", cfg.model).put("messages", withSystem).put("tools", tools).put("max_tokens", 1024)
     }
 
-    /**
-     * One tiny real call, so a wrong key is caught here and not mid-conversation. Null when it
-     * worked, else the provider's own complaint, more useful than anything we could invent.
-     */
+    /** One tiny real call to catch a wrong key early. Null on success, else the provider's error message. */
     suspend fun test(ctx: Context): String? = withContext(Dispatchers.IO) {
         val cfg = Secrets.model(ctx)
         if (!cfg.ready) return@withContext ctx.getString(R.string.brain_no_key)
@@ -359,7 +351,7 @@ object Brain {
         c.disconnect()
         text?.let { JSONObject(it) }
     } catch (e: Exception) {
-        // Never log the body: it carries the key's neighbourhood and the user's words.
+        // Never log the body: it holds the user's messages, and the request carries the key.
         Log.w(TAG, "POST failed: ${e.javaClass.simpleName}")
         null
     }

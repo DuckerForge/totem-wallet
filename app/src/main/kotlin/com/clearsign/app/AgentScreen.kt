@@ -51,11 +51,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The Agent tab, in two depths. Simple answers the three questions a person has, in order:
- * is it working, what does it hold, what did it do. Pro, a remembered switch at the top,
- * adds the model, the collar's numbers, lane and targets with the shadow book, the live
- * trace, and the bridge to a computer. The tab used to show all of it to everyone: seven
- * paragraphs and twenty buttons, half about a PC bridge most people will never run.
+ * The Agent tab, in two depths. Simple answers: is it working, what does it hold, what
+ * did it do. Pro (a remembered switch at the top) adds the model, the collar's numbers,
+ * lane and targets with the shadow book, the live trace, and the PC bridge.
  */
 @Composable
 internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> Unit = {}) {
@@ -92,9 +90,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
     LaunchedEffect(session?.pubkey, refresh) {
         val pub = session?.pubkey ?: return@LaunchedEffect
         balance = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), pub) }.getOrNull() }
-        // What the coins it bought are worth right now. Without this the SOL left
-        // over would be called the result, and the minute the agent bought
-        // anything it would look like it had lost the money.
+        // Current value of the coins it bought. Without it the leftover SOL reads as
+        // the result, and every buy looks like a loss.
         invested = Positions.open(ctx).sumOf { p -> runCatching { SessionActions.quoteValue(ctx, p) }.getOrNull() ?: 0L }
         deposits = SessionActions.deposits(ctx)
     }
@@ -126,20 +123,19 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         NightCard(refresh)
 
         if (session == null || policy == null) {
-            // No budget: one card, one sentence, two ways in. The chat needs no
-            // budget, because it can only ever propose.
+            // No budget yet. The chat works without one, since it can only propose.
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.agent_nobudget_title), style = HaloType.title, color = Halo.ink)
                     Text(stringResource(R.string.env_none), style = HaloType.small, color = Halo.muted)
                     PrimaryButton(stringResource(R.string.env_create), danger = false, enabled = owner != null, icon = HIcon.HOURGLASS) { showNew = true }
-                    // One button, one link: the chat is the quiet way in.
+                    // One button, plus the chat as a link.
                     LinkRow(stringResource(R.string.chat_open)) { onChat() }
                     if (owner == null) Text(stringResource(R.string.agent_tab_none), style = HaloType.small, color = Halo.amber)
                 }
             }
             note?.let { Banner(it, Halo.amber, HIcon.INFO) }
-            // The first minute, said before the first budget: three steps and what to expect.
+            // Before the first budget: three steps and what to expect.
             if (SessionWallet.lastClose(ctx) == null) GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.first_title).uppercase(), style = HaloType.label, color = Halo.muted)
@@ -156,15 +152,14 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
         } else {
             AgentPulse(refresh)
 
-            // The money, in the order a person asks: how much is here, how did
-            // it go, and the three numbers behind that.
+            // The money: how much is here, how it went, and the three numbers behind it.
             val inCoins = invested ?: 0L
             // The coins' account rent counts too: it comes back when they are sold and the account closed.
             val total = (balance ?: 0L) + inCoins + deposits
             val diff = if (balance == null) null else total - session.fundedLamports + session.harvestedLamports
             val open = remember(refresh) { Positions.open(ctx) }
             val openCount = open.size
-            // A panel that is read and not touched: no chevron, no press.
+            // Read-only panel: no chevron, not clickable.
             SoftPanel(padding = 16.dp) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(if (balance == null) "…" else fmtSol(total, 4), style = HaloType.amount, color = Halo.ink)
@@ -180,9 +175,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                // From where it started to where it stands. The big total and the signed difference were
-                // there, but "+0.008" is a lot or a little depending on what you put in, and that number was
-                // nowhere on the page. Two lines, the two ends, the road between.
+                // Put in and now, so the signed difference has a scale.
                 if (balance != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.env_put_in), style = HaloType.small, color = Halo.muted, modifier = Modifier.width(96.dp))
@@ -203,9 +196,8 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 if (session.expired) { Spacer(Modifier.height(6.dp)); Banner(stringResource(R.string.env_expired_note), Halo.amber, HIcon.HOURGLASS) }
             }
 
-            // The two things you do here. Starting is a choice of lane, so it opens a small sheet; it
-            // is the one full button on the page. Stopping is quieter, the chat is the other way in,
-            // the Eyes are a link.
+            // Start opens the lane sheet and is the page's one full button; stop and chat
+            // are ghost buttons, Eyes is a link.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (cfg.on) {
                     GhostButton(stringResource(R.string.trader_stop_action), Modifier.weight(1f), HIcon.BLOCK, tint = Halo.amber, height = 54.dp) {
@@ -216,16 +208,15 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                 }
                 GhostButton(stringResource(R.string.chat_open), Modifier.weight(1f), HIcon.AGENT, tint = Halo.cyan, height = 54.dp) { onChat() }
             }
-            // The screen that never sleeps: charts, lines, and the loop's own words.
+            // Eyes: live charts, lines and the loop's trace.
             LinkRow(stringResource(R.string.eyes_open)) { showEyes = true }
 
             if (open.isNotEmpty()) {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(stringResource(R.string.agent_positions).uppercase(), style = HaloType.label, color = Halo.muted)
-                        // A stopped loop with coins still open is the state nobody should have to work out. The
-                        // stop-loss lives in the loop and nowhere else, so while it is off a position with no
-                        // on-chain order has nothing watching it either way. Said here, in red, above the rows.
+                        // The stop-loss lives only in the loop: while it is off, a position without an
+                        // on-chain order is unwatched. Warn in red above the rows.
                         val unwatched = open.count { !it.parked && it.triggerOrder == null }
                         if (!cfg.on && unwatched > 0) {
                             Banner(stringResource(R.string.trader_unwatched, unwatched), Halo.red, HIcon.WARNING)
@@ -238,7 +229,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
             RecentMoves(refresh)
             FollowsSection(refresh)
 
-            // Everything else, small. Each opens the same sheet it always did.
+            // Everything else, small; each opens its own sheet.
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (account != null) HaloChip(stringResource(R.string.env_add), HIcon.DOWNLOAD, tint = Halo.cyan) { showTopUp = true }
                 val gain = ((balance ?: 0L) - session.fundedLamports).coerceAtLeast(0L)
@@ -266,8 +257,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
                     }
                 }
                 HaloChip(stringResource(R.string.env_close), HIcon.BLOCK, tint = Halo.red) {
-                    // Look inside before the key disappears: a coin left in a
-                    // closed budget is a coin nobody can ever reach again.
+                    // Check before the key is gone: a coin left in a closed budget is lost for good.
                     busy = ctx.getString(R.string.env_closing)
                     scope.launch {
                         val inside = runCatching { SessionActions.holdings(ctx) }.getOrDefault(emptyList())
@@ -331,8 +321,7 @@ internal fun AgentScreen(owner: String?, signer: SeedVaultSigner, onChat: () -> 
 
             ProSection(stringResource(R.string.pro_trace), HIcon.AGENT) { AgentConsole() }
 
-            // The bridge to an agent on a computer: the four cards the tab used
-            // to open with, folded into one section for the people who run one.
+            // Bridge to an agent on a computer, folded into one section.
             ProSection(stringResource(R.string.pro_pc), HIcon.SCAN) {
                 Text(stringResource(R.string.agent_tab_how), style = HaloType.small, color = Halo.muted, lineHeight = 18.sp)
                 if (owner != null) {
@@ -401,7 +390,7 @@ private fun ProSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     HaloChip(stringResource(R.string.agent_pro), tint = if (on) Halo.cyan else Halo.muted, selected = on) { onChange(!on) }
 }
 
-/* A Pro section: a title you tap, and its content when open. Closed by default, so the page stays a page. */
+/* A Pro section: a tappable title and its content when open. Closed by default. */
 @Composable
 private fun ProSection(title: String, icon: HIcon, openAtFirst: Boolean = false, content: @Composable () -> Unit) {
     var open by remember(title) { mutableStateOf(openAtFirst) }
@@ -419,8 +408,7 @@ private fun LastBudget(refresh: Int) {
     val up = c.resultLamports >= 0
     val mins = ((c.closedAt - c.createdAt) / 60_000L).coerceAtLeast(0L)
     val dur = if (mins >= 60) String.format(java.util.Locale.ROOT, "%dh %02dm", mins / 60, mins % 60) else "$mins min"
-    // A panel that is read: the two ends, the result in a pill, and the
-    // share as a small round button, not a third bordered box on the page.
+    // Read-only: the two ends, the result in a pill, share as a small round button.
     SoftPanel {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -449,9 +437,8 @@ private fun LastBudget(refresh: Int) {
 }
 
 /**
- * Copy trading where the person can see it. The star in Scout follows a wallet; this lists
- * what that star did, with each wallet's last buy. What they buy goes to the front of the
- * loop's list, through the same gates.
+ * Copy trading: the wallets starred in Scout, each with its last buy. Their buys go to the
+ * front of the loop's list, through the same gates.
  */
 @Composable
 private fun FollowsSection(refresh: Int) {
@@ -479,10 +466,8 @@ private fun FollowsSection(refresh: Int) {
                             fontFamily = Inter, fontSize = 10.5.sp, color = if (last != null) Halo.mint else Halo.muted, maxLines = 1,
                         )
                     }
-                    // Three commands, and none looked like one: bare words ("sells too", "buys only",
-                    // "Following") that did something when tapped, with nothing saying they could be tapped or
-                    // which state was on. The question here is "how do I make it copy", and the answer is that
-                    // following is copying: now it says so, and the two things that can change look changeable.
+                    // Following is copying. The switch picks buys only or buys and sells, and the label
+                    // says which is on.
                     var mirror by remember(w) { mutableStateOf(Follows.mirrors(ctx, w)) }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
@@ -496,8 +481,7 @@ private fun FollowsSection(refresh: Int) {
                         )
                     }
                     Spacer(Modifier.width(2.dp))
-                    // The star, the same as Scout's: lit means you follow it, tapping stops.
-                    // A recognizable icon beats a word that has to be read.
+                    // Same star as Scout: lit means followed, tap to unfollow.
                     Box(
                         Modifier.size(34.dp).clip(rs(999)).clickable { Follows.toggle(ctx, w); Haptics.tick(ctx) },
                         contentAlignment = Alignment.Center,
@@ -551,9 +535,9 @@ private fun RecentMoves(refresh: Int) {
 }
 
 /**
- * Why a move was stopped, in the language the app speaks now. The collar's own refusals are
- * said again from their key; rows older than the key are read back from the sentence. An
- * unanswered question is always the same sentence, so it comes from today's strings.
+ * Why a move was stopped, in the device's language. Refusals are rebuilt from their key;
+ * older rows without a key are parsed from the sentence. An expired question always uses
+ * the current string.
  */
 private fun refusalNote(ctx: android.content.Context, e: LedgerEntry): String {
     if (e.host == "expired") return ctx.getString(R.string.agent_ask_timeout)
@@ -561,10 +545,7 @@ private fun refusalNote(ctx: android.content.Context, e: LedgerEntry): String {
     return com.clearsign.core.Refusals.say(t, deviceLocaleTag()) ?: e.note
 }
 
-/**
- * Starting is a choice of lane, in the two words crypto uses. The reason it cannot start,
- * when there is one, sits here before the button, not six minutes later in a note.
- */
+/** The start sheet: pick a lane. If the loop cannot start, the reason shows here, before the button. */
 @Composable
 private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
@@ -582,11 +563,8 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.lane_body), style = HaloType.small, color = Halo.muted)
             StatRow(stringResource(R.string.trader_tp), "+" + cfg.takeProfitPct + "%", accent = true)
             StatRow(stringResource(R.string.trader_sl), if (cfg.stopLossPct < 1) stringResource(R.string.agent_payout_off) else "-" + cfg.stopLossPct + "%")
-            // The two numbers to change at the door, two different questions that looked like one. How
-            // many coins at once answers "how many bets"; how much per coin answers "how much per bet",
-            // and it was the one you could not touch: fixed in the engine at eighty percent, which with
-            // one slot looks like the whole budget, so the only way to put in less was tightening the
-            // collar. The line below says the slice in SOL and money, and moves with both sliders.
+            // Slots (how many coins at once) and slice (how much per coin) are separate
+            // settings. The note below shows the slice in SOL and money and follows both.
             SliderRow(stringResource(R.string.trader_slots), cfg.maxPositions.toString(), cfg.maxPositions.toFloat(), 1f..5f, Halo.cyan, steps = 3) {
                 cfg = cfg.copy(maxPositions = it.toInt().coerceIn(1, 5))
             }
@@ -594,8 +572,7 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 stringResource(R.string.agent_slice), cfg.slicePercent.toString() + "%",
                 cfg.slicePercent / 100f, 0.1f..1f, Halo.mint, steps = 17,
             ) { cfg = cfg.copy(slicePercent = (it * 100).toInt().coerceIn(10, 100)) }
-            // The fee the coin itself keeps. Zero is the closed door and the starting
-            // value: it opens only on purpose.
+            // Max fee the coin itself keeps. Starts at zero (off), so it opens only on purpose.
             SliderRow(
                 stringResource(R.string.agent_fee_max),
                 if (cfg.maxFeePct == 0) stringResource(R.string.agent_payout_off) else cfg.maxFeePct.toString() + "%",
@@ -628,8 +605,8 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
                 }
                 Text(stringResource(R.string.ore_wager_note), style = HaloType.small, color = Halo.amber)
             }
-            // The gain in hard coin: on close, what sits above the capital becomes ORE.
-            // Works without digging too: it is a separate thing.
+            // Payout in ORE: on close, profit above the capital becomes ORE.
+            // Independent of mining.
             SwitchRow(stringResource(R.string.agent_ore_bury_title), stringResource(R.string.agent_ore_bury_sub), cfg.oreBury) { cfg = cfg.copy(oreBury = it) }
             blocked?.let { Banner(it, Halo.amber, HIcon.WARNING) }
             PrimaryButton(stringResource(R.string.lane_start), danger = false, enabled = blocked == null, icon = HIcon.AGENT) {
@@ -644,7 +621,7 @@ private fun LaneSheet(onStarted: () -> Unit, onDismiss: () -> Unit) {
     }
 }
 
-/** The guarantees, all of them, in one place, for whoever asks. Off the page, because the page is for what is happening. */
+/** All the guarantees in one sheet, off the main page. */
 @Composable
 private fun TruthSheet(onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -674,15 +651,13 @@ private fun TruthBlock(icon: HIcon, title: String, body: String) {
     }
 }
 
-/** Twelve hours: long enough to hold a night, short enough that it is still news. */
+/** The overnight window: twelve hours. */
 private const val NIGHT_MS = 12 * 3600_000L
 
 /**
- * What happened while you slept. A desk spends its first hour building context: what moved
- * overnight, what it still holds, how much it may lose today. This costs nothing: four local
- * reads (ledger, positions, the crowd file Scout downloaded, the budget's caps). A brief
- * that spent a request per open is one people learn not to open. It draws nothing when the
- * night was empty: "nothing happened" every morning teaches people to scroll past it.
+ * Overnight brief: what moved, what it holds, how much it may still lose today. Four local
+ * reads (ledger, positions, Scout's cached crowd file, the budget's caps), no network.
+ * Draws nothing when the night was empty.
  */
 @Composable
 private fun NightCard(refresh: Int) {
@@ -695,8 +670,7 @@ private fun NightCard(refresh: Int) {
             .getOrDefault(emptyList()).sortedByDescending { it.at }
     }
     val held = remember(refresh) { runCatching { Positions.open(ctx) }.getOrDefault(emptyList()) }
-    // Scout's own file, whatever age it is. Refreshing it here would turn opening
-    // this page into a request, and the page is opened every morning.
+    // Scout's cached file, however old: refreshing here would cost a request per page open.
     val crowd = remember(refresh) {
         runCatching { SeekerFeed.cached(ctx)?.events.orEmpty().filter { it.at >= since && !it.sell } }
             .getOrDefault(emptyList())
@@ -708,8 +682,7 @@ private fun NightCard(refresh: Int) {
 
     val coins = crowd.map { it.mint }.distinct()
     val people = crowd.map { it.wallet }.distinct().size
-    // Morning or not, the window is the same twelve hours. Only the name changes,
-    // because calling six in the evening "the night" would be a small lie.
+    // Same twelve-hour window all day; only the title changes with the hour.
     val hour = remember(refresh) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val title = if (hour in 4..12) R.string.night_title else R.string.night_title_recent
 
@@ -723,9 +696,7 @@ private fun NightCard(refresh: Int) {
             Text(
                 stringResource(
                     when {
-                        // "While you slept" at two in the afternoon does not hold: the
-                        // window is the same twelve hours, but the name changes with
-                        // the hour and so must the verdict.
+                        // The verdict follows the title's hour: no "while you slept" in the afternoon.
                         moves.isNotEmpty() && hour in 4..12 -> R.string.night_worked
                         moves.isNotEmpty() -> R.string.night_worked_recent
                         coins.isNotEmpty() -> R.string.night_still
@@ -761,9 +732,7 @@ private fun NightCard(refresh: Int) {
                     Text(stringResource(R.string.night_crowd_none), style = HaloType.small, color = Halo.muted)
                 } else {
                     Text(stringResource(R.string.night_crowd_line, people, coins.size), style = HaloType.small, color = Halo.ink)
-                    // The three that most different people bought, which is the only
-                    // count that means a crowd: one wallet buying nine times is one
-                    // person changing their mind.
+                    // Top three by distinct buyers: one wallet buying nine times is one person.
                     crowd.groupBy { it.mint }
                         .map { (_, b) -> b.first().symbol to b.map { it.wallet }.distinct().size }
                         .sortedByDescending { it.second }.take(3)

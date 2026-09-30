@@ -6,11 +6,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * What a coin is, and how it moved over more than a day. Jupiter's registry answers "is this a
- * trap", not "what am I buying", and an agent proposing a purchase with no idea what the thing
- * does is guessing. This adds a sentence about the project, its rank, and the week, month and
- * year behind the last 24 hours. Keyless, rate-limited by IP, 429 when pushed: cached an hour,
- * every failure silent. A free demo key (`x-cg-demo-api-key` in [get]) would lift the limit to ten thousand calls a month.
+ * What a coin is and how it moved beyond 24 h. Jupiter's registry answers "is this a trap", not
+ * "what am I buying"; this adds a project sentence, rank, and 7d/30d/1y change. Keyless, limited by
+ * IP, 429 when pushed: cached an hour, failures silent. A free demo key (`x-cg-demo-api-key` in
+ * [get]) would lift it to 10k calls a month.
  */
 object CoinGecko {
     private const val TAG = "Apex-Gecko"
@@ -18,9 +17,8 @@ object CoinGecko {
     private const val TTL_MS = 60L * 60 * 1000
 
     /**
-     * [changePct] is keyed by window: "24h", "7d", "30d", "1y". Anything the API
-     * did not return is simply absent, so a caller can say "this is new" instead
-     * of printing a zero that looks like a flat week.
+     * [changePct] is keyed by window: "24h", "7d", "30d", "1y". A window the API did not return is
+     * absent, not zero, so a new coin doesn't look flat.
      */
     data class Coin(
         val name: String,
@@ -60,8 +58,7 @@ object CoinGecko {
         val cats = o.optJSONArray("categories")?.let { a ->
             (0 until a.length()).mapNotNull { a.optString(it).takeIf { c -> c.isNotEmpty() && c != "null" } }
         } ?: emptyList()
-        // The listing blurb runs to pages of marketing. Two sentences is what a
-        // person is told out loud, and all the model needs to say what it is.
+        // The blurb runs to pages of marketing; two sentences are enough for the model.
         val about = o.optJSONObject("description")?.optString("en")?.takeIf { it.isNotBlank() }
             ?.replace(Regex("<[^>]*>"), "")
             ?.split(Regex("(?<=\\.)\\s+"))?.take(2)?.joinToString(" ")?.trim()?.take(280)

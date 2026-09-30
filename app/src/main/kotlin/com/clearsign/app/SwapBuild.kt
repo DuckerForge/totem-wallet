@@ -5,11 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * One swap, built in one place for every screen that offers one. The swap sheet did this
- * well (Ultra first, our fee account only on the old route, the receipt read from the real
- * bytes and tidied so the pool has a name); a second caller meant two copies, and the feed
- * could show a different receipt from the sheet for the same operation. Both callers get the
- * same bytes and the same words.
+ * One swap builder for every screen that offers a swap: Ultra first, our fee account only on the
+ * v1 route, the receipt read from the real bytes and tidied so the pool has a name. With two
+ * copies the feed could show a different receipt than the sheet for the same trade.
  */
 internal data class SwapBuilt(
     val tx: ByteArray,
@@ -86,10 +84,9 @@ internal object SwapBuild {
     }
 
     /**
-     * A swap is not a transfer, and the generic reading made it look like one: the "new unknown
-     * recipient" is the AMM vault and the "account close" is the wSOL account unwrapping. Amounts
-     * and destination stay visible and recorded; the pool gets its name and the two transfer-only
-     * warnings go.
+     * Swap-specific receipt cleanup. The generic reading flags the AMM vault as a "new unknown
+     * recipient" and the wSOL unwrap as an "account close". Amounts and destination stay visible and
+     * recorded; the pool gets its name and those two transfer-only warnings are dropped.
      */
     fun tidy(ctx: Context, analyzed: ReceiptEngine.Analyzed, owner: String, to: Side? = null): ReceiptEngine.Analyzed {
         val r = analyzed.receipt
@@ -99,8 +96,7 @@ internal object SwapBuild {
             val o = Base58.decode(owner); val m = Base58.decode(to.mint)
             listOf(WalletTx.TOKEN_PROGRAM, WalletTx.TOKEN_2022).map { Base58.encode(Pda.associatedTokenAddress(o, m, it)) }.toSet()
         }.getOrDefault(emptySet())
-        // Short, because this name is read under a circle on a map and at the head
-        // of a row. The full route lives one line up, in the summary.
+        // Short: shown under a circle on the map and at the start of a row. The full route is in the summary.
         val pool = ctx.getString(R.string.swap_pool_short)
         val drop = setOf(com.clearsign.core.RiskFlag.NEW_UNKNOWN_RECIPIENT, com.clearsign.core.RiskFlag.ACCOUNT_CLOSE)
         return analyzed.copy(
@@ -111,8 +107,8 @@ internal object SwapBuild {
                     when {
                         d.label != null -> d
                         d.isNewAccount && d.address in mine -> d.copy(label = ctx.getString(R.string.swap_your_account, to!!.symbol))
-                        // Any other account this transaction opens belongs to the route: "Account for CATE" once put
-                        // one wrong name on two accounts.
+                        // Any other account opened here belongs to the route; naming them all "Account for CATE"
+                        // mislabeled two accounts.
                         d.isNewAccount -> d.copy(label = ctx.getString(R.string.swap_new_account))
                         d.address == owner -> d
                         else -> d.copy(label = pool)

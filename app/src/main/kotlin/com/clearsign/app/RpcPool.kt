@@ -3,11 +3,11 @@ package com.clearsign.app
 import org.json.JSONObject
 
 /**
- * The RPC node pool: whom to ask, in what order, what to learn from each answer. Free keys are
- * few and shared, with a monthly quota across every install and a per-second limit that bites
- * first. Spread: each install orders providers at random, weighted by quota, so a thousand
- * phones do not hammer one node. Learn: a `-32099` or a 4xx on a method marks that provider as
- * not doing it; a passing 429 cools for minutes, a 402 or a 429 that stays is a spent month, refused until the 1st. Plus a daily per-phone cap on shared keys that slows the hunt, never the exits, changeable from the archive. Pure: clock from outside.
+ * RPC pool: whom to ask, in what order, what to learn from each answer. Free keys are shared by all
+ * installs (monthly quota; the per-second limit bites first), so each install orders them at random
+ * weighted by quota. `-32099` or a 4xx on a method: provider doesn't serve it. Passing 429: cool for
+ * minutes; 402 or lasting 429: month spent, skip until the 1st. A daily per-phone cap on shared keys
+ * slows the hunt, never exits (changeable from the archive). Pure: the clock comes from outside.
  */
 class RpcPool(
     providers: List<Provider>,
@@ -25,7 +25,7 @@ class RpcPool(
         val weight: Int,
         /** Serves the DAS API (`getAsset*`), which is Helius only. */
         val das: Boolean = false,
-        /** Accetta `sendTransaction` da noi: un gratuito su nodi pubblici no. */
+        /** Accepts our `sendTransaction`; free tiers on public nodes don't. */
         val sends: Boolean = true,
         /** Last resort: tried only after all the others. No key, no quota of ours. */
         val lastResort: Boolean = false,
@@ -69,7 +69,7 @@ class RpcPool(
         }
     }
 
-    // ---- l'ordine -------------------------------------------------------------
+    // ---- order ----------------------------------------------------------------
 
     /**
      * In what order to ask [method], now. The own node first if there is one, the writer's
@@ -118,7 +118,7 @@ class RpcPool(
         }
     }
 
-    // ---- imparare ----------------------------------------------------------------
+    // ---- learning ----------------------------------------------------------------
 
     /**
      * What to make of [name]'s answer to [method]: an OK warms it, a deterministic refusal says
@@ -134,7 +134,7 @@ class RpcPool(
                 h.failures++; h.lastError = detail ?: "429"
                 h.rateStreak++
                 h.coldUntil = now + (COLD_RATE_MS * h.rateStreak).coerceAtMost(COLD_RATE_MAX_MS)
-                // A 429 that no longer passes is a spent month, not a crowded second.
+                // A lasting 429 means the monthly quota is spent, not the per-second limit.
                 if (h.rateStreak >= RATE_STREAK_EXHAUSTED) exhaust(name, h, now)
             }
             Outcome.EXHAUSTED -> { h.failures++; h.lastError = detail ?: "402"; exhaust(name, h, now) }
@@ -165,7 +165,7 @@ class RpcPool(
     @Volatile private var day: Long = -1L
     @Volatile private var used: Int = 0
 
-    /** Il tetto. Zero vuol dire nessuno. */
+    /** The daily cap. Zero means no cap. */
     @Volatile var cap: Int = store.get("cap")?.toIntOrNull() ?: DEFAULT_CAP
         set(v) { field = v.coerceAtLeast(0); store.put("cap", field.toString()) }
 
@@ -203,7 +203,7 @@ class RpcPool(
          */
         const val DEFAULT_CAP = 600
 
-        /** The last instant of the month, UTC: when a spent key comes back to life. */
+        /** The last instant of the month, UTC: when a spent key's quota resets. */
         fun monthEnd(now: Long): Long {
             val c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
             c.timeInMillis = now

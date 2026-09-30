@@ -11,11 +11,9 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Every coin there is, ranked, the way a market screen is expected to work. The wallet's
- * lists (Jupiter's registry, Solana only) answer what this wallet can trade, the wrong list
- * for "how is bitcoin doing" or for following a coin held elsewhere. This is CoinGecko's,
- * free, no key, by market cap, every chain. [Coin.mint] says whether a coin also lives on
- * Solana: the difference between a row you can buy from and one you can only watch.
+ * All coins by market cap, every chain, from CoinGecko (free, no key). Jupiter's lists only
+ * cover what this wallet can trade. [Coin.mint] is set when a coin also lives on Solana,
+ * i.e. it can be bought here, not just watched.
  */
 object Market {
     private const val TAG = "Apex-Market"
@@ -45,40 +43,26 @@ object Market {
     @Volatile private var top: List<Coin> = emptyList()
     @Volatile private var topAt = 0L
     private val mints = java.util.concurrent.ConcurrentHashMap<String, String>(
-        // Solana's own coin has no entry in CoinGecko's platform map (nothing "lives on" the chain
-        // it is the gas of), so the lookup came back empty and the screen concluded Solana cannot
-        // be charted or bought. Wrapped SOL is the mint every pool and quote names: the right answer.
+        // SOL has no entry in CoinGecko's platform map, so the lookup comes back empty.
+        // Wrapped SOL is the mint pools and quotes use.
         mapOf("solana" to "So11111111111111111111111111111111111111112"),
     )
 
-    /**
-     * What is already in memory, never a network call: [top] blocks, and a composable blocking
-     * on a cold cache freezes its frame. The market screen fills this when it opens.
-     */
+    /** Memory only, no network: [top] blocks and would freeze a composable. The screen fills it on open. */
     fun cachedTop(): List<Coin> = top
 
     /**
-     * The list as it was when the app last closed, so the market does not open empty.
-     *
-     * The memory cache dies with the process, and the first visit of every run was a spinner
-     * waiting on a free API over the network. The screen shows what is here immediately and
-     * replaces it as soon as the fresh list lands, which is a second later, not a minute.
-     *
-     * Kept six hours and no longer. These are prices: an old one shown as if it were current
-     * is worse than a wait, and past six hours the screen would rather look empty for a moment.
-     * `topAt` is stamped with the file's own age, so the two minute TTL still forces the refresh.
+     * Last list saved to disk, shown on a cold start until the fresh one lands.
+     * Kept six hours at most: stale prices shown as current are worse than a short wait.
+     * `topAt` gets the file's age, so the two minute TTL still forces a refresh.
      */
     private const val DISK_MS = 6 * 3600_000L
     private const val FILE = "market_top.json"
     @Volatile private var file: java.io.File? = null
 
-    /**
-     * Where the list on screen came from when it is not CoinGecko's own answer: null when it is.
-     * CoinGecko blocks whole networks with a 403, so the screen says what it is showing instead.
-     */
+    /** Where the list on screen came from, null for CoinGecko. CoinGecko 403s whole networks. */
     enum class Source { SAVED, JUPITER }
-    // Snapshot state, not plain fields: a refresh that fails over a list on screen changes only
-    // these, and the screen has to redraw to say so.
+    // Snapshot state: a failed refresh changes only these, and the screen must still redraw.
     var source: Source? by mutableStateOf<Source?>(null)
         private set
     /** When the list on screen was priced: for [Source.SAVED], when it was saved. */
@@ -109,11 +93,8 @@ object Market {
     }
 
     /**
-     * The next hundred by market cap, appended.
-     *
-     * The screen only ever asked for page one, so the market stopped at the hundredth coin with
-     * nothing to say it had. Pages are additive and de-duplicated by id: the list only grows,
-     * and a refresh of page one replaces the head without throwing away what was read below it.
+     * Appends the next hundred by market cap, de-duplicated by id. A refresh of page one
+     * replaces the head and keeps what was loaded below it.
      */
     fun more(): List<Coin> {
         // Under a saved or Jupiter list, page two would be glued to a head of another age.
@@ -140,18 +121,15 @@ object Market {
     fun top(force: Boolean = false): List<Coin> {
         val now = System.currentTimeMillis()
         if (!force && top.isNotEmpty() && now - topAt < TTL_MS) return top
-        // The archive first: the worker asks CoinGecko once every ten minutes for every phone,
-        // so ten thousand phones are one caller, not ten thousand. The phone asks CoinGecko
-        // itself only when the archive is missing or stale.
+        // Archive first: the worker polls CoinGecko every ten minutes for all phones.
+        // Ask CoinGecko directly only when the archive is missing or stale.
         val head = archived()?.let { parse(it) }?.takeIf { it.isNotEmpty() }
             ?: getArray("$BASE/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$PAGE&page=1&price_change_percentage=24h")?.let { parse(it) }?.takeIf { it.isNotEmpty() }
             ?: paprika()?.let { parse(it) }.orEmpty()
         if (head.isEmpty()) {
-            // Nobody gave a ranked list. Jupiter's list is priced again (if that fails too, it is
-            // said as saved); any other list on screen stays, said as saved; with nothing on
-            // screen, the last saved list at any age (said as such), else Jupiter's list.
-            // Jupiter's rows are keyed by mint: while they are on screen, Jupiter is asked again
-            // every time, even after one failure marked them saved.
+            // No ranked list from anyone. Jupiter rows on screen: reprice them, else mark saved.
+            // Any other list stays, marked saved. Nothing on screen: the saved list at any age,
+            // else Jupiter's. Jupiter rows (id == mint) are retried even once marked saved.
             val jupiterRows = top.firstOrNull()?.let { it.id == it.mint } == true
             when {
                 source == Source.JUPITER || jupiterRows -> {
@@ -165,9 +143,8 @@ object Market {
             topAt = now
             return top
         }
-        // Page one refreshed in place: the tail below it stays, or scrolling past the hundredth
-        // coin and pulling to refresh would silently take the rest away. Not under a saved or
-        // Jupiter list: that tail is as old as the list, and nothing would say so any more.
+        // Refresh page one in place and keep the tail below it, except under a saved or Jupiter
+        // list, where the tail would be stale with nothing marking it.
         val keepTail = source == null
         source = null
         pricedAt = now
@@ -186,10 +163,9 @@ object Market {
     }
 
     /**
-     * CoinPaprika's first hundred, in CoinGecko's shape, for networks CoinGecko refuses. Asked by
-     * the phone itself: from Cloudflare its shared quota is spent (29 Sep 2026). Its ids become
-     * CoinGecko's where the two differ, so the mint map and the lookups keep working; its images
-     * are not served to apps, so [parse] takes the logo already seen for the coin.
+     * CoinPaprika's top hundred in CoinGecko's shape, for networks CoinGecko blocks. Called from the
+     * phone: the shared quota from Cloudflare is spent (29 Sep 2026). Ids are mapped to CoinGecko's
+     * so the mint map works. Its images aren't served to apps, so [parse] reuses a known logo.
      */
     private fun paprika(): JSONArray? {
         val arr = fetch("https://api.coinpaprika.com/v1/tickers?limit=$PAGE")?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return null
@@ -229,12 +205,9 @@ object Market {
     }
 
     /**
-     * Jupiter's popular list as coins, by its own market caps. Keyed by mint, so charts and
-     * buying work; no global rank, and no BTC or ETH. Not saved: it is not the ranked list.
-     *
-     * That list is kept a day, and on disk without market caps: after a restart it came back
-     * empty, otherwise with prices up to a day old shown as live. So every price is asked
-     * again, and a coin with no price now is left out.
+     * Jupiter's popular list as coins, by its market caps. Keyed by mint so charts and buying work;
+     * no global rank, no BTC or ETH. Not saved, it isn't the ranked list. The cached list can be a
+     * day old and has no caps on disk, so every price is fetched again and unpriced coins dropped.
      */
     private fun fromJupiter(): List<Coin> {
         val ctx = app ?: return emptyList()
@@ -338,10 +311,9 @@ object Market {
     }
 
     /**
-     * Candles for a coin with no pool to read: bitcoin, ether, anything not on this chain.
-     * GeckoTerminal knows only pools, and "no chart" on the most famous coin reads as a broken
-     * screen. CoinGecko's OHLC is the same data one level up, free, every coin. The API picks the
-     * candle size from the days asked (a day gives half-hours, a month four-hours, a year four-day candles), so spans are named after the range covered. No volume comes back.
+     * Candles for coins with no Solana pool (BTC, ETH), since GeckoTerminal only knows pools.
+     * CoinGecko picks the candle size from the days asked (1 day: 30 min, a month: 4 h, a year:
+     * 4 days), so spans are named by range covered. No volume.
      */
     private val ohlcCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Gecko.Candle>>>()
     private const val OHLC_TTL_MS = 5 * 60_000L

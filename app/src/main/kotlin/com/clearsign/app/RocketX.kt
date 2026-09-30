@@ -10,10 +10,10 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * RocketX, the bridge: one API over 200 chains, DEX and exchange routes, no account. Verified
- * 16 Sep 2026 with the partner key. A quote picks a route, `/swap` opens the order and answers
- * with a deposit address, the money goes there through the ordinary Send (receipt, fingerprint),
- * `/status` follows it. Routes needing a memo are skipped. Privacy: no identity asked and the on-chain thread breaks at the exchange; not a mixer, one less form.
+ * RocketX bridge: one API over 200 chains, DEX and exchange routes, no account. Verified
+ * 16 Sep 2026 with the partner key. A quote picks a route, `/swap` returns a deposit address,
+ * the ordinary Send pays it (receipt, fingerprint), `/status` tracks it. Memo routes are
+ * skipped. No identity asked and the on-chain trail breaks at the exchange; not a mixer.
  */
 object RocketX {
     private const val TAG = "Apex-RocketX"
@@ -21,10 +21,9 @@ object RocketX {
     private const val KEY = BuildConfig.ROCKETX_KEY
 
     /**
-     * With the key we go direct, without it through the service. A key inside the APK is
-     * anyone's to extract and spend or get revoked. The trade, said whole: the service then
-     * sits in the middle of the answer that carries the deposit address, a surface on the
-     * money instead of one on the quota. So the choice is a line in `local.properties`.
+     * With a key, call RocketX directly; without, go through the worker. A key in the APK can be
+     * extracted and abused or revoked, but the worker then sits in the response that carries
+     * the deposit address. The choice is a line in `local.properties`.
      */
     private val viaWorker: String? get() =
         BuildConfig.CROWD_URL.takeIf { KEY.isBlank() && it.isNotBlank() }?.trimEnd('/')
@@ -36,17 +35,16 @@ object RocketX {
 
     data class Network(
         val id: String, val name: String, val chainId: String, val native: String,
-        /** Where to look something up on that chain. RocketX says it, chain by chain. */
+        /** Block explorer base URL, from RocketX per chain. */
         val explorer: String = "",
         /** The short, stable name RocketX sends: ETHEREUM, BASE, AVAXC. See [POPULAR]. */
         val short: String = "",
     )
 
     /**
-     * The eight in use, in this order; everything else sits behind the search. RocketX's own
-     * order puts a chain nobody here would use third, and two hundred pills are a wall, not a
-     * choice. Hooked on the readable `shorthand`, not the id, and if one disappears the chain
-     * only leaves the front row: the old id list silently dropped chains from the screen.
+     * The eight shown up front, in this order; the rest are behind search. Keyed on `shorthand`,
+     * not the id: if one disappears it only leaves the front row, where the old id list
+     * silently dropped chains from the screen.
      */
     val POPULAR = listOf("ETHEREUM", "BASE", "ARBITRUM", "BNB", "POLYGON", "OPTIMISM", "AVAXC", "BITCOIN")
 
@@ -57,9 +55,8 @@ object RocketX {
     }
 
     /**
-     * The deal, once struck. When `/swap` answers the numbers are no longer negotiable: that
-     * order waits for that amount at that deposit address and sends that amount to the other
-     * side. From here the screen only says what was agreed and has it signed.
+     * An order as `/swap` fixed it: this amount to this deposit address, that amount out on
+     * the other side. The screen only shows it and has it signed.
      */
     data class Deal(
         val requestId: String,
@@ -89,10 +86,9 @@ object RocketX {
         val fromAmount: Double, val toAmount: Double, val feeUsd: Double, val gasUsd: Double, val minutes: Int?,
         val fromId: Int, val toId: Int, val allowed: Boolean, val priceImpact: Double?,
         /**
-         * Fee plus gas in the coin you send, as they declare it. Not all you pay: on one SOL these
-         * two are 0.0079 and what arrives is 0.0102 short; the rest is the round-trip exchange
-         * inside the route, seen only by subtracting. So the screen shows the subtraction and
-         * these two underneath, as detail.
+         * Declared fee plus gas, in the source coin. Not the full cost: on 1 SOL these are 0.0079
+         * while 0.0102 goes missing; the rest is the exchange spread inside the route. The screen
+         * shows the difference, with these as detail.
          */
         val feeCoin: Double?,
         /** The coin's price, implicit in the same answer: the fee in dollars over the fee in coin. */
@@ -101,27 +97,23 @@ object RocketX {
     data class Order(val requestId: String, val txId: Long, val depositAddress: String?, val memo: String?, val toAmount: Double, val exchange: String)
 
     /**
-     * The quotes, and why the missing ones are missing. A refused route comes back in `quotes`
-     * without `toAmount`, with the reason in `err` ("Min. Amount: 0.462745 SOL"); it used to be
-     * dropped and the screen said "no route". [minAmount] is the lowest refused minimum, valid only
-     * when nothing usable is left. [minUsd] stands still: measured 20 Sep 2026, private routes want a round 50 $ in SOL as in USDC, so the SOL figure changes by the hour.
+     * Quotes, and why missing ones are missing. A refused route comes back without `toAmount`,
+     * reason in `err` ("Min. Amount: 0.462745 SOL"). [minAmount] is the lowest refused minimum,
+     * set only when no route is usable. [minUsd] is stable: measured 20 Sep 2026, private routes
+     * want a flat $50 in SOL or USDC, so the SOL figure changes by the hour.
      */
     data class Quotes(val list: List<Quote>, val minAmount: Double?, val minUsd: Double?)
 
-    /**
-     * A deliberately silly amount, to be told no and read the minimum: the number is in no
-     * list, only a refused quote says it. A thousandth of a SOL is under anybody's floor.
-     */
+    /** Below every floor, to get refused and read the minimum from `err`: no endpoint lists it. */
     const val PROBE = 0.001
 
-    /** "Min. Amount: 0.462745 SOL" -> 0.462745. Il simbolo lo sappiamo gia' noi. */
+    /** "Min. Amount: 0.462745 SOL" -> 0.462745. We already know the symbol. */
     private val MIN_NUM = Regex("([0-9]+(?:\\.[0-9]+)?)")
 
     /**
-     * The private route's numbers, before the bridge is opened. The Send tag said "costs
-     * 1 or 2%", written by hand long ago, and not that nothing moves under fifty dollars.
-     * One call when the amount is fine, two when refused (the second says by how much).
-     * Blocking, IO. [fromToken] null is SOL, else the mint.
+     * The private route's minimum and cost, before the bridge opens. One call when the amount
+     * is fine, two when refused (the second gives the minimum). Blocking, IO. [fromToken]
+     * null is SOL, else the mint.
      */
     data class Privately(
         val minAmount: Double?,
@@ -133,10 +125,8 @@ object RocketX {
     )
 
     /**
-     * Yesterday's minimum, so the line is not empty while today's arrives. Knowing it costs
-     * two calls and three seconds, and a line that arrives after you stopped looking never
-     * arrived. The dollar floor does not move (fifty, measured ten minutes straight), so the
-     * last seen is almost always right; written at once, corrected a moment later.
+     * Last seen minimum, shown while the fresh one loads (two calls, about 3 s). The dollar
+     * floor held at $50 over ten minutes of measuring, so the cached one is almost always right.
      */
     private fun floorPrefs(ctx: Context) = ctx.getSharedPreferences("apex_rocketx", Context.MODE_PRIVATE)
 
@@ -152,10 +142,8 @@ object RocketX {
     }
 
     fun privately(fromToken: String?, amount: Double?): Privately? {
-        // Without going through [home]. It only read an id that is "solana" and is already
-        // hard-coded as the source chain in every call here, at the price of loading the
-        // chains: 170 KB and two hundred entries before asking the one thing needed, while
-        // the Send tag stayed mute.
+        // Skip [home]: it only yields the id "solana", already hard-coded here, and costs
+        // loading every chain (170 KB, 200 entries).
         if (amount != null && amount > 0) {
             val q = quote(fromToken, "solana", fromToken, "solana", amount)
             val best = q.list.firstOrNull { it.walletLess }
@@ -171,18 +159,16 @@ object RocketX {
     }
 
     /**
-     * Does the address fit that chain? Null means we do not know, and not knowing is not a
-     * no: blocking an unknown format would break the bridge every time RocketX adds a chain.
-     * Where the format is known and does not match, block. This is the one place a paste
-     * error sends money away silently: the deposit goes to RocketX, what you sign is not the
-     * final destination, and a Solana address pasted while bridging to Arbitrum went through.
+     * Does the address fit the chain? Null means unknown, and unknown passes, or every new
+     * RocketX chain would break the bridge. Known and mismatched blocks. What you sign pays
+     * RocketX's deposit, not the destination, so a paste error here loses money silently:
+     * a Solana address once went through on a bridge to Arbitrum.
      */
     fun addressFits(network: Network, address: String): Boolean? {
         val a = address.trim()
         if (a.isEmpty()) return null
-        // Native coin first, numeric chainId second. If RocketX gave Bitcoin or Tron a numeric
-        // chainId too (not verified live), checking the number first would apply the EVM rule
-        // to a bitcoin address and refuse every valid one. The native coin leaves no doubt.
+        // Native coin first: if Bitcoin or Tron also had a numeric chainId (not verified),
+        // the EVM rule would refuse every valid address.
         when (network.native.uppercase()) {
             "BTC" -> return Regex("^(bc1[0-9ac-hj-np-z]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$").matches(a)
             "TRX" -> return Regex("^T[1-9A-HJ-NP-Za-km-z]{33}$").matches(a)
@@ -190,10 +176,8 @@ object RocketX {
             "TON" -> return Regex("^([A-Za-z0-9_-]{48}|-?\\d+:[0-9a-fA-F]{64})$").matches(a)
             "SOL" -> return Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$").matches(a)
         }
-        // EVM chains share one address format and RocketX identifies them with a hexadecimal
-        // chainId ("0x1", "0xA4B1", "0x38"), verified live 17 Sep. The first version looked
-        // for a decimal, never found it, and the check on the six chains that matter never
-        // fired. A check that never fires is worse than none, because it seems to be there.
+        // EVM chains share one address format. RocketX gives their chainId in hex ("0x1",
+        // "0xA4B1", "0x38"), verified 17 Sep; parsing only decimals made this check never fire.
         val cid = network.chainId.trim()
         val evm = (cid.startsWith("0x", ignoreCase = true) && cid.drop(2).toLongOrNull(16) != null) || cid.toLongOrNull() != null
         if (evm) return Regex("^0x[0-9a-fA-F]{40}$").matches(a)
@@ -204,11 +188,9 @@ object RocketX {
     @Volatile private var homeNet: Network? = null
 
     /**
-     * The chains, in RocketX's order. A hand-written list of eleven ids had three dead ones
-     * (`avalanche` is now `avaxc-mainnet`, `sui` is `Sui Mainnet`, `ton` is `TON`), and a
-     * dead id gives no error: the chain simply does not appear. RocketX sends two hundred,
-     * already sorted (`sort_order`) and flagged enabled: take all the enabled ones minus
-     * Solana, the shore we leave from.
+     * Chains in RocketX's order (`sort_order`), enabled only, minus Solana. A hand-written id
+     * list went stale (`avalanche` became `avaxc-mainnet`, `sui` `Sui Mainnet`, `ton` `TON`),
+     * and a dead id gives no error: the chain just disappears.
      */
     fun networks(): List<Network> {
         networks.takeIf { it.isNotEmpty() }?.let { return it }
@@ -224,14 +206,14 @@ object RocketX {
                 n.optString("block_explorer_url"), n.optString("shorthand"),
             )
         }.sortedBy { it.first }.map { it.second }
-        // Solana leaves the destination list (it is the shore we leave from) but is kept aside:
-        // the private send has Solana on both sides and needs its explorer and address format.
+        // Solana is the source, not a destination, but the private send (Solana to Solana)
+        // needs its explorer and address format.
         homeNet = parsed.firstOrNull { it.id.equals("solana", true) }
         networks = parsed.filterNot { it.id.equals("solana", true) }
         return networks
     }
 
-    /** La sponda di casa: Solana. Fuori dalle destinazioni, ma serve all'invio privato. */
+    /** Solana, the home chain. Not a destination, but the private send needs it. */
     fun home(): Network? {
         homeNet?.let { return it }
         networks()
@@ -256,8 +238,7 @@ object RocketX {
         val q = "fromToken=${fromToken ?: "null"}&fromNetwork=${enc(fromNetwork)}&toToken=${toToken ?: "null"}&toNetwork=${enc(toNetwork)}&amount=$amount&slippage=$slippage"
         val o = get(endpoint("/quotation?$q")) ?: return Quotes(emptyList(), null, null)
         val arr = o.optJSONArray("quotes") ?: return Quotes(emptyList(), null, null)
-        // The minimum of whoever said no, with the price it used to compute it, before
-        // the refused routes leave the list.
+        // Lowest refused minimum and its USD price, read before refused routes are filtered out.
         val refused = (0 until arr.length()).mapNotNull { i ->
             val x = arr.optJSONObject(i) ?: return@mapNotNull null
             val why = x.optString("err").takeIf { it.isNotBlank() && it != "null" } ?: return@mapNotNull null
@@ -280,23 +261,20 @@ object RocketX {
                     x.optDouble("platformFeeInSourceToken").takeIf { !it.isNaN() && it > 0 },
                     x.optDouble("networkFeeInSourceToken").takeIf { !it.isNaN() && it > 0 },
                 ).takeIf { it.isNotEmpty() }?.sum(),
-                // An accepted quote carries no coin price, but it carries the same fee twice, in coin
-                // and in dollars: their ratio is the price, free.
+                // No coin price in an accepted quote, but the fee comes in coin and in USD:
+                // their ratio is the price.
                 usdPerUnit = x.optDouble("platformFeeInSourceToken").takeIf { !it.isNaN() && it > 0 }
                     ?.let { pf -> x.optDouble("platformFeeUsd").takeIf { !it.isNaN() && it > 0 }?.div(pf) },
             )
         }.filter { it.allowed && it.toAmount > 0 }.sortedByDescending { it.toAmount }
-        // A minimum is declared only if it stopped everything: with a live route behind
-        // it, the figure is one exchange's whim, not a threshold.
+        // Report a minimum only when every route refused; otherwise it is one exchange's limit.
         if (list.isNotEmpty() || refused == null) return Quotes(list, null, null)
         return Quotes(list, refused.first, refused.second?.times(refused.first))
     }
 
     /**
-     * Open the order; for a deposit route the answer is the address to pay. The refund
-     * address is sent explicitly: private routes declare `isRefundAddressRequired: true`,
-     * and there the bet is on where the money returns when the exchange fails. It goes
-     * back where it came from.
+     * Open the order; for a deposit route the response has the address to pay. Private routes
+     * declare `isRefundAddressRequired: true`, so the refund address is set to the sender.
      */
     fun swap(fromId: Int, toId: Int, userAddress: String, destinationAddress: String, amount: Double, slippage: Double = 1.0): Order? {
         val body = JSONObject().put("fromTokenId", fromId).put("toTokenId", toId).put("userAddress", userAddress)
@@ -314,11 +292,10 @@ object RocketX {
     }
 
     /**
-     * How it ended, and where to go and look. Only `status` was read, and "success" alone
-     * proves nothing: RocketX is happy, not the money arrived. `destinationTransactionUrl`
-     * is the transaction on the other chain, the one page that proves arrival, and
-     * `actualAmount` is what really arrived. RocketX builds the links, not us: a hand-written
-     * explorer list would rot like the chain list did. Measured 18 Sep 2026, SOL to ETH on Base.
+     * Final state and proof links. "success" alone only means RocketX is done:
+     * `destinationTransactionUrl` is the tx on the other chain and `actualAmount` what really
+     * arrived. RocketX builds the links, so there is no explorer list to maintain.
+     * Measured 18 Sep 2026, SOL to ETH on Base.
      */
     data class Status(
         val state: String,
@@ -329,7 +306,7 @@ object RocketX {
         val destUrl: String?,
         val destAddress: String,
     ) {
-        /** Over, for better or worse: nothing left to wait for. */
+        /** Terminal: success, failed or refunded. */
         val done: Boolean get() = state.equals("success", true) || state.equals("failed", true) || state.equals("refunded", true)
         val good: Boolean get() = state.equals("success", true)
     }
@@ -349,11 +326,7 @@ object RocketX {
 
     // ---- bridges this phone opened, so their status can be asked later -------
 
-    /**
-     * A bridge this phone opened. It also keeps where the money was meant to land and how
-     * much, which were not saved before: the history could only say "SOL to Base" with no
-     * way to check afterwards whether it arrived.
-     */
+    /** A bridge this phone opened, with destination and expected amount so arrival can be checked later. */
     data class Bridge(
         val requestId: String, val signature: String, val from: String, val to: String, val toNetwork: String,
         val at: Long, val exchange: String, val deposit: String = "",
@@ -382,7 +355,7 @@ object RocketX {
         (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { bridge(it) } }
     }.getOrDefault(emptyList()).sortedByDescending { it.at }
 
-    /** An order opened and never paid: out of the history, because nothing ever left. */
+    /** Drop an order that was opened but never paid. */
     fun forget(ctx: Context, requestId: String) {
         val arr = JSONArray()
         bridges(ctx).filterNot { it.requestId == requestId }.forEach { arr.put(json(it)) }
@@ -403,7 +376,7 @@ object RocketX {
     private fun open(url: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {
         connectTimeout = 8_000; readTimeout = 25_000
         setRequestProperty("Accept", "application/json")
-        // Through the service the service adds the key: there is none here.
+        // Via the worker, the worker adds the key.
         if (KEY.isNotBlank()) setRequestProperty("x-api-key", KEY)
     }
 

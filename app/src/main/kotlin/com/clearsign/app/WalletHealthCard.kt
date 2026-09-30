@@ -41,12 +41,12 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** The wow card: a live security score for the connected wallet, with issues → the fix flow below. */
+/** Live security score for the connected wallet, with its issues and their fixes. */
 @Composable
 internal fun WalletHealthCard(owner: String?, signer: SeedVaultSigner? = null, refreshKey: Int = 0) {
     val ctx = LocalContext.current
     if (owner == null) return
-    // After a fix the card reads the chain again, so the score moves in front of you.
+    // Bumped after a fix: re-reads the chain so the score updates.
     var fixed by remember { mutableIntStateOf(0) }
     val accounts by produceState<List<SolanaRpc.TokenAccountInfo>?>(initialValue = null, owner, refreshKey, fixed) {
         value = withContext(Dispatchers.IO) {
@@ -75,7 +75,7 @@ internal fun WalletHealthCard(owner: String?, signer: SeedVaultSigner? = null, r
                         },
                         fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink,
                     )
-                    // A frozen account is reported but not counted: "things to fix" promised a fix it cannot have.
+                    // Frozen accounts are shown but not counted as fixable.
                     val toFix = h?.issues?.filter { it.kind != HealthIssue.Kind.FROZEN }?.sumOf { it.count } ?: 0
                     if (h != null) Text(
                         if (toFix == 0) stringResource(R.string.health_clean) else pluralStringResource(R.plurals.health_issues, toFix, toFix),
@@ -89,8 +89,8 @@ internal fun WalletHealthCard(owner: String?, signer: SeedVaultSigner? = null, r
                         HaloIcon(iconFor(issue.kind), colorFor(issue.kind), 15.dp); Spacer(Modifier.width(8.dp))
                         Text(textFor(ctx, issue), fontFamily = Inter, fontSize = 12.5.sp, color = Halo.ink, modifier = Modifier.weight(1f))
                     }
-                    // A frozen account is the one line here with no fix behind it: only the freeze authority can
-                    // thaw it, it cannot even be closed for the rent, and a button next to fixable things promised one that could never exist.
+                    // No fix button for frozen accounts: only the freeze authority can thaw them,
+                    // and they can't be closed for the rent.
                     if (issue.kind == HealthIssue.Kind.FROZEN) {
                         Text(
                             stringResource(R.string.health_frozen_why),
@@ -100,8 +100,7 @@ internal fun WalletHealthCard(owner: String?, signer: SeedVaultSigner? = null, r
                     }
                 }
             }
-            // The fixes, here. The card used to send you to another card "below", which on the
-            // health sheet did not exist: "1 thing to fix" and nothing that fixed it.
+            // Fixes live on this card: the health sheet has no other card to point to.
             val list = accounts
             if (signer != null && list != null) {
                 list.filter { it.hasActiveDelegate }.forEach { a ->

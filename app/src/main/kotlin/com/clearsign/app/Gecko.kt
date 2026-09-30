@@ -7,10 +7,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * A second opinion on which coins are worth a look. Jupiter alone decided what exists and what
- * is interesting: one vendor, one list to game. GeckoTerminal ranks pools by what moves through
- * them, free, no key. Only mints come back, and they go through [JupiterTokens.byMints] so they
- * reach the gates like everything else: a new source widens the field, never walks around the checks. Blocking, IO, failure is an empty list.
+ * A second candidate source, so Jupiter's list is not the only one to game. GeckoTerminal
+ * ranks pools by volume, free, no key. Only mints come back; they go through
+ * [JupiterTokens.byMints] and the same gates as everything else. Blocking, IO; failure is an
+ * empty list.
  */
 object Gecko {
     private const val TAG = "Apex-Gecko"
@@ -35,10 +35,8 @@ object Gecko {
     }
 
     /**
-     * How far back a chart looks. Each span is a real GeckoTerminal bucket, not a label
-     * over the same data: drawing every tenth one-minute candle lies about resolution.
-     * [cgDays] is what to ask CoinGecko when the coin has no pool; null where no honest
-     * range matches.
+     * Chart spans, each a real GeckoTerminal bucket: thinning one-minute candles would fake the
+     * resolution. [cgDays] is the CoinGecko range for coins with no pool; null where none matches.
      */
     enum class Span(val path: String, val aggregate: Int, val limit: Int, val labelRes: Int, val cgDays: Int?) {
         MINUTES("minute", 5, 60, R.string.span_minutes, null),  // five hours, five-minute candles
@@ -49,26 +47,21 @@ object Gecko {
         YEAR("day", 1, 365, R.string.span_year, 365);           // a year, daily
 
         companion object {
-            /**
-             * The three that fit under a button. A swap or order sheet has room for a glance, not
-             * a timeframe picker; the coin page, where people go to look at the chart, gets them all.
-             */
+            /** The three spans for swap and order sheets; the coin page gets them all. */
             val small = listOf(MINUTES, HOURS, DAYS)
         }
     }
 
     /**
-     * The series, kept per coin. There was no cache, and it did not show while one chart
-     * was open; a feed where every row opens a chart would fire two uncached calls per row
-     * at a keyless public API and get everybody rate limited.
+     * Series cache, per coin. Without it a feed where every row opens a chart fires two calls
+     * per row at a keyless public API and gets rate limited.
      */
     private const val FRESH_MS = 30 * 60_000L
     private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Candle>>>()
     /**
-     * Which pool a coin is read from, written down for good. The busiest pool does not
-     * change minute to minute, and finding it costs a request to a source that refuses
-     * after five. In memory only, it was looked up again after every restart, and the
-     * second request was the refused one: a coin just called unchartable had twenty pools.
+     * The pool each coin is read from, persisted for a week. The busiest pool rarely changes,
+     * and finding it costs a request to an API that refuses after five; memory-only, every
+     * restart spent that budget again and charts came back empty.
      */
     private val poolCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
     private const val POOL_MS = 7 * 24 * 3600_000L
@@ -78,8 +71,7 @@ object Gecko {
     fun warmPools(ctx: android.content.Context) {
         if (poolsLoaded) return
         poolsLoaded = true
-        // The name carries a number because the pick rule changed: the old file holds
-        // pools chosen by depth, some dead, good for another week. Thrown away, start over.
+        // Versioned name: the old file holds pools picked by depth, some dead. Drop it.
         runCatching { java.io.File(ctx.filesDir, "gecko_pools.json").delete() }
         poolFile = java.io.File(ctx.filesDir, "gecko_pools2.json")
         runCatching {
@@ -115,17 +107,15 @@ object Gecko {
             ?: topPool(mint, bg)?.also { poolCache[mint] = now to it; savePools() }
             ?: return emptyList()
         val v = candles(pool, span, bg, token = mint)
-        // An empty answer is not cached: the pool may simply be a minute too young,
-        // and a coin bought right now is exactly the one somebody wants to see.
+        // Empty is not cached: the pool may be a minute too young, and a coin just bought
+        // is the one people want to see.
         if (v.isNotEmpty()) seriesCache[key] = now to v
         return v
     }
 
     /**
-     * The busiest pool for a coin and what goes through it. The call that finds the pool
-     * already says how deep it is, today's volume, buys against sells; it was thrown away
-     * and the coin page showed a price standing on nothing. Figures are minutes-fresh and
-     * the id is not, so they cache apart: the id a week on disk, the figures three minutes.
+     * A coin's busiest pool and its figures (depth, day volume, buys vs sells), which come free
+     * with the pool lookup. They cache apart: the id a week on disk, the figures three minutes.
      */
     data class Pool(
         val id: String,
@@ -142,10 +132,8 @@ object Gecko {
     private const val STATS_MS = 3 * 60_000L
 
     /**
-     * One question per coin, even when two ask. Opening a sheet starts the figures and the
-     * chart together, and the chart asks here again for its pool; the cache fills at the
-     * end, so two identical requests went out a second apart. The second now waits at the
-     * door and finds the answer written.
+     * One in-flight lookup per coin. Opening a sheet starts the figures and the chart together,
+     * both asking for the pool before the cache fills; the second caller waits for the first.
      */
     private val asking = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
@@ -181,10 +169,10 @@ object Gecko {
     }
 
     /**
-     * Of all a coin's pools, the one where it actually trades. The deepest was taken, and depth says
-     * nothing about buying: on EDEL, 20 Sep 2026, the deepest pool had 179k $ sitting still, zero
-     * trades, last candle from May at 0.0062 $; the traded one 127 $ deep, 14k volume, coin at
-     * 0.0230 $. So by volume, with a floor of a fiftieth of the deepest pool's depth (two dollars and much volume is two wallets passing a ball). Nothing traded: the deepest stays.
+     * The pool where the coin actually trades: top volume, with a depth floor of 1/50 of the
+     * deepest pool (tiny depth with big volume is wash trading). Nothing traded: the deepest.
+     * Depth alone misleads: EDEL on 20 Sep 2026, deepest pool $179k, zero trades, stale at
+     * $0.0062; the traded one $127 deep, $14k volume, at $0.0230.
      */
     internal fun busiest(pools: List<Pool>): Pool? {
         val deepest = pools.maxOfOrNull { it.liquidityUsd ?: 0.0 } ?: return null
@@ -201,11 +189,7 @@ object Gecko {
      */
     fun closes(pool: String, span: Span, token: String? = null): List<Double> = candles(pool, span, token = token).map { it.close }
 
-    /**
-     * One candle with its hour. The timestamp used to be thrown away, and it is what turns
-     * a price line into a story: knowing when somebody bought puts a mark on the line, and
-     * the price under it is read off the chart, never off a claim nobody published.
-     */
+    /** One candle with its timestamp, so a buy can be marked on the chart at the chart's own price. */
     data class Candle(
         val at: Long,
         val open: Double,
@@ -217,10 +201,9 @@ object Gecko {
     )
 
     /**
-     * [token] is the mint whose price you want; always pass it when known. A pool has two
-     * coins and without it the API answers with the first: measured 20 Sep 2026 on SOL,
-     * the deepest pool is "WOTF / SOL" and the Solana chart was WOTF's. Not a visible
-     * error, just the wrong coin. With the mint the same pool says 111 $, a SOL's price.
+     * [token] is the mint whose price you want; always pass it when known. Without it the API
+     * prices the pool's first coin: measured 20 Sep 2026, SOL's deepest pool is "WOTF / SOL"
+     * and the SOL chart showed WOTF. With the mint the same pool gives $111, SOL's price.
      */
     fun candles(pool: String, span: Span, bg: Boolean = false, token: String? = null): List<Candle> {
         val url = "$BASE/pools/$pool/ohlcv/${span.path}?aggregate=${span.aggregate}&limit=${span.limit}" +
@@ -234,9 +217,7 @@ object Gecko {
             val c = row.optDouble(4)
             val t = row.optLong(0)
             if (c.isNaN() || c <= 0 || t <= 0) continue
-            // The close was all anybody kept, because all anybody drew was a
-            // line. A candle needs the other three, and the bar under it needs
-            // the volume: the same request already carried them.
+            // Keep OHLC and volume, not just the close: candles and volume bars need them.
             fun at(k: Int, fallback: Double) = row.optDouble(k).takeIf { !it.isNaN() && it > 0 } ?: fallback
             out += Candle(t * 1000L, at(1, c), at(2, c), at(3, c), c, row.optDouble(5).takeIf { !it.isNaN() && it > 0 } ?: 0.0)
         }
@@ -245,29 +226,26 @@ object Gecko {
     }
 
     /**
-     * One request at a time, not too close together. Measured: five calls in a row and it
-     * answers 429 and stays refused for a while. Two callers ask at once, a chart someone
-     * opened and the balance curve behind the home buttons, so without a gate the background
-     * spends the allowance and the person's chart gets the refusal. A lock and a gap, on IO.
+     * One request at a time, spaced out. Measured: five calls in a row get 429 for a while.
+     * An opened chart and the home balance curve share that budget; without this gate the
+     * background spends it and the visible chart gets refused. Lock plus gap, on IO.
      */
     private val gate = Any()
     @Volatile private var lastCall = 0L
     @Volatile private var lastFront = 0L
     /** A chart somebody opened waits about a second. */
     private const val GAP_FRONT = 900L
-    /** The curve filling itself in behind the buttons waits much longer, and gets out of the way. */
+    /** The background balance curve waits much longer and yields to the foreground. */
     private const val GAP_BACK = 3600L
 
     /**
-     * Two lanes, because one caller has somebody watching it. One gap for all made the curve
-     * and an opened chart equally slow, and the curve starts first: tap a row and you queue
-     * behind six of its requests. Background keeps a wider gap and stands down three seconds
-     * after anything in front asked.
+     * Two lanes: foreground (an opened chart) and background (the balance curve). With one gap
+     * an opened chart queued behind the curve's six requests. Background keeps a wider gap and
+     * stands down for 3 s after any foreground request.
      */
     private fun pace(bg: Boolean) {
-        // The slot is booked inside the lock, the wait happens outside. Sleeping with the lock
-        // held, the background curve kept it three seconds and six: whoever opened a coin waited
-        // to learn when they could start waiting.
+        // Book the slot inside the lock, sleep outside it: sleeping with the lock held made the
+        // foreground wait out the background's 3-6 s sleeps.
         val wait: Long
         synchronized(gate) {
             val now = System.currentTimeMillis()
@@ -281,9 +259,8 @@ object Gecko {
     }
 
     private fun get(url: String, bg: Boolean = false): JSONObject? {
-        // Refused once is not refused. The limiter answers 429 and forgets about
-        // it a moment later, and an empty answer here is a chart that simply
-        // does not appear, which reads as broken rather than as busy.
+        // Retry once on 429: the limit clears, and an empty answer here is a missing chart,
+        // which looks broken.
         repeat(2) { attempt ->
             pace(bg)
             val body = runCatching {
@@ -298,8 +275,7 @@ object Gecko {
                 out
             }.getOrElse { Log.w(TAG, "GET failed: ${it.message}"); null }
             if (body != null) return runCatching { JSONObject(body) }.getOrNull()
-            // Six seconds, not one and a half. Measured: a refusal lasts tens of seconds,
-            // so retrying at once only got a second no.
+            // 6 s, not 1.5 s: measured, a 429 lasts tens of seconds and a quick retry got another.
             if (attempt == 0) runCatching { Thread.sleep(6000) }
         }
         return null

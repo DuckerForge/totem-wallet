@@ -51,11 +51,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * The market, the way everyone knows how to read one: ranked by market cap, every chain, a
- * star to follow, a search past the first hundred. The wallet's lists say what this wallet
- * can trade; this says what the market is doing. Two things a price site cannot do: it knows
- * which coins have a Solana mint, so a followed coin that can be bought says so; and it takes
- * your own amount for what you hold elsewhere, so the followed list is a portfolio.
+ * Market by market cap, all chains, with a star to follow and search past the first hundred.
+ * Unlike a price site, it knows which coins have a Solana mint (so a followed coin shows it
+ * can be bought) and takes your amount held elsewhere, so the followed list is a portfolio.
  */
 @Composable
 internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null, onBuy: (String) -> Unit = {}) {
@@ -70,8 +68,8 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     var editing by remember { mutableStateOf<Market.Coin?>(null) }
     var loadingMore by remember { mutableStateOf(false) }
 
-    // reconcile reads every stored preference and can write: off the composition thread, or
-    // the market janks on open for work that has nothing to do with drawing it.
+    // reconcile reads all stored prefs and may write: keep it off the composition thread,
+    // or opening the market janks.
     var keys by remember { mutableStateOf(Watchlist.all(ctx)) }
     LaunchedEffect(refresh) {
         keys = withContext(Dispatchers.IO) { Watchlist.reconcile(ctx); Watchlist.all(ctx) }
@@ -82,9 +80,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
     val fx = rememberFx()
 
     LaunchedEffect(refresh) {
-        // Whatever is already known goes up first, and the spinner only appears when there is
-        // genuinely nothing to show. Coming back to this tab used to blank the list and wait on
-        // the network for something it had in hand.
+        // Show cached data first; the spinner only when there is nothing at all.
         val known = Market.cachedTop()
         if (known.isNotEmpty()) ranked = known
         loading = known.isEmpty()
@@ -110,9 +106,8 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 byId[key.removePrefix("cg:")] ?: ranked.firstOrNull { it.key == key }
             } else {
                 ranked.firstOrNull { it.mint == key } ?: jup[key]?.let { t ->
-                    // The registry answers with the market cap in the same call, and dropping it
-                    // here is what emptied the comparison inside a favourite's sheet: that block
-                    // returns early with no cap, so it vanished without saying why.
+                    // Keep the market cap from the same registry call: the sheet's comparison
+                    // block needs it and hides without it.
                     Market.Coin(id = key, symbol = t.symbol, name = t.name, image = t.icon, priceUsd = t.usd, marketCap = t.mcap, rank = null, change24h = t.change24h, mint = key)
                 } ?: solanaCoin(key)
             }
@@ -123,9 +118,8 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 Market.Coin(id = id, symbol = if (key.startsWith("cg:")) id.uppercase().take(10) else shorten(key, 4), name = id.replaceFirstChar { it.uppercase() }, image = null, priceUsd = null, marketCap = null, rank = null, change24h = null, mint = key.takeIf { !it.startsWith("cg:") })
             }
         }.let { coins ->
-            // One coin, one key. A coin followed by its CoinGecko name that turns out to live on Solana
-            // is the same coin as the one followed by mint, and two rows with one key crashed the list.
-            // The mint wins: the amount moves over and the name key goes.
+            // A coin followed by CoinGecko id that turns out to have a Solana mint merges into the
+            // mint entry, amount included: two rows with one key crash the list.
             var moved = false
             keys.zip(coins).forEach { (stored, c) ->
                 // The markets list rarely carries the mint; the coin page does.
@@ -152,8 +146,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         searching = true
         val hits = withContext(Dispatchers.IO) { runCatching { Market.search(q) }.getOrDefault(emptyList()) }
         found = hits
-        // The search knows names, not prices. One more call fills the rows that
-        // came back thin, so a coin with a price is never shown as "no price".
+        // Search returns names only; one more call prices the rows.
         val thin = hits.filter { it.priceUsd == null }.map { it.id }.take(25)
         if (thin.isNotEmpty()) {
             val px = withContext(Dispatchers.IO) { runCatching { Market.pricesFor(thin) }.getOrDefault(emptyMap()) }
@@ -172,11 +165,10 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 }
             }
         }
-        // Whoever follows nothing reads it here, where the list would be, with what to do.
+        // Nothing followed: explain what to do where the list would be.
         if (keys.isEmpty() && q.length < 2) item { EmptyLine(HIcon.STAR, stringResource(R.string.market_empty)) }
 
-        // What is standing on Jupiter in your name, before the watchlist: an order
-        // is a decision already made, and it is the first thing worth checking.
+        // Open Jupiter orders go above the watchlist: the first thing worth checking.
         item { OrdersSection(signer, owner, refresh) { refresh++ } }
 
         if (followed.isNotEmpty()) {
@@ -238,7 +230,7 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
                 ),
             )
         }
-        // Not CoinGecko's own list: said above it, so an old price is never read as today's.
+        // Fallback source: say so above the list, so an old price isn't read as today's.
         if (q.length < 2 && ranked.isNotEmpty()) Market.source?.let { src ->
             item {
                 Text(
@@ -253,13 +245,13 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
         when (marketState(loading, ranked.isEmpty(), q, searching, shown.isEmpty())) {
             // Six placeholder rows: the page already has its shape while the list arrives.
             MarketState.LOADING -> items(6) { PlaceholderRow() }
-            // The listing did not arrive: before, a label sat over nothing.
+            // Listing failed to load.
             MarketState.DOWN -> item {
                 EmptyState(HIcon.CHART_DOWN, stringResource(R.string.market_down_title), stringResource(R.string.market_down_body), stringResource(R.string.market_retry) to { refresh++ })
             }
             MarketState.NO_RESULTS -> item { EmptyLine(HIcon.SEARCH, stringResource(R.string.tok_none)) }
             else -> items(shown, key = { "r-" + it.id }) { c ->
-                // The star says the truth here too: lit when the coin is already followed.
+                // Star lit when the coin is already followed.
                 val isFollowed = c.key in keys
                 val amount = remember(refresh, c.key) { Watchlist.amount(ctx, c.key) }
                 CoinRow(c, fx, followed = isFollowed, amount = amount, onOpen = { editing = c }) {
@@ -306,11 +298,10 @@ internal fun MarketScreen(owner: String? = null, signer: SeedVaultSigner? = null
 }
 
 /**
- * "If it were as big as Solana, one of these would cost…", the arithmetic of marketcapof.com
- * with the one thing a website cannot have: your amount. Supply fixed, a coin at another's
- * market cap is worth `target ÷ current` times more. Three comparisons, chosen: the coin
- * directly above in the ranking (the next real step), Solana (its chain), Bitcoin (the
- * ceiling). It says once, underneath, that supply does not stay still and this is not a forecast.
+ * "If it were as big as Solana, one of these would cost…", like marketcapof.com but with your
+ * amount. At fixed supply a coin at another's market cap is worth `target ÷ current` times
+ * more. Three fixed comparisons: the next coin up the ranking, Solana, Bitcoin. A note below
+ * says supply changes and this is not a forecast.
  */
 @Composable
 private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
@@ -320,9 +311,8 @@ private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
     val ranked = remember { Market.cachedTop() }
     if (ranked.isEmpty()) return
 
-    // The three fixed thoughts, then the ladder: the ranked coin nearest to
-    // twice, ten times and a hundred times this one. "To do a ×10 it has to
-    // become as big as X" is the sentence people actually think in.
+    // After the three fixed rows, a ladder: the ranked coins nearest to 2x, 10x and
+    // 100x this cap ("for a 10x it has to get as big as X").
     val fixed = remember(coin.id, ranked) {
         val above = coin.rank?.let { r -> ranked.filter { (it.rank ?: 0) < r && it.id != coin.id }.minByOrNull { it.rank ?: 0 } }
         listOfNotNull(above, ranked.firstOrNull { it.symbol == "SOL" }, ranked.firstOrNull { it.symbol == "BTC" })
@@ -389,8 +379,7 @@ private fun WhatIf(coin: Market.Coin, amount: Double, fx: Fx) {
         }
     }
 
-    // The row you touch opens and says the price big: that is the number the
-    // whole comparison exists for.
+    // The tapped row expands to show the price large, the number the comparison is for.
     var openId by remember(coin.id) { mutableStateOf<String?>(null) }
 
     @Composable
@@ -457,8 +446,7 @@ internal fun fmtCap(v: Double, cur: String = "USD"): String {
     // apart when it is a word: "128 kSOL" does not read.
     val sym = runCatching { java.util.Currency.getInstance(cur).symbol }.getOrDefault(cur)
     fun s(scale: String) = if (sym.length > 1) "$scale $sym" else "$scale$sym"
-    // The app's language, not the phone's: "Mld" was written in every language, so an English
-    // app said "61.1 Mld€" (30 Sep, the film).
+    // Use the app's language, not the phone's, or an English app shows "61.1 Mld€".
     val l = AppLocale.applied() ?: java.util.Locale.getDefault()
     val billion = if (l.language == "it") "Mld" else "B"
     return when {
@@ -485,9 +473,8 @@ private fun SectionLabel(text: String) {
 }
 
 /**
- * One row: rank, logo, name, price, the day, the star. Only the star follows or unfollows;
- * tapping the row opens the coin, where the amount and the buy live. A row that navigates
- * and mutates on one tap adds things you did not ask for.
+ * One row: rank, logo, name, price, 24h change, star. Only the star follows or unfollows;
+ * tapping the row opens the coin sheet, so one tap never both navigates and mutates.
  */
 @Composable
 private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, onOpen: () -> Unit, onStar: () -> Unit) {
@@ -505,9 +492,7 @@ private fun CoinRow(c: Market.Coin, fx: Fx, followed: Boolean, amount: Double, o
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(c.name, style = HaloType.small.copy(fontWeight = FontWeight.SemiBold), color = Halo.ink, maxLines = 1)
-            // How much you have, and what it is worth now. The quantity alone is not why anyone types
-            // it: "fifteen hundred" wants to know what that makes, and the price on the right is one
-            // coin's, not your share's. The multiplication is here on the row, not only in the total.
+            // Your amount and its current value, on the row: the price on the right is per coin.
             val mine = amount.takeIf { it > 0 }?.let { amt ->
                 fmtUi(amt) + " " + c.symbol + (c.priceUsd?.let { " · " + fx.fiat(amt * it) } ?: "")
             }
@@ -548,10 +533,8 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
         looking = false
     }
 
-    // The price, when the list did not have it. The row arrives priceless whenever the listing
-    // and Jupiter are both silent, and then the sheet could not multiply: you typed how much you
-    // have and nothing appeared. Opened, one question to the right source (the listing for
-    // another chain's coin, Jupiter for a mint) brings the figure back.
+    // Price missing from the list: ask the right source when the sheet opens (the listing for
+    // other chains, Jupiter for a mint), so the holding can be valued.
     var price by remember(coin.key) { mutableStateOf(coin.priceUsd) }
     LaunchedEffect(coin.key, mint) {
         if (price != null) return@LaunchedEffect
@@ -591,8 +574,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                     Text(fx.price(it), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Halo.ink)
                 }
                 Spacer(Modifier.width(10.dp))
-                // The star was missing here, so opening a coin you already follow showed nothing saying so.
-                // It is the same star as the row behind, and it means the same thing.
+                // Same star as the row, so a followed coin shows it here too.
                 var starred by remember(coin.key) { mutableStateOf(coin.key in Watchlist.all(ctx)) }
                 Box(
                     Modifier.size(38.dp).clip(rs(999))
@@ -632,8 +614,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 onSaved(); onDismiss()
             }
 
-            // The bell: a notification when it moves five percent, either way,
-            // measured from the last time it rang. Like CoinGecko's, without the account.
+            // Price alert: notify on a 5% move either way since the last alert. No account.
             var moves by remember(coin.key) { mutableStateOf(Watchlist.moves(ctx, coin.key)) }
             Row(
                 Modifier.fillMaxWidth().clip(rs(12)).clickable {
@@ -650,9 +631,8 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 androidx.compose.material3.Switch(checked = moves, onCheckedChange = { on -> moves = on; Watchlist.setMoves(ctx, coin.key, on); OrdersKeeper.sync(ctx); onSaved() })
             }
 
-            // The shape of the price. A coin that lives on Solana is drawn from
-            // its busiest pool, with the depth under it; everything else is drawn
-            // from the market, so bitcoin has a chart here too instead of a gap.
+            // Chart: Solana coins from their busiest pool, with depth; others from market
+            // data, so bitcoin gets a chart too.
             CoinChart(priced, mint)
             // Who can do what to the coin. Only a mint has an authority to check.
             mint?.let { ShieldCard(it, coin.symbol) }
@@ -660,8 +640,8 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
             // What if it were as big as something else. Arithmetic, not a forecast.
             WhatIf(priced, qty.toDoubleOrNull() ?: 0.0, fx)
 
-            // Buy it cheaper, buy it a slice at a time, or be told: all three need
-            // the mint and a price, and the first two need the Seed Vault.
+            // Limit order, DCA, price alert: all need the mint and a price, the first
+            // two also the Seed Vault.
             val m = mint
             if (m != null && price != null) {
                 var limit by remember { mutableStateOf(false) }
@@ -687,8 +667,8 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                 mint != null -> GhostButton(stringResource(R.string.market_buy, coin.symbol), Modifier.fillMaxWidth(), HIcon.SWAP, tint = Halo.mint) {
                     onBuy(mint!!)
                 }
-                // Not on Solana as itself, but here as an official bridged coin:
-                // the same asset, and a way to buy it, said which.
+                // Not native on Solana but available as an official bridged token:
+                // offer those, labeled.
                 Market.bridged[coin.id] != null -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.market_bridged_title, coin.symbol), style = HaloType.label, color = Halo.muted)
                     Market.bridged[coin.id]!!.forEach { b ->
@@ -696,7 +676,7 @@ private fun CoinSheet(coin: Market.Coin, signer: SeedVaultSigner?, owner: String
                     }
                     Text(stringResource(R.string.market_bridged_note), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
                 }
-                // Said once, plainly, instead of a button that cannot work.
+                // Not buyable here: a note, not a dead button.
                 else -> Text(stringResource(R.string.market_not_on_solana), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
             }
         }

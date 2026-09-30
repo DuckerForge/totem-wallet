@@ -103,11 +103,10 @@ fun rememberReveal(key: Any?, durationMs: Int = 700): Float {
 val LocalEntrance = androidx.compose.runtime.compositionLocalOf<java.util.concurrent.atomic.AtomicInteger?> { null }
 
 /**
- * One slow ring of light around a badge, once, then gone: a 270 degree arc with a conic
- * gradient, bright head, tail fading to nothing, one traveling point of light, not a spinner.
- * Two turns over two and a half seconds, then it fades and stops drawing: a permanent spinner
- * on a screen not loading anything is noise. The glow is two arcs, not a blur (a render node per
- * frame). [key] restarts it; pass something that changes once per app launch, or the greeting becomes a tic.
+ * One slow ring of light around a badge, then gone: a 270 degree arc with a conic gradient,
+ * bright head, fading tail. Two turns in 2.5 s, then it fades and stops drawing, since a
+ * spinner on an idle screen is noise. The glow is two arcs, not a blur (a render node per
+ * frame). [key] restarts it; pass something that changes once per launch, not per visit.
  */
 @Composable
 fun SweepHalo(
@@ -158,10 +157,7 @@ fun SweepHalo(
     }
 }
 
-/**
- * Something that changes once per app launch. A greeting keyed on a composable's lifetime
- * replays every time you come back to the tab, how a nice touch turns nervous.
- */
+/** Changes once per app launch. Keyed on a composable's lifetime, a greeting replays on every return to the tab. */
 object FirstRun {
     val at: Long = System.currentTimeMillis()
 }

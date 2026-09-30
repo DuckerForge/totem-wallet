@@ -15,10 +15,10 @@ data class AgentIntent(
 )
 
 /**
- * The Agent Gate's brain: the declared intent against the simulated effect. A hallucinating
- * or compromised agent cannot lie past this, the receipt is what the network says will happen.
- * Returns one risk: [RiskFlag.AGENT_INTENT_OK] (INFO) when the claim holds, or
- * [RiskFlag.AGENT_INTENT_MISMATCH] (DANGER, blocks approval) listing every discrepancy.
+ * Agent Gate check: the declared intent against the simulated effect, so a hallucinating or
+ * compromised agent cannot misdescribe a transaction. Returns [RiskFlag.AGENT_INTENT_OK] (INFO)
+ * when the claim holds, or [RiskFlag.AGENT_INTENT_MISMATCH] (DANGER, blocks approval) listing
+ * every discrepancy.
  */
 object IntentGuard {
     private const val WSOL = "So11111111111111111111111111111111111111112"
@@ -39,12 +39,9 @@ object IntentGuard {
         val ins = receipt.inflows.filter { d -> d.rawAmount > 0 && !d.createdAccount }
         val action = intent.action.lowercase()
 
-        // Nothing moved because nothing was simulated. Comparing a claim against an empty list
-        // finds every field missing and calls it a lie: that is how a dropped connection became
-        // "the agent is not telling the truth" and stopped the loop. Two silences: when the node ran
-        // it and it failed, the receipt already carries the reason and that is the answer (repeating
-        // "did not answer" hid the cause and made the loop retry the same broken swap); when the
-        // node could not be asked, the claim is simply unverifiable.
+        // Empty simulation: comparing against it would flag every field as a mismatch and stop the
+        // loop on a dropped connection. If the node ran it and it failed, return its reason;
+        // if the node could not be reached, the claim is unverifiable.
         if (outs.isEmpty() && ins.isEmpty()) {
             receipt.risks.firstOrNull { r -> r.flag == RiskFlag.SIMULATION_FAILED }?.let { r ->
                 return Risk(RiskFlag.SIMULATION_FAILED, Severity.DANGER, r.detail)
@@ -68,11 +65,9 @@ object IntentGuard {
             return claimSol && dSol
         }
         /**
-         * How much more SOL than declared may leave before it counts as a lie. "Swap 0.031 SOL"
-         * spends 0.036: network fee, priority fee, and the rent for the accounts it opens, about
-         * 0.002 SOL each, two for a swap through wrapped SOL. A flat 0.003 refused every purchase of
-         * a new coin as a lie, and the loop read that as "the person said no". The numbers now come
-         * from the simulation itself; a transfer to a stranger is still caught to the lamport.
+         * Extra SOL allowed out beyond the declared amount. "Swap 0.031 SOL" spends 0.036: network
+         * and priority fees plus about 0.002 SOL rent per new account, two for a swap via wrapped
+         * SOL. Taken from the simulation; a flat 0.003 refused every buy of a new coin.
          */
         fun slackFor(d: BalanceDelta, amount: Double): Double {
             val isSol = d.mint == NATIVE_SOL_MINT || d.mint == WSOL

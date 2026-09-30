@@ -53,11 +53,11 @@ import kotlinx.coroutines.withContext
 import kotlin.math.pow
 
 /*
- * The four things a person can ask of a coin without staying on the chart: sell it in profit,
- * buy it cheaper, buy it a slice at a time, be told when it moves. The first three are Jupiter
- * orders and fire with the phone off; the fourth signs nothing. Every order goes through the
- * receipt and the Seed Vault like a swap: Jupiter builds the bytes, the receipt names the escrow,
- * the person holds to confirm. None can be a stop loss: that needs Jupiter's keyed API, and every sheet says so.
+ * Four things to ask of a coin without watching the chart: take profit, buy below a price,
+ * DCA, price alert. The first three are Jupiter orders that fire with the phone off; the alert
+ * signs nothing. Orders go through the receipt and Seed Vault like a swap: Jupiter builds the
+ * bytes, the receipt names the escrow, the user holds to confirm. No stop loss: that needs
+ * Jupiter's keyed API, and every sheet says so.
  */
 
 /** The coin an order is about, the same way every sheet sees it. */
@@ -357,8 +357,8 @@ internal fun DcaSheet(coin: OrderCoin, signer: SeedVaultSigner, owner: String, o
                                 val done = JupiterRecurring.execute(b.built, signed) ?: return@Review ctx.getString(R.string.brain_unreachable)
                                 done.optString("error").takeIf { it.isNotEmpty() }?.let { return@Review it }
                                 val sig = done.optString("signature").takeIf { it.isNotEmpty() }
-                                // Jupiter's answer has no order key. The list does, a
-                                // moment later: the new one is the one we did not know.
+                                // The create response has no order key; the list shows it
+                                // a moment later, as the one we did not know.
                                 var key: String? = null
                                 repeat(3) {
                                     if (key == null) {
@@ -387,7 +387,7 @@ internal fun DcaSheet(coin: OrderCoin, signer: SeedVaultSigner, owner: String, o
     }
 }
 
-// ---- 4. tell me ---------------------------------------------------------------
+// ---- 4. price alert -----------------------------------------------------------
 
 @Composable
 internal fun AlertSheet(coin: OrderCoin, onDone: () -> Unit, onDismiss: () -> Unit) {

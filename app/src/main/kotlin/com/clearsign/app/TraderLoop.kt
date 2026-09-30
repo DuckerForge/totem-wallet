@@ -12,34 +12,28 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The agent working on its own, app closed. The pieces existed and were proven
- * headless ([SessionWallet.sign], [AgentBroker.handle], [scanMarket]); this file
- * only decides when. From a service the collar's `Ask` cannot open a screen, so
- * every move must fit under the silent threshold and inside every cap, or the loop
- * says so and stops. One tick: exits first, then the harvest, then the hunt.
+ * Background trading, app closed. Signing and scanning live in [SessionWallet.sign],
+ * [AgentBroker.handle] and [scanMarket]; this file only schedules them. A service cannot
+ * open the approval screen, so every move must fit under the silent threshold and the
+ * caps, or the loop stops with a reason. Each tick: exits, then harvest, then hunt.
  */
 object TraderLoop {
     private const val PREFS = "apex_trader"
     private const val FEE = 5_000L
 
-    /** What the network charges to open a token account: the hidden cost of a coin never held. Back when the account is closed. */
+    /** Rent to open a token account, in lamports. Returned when the account is closed. */
     private const val ATA_RENT = 2_040_000L
 
     /** How much of a tick we skip when nothing needs doing. */
     const val EXIT_EVERY_MS = 90_000L
-    /**
-     * Hunt cadence: six minutes on an own node, twelve on the shared keys. Exits stay
-     * at ninety seconds either way, a stop-loss waits for nobody.
-     */
+    /** Hunt cadence: 6 min on an own node, 12 on the shared keys. Exits stay at 90 s either way. */
     private const val HUNT_OWN_MS = 360_000L
     private const val HUNT_SHARED_MS = 720_000L
     val HUNT_EVERY_MS: Long get() = if (Rpc.ownNode != null) HUNT_OWN_MS else HUNT_SHARED_MS
 
     /**
-     * How long until the next tick. Ninety seconds exist for the stop-loss; with no
-     * position there is nothing to watch fall, and the short breath cost 960 balance
-     * reads a day per idle phone on the shared node. Empty hands breathe at the hunt's
-     * pace, the only thing that can happen anyway.
+     * Delay to the next tick: 90 s only while a position needs its stop-loss, else hunt pace.
+     * Ticking fast while idle cost 960 balance reads a day per phone on the shared node.
      */
     fun breath(ctx: Context): Long = if (Positions.open(ctx).isEmpty()) HUNT_EVERY_MS else EXIT_EVERY_MS
 
@@ -48,8 +42,8 @@ object TraderLoop {
     private var sinceReconcile = 0
 
     /**
-     * What the person asked for, in one place. [slicePercent] is a share of the
-     * per-move cap, not an amount, so a refilled budget cannot push it past the collar.
+     * Trading settings. [slicePercent] is a share of the per-move cap, not an amount,
+     * so a refilled budget cannot push it past the collar.
      */
     data class Config(
         val on: Boolean = false,
@@ -59,10 +53,9 @@ object TraderLoop {
         val stopLossPct: Int = 15,
         val slicePercent: Int = 80,
         /**
-         * The coin's own transfer fee we accept, in percent; zero means none. Jupiter's
-         * shield marks any such fee critical: on 17 Sep four of five candidates were
-         * thrown out for a 1 to 3% fee and the agent bought nothing. A fee is a cost,
-         * not a scam; the person decides. The rest of the shield still stops.
+         * Max token transfer fee accepted, in percent; 0 means none. Jupiter's shield flags
+         * any such fee as critical: on 17 Sep four of five candidates were dropped for a
+         * 1 to 3% fee. Other critical warnings still stop.
          */
         val maxFeePct: Int = 0,
         /** The agent digs ORE: hands part of the budget to an executor, under the collar. */
@@ -71,11 +64,11 @@ object TraderLoop {
         val oreLamportsPerDay: Long = 50_000_000L,
         /** How many squares per round. */
         val oreSquares: Int = 3,
-        /** At close, the profit (not the capital) is swapped into ORE and goes home as hard money. */
+        /** At close, swap the profit (not the capital) into ORE before sending it home. */
         val oreBury: Boolean = false,
     ) {
-        // One lane. The wild one is where the money goes to die, and the paid bots that
-        // win all run the same safe floor. [bold] is kept so an old budget still reads.
+        // Always CAREFUL: the bold gate lost money, and the paid bots that win use the safe
+        // floor too. [bold] stays so old saved settings still load.
         val gate: ScanGate get() = ScanGate.CAREFUL
     }
 
@@ -108,9 +101,8 @@ object TraderLoop {
     }
 
     /**
-     * Why it cannot start, in a person's words, or null. Checked before switching on:
-     * the loop used to start, get refused, wait ninety seconds for nobody, then turn
-     * itself off with a paragraph.
+     * Why the loop cannot start, as a user-facing message, or null. Checked before
+     * switching on, instead of starting, getting refused and stopping 90 s later.
      */
     fun cannotStart(ctx: Context): String? {
         val s = SessionWallet.current(ctx) ?: return ctx.getString(R.string.trader_stop_nobudget)
@@ -125,7 +117,7 @@ object TraderLoop {
         return null
     }
 
-    /** Forget this budget's trading entirely: off, no history, no complaint. */
+    /** Wipe this budget's trading state: off, no history, no stop reason. */
     fun reset(ctx: Context) {
         prefs(ctx).edit().clear().apply()
         runCatching { TraderKeeper.cancel(ctx) }
@@ -137,9 +129,8 @@ object TraderLoop {
     }
 
     /**
-     * The loop switching itself off, said out loud. [stop] is what the Ferma button
-     * calls and needs no notification. This is for the service deciding alone, app
-     * closed: a note in the card was found two hours later, position unwatched.
+     * Stop from the service, with a notification. [stop] is the Stop button's path and
+     * needs none. With the app closed a note in the card alone goes unseen for hours.
      */
     fun stopSelf(ctx: Context, why: String) {
         stop(ctx, why)
@@ -149,15 +140,14 @@ object TraderLoop {
     }
 
     /**
-     * Switch on, forget the last stop's reason, and run the first tick now, under the
-     * same lock as the alarm's ticks. Before, Start only flipped the switch and the
-     * screen sat still for up to ninety seconds while the countdown could even grow.
+     * Switch on, clear the last stop reason, and run the first tick now under the same
+     * lock as the alarm's ticks, so the screen does not sit idle for up to 90 s.
      */
     fun start(ctx: Context, cfg: Config) {
         forgetRoom()
         setConfig(ctx, cfg.copy(on = true))
-        // Digging pays the ORE program and its accounts from this budget: the
-        // collar must know them by name or it refuses every move.
+        // Mining pays the ORE program and its accounts from this budget; allowlist
+        // them or the collar refuses every move.
         OreAgent.reset(ctx)
         if (cfg.oreOn) {
             val s = SessionWallet.current(ctx); val p = SessionWallet.policy(ctx)
@@ -181,11 +171,11 @@ object TraderLoop {
 
     private fun note(ctx: Context, s: String) {
         prefs(ctx).edit().putString("note", s).putLong("tickAt", System.currentTimeMillis()).apply()
-        // The widget is a courtesy, never the thing we are waiting on.
+        // Widget refresh is best effort, don't wait on it.
         AppScope.launch { runCatching { HealthWidgetData.refresh(ctx) } }
     }
 
-    /** What one tick did, so the caller can pace itself and say it out loud. */
+    /** Result of one tick, for pacing and the status note. */
     data class Tick(val summary: String, val acted: Boolean, val stopped: Boolean = false)
 
     /** When the last look and the last hunt ran, for the clock on screen. In memory, observed by Compose. */
@@ -194,11 +184,9 @@ object TraderLoop {
     val huntedAt = androidx.compose.runtime.mutableLongStateOf(0L)
 
     /**
-     * Two ticks back to back count as one: since Start runs a tick at once, it and the
-     * alarm can land seconds apart. The lock keeps them in order, but the screen read
-     * "looking at the market" twice. Within twelve seconds the second does nothing.
-     * [tick] itself is safe to call any time: it checks, and returns without the
-     * network when there is nothing to do, one at a time under the budget key's lock.
+     * Start runs a tick at once, so it and the alarm can land seconds apart. A second tick
+     * within 12 s is a no-op, or the screen shows "looking at the market" twice.
+     * [tick] is safe to call any time: it serializes on the budget key's lock.
      */
     private const val SAME_TICK_MS = 12_000L
 
@@ -209,16 +197,14 @@ object TraderLoop {
         }
         lookedAt.longValue = now
         if (mayHunt) huntedAt.longValue = now
-        // One line per look, so a take can be timed on the loop from outside (logcat).
+        // One logcat line per look, to time screen recordings against the loop.
         android.util.Log.i("Apex-Loop", "look hunt=$mayHunt")
         AgentTrace.working { tickInner(ctx, mayHunt) }.also { if (it.acted) forgetRoom() }
     }
 
     /**
-     * The budget's free SOL, read at most every half hour. It answers one question,
-     * is there room for another slice, and only changes when the agent acts (we know)
-     * or someone tops up (half an hour is fine). It was 240 reads a day for a number
-     * that did not move.
+     * Budget's free SOL, cached 30 min. It only answers "room for another slice?" and
+     * changes when the agent acts (cache reset) or on a top-up. Uncached: 240 reads a day.
      */
     private const val ROOM_TTL_MS = 30 * 60_000L
     @Volatile private var roomKey: String? = null
@@ -238,9 +224,8 @@ object TraderLoop {
     @Volatile private var budgetSaidDay = -1L
 
     /**
-     * One more slice of a coin already in play, asked by a person at the screen. The
-     * hunt's road minus the search: collar, receipt, and the row merges into the open
-     * one. Returns what to tell the person.
+     * One more slice of a coin already held, requested from the screen. Same path as the
+     * hunt minus the search; the row merges into the open one. Returns the message to show.
      */
     suspend fun buyMore(ctx: Context, mint: String): String = EnvelopeLock.withLock {
         AgentTrace.working {
@@ -281,10 +266,9 @@ object TraderLoop {
     }
 
     /**
-     * Bury the gain: [lamports] of budget SOL become ORE by the usual road (Jupiter
-     * route, receipt, collar). Called on close, once everything above the capital is
-     * SOL. Null when done, else the reason. If the collar wants a person, nobody is
-     * there: the gain stays SOL and goes home that way.
+     * Swap [lamports] of budget SOL into ORE (Jupiter route, receipt, collar). Called on
+     * close, once everything above the capital is SOL. Null on success, else the reason.
+     * If the collar asks for approval nobody is there, so the gain goes home as SOL.
      */
     suspend fun buryInOre(ctx: Context, lamports: Long): String? {
         val s = SessionWallet.current(ctx) ?: return ctx.getString(R.string.trader_stop_nobudget)
@@ -321,21 +305,18 @@ object TraderLoop {
             return Tick(ctx.getString(R.string.trader_stop_nobudget), acted = false, stopped = true)
         }
         if (s.expired) {
-            // The budget's time is up: sell, close, bring everything home, and say the account.
+            // Budget expired: sell, close, send everything home, and report.
             val owner = Settings.watchWallet(ctx)
             val said = if (owner != null) runCatching { SessionActions.closeBudgetInner(ctx, owner) }.getOrNull() else null
             stopSelf(ctx, said?.second ?: ctx.getString(R.string.trader_stop_closed))
             return Tick(said?.second ?: ctx.getString(R.string.trader_stop_closed), acted = false, stopped = true)
         }
-        // Paused is not stopped. Pause sets the mode OFF and Resume sets it back; this
-        // used to switch trading off for good in between. Paused, the loop waits and
-        // touches nothing.
+        // Pause sets mode OFF and Resume restores it: wait here, don't switch trading off.
         if (p.mode == AgentMode.OFF || p.mode == AgentMode.READ_ONLY) {
             return Tick(ctx.getString(R.string.pulse_paused), acted = false)
         }
 
-        // A move the collar would want confirmed cannot happen without a person,
-        // so the slice is measured against the silent threshold, not the cap.
+        // Nobody is there to approve, so size the slice on the silent threshold, not the cap.
         val ceiling = minOf(p.perTxLamports, p.askAboveLamports.takeIf { it > 0 } ?: p.perTxLamports)
         val slice = (ceiling * cfg.slicePercent / 100).coerceAtLeast(0L)
         if (slice <= FEE * 4) {
@@ -343,15 +324,13 @@ object TraderLoop {
             return Tick(ctx.getString(R.string.trader_stop_toosmall), acted = false, stopped = true)
         }
 
-        // The book is written from simulations, the chain is what is: compare them before
-        // pricing anything off the book, but on a slower clock. It cost two chain reads
-        // every ninety seconds, two thirds of an idle phone's daily traffic, to catch a
-        // rare mismatch. Safe because a sale reads the wallet fresh (`heldRaw` with
-        // `force`) and a ghost row is handled below without counting as a failure.
+        // The book comes from simulations: check it against the chain, every RECONCILE_EVERY
+        // ticks. Every tick cost two thirds of an idle phone's daily reads. Safe because a
+        // sale re-reads the wallet (`heldRaw` with `force`) and a ghost row below is not
+        // counted as a failure.
         val ghosts = if (sinceReconcile++ % RECONCILE_EVERY == 0) reconcile(ctx, s.pubkey) else null
 
-        // The shadow book moves with the same market, on its own slower clock.
-        // Nothing here signs: it is a notebook that costs one quote per open row.
+        // Paper trades: nothing signs, one quote per open row, on their own slower clock.
         runCatching {
             Paper.step(ctx, cfg.takeProfitPct, cfg.stopLossPct) { pos ->
                 val units = if (pos.entryOf() > 0) pos.sizeLamports / pos.entryOf() else 0.0
@@ -367,8 +346,8 @@ object TraderLoop {
         progress(ctx, cfg, exit.moves)
         exit.did?.let { note(ctx, it); return Tick(it, acted = true) }
 
-        // A coin that could not be sold is worth saying, not a reason to skip the harvest
-        // and the hunt. This used to return here, and one stuck position froze the agent.
+        // An unsold coin is reported but does not skip harvest and hunt; returning
+        // here let one stuck position freeze the agent.
         val problem = exit.problem ?: ghosts
         fun finish(t: Tick): Tick {
             if (t.acted || t.stopped || problem == null) return t
@@ -396,10 +375,8 @@ object TraderLoop {
         val open = Positions.open(ctx)
         if (open.size >= cfg.maxPositions) return finish(Tick("full", acted = false))
 
-        // The gate that existed and was never wired: `MarketMood` reads three free sources
-        // and calls itself "useful as a gate, useless as a forecast", yet only a chat tool
-        // called it. It sits here because it is about the hunt only: exits are done, and an
-        // open position is watched even while the world burns. No reading, no block.
+        // `MarketMood` (three free sources) is fit to gate, not to forecast. Hunt only:
+        // exits already ran and open positions stay watched. No reading, no block.
         val mood = withContext(Dispatchers.IO) { runCatching { MarketMood.read() }.getOrNull() }
         if (mood != null && !mood.riskOn) {
             val said = ctx.getString(R.string.trader_mood_red)
@@ -408,8 +385,8 @@ object TraderLoop {
             return finish(Tick(said, acted = false))
         }
 
-        // The daily cap on the shared keys: the hunt stops, the exits above have
-        // already run and never stop. Said once a day.
+        // Daily cap on the shared keys stops the hunt only; exits above always run.
+        // Reported once a day.
         if (Rpc.overBudget()) {
             val day = System.currentTimeMillis() / RpcPool.DAY_MS
             if (budgetSaidDay != day) {
@@ -430,20 +407,17 @@ object TraderLoop {
     // ---- the book against the chain ------------------------------------------
 
     /**
-     * Believe the chain, not the book. The position list is written from simulations,
-     * and between then and now a budget can be remade, an order can fill, a coin can be
-     * sold from the chat. A stale row is an agent proposing to sell what it does not
-     * have, every ninety seconds. Nothing is dropped on a network failure: not reaching
-     * Jupiter is not evidence a coin is gone. Returns a line to show, or null.
+     * Sync the position list with the chain. The list is written from simulations, and
+     * meanwhile a budget can be remade, an order fill, a coin be sold from chat. A network
+     * failure drops nothing. Returns a line to show, or null.
      */
     private suspend fun reconcile(ctx: Context, envelope: String): String? {
         val book = Positions.all(ctx)
         if (book.isEmpty()) return null
         val held = SessionActions.heldRaw(ctx, envelope) ?: return null
-        // Jupiter is asked when a row has nothing behind it (an order holding the coins?)
-        // and when a row carries an order key (still live?). A key is dropped only on
-        // Jupiter's word: a cancel accepted but never landed once left coins in escrow
-        // with no key to reach them.
+        // Ask Jupiter when a row has no coins behind it (held by an order?) or carries an
+        // order key (still live?). Drop a key only when Jupiter no longer lists it: a cancel
+        // can be accepted and never land, leaving coins in escrow with no key to reach them.
         val missing = book.filter { (held[it.mint] ?: 0L) <= 0L }
         val ask = missing.isNotEmpty() || book.any { it.triggerOrder != null }
         val live = if (!ask) JupiterTrigger.Live(emptySet(), emptySet())
@@ -452,9 +426,7 @@ object TraderLoop {
         val gone = Positions.reconcile(ctx, envelope, held, parked, if (ask) live.byMint else null)
         if (gone.isEmpty()) return null
         val line = ctx.getString(R.string.trader_gone, gone.joinToString(", ") { it.symbol })
-        // A holding leaving the list is worth one notification. It happens rarely,
-        // it is always about money, and the alternative is a line in a card that
-        // the next thing the loop does will overwrite within the minute.
+        // Notify: it is rare, it is about money, and a card line is overwritten within a minute.
         AgentBroker.warn(ctx, ctx.getString(R.string.trader_gone_title), line)
         return line
     }
@@ -462,10 +434,9 @@ object TraderLoop {
     // ---- exits ---------------------------------------------------------------
 
     /**
-     * How the open coins are doing, where a person sees it without opening the app.
-     * A quiet card rewritten every tick ("Bert −2% · ALL +21%"), plus one notification
-     * each time a coin crosses a new ten percent line, up or down. Lines already
-     * crossed are kept per coin and forgotten when it is bought again.
+     * Open positions outside the app: a card rewritten every tick ("Bert −2% · ALL +21%")
+     * and a notification each time a coin crosses a new 10% step, up or down. Crossed
+     * steps are stored per coin and cleared when it is bought again.
      */
     private fun progress(ctx: Context, cfg: Config, moves: Map<String, Double>) {
         val open = Positions.open(ctx)
@@ -511,9 +482,8 @@ object TraderLoop {
     private data class ExitOutcome(val did: String? = null, val problem: String? = null, val moves: Map<String, Double> = emptyMap())
 
     /**
-     * Sell whatever reached its target or its stop. One sale per tick, on purpose: two
-     * in the same minute would price against a market the first just moved. A coin that
-     * cannot be sold never blocks the others; a failure walks on.
+     * Sell what hit its target or stop. One sale per tick: a second in the same minute
+     * would price against a market the first just moved. A failed sale doesn't block the others.
      */
     private suspend fun exits(ctx: Context, envelope: String): ExitOutcome {
         val at = System.currentTimeMillis()
@@ -526,12 +496,11 @@ object TraderLoop {
             val feed = SeekerFeed.cached(ctx) ?: return@runCatching emptyMap()
             com.clearsign.core.SeekerCrowd.signals(feed.events, mirrored, at).filterIsInstance<com.clearsign.core.CrowdSignal.FollowedSell>().associateBy { it.mint }
         }.getOrDefault(emptyMap())
-        // Said before the verdicts, so every look writes its lines even when a price has not moved:
-        // one repeated line is dropped as idling, and the page stayed still under a running loop.
+        // Log before the verdicts so every look writes a line even when no price moved;
+        // a single repeated line is dropped as idle.
         if (Positions.open(ctx).isNotEmpty()) AgentTrace.say(ctx.getString(R.string.trace_checking))
         for (pos in Positions.open(ctx)) {
-            // Failed three times already: it gets a slower lane, not the same
-            // ninety seconds forever.
+            // After three failures a position retries on a slower lane.
             if (at < pos.readyAt) continue
             val now = unitPriceLamports(pos) ?: continue
             pos.entryLamports?.takeIf { it > 0 }?.let { moves[pos.mint] = (now - it) / it * 100.0 }
@@ -553,17 +522,15 @@ object TraderLoop {
             }
             val exit = pos.verdict(now)
             if (exit == null) {
-                // A look that changes nothing is still a look. Unsaid, the page of its thoughts read
-                // "Quiet" for as long as it held a coin, and the voice had nothing to say (30 Sep).
+                // Log quiet looks too, or the thoughts page stays empty while a coin is held.
                 moves[pos.mint]?.let { m ->
                     AgentTrace.say(ctx.getString(R.string.trace_holding, pos.symbol, String.format(java.util.Locale.ROOT, "%+.1f%%", m), pos.takeProfitPct, pos.stopLossPct))
                 }
                 continue
             }
 
-            // The coins sit in Jupiter's escrow under a take-profit order, so no swap of ours
-            // can move them: take the order back first, sell next tick. Otherwise the stop
-            // could never fire on the very position most worth protecting.
+            // Coins under a take-profit order sit in Jupiter's escrow where no swap can reach
+            // them: cancel the order first, sell next tick. Otherwise the stop never fires.
             if (pos.parked || pos.triggerOrder != null) {
                 val order = pos.triggerOrder
                 if (order == null) {
@@ -577,9 +544,8 @@ object TraderLoop {
                     problem = ctx.getString(R.string.trader_sell_failed, pos.symbol, why)
                     continue
                 }
-                // The key stays. "Accepted" is not "landed": the next reconcile drops it once
-                // Jupiter no longer lists the order and the coins are back. A fallen cancel
-                // leaves the row parked with its key, and this runs again.
+                // Keep the key: an accepted cancel may not land. The next reconcile drops it
+                // once Jupiter no longer lists the order; if it did not land, this runs again.
                 return ExitOutcome(did = ctx.getString(R.string.trader_order_cancelled, pos.symbol), moves = moves)
             }
 
@@ -589,8 +555,8 @@ object TraderLoop {
                 pos.symbol,
             )
             Positions.markClosing(ctx, pos.mint)
-            // A stop is about getting out, so it accepts whatever the chain gives for a thin
-            // coin. A target is about the price: unconfirmed by the chain, it is not reached.
+            // A stop takes whatever a thin coin really fetches; a target sells only if the
+            // chain confirms the price.
             val sale = SessionActions.sellNow(ctx, pos, why, AgentBroker.Job.Source.LINK, acceptReal = exit.why == Positions.Exit.Why.STOP)
             if (sale is SessionActions.Sale.Worse) {
                 val drop = ((1 - sale.realLamports.toDouble() / sale.quotedLamports) * 100).toInt()
@@ -612,13 +578,10 @@ object TraderLoop {
                     moves = moves,
                 )
             }
-            // Put it back rather than strand it: a failed sale is one to retry, with its
-            // reason. "Could not sell, trying again shortly" eighty-four times is how sixteen
-            // hours passed with nobody knowing the coin was not in the wallet.
+            // Reopen the row so the sale is retried, and keep the reason visible.
             Positions.reopen(ctx, pos.mint)
-            // A node that did not answer and a coin not in the wallet are not failures of this
-            // coin: counting them once pushed a live stop-loss into the six-hour lane after
-            // three network blinks.
+            // Network errors and a coin missing from the wallet don't count as failures,
+            // or three blips push a live stop-loss into the six-hour lane.
             when (sale) {
                 is SessionActions.Sale.Unreachable -> {
                     problem = ctx.getString(R.string.trader_sell_failed, pos.symbol, ctx.getString(R.string.trader_net_down))
@@ -633,7 +596,7 @@ object TraderLoop {
             val reason = reasonOf(ctx, v)
             val fails = Positions.noteFailure(ctx, pos.mint, reason)
             problem = ctx.getString(R.string.trader_sell_failed, pos.symbol, reason)
-            // Said once, where the quick retries stop. Not every ninety seconds.
+            // Notify once, when the quick retries end.
             if (fails == 3) {
                 AgentBroker.warn(ctx, ctx.getString(R.string.trader_stuck_title, pos.symbol), problem)
             }
@@ -641,7 +604,7 @@ object TraderLoop {
         return ExitOutcome(problem = problem, moves = moves)
     }
 
-    /** Why a sale did not happen, in the words the person reads. */
+    /** User-facing reason a sale did not happen. */
     private fun reasonOf(ctx: Context, v: AgentBroker.Verdict?): String = when {
         v == null -> ctx.getString(R.string.trader_no_route)
         v is AgentBroker.Verdict.Timeout -> ctx.getString(R.string.trader_needed_you)
@@ -668,49 +631,40 @@ object TraderLoop {
             return Tick("market unreachable", acted = false)
         }
         val scan = com.clearsign.core.scanMarket(pool.filter { it.mint !in held }, cfg.gate, limit = 5)
-        // What the Seeker crowd is buying, ahead of the registry ranking: a followed wallet
-        // bought, or two whales bought the same coin within the hour. Same gates, same
-        // slice. Copy trading with a collar: the signal says where to look, never what to
-        // do, and it arrives minutes late by design, so the gates are not optional.
+        // Seeker crowd picks go first: a followed wallet bought, or two whales bought the
+        // same coin within the hour. Same gates and slice: the signal arrives minutes late
+        // by design and only says where to look.
         val scout = scoutPicks(ctx, cfg, held)
         val picks = scout + scan.picks.filter { p -> scout.none { it.c.mint == p.c.mint } }
         AgentTrace.say(ctx.getString(R.string.trace_scanned, pool.size, picks.size))
-        // The commonest reason the whole field was thrown out, said once. It is
-        // the difference between "found nothing" and "found nothing because every
-        // coin out there today can still be frozen by its creator".
+        // If nothing passed, log the most common rejection once (e.g. every coin still freezable).
         scan.rejected.maxByOrNull { it.value }?.let { (why, n) ->
             if (picks.isEmpty()) AgentTrace.say(ctx.getString(R.string.trace_rejected, n, why), AgentTrace.Kind.REFUSED)
         }
-        // What the base does today, one call before the loop. The question is not "does
-        // this coin beat SOL" five times but "does none of them" once. The SOL price is
-        // already fetched for the spread check; `change24h` was simply unused.
+        // SOL's 24h move, read once, to compare each pick against just holding SOL.
         val baseMove = withContext(Dispatchers.IO) {
             runCatching { Prices.quotes(listOf(com.clearsign.core.NATIVE_SOL_MINT))[com.clearsign.core.NATIVE_SOL_MINT]?.change24h }.getOrNull()
         }
         var baseBeat: String? = null
         for (pick in picks) {
             val t = pick.c
-            // Buy, or keep what you already hold. The loop knew "is this a trap" and "which of
-            // the five is best", not the third question that matters when everything rises.
-            // 18 Sep 2026: budget −5.1% while SOL did +10.4%, fees 0.9% of the loss. It was
-            // the coins, not the costs.
+            // Skip coins lagging SOL. 18 Sep 2026: budget −5.1% while SOL did +10.4%,
+            // fees only 0.9% of the loss.
             val lagsBase = com.clearsign.core.beatsBase(t, baseMove)
             if (lagsBase != null) {
                 baseBeat = lagsBase
                 AgentTrace.say(lagsBase, AgentTrace.Kind.WARN)
                 continue
             }
-            // The scan says it is worth looking at. Before money moves, the other
-            // question: can this be sold back at all.
+            // Before buying, check it can be sold back at all.
             AgentTrace.say(ctx.getString(R.string.trace_looking, t.symbol), AgentTrace.Kind.FOUND)
             val sellable = withContext(Dispatchers.IO) { runCatching { Jupiter.sellableBack(t.mint, t.decimals, t.usd) }.getOrNull() }
             if (sellable == false) {
                 AgentTrace.say(ctx.getString(R.string.trace_no_exit, t.symbol), AgentTrace.Kind.REFUSED)
                 continue
             }
-            // What the mint can still do once the coin is ours. A permanent
-            // delegate burns the balance out of the budget wherever it sits, so
-            // this has to be asked before the money moves, not after.
+            // Mint extensions, checked before buying: a permanent delegate can burn
+            // the balance out of the budget.
             val ext = withContext(Dispatchers.IO) { TokenExtensions.of(t.mint, t.token2022) }
             val safety = com.clearsign.core.assessToken(
                 com.clearsign.core.TokenFacts(
@@ -725,8 +679,8 @@ object TraderLoop {
                 AgentTrace.say(ctx.getString(R.string.trace_unsafe, t.symbol, safety.score), AgentTrace.Kind.REFUSED)
                 continue
             }
-            // The pool's story, from Rugcheck: LP burned or pullable, copies of
-            // verified coins, creators who rugged before. Unknown never blocks.
+            // Rugcheck: LP burned or pullable, copies of verified coins, creators
+            // who rugged before. Unknown never blocks.
             when (val rug = RugCheck.verdict(t.mint, deviceLocaleTag() == "it")) {
                 is RugCheck.Verdict.Stop -> {
                     AgentTrace.say(ctx.getString(R.string.trace_rug_stop, t.symbol, rug.reason), AgentTrace.Kind.REFUSED)
@@ -737,10 +691,10 @@ object TraderLoop {
                 )
                 RugCheck.Verdict.Unknown -> AgentTrace.say(ctx.getString(R.string.trace_rug_unknown, t.symbol))
             }
-            // Jupiter's own shield: critical stops, a warning is said, info is nothing.
+            // Jupiter's shield: critical stops, warning is logged, info is ignored.
             val shield = withContext(Dispatchers.IO) { runCatching { TokenShield.warnings(t.mint) }.getOrNull() }
-            // A fee within the chosen threshold is said and let through; every
-            // other critical warning stops as before.
+            // A transfer fee within maxFeePct is logged and allowed; any other
+            // critical warning stops.
             val stopper = shield?.firstOrNull { w ->
                 w.critical && (w.transferFeePct?.let { it > cfg.maxFeePct } ?: true)
             }
@@ -757,9 +711,8 @@ object TraderLoop {
             val built = SessionActions.buildSwap(Jupiter.SOL_MINT, t.mint, slice, s.pubkey) ?: continue
             val quote = built.quote
 
-            // What one whole coin costs at this moment, straight out of the quote
-            // the trade would have used. The shadow book starts here and nowhere
-            // better: no invented price, no price we were not actually offered.
+            // Price of one whole coin from the quote the trade would use, so paper
+            // trades start at a price we were really offered.
             val units = quote.outAmount / Math.pow(10.0, t.decimals.toDouble())
             val entry = if (units > 0) slice / units else 0.0
             fun shadow(blockedBy: String?) = Paper.open(
@@ -767,10 +720,9 @@ object TraderLoop {
                 cfg.takeProfitPct, cfg.stopLossPct, blockedBy,
             )
 
-            // The one question that is not arithmetic: does the web know something about this
-            // coin. Only here, after everything cheap said yes, on the one coin about to be
-            // bought: it costs about a cent a time. After the quote, so a stopped coin still
-            // enters the shadow book with a real entry price.
+            // Web check, about a cent a call: only on the coin about to be bought, after the
+            // cheap checks. After the quote, so a stopped coin still enters the paper book
+            // with a real entry price.
             when (val web = CoinCheck.verdict(ctx, t.symbol, t.mint)) {
                 is CoinCheck.Verdict.Stop -> {
                     AgentTrace.say(ctx.getString(R.string.trace_web_stop, t.symbol), AgentTrace.Kind.REFUSED)
@@ -779,14 +731,12 @@ object TraderLoop {
                     note(ctx, m)
                     continue
                 }
-                // Ok and Unknown both proceed: a check we could not run is not a
-                // reason to stop, and never has been anywhere else in this app.
+                // Ok and Unknown both proceed: a check that could not run never blocks.
                 else -> Unit
             }
 
-            // The person's own rules, when they wrote any. Same shape as the web
-            // check: one coin, after everything cheap said yes, and it can only
-            // say no. Runs on whatever model they configured, any provider.
+            // User-written rules, like the web check: one coin, after the cheap checks,
+            // veto only. Runs on whatever model and provider they configured.
             when (val own = UserRules.verdict(ctx, t, pick.notes, cfg.gate.name, slice)) {
                 is UserRules.Verdict.Stop -> {
                     AgentTrace.say(ctx.getString(R.string.trace_rules_stop, t.symbol, own.reason), AgentTrace.Kind.REFUSED)
@@ -797,10 +747,9 @@ object TraderLoop {
                 else -> Unit
             }
 
-            // What the trade costs before the price moves. The collar refuses a silent
-            // exchange returning under nine tenths, rightly: a slice moves a thin coin. The
-            // loop used to learn that by proposing and being asked for an absent fingerprint;
-            // the same arithmetic here skips the coin and the hunt goes on.
+            // Round-trip value before the price moves. The collar refuses a silent swap
+            // returning under 0.9, and a slice moves a thin coin; checking here skips the
+            // coin instead of proposing a swap that would need approval.
             val back = withContext(Dispatchers.IO) {
                 runCatching {
                     val q = Prices.quotes(listOf(t.mint, com.clearsign.core.NATIVE_SOL_MINT))
@@ -832,18 +781,15 @@ object TraderLoop {
                 note(ctx, m)
                 return Tick(m, acted = true)
             }
-            // Anything that is not a silent signature ends this tick's hunt: walking on once
-            // showed the approval screen five times in a row. A timeout means the collar wanted
-            // a person and nobody was there. The message used to blame the account rent every
-            // time; the real case was the daily cap, half spent by the morning trade. The collar
-            // knows which rule stopped it, and says so.
+            // Anything but a silent signature ends this tick's hunt; moving on once showed the
+            // approval screen five times in a row. A timeout means the collar asked for approval
+            // and nobody was there. `v.rule` names the rule, so the message can be specific.
             if (v is AgentBroker.Verdict.Timeout) {
                 shadow("collar")
                 AgentTrace.say(ctx.getString(R.string.trace_asked, t.symbol), AgentTrace.Kind.REFUSED)
                 val m = when (v.rule) {
-                    // The daily cap, said so something can be done. "Exhausted, raise it in the rules"
-                    // was impossible advice when the cap already is the whole budget: now it says
-                    // how much is left, when it frees, and to raise it only if it can be raised.
+                    // Say what is left and when it frees. Suggest raising the cap only if it
+                    // is below the whole budget.
                     "daily" -> {
                         val left = (p.dailyLamports - SessionWallet.history(ctx).spentLast24hLamports).coerceAtLeast(0L)
                         val free = SessionWallet.freesAt(ctx)?.let { at ->
@@ -861,16 +807,15 @@ object TraderLoop {
                 stopSelf(ctx, m)
                 return Tick(m, acted = false, stopped = true)
             }
-            // Turned down by a person: asking again in six minutes makes the agent a nuisance.
-            // Turned down by the collar: quote it, do not put it in their mouth. A dropped
-            // network is neither: skip the coin and carry on, or the loop spends a night off.
+            // Refused by the user: stop, don't ask again in six minutes. By the collar: stop
+            // and quote it. No simulation (network dropped) is neither: skip the coin, or the
+            // loop stays off all night.
             if (v is AgentBroker.Verdict.Refused && v.rule == "no_simulation") {
                 AgentTrace.say(ctx.getString(R.string.trace_no_sim, t.symbol), AgentTrace.Kind.REFUSED)
                 continue
             }
-            // The node ran it and it failed: a bad swap for this coin now, with the node's own
-            // reason. Not a blip, not a reason to stop. It used to read "did not answer" and
-            // the same broken swap was retried every round.
+            // Simulation ran and failed: a bad swap for this coin right now. Log the node's
+            // reason and skip the coin; don't stop, and don't report it as a network error.
             if (v is AgentBroker.Verdict.Refused && v.rule == "sim_failed") {
                 AgentTrace.say(ctx.getString(R.string.trace_sim_failed, t.symbol, v.reason ?: ""), AgentTrace.Kind.REFUSED)
                 shadow("sim")
@@ -890,9 +835,8 @@ object TraderLoop {
                         stopSelf(ctx, m)
                         return Tick(m, acted = false, stopped = true)
                     }
-                    // Nobody said no: the send failed, the key could not be read.
-                    // Said out loud and tried again next round. Switching off here
-                    // used to blame a person for a node that answered 429.
+                    // Send failed, key unreadable, a 429: report and retry next round.
+                    // Don't stop, it was nobody's no.
                     AgentBroker.Verdict.Refused.By.SYSTEM -> {
                         val m = ctx.getString(R.string.trader_buy_failed, t.symbol, v.reason ?: "")
                         AgentTrace.say(m, AgentTrace.Kind.REFUSED)
@@ -903,9 +847,7 @@ object TraderLoop {
             }
             return Tick("waiting on you", acted = false)
         }
-        // None of the five beat what you already hold. Not a failed hunt, an
-        // answer, and it has to be said or the card sits on the last buy as if
-        // nothing happened.
+        // Every pick lagged SOL: say so, or the card keeps showing the last buy.
         baseBeat?.let {
             val said = ctx.getString(R.string.trader_base_wins, String.format(java.util.Locale.ROOT, "%+.1f%%", baseMove ?: 0.0))
             note(ctx, said)
@@ -915,9 +857,9 @@ object TraderLoop {
     }
 
     /**
-     * The live feed's candidates, graded like everybody else's. One registry call per
-     * signal, bounded so a loud hour cannot spend the budget on lookups. Each pick
-     * carries its signal in the first note, so receipt and trace say why this coin.
+     * Feed candidates, graded like the scan's. One registry call per signal, capped so a
+     * busy hour cannot burn the budget on lookups. The signal goes in the first note, so
+     * receipt and trace show why this coin.
      */
     private suspend fun scoutPicks(ctx: Context, cfg: Config, held: Set<String>): List<com.clearsign.core.Scored> {
         // The slow window: nobody is watching, and the crowd signal arrives late
@@ -955,23 +897,20 @@ object TraderLoop {
     }
 
     /**
-     * Put the take-profit on chain when Jupiter accepts it: the only exit that outlives
-     * the app. Tried right after the buy and allowed to fail quietly; a missing order
-     * means the loop watches the target instead, a smaller promise, not a broken one.
+     * Place the take-profit on chain, the only exit that works without the app. Tried
+     * right after the buy; if it fails, the loop watches the target instead.
      */
     private suspend fun armOnChainExit(ctx: Context, envelope: String, mint: String) {
         val pos = Positions.open(ctx).firstOrNull { it.mint == mint } ?: return
         when (val r = runCatching { JupiterTrigger.placeTakeProfit(ctx, envelope, pos) }.getOrNull()) {
             is JupiterTrigger.Placed.Ok -> Positions.setTrigger(ctx, mint, r.order)
-            // Under about five dollars Jupiter takes no order. Nothing to retry, but it means
-            // the only exit that outlives the app is missing, so it is said on the row.
-            // Measured 2026-09-15: 0.036 SOL at 99 dollars is 3.60, its target 4.68, both under.
+            // Jupiter takes no order under about $5. Nothing to retry, but note it on the row.
+            // Measured 15 Sep: 0.036 SOL at $99 is $3.60, its target $4.68, both under.
             JupiterTrigger.Placed.TooSmall -> {
                 Positions.note(ctx, mint, ctx.getString(R.string.trader_no_onchain_small))
                 AgentTrace.say(ctx.getString(R.string.trader_no_onchain_small), AgentTrace.Kind.WARN)
             }
-            // Any other no, said. It was `else -> Unit`: the app had just promised an on-chain
-            // order and went quiet. A silent failure on a promise is a lie on a timer.
+            // Any other failure is noted on the row too.
             is JupiterTrigger.Placed.Failed -> {
                 val why = ctx.getString(R.string.trader_no_onchain_why, r.reason)
                 Positions.note(ctx, mint, why)
@@ -985,14 +924,14 @@ object TraderLoop {
         }
     }
 
-    // ---- the one door --------------------------------------------------------
+    // ---- signing -------------------------------------------------------------
 
     const val AGENT = "apex-trader"
 
     /**
-     * Everything goes through the collar, like a move proposed in chat. Source is LINK,
-     * not `IN_APP`: with `IN_APP` the broker posts no notification when it wants a
-     * person, and a background move would wait ninety seconds on a screen never shown.
+     * Every move goes through the collar, like one proposed in chat. Source is LINK: with
+     * `IN_APP` the broker posts no approval notification, and a background move would wait
+     * 90 s on a screen nobody sees.
      */
     internal suspend fun handle(
         ctx: Context, tx: ByteArray, intent: JSONObject, source: AgentBroker.Job.Source = AgentBroker.Job.Source.LINK, ultraRequestId: String? = null,

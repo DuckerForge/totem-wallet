@@ -8,11 +8,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Two ways to move money with a link, neither needing a program on chain. Asking is free
- * of risk: a Solana Pay URI is a request, the payer signs with their own wallet. Giving is
- * a real trade-off, stated wherever it appears: the link contains a throwaway key, so
- * whoever opens it first can take the money. Right for a tip, wrong for a salary, and
- * reclaimable until someone takes it.
+ * Two ways to move money with a link, no on-chain program needed. Asking is risk-free: a
+ * Solana Pay URI is a request the payer signs in their own wallet. Giving puts a throwaway key
+ * in the link, so whoever opens it first takes the money (fine for a tip, not a salary); it
+ * can be reclaimed until then.
  */
 object MoneyLinks {
     private const val PREFS = "apex_gifts"
@@ -105,9 +104,8 @@ object MoneyLinks {
             recipient = pubkey,
             recipientLabel = ctx.getString(R.string.gift_log),
         )
-        // Sealed before the signature, not after. The key that will hold the money existed only in
-        // this local: a send whose answer got lost, or the process killed in between, left the SOL
-        // at an address whose seed had just gone out of scope. Written first; dropped if the send failed.
+        // Save the gift key before signing: it exists only in this local, so a lost answer or a
+        // killed process would strand the SOL. Dropped if the send fails.
         val gift = Gift(pubkey, lamports, note, System.currentTimeMillis())
         remember(ctx, gift, seed)
         return when (val r = WalletActions.signAndSend(ctx, signer, owner, listOf(WalletTx.systemTransfer(from, to, lamports)), log)) {
@@ -132,7 +130,7 @@ object MoneyLinks {
         val sw = SoftKey.sweepAll(seed, owner)
         val sig = sw.signature ?: return@withContext if (sw.error == "empty") ctx.getString(R.string.gift_already_taken) else sw.error
         markClaimed(ctx, gift.pubkey)
-        // Money that came back is a line in the book, like the money that left.
+        // Log the reclaim in the ledger, like the gift itself.
         LedgerRecorder.record(ctx, LedgerRecorder.plainMove(ctx, "gift", owner, sig, inflows = solLeg(sw.lamports), outflows = emptyList(), label = ctx.getString(R.string.gift_log_back)))
         null
     }
@@ -146,8 +144,7 @@ object MoneyLinks {
         val sw = SoftKey.sweepAll(seed, to)
         if (sw.signature != null) {
             markClaimed(ctx, SoftKey.pubkeyOf(seed))
-            // A gift taken used to arrive with no receipt: SOL in the wallet and
-            // not a line to say where from.
+            // Log the claim in the ledger, so the SOL has a source.
             LedgerRecorder.record(ctx, LedgerRecorder.plainMove(ctx, "gift", to, sw.signature, inflows = solLeg(sw.lamports), outflows = emptyList(), label = ctx.getString(R.string.gift_log_taken)))
         }
         sw.signature to sw.error

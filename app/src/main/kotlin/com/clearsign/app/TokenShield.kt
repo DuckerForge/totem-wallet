@@ -30,10 +30,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Jupiter's shield: what Jupiter itself says about a mint before it lets you trade it (not
- * verified, freeze authority, transfer fees, a copy of a known symbol). One call, no key, a
- * few warnings with a severity. Under our gates, never in their place: the collar and the
- * safety grade decide, this adds a second pair of eyes. Unknown never blocks.
+ * Jupiter's shield: its own warnings on a mint (not verified, freeze authority, transfer fees,
+ * copied symbol), each with a severity. One call, no key. Advisory on top of our gates: the
+ * collar and the safety grade decide. Unknown never blocks.
  */
 object TokenShield {
     data class Warning(val type: String, val message: String, val severity: String) {
@@ -41,10 +40,9 @@ object TokenShield {
         val warning: Boolean get() = severity.equals("warning", true)
 
         /**
-         * The fee the coin itself keeps, in percent, if this is that. Jupiter marks a per-transfer
-         * fee critical, rightly, it is a tax paid in and out; but it is a cost, not a scam like fake
-         * liquidity or an open mint, and a cost is accepted or not by whoever puts the money in. Read
-         * from the text, where Jupiter writes it. Unreadable, it is not a fee and the door stays closed.
+         * Transfer fee in percent, if this warning is one. Jupiter marks it critical, but it is a
+         * cost paid in and out, not a scam like fake liquidity or an open mint, so the user may
+         * accept it. Parsed from Jupiter's text; unparseable means not a fee, still blocking.
          */
         val transferFeePct: Double?
             get() {

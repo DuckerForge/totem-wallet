@@ -36,10 +36,9 @@ object WalletActions {
     )
 
     /**
-     * Build the transaction and read it back before anyone signs. `signAndSend` analyzes the
-     * bytes only after sending, to write the ledger row: backwards for the two flows that hand
-     * money to a key, funding the budget and making a gift link, which asked for a fingerprint
-     * without showing where the money went. Null when it cannot be built or simulated.
+     * Build and analyze the transaction before signing, for flows that fund a key (agent budget,
+     * gift link) and must show a receipt first. `signAndSend` analyzes only after sending, for
+     * the ledger row. Null when it cannot be built or simulated.
      */
     suspend fun preview(
         ctx: Context,
@@ -69,7 +68,7 @@ object WalletActions {
         val bh = withContext(Dispatchers.IO) { SolanaRpc.latestBlockhash(rpc) }
             ?: return Result.Failed(ctx.getString(R.string.wa_no_blockhash))
         val ownerKey = Base58.decodePubkey(owner) ?: return Result.Failed(ctx.getString(R.string.wa_bad_address))
-        // The person's chosen priority, in front of everything we build ourselves.
+        // The user's priority fee, prepended to every transaction we build.
         val speed = Settings.speed(ctx)
         val withPriority = if (speed > 0) listOf(WalletTx.setComputeUnitPrice(speed)) + instructions else instructions
         val tx = WalletTx.build(ownerKey, Base58.decode(bh.hash), withPriority)
@@ -164,20 +163,18 @@ object WalletActions {
     )
 
     /**
-     * The mints worth a fee account: the usual suspects plus the coins this person trades. A
-     * hand-written six was why the fee earned nothing: a swap into a coin with no account does
-     * not skip the fee, it fails ([Jupiter.feeAccountIfUsable]). Blocking, IO.
+     * Mints worth a fee account: the common ones plus the coins this user watches and holds.
+     * Swaps into a mint with no fee account earn no fee ([Jupiter.feeAccountIfUsable]).
+     * Blocking, IO.
      */
     fun feeMintsToOpen(ctx: Context, owner: String): List<String> {
         val held = runCatching { SolanaRpc.tokenAccountsOf(SolanaRpc.urlFor(null), owner) }
             .getOrDefault(emptyList()).filter { it.amount > 0 }.map { it.mint }
         val watched = runCatching { Watchlist.all(ctx) }.getOrDefault(emptyList())
-        // Bounded before the questions, not after: each candidate costs one call
-        // to the chain, and a long watchlist would turn opening this card into a
-        // minute of waiting.
+        // Cap before checking: each candidate costs one RPC call, and a long watchlist
+        // would stall opening the card for a minute.
         return (FEE_MINTS + watched + held).distinct().take(20)
-            // Already open is nothing to do, and one transaction can only carry
-            // so many accounts before it stops fitting.
+            // Skip the ones already open; one transaction only fits so many accounts.
             .filter { Jupiter.feeAccountIfUsable(it) == null && Jupiter.feeAccountFor(it) != null }
             .take(8)
     }
@@ -211,9 +208,9 @@ object WalletActions {
     }
 
     /**
-     * The two failures a person meets, in their words. The System Program reports "not enough
-     * lamports" as `custom program error: 0x1`; everything else falls back to the raw text,
-     * because a wrong guess is worse than an honest dump.
+     * The two common failures in plain words. The System Program reports "not enough lamports"
+     * as `custom program error: 0x1` and "account exists" as `0x0`; anything else falls back to
+     * the raw text, since a wrong guess is worse than the raw error.
      */
     private fun humanError(ctx: Context, sim: SolanaRpc.SimResult, needLamports: Long? = null, haveLamports: Long? = null): String {
         val raw = (sim.logs + listOfNotNull(sim.err)).joinToString(" ")

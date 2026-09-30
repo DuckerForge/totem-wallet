@@ -12,11 +12,9 @@ import org.json.JSONObject
  * by the budget key this app holds, no biometrics: ending the agent's power must be instant).
  */
 /**
- * One hand on the budget key at a time. The loop had its own lock and nothing else
- * that signs with the key went through it: sell from a notification, sell everything,
- * harvest, the keeper closing an expired budget. That ends with the keeper forgetting
- * the key mid-sale. Not reentrant: each public action has a private twin for callers
- * already under the lock.
+ * One user of the budget key at a time: the loop, notification sells, sell all, harvest,
+ * and the keeper closing an expired budget, which could otherwise forget the key mid-sale.
+ * Not reentrant: each public action has a private twin for callers already under the lock.
  */
 internal object EnvelopeLock {
     private val m = kotlinx.coroutines.sync.Mutex()
@@ -43,9 +41,8 @@ object SessionActions {
     }
 
     /**
-     * The coins the budget holds, minus dust. Invisible elsewhere: the wallet screen shows
-     * the Seed Vault account and the agent buys with another key. Closing used to move
-     * only the SOL and erase the key, leaving real tokens nobody could ever open again.
+     * The coins the budget holds, minus dust. The wallet screen shows only the Seed Vault
+     * account, so closing must deal with these or they are lost with the key.
      */
     suspend fun holdings(ctx: Context): List<SolanaRpc.TokenAccountInfo> {
         val s = SessionWallet.current(ctx) ?: return emptyList()
@@ -72,8 +69,8 @@ object SessionActions {
     }
 
     /**
-     * A sale asked by a person, answered in words: true when the coins are gone and the
-     * row removed, false with the reason. Card, notification and eyes say the same thing.
+     * A manual sale: true when the coins are gone and the row removed, false with the reason.
+     * Shared by the card, the notification and Eyes.
      */
     class Said(val ok: Boolean, val text: String, val worse: Sale.Worse? = null)
 
@@ -91,8 +88,8 @@ object SessionActions {
         val r: Pair<Boolean, String> = when {
             v is AgentBroker.Verdict.SignedSilently || v is AgentBroker.Verdict.Confirmed -> {
                 Positions.remove(ctx, pos.mint)
-                // The coin's account is empty now: closed at once, its rent back in the budget, as the
-                // loop does after its own sales. A sale by hand left it open, rent and all (30 Sep).
+                // The coin's account is now empty: close it at once and return its rent to the
+                // budget, as the loop does after its own sales.
                 SessionWallet.current(ctx)?.pubkey?.let { me -> runCatching { closeEmpty(ctx, me) } }
                 val m = ctx.getString(R.string.trader_sold_you, pos.symbol)
                 AgentTrace.say(m, AgentTrace.Kind.ACTED)
@@ -108,11 +105,9 @@ object SessionActions {
     }
 
     /*
-     * Selling one holding back to SOL, now, through the collar: the one door out, used by
-     * the loop on a target or a stop and by the button. The transaction is built at the
-     * moment of the decision, a swap's blockhash dies in about ninety seconds. The amount
-     * comes from the chain, never the book, and the answer says which of four things
-     * happened: all-null answers once pushed a live stop-loss into the six-hour lane.
+     * Sell one holding back to SOL through the collar, for the loop (target or stop) and the
+     * button. Built at decision time: a swap's blockhash expires in about 90 s. The amount
+     * comes from the chain, never the book, and the result says which of four outcomes happened.
      */
     /**
      * A swap transaction, Ultra first and swap v1 when Ultra does not answer. [quote]
@@ -156,16 +151,14 @@ object SessionActions {
         val held = heldRaw(ctx, s.pubkey, force = true) ?: return Sale.Unreachable
         val raw = held[pos.mint] ?: return Sale.Nothing
         if (raw <= 0L) return Sale.Nothing
-        // Wider slippage on the way out than on the way in: a stop that does not
-        // fill because the price moved while we asked is not a stop at all.
+        // Wider slippage out than in: a stop must fill even if the price moved meanwhile.
         val built = buildSwap(pos.mint, Jupiter.SOL_MINT, raw, s.pubkey, slippageBps = 300) ?: return Sale.NoRoute
         val quote = built.quote
         val tx = built.tx
         val units = raw / Math.pow(10.0, pos.decimals.toDouble())
-        // What the chain says comes back, before anything is declared. On a thin coin the
-        // quote and the simulated route can be far apart and the collar rightly refuses a
-        // declaration that differs. If the real number is worse than the guard tolerates,
-        // say so and stop, or, when the caller accepts, declare the real number.
+        // Simulate before declaring: on a thin coin the quote and the real route can be far
+        // apart, and the collar refuses a mismatched declaration. If the real number is worse
+        // than the guard allows, stop, or declare it when the caller accepts.
         val real = withContext(Dispatchers.IO) {
             runCatching {
                 ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), tx, s.pubkey, null, requireSim = true).receipt
@@ -193,11 +186,7 @@ object SessionActions {
     }
 
     /* What the whole holding would fetch in lamports right now, or null. */
-    /**
-     * The rent held by the budget's token accounts. It is the budget's own money, back as SOL when
-     * an empty account is closed, so it belongs in what the budget is worth: left out, a coin bought
-     * on a 0.005 slice showed the whole budget at -7.5% the moment it landed (30 Sep).
-     */
+    /** Rent held by the budget's token accounts. It returns on close, so it counts in the budget's value. */
     suspend fun deposits(ctx: Context): Long {
         val s = SessionWallet.current(ctx) ?: return 0L
         return withContext(Dispatchers.IO) {
@@ -219,9 +208,7 @@ object SessionActions {
      * because "sell everything" is this repeated, and a retry must be the same operation.
      */
     private suspend fun sellOne(ctx: Context, owner: String, h: SolanaRpc.TokenAccountInfo): Boolean {
-        // Through the collar like every sale: signing directly made this the one button
-        // that skipped the receipt. The chain's real price is accepted: the person asked to
-        // be out, not to be asked again.
+        // Through the collar like every sale. The real price is accepted: the person asked to be out.
         val cfg = TraderLoop.config(ctx)
         val pos = Positions.open(ctx).firstOrNull { it.mint == h.mint } ?: Positions.Position(
             mint = h.mint, symbol = TokenSymbols.symbol(h.mint), decimals = h.decimals,
@@ -238,10 +225,9 @@ object SessionActions {
     }
 
     /**
-     * Sell everything the budget holds back to SOL, and mean it. The first version walked the list
-     * once and came home having sold one coin: Jupiter rate-limits a burst of quotes, so every coin
-     * after the first was filed as "could not sell". So: a breath between coins, a second pass,
-     * holdings re-read from the chain between passes, [onProgress] as "n of total". Returns the symbols that would not sell; a coin with no route out cannot be sold by anybody.
+     * Sell everything the budget holds back to SOL. Jupiter rate-limits a burst of quotes, so:
+     * a pause between coins, a second pass, holdings re-read from the chain between passes,
+     * [onProgress] as "n of total". Returns the symbols that would not sell (no route out).
      */
     suspend fun sellAll(ctx: Context, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<String> =
         EnvelopeLock.withLock { sellAllInner(ctx, onProgress) }
@@ -251,9 +237,7 @@ object SessionActions {
         var left = holdings(ctx)
         val total = left.size
         var done = 0
-        // Keyed by mint, never by symbol: two mints calling themselves USDC is the oldest
-        // trick here. Keyed by symbol one got sold, the other left the stuck list, and the
-        // caller heard "empty" when it was not. People see the symbol; the code counts the mint.
+        // Keyed by mint, never symbol: two mints can both call themselves USDC.
         val stuck = LinkedHashMap<String, SolanaRpc.TokenAccountInfo>()
 
         repeat(2) { pass ->
@@ -266,13 +250,11 @@ object SessionActions {
                     stuck[h.mint] = h
                 }
                 onProgress(done, total)
-                // Jupiter rate-limits a burst from one client, and this loop is a burst. Three
-                // quarters of a second between coins is the difference between selling one and all.
+                // Jupiter rate-limits bursts; without 750 ms between coins only the first one sells.
                 if (i < left.lastIndex) kotlinx.coroutines.delay(750)
             }
             if (stuck.isEmpty()) return@repeat
-            // Between passes, believe the chain rather than our own list: a coin
-            // that did land is gone from it, and one that did not is still there.
+            // Between passes, re-read holdings from the chain, not our own list.
             kotlinx.coroutines.delay(1_500)
             val onChain = holdings(ctx).associateBy { it.mint }
             left = stuck.keys.mapNotNull { onChain[it] }
@@ -282,9 +264,8 @@ object SessionActions {
     }
 
     /**
-     * Move every coin the budget holds to the owner's account, untouched: one transaction
-     * per coin, opening the receiving account first. Nothing is sold, so a coin nobody
-     * wants still lands where you can reach it: a bad trade, not a lost one.
+     * Move every coin the budget holds to the owner's account, unsold: one transaction per
+     * coin, opening the receiving account first. A coin with no buyer still ends up reachable.
      */
     suspend fun moveTokensTo(ctx: Context, owner: String): List<String> =
         EnvelopeLock.withLock { moveTokensToInner(ctx, owner) }
@@ -314,9 +295,7 @@ object SessionActions {
             val signed = SolanaTx.attachSignature(tx, 0, sig)
             val out = withContext(Dispatchers.IO) { SolanaRpc.send(SolanaRpc.urlFor(null), signed) }
             if (out.signature == null) { stuck += sym; continue }
-            // A coin that came home is a line in the book. These moves used to
-            // be the only transactions of the budget without one: the coin
-            // appeared in the wallet and the receipts had nothing to say.
+            // Log each moved coin in the ledger, like every other budget transaction.
             val receipt = withContext(Dispatchers.IO) {
                 runCatching { ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), signed, owner, null, requireSim = false).receipt }.getOrNull()
             }
@@ -360,10 +339,9 @@ object SessionActions {
     }
 
     /*
-     * Closing the budget's empty token accounts and sending their rent to [owner]. Every
-     * coin bought opens an account holding about 0.002 SOL; forgetting the key with those
-     * open loses that rent for good (it happened: two accounts, 0.003 SOL). So it runs
-     * before the sweep, while the key still signs and still has SOL for the fee.
+     * Close the budget's empty token accounts and send their rent to [owner]. Each coin bought
+     * opens an account holding about 0.002 SOL, lost for good if the key is forgotten with it
+     * open. So this runs before the sweep, while the key still signs and has SOL for the fee.
      */
     /** What closing did: how many landed, how many did not, the rent that reached the owner. */
     class Closed(val closed: Int, val failed: Int, val rentLamports: Long)
@@ -373,8 +351,8 @@ object SessionActions {
         val from = Base58.decodePubkey(session.pubkey) ?: return@withContext Closed(0, 0, 0L)
         val to = Base58.decodePubkey(owner) ?: return@withContext Closed(0, 0, 0L)
         val rpc = SolanaRpc.urlFor(null)
-        // A read that did not come back is not an empty wallet: "nothing to close" here would
-        // let the caller forget the key with rent still inside, so it counts as one failure.
+        // A failed read counts as one failure, not "nothing to close", or the caller would
+        // forget the key with rent still inside.
         val accounts = runCatching { SolanaRpc.tokenAccountsOf(rpc, session.pubkey, force = true) }.getOrNull()
             ?: return@withContext Closed(0, 1, 0L)
         val empty = accounts
@@ -396,12 +374,11 @@ object SessionActions {
             if (signature == null) { failed += batch.size; continue }
             val signed = SolanaTx.attachSignature(tx, 0, signature)
             val out = SolanaRpc.send(rpc, signed)
-            // Sent is not landed: recorded as done twice for transactions that never reached the
-            // chain, and the key was forgotten with the rent inside. Row and count wait for the chain.
+            // Row and count wait for confirmation: a sent transaction may never land, and the
+            // key must not be forgotten with rent inside.
             if (out.signature == null || !SolanaRpc.confirmed(rpc, out.signature)) { failed += batch.size; continue }
-            // Count the rent of the accounts this transaction actually closed.
-            // Summing the whole batch overstated it whenever a pubkey would not
-            // decode and its instruction was dropped.
+            // Count the rent of the accounts this transaction actually closed, not the whole
+            // batch: a pubkey that fails to decode drops its instruction.
             closed += ixs.size
             rent += batch.take(ixs.size).sumOf { it.lamports }
             if (ixs.size < batch.size) failed += batch.size - ixs.size
@@ -431,7 +408,7 @@ object SessionActions {
     suspend fun closeBudget(ctx: Context, owner: String): Pair<Boolean, String> =
         EnvelopeLock.withLock { closeBudgetInner(ctx, owner) }
 
-    /** No burying below this gain: a transaction for crumbs is not worth it. */
+    /** Minimum gain to bury in ORE; below it the fee is not worth it. */
     private const val BURY_MIN_LAMPORTS = 5_000_000L
     /** What stays in SOL for the fees of the exits that follow. */
     private const val BURY_KEEP_LAMPORTS = 1_000_000L
@@ -439,18 +416,17 @@ object SessionActions {
     internal suspend fun closeBudgetInner(ctx: Context, owner: String): Pair<Boolean, String> {
         val s = SessionWallet.current(ctx) ?: return false to ctx.getString(R.string.trader_stop_nobudget)
         runCatching { AgentLinkService.revoke(ctx) }
-        // ORE first: the automation stops, its leftovers return to the budget, the dug ORE
-        // goes to the owner. An error here stops the close like any step: closing with money
-        // parked in another program's account is forgetting the key with the money outside.
+        // ORE first: stop the automation, return its leftovers to the budget, send mined ORE
+        // to the owner. An error stops the close: money left in another program's account
+        // would be lost with the key.
         runCatching { OreAgent.bringHome(ctx, owner) }.getOrDefault(null)?.let { return false to it }
         val stuck = runCatching { sellAllInner(ctx) }.getOrDefault(listOf("?"))
         if (stuck.isNotEmpty()) return false to ctx.getString(R.string.env_sell_all_stuck, stuck.joinToString(", "))
         var rent = runCatching { closeEmpty(ctx, owner) }.getOrNull() ?: Closed(0, 1, 0L)
         if (rent.failed > 0) return false to ctx.resources.getQuantityString(R.plurals.env_rent_stuck, rent.failed, rent.failed)
-        // Bury the gain. Everything is SOL by now: what sits above the capital, counting what
-        // already went home, is swapped into ORE and leaves with the rest. Never the capital.
-        // If the swap fails (no route, collar asking) the gain stays SOL and goes home; the
-        // close does not stop for this.
+        // Bury the gain: everything is SOL by now, and what sits above the capital (counting
+        // what already went home) is swapped into ORE. Never the capital. If the swap fails
+        // (no route, collar asking) the gain goes home as SOL and the close goes on.
         if (TraderLoop.config(ctx).oreBury) {
             val now = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() }
             val gain = if (now == null) 0L else now + s.harvestedLamports - s.fundedLamports - BURY_KEEP_LAMPORTS
@@ -469,8 +445,7 @@ object SessionActions {
                 }
             }
         }
-        // Fail closed here too: an unreadable balance read as zero once sent nothing home and
-        // forgot the key with the money still on the chain. This was the last hole.
+        // Fail closed: an unreadable balance read as zero would forget the key with the money on chain.
         val left = withContext(Dispatchers.IO) { runCatching { SolanaRpc.getBalance(SolanaRpc.urlFor(null), s.pubkey) }.getOrNull() }
         val back = BudgetMath.sweepBack(left) ?: return false to ctx.getString(R.string.env_balance_unknown)
         if (back > 0L) sweep(ctx, owner, back)?.let { return false to it }
@@ -507,13 +482,10 @@ object SessionActions {
         val signed = SolanaTx.attachSignature(tx, 0, signature)
         val out = SolanaRpc.send(rpc, signed)
         if (out.signature == null) return@withContext ctx.getString(R.string.wa_send_failed, out.error ?: "?")
-        // The key is about to be forgotten on the strength of this. Wait for
-        // the chain, not the node.
+        // The key is forgotten after this: wait for chain confirmation, not the node's ack.
         if (!SolanaRpc.confirmed(rpc, out.signature)) return@withContext ctx.getString(R.string.env_sweep_unconfirmed)
         val at = System.currentTimeMillis()
-        // Read the bytes we just sent, so the ledger row says how much came back and
-        // from where. It used to record `r = null`: the receipt said a budget had
-        // been closed and never said what for.
+        // Read back the sent bytes, so the ledger row says how much came back and from where.
         val receipt = runCatching {
             ReceiptEngine.analyze(ctx, BlocklistScanner(ctx), signed, owner, null, requireSim = false).receipt
         }.getOrNull()

@@ -20,11 +20,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The agent budget: a throwaway wallet the agent may spend from on its own. By construction the
- * agent holds only this key, so it can never move more than the budget, and the Seed Vault
- * account is untouchable; a sweep ends its power at once. Not on chain: "only swaps", "only
- * these destinations", "seven days" are things this app reports on, not things the network
- * refuses; the cap is the security boundary. The key is software because the Seed Vault will not sign without a person; at rest the seed is encrypted with an AES key in the Android Keystore.
+ * The agent budget: a throwaway wallet the agent spends from alone. The agent holds only this
+ * key, so it cannot move more than the budget, and a sweep revokes it at once. "Only swaps",
+ * "only these destinations" and "seven days" are enforced by this app, not on chain; the cap is
+ * the real boundary. A software key because the Seed Vault needs a person to sign; the seed is
+ * encrypted at rest with an AES key in the Android Keystore.
  */
 object SessionWallet {
     private const val PREFS = "apex_session"
@@ -79,11 +79,9 @@ object SessionWallet {
     // ---- the key ------------------------------------------------------------
 
     /**
-     * The last key prepared but not yet saved. Between the preview and the signature the
-     * budget exists only here: writing the seed to disk at preview time would overwrite a
-     * budget already funded, and that seed is the only copy of the key to that money. But the
-     * receipt must be able to say the destination is yours, or it warns about a wallet you
-     * just created.
+     * Key prepared for the preview but not yet saved: saving the seed at preview time could
+     * overwrite the only copy of a funded budget's key. Kept here so the receipt recognizes
+     * the destination as yours instead of warning about it.
      */
     @Volatile var preparedPubkey: String? = null
         private set
@@ -119,9 +117,8 @@ object SessionWallet {
     fun current(ctx: Context): Session? {
         val p = prefs(ctx)
         val pub = p.getString("pubkey", null) ?: return null
-        // A budget topped up before the ceiling learned to follow the money kept limits sized for
-        // an amount that no longer exists: the SOL was there and the agent could spend a cent of
-        // it. Put right on first read, once.
+        // Migration: budgets topped up before the cap tracked funding kept limits sized for
+        // the old amount. Fixed once, on first read.
         val cap0 = p.getLong("cap", 0L)
         val funded0 = p.getLong("funded", 0L)
         if (funded0 > cap0 && cap0 > 0) {
@@ -141,10 +138,9 @@ object SessionWallet {
     }
 
     /**
-     * Money added to an existing budget. The ceiling rises with it: recording only the deposit
-     * left every limit sized for the old amount, and six times more money bought a cent of
-     * spending. The cap is "the most this budget may ever be worth", and the collar's caps are
-     * shares of it, so [rescale] moves them too.
+     * Record a top-up. The cap ("the most this budget may ever be worth") rises with it, and
+     * [rescale] moves the collar's caps, which are shares of it; otherwise more money would
+     * buy no more spending room.
      */
     fun addFunded(ctx: Context, lamports: Long) {
         val p = prefs(ctx)
@@ -154,10 +150,7 @@ object SessionWallet {
         if (funded > cap && cap > 0) rescale(ctx, cap, funded)
     }
 
-    /**
-     * Carry the collar across a bigger budget at the same shares: growing the pocket must not
-     * loosen the rules, nor leave them tied to an amount that is gone.
-     */
+    /** Scale the collar's caps to a bigger budget, keeping the same shares. */
     internal fun rescale(ctx: Context, oldCap: Long, newCap: Long) {
         val p = policy(ctx) ?: return
         fun scale(v: Long) = (v.toDouble() / oldCap * newCap).toLong()
@@ -172,14 +165,12 @@ object SessionWallet {
     }
 
     /*
-     * Closing forgets everything that belonged to the budget: trading settings, the loop's
-     * last word, the open positions. Left behind, a new budget opened showing "you stopped
-     * it" about money that was gone and coins the new key never held. Done here because
-     * there is more than one way to close a budget.
+     * Closing wipes the budget's trading settings, last note and open positions, or a new
+     * budget shows stale state. Done in forget() because a budget can be closed several ways.
      */
     /**
-     * The account of a closed budget: what went in, what came back, what happened between.
-     * Kept apart from the budget's prefs, which [forget] wipes, so the last one can be shown.
+     * Summary of a closed budget: in, out, buys and sells. Stored apart from the budget's
+     * prefs, which [forget] wipes, so the last one can be shown.
      */
     data class Close(
         val fundedLamports: Long, val harvestedLamports: Long, val backLamports: Long,
@@ -226,9 +217,8 @@ object SessionWallet {
                 perTxLamports = o.getLong("perTx"), dailyLamports = o.getLong("daily"), askAboveLamports = o.getLong("askAbove"),
                 allowedPrograms = set("programs"), allowedMints = set("mints"), allowedDestinations = set("destinations"),
                 maxTxPerHour = o.getInt("perHour"), expiresAt = o.getLong("expiresAt"),
-                // A budget saved before this setting existed had no way to say yes,
-                // so it reads as open. Nothing else about it changes: the caps, the
-                // silent threshold and the destination list are whatever it stored.
+                // Budgets saved before this setting existed read as open; everything
+                // else keeps its stored value.
                 allowAnyMint = o.optBoolean("anyMint", true),
             )
         }.getOrNull()
@@ -246,10 +236,10 @@ object SessionWallet {
     fun setMode(ctx: Context, mode: AgentMode) { policy(ctx)?.let { setPolicy(ctx, it.copy(mode = mode)) } }
 
     /**
-     * Every move leaves a row; its cost may be zero. The daily money cap sums the lamports, the
-     * hourly move cap counts the rows: a round trip spends nothing but is still a move, and skipping
-     * the row let an agent buy and sell without limit, paying fee and spread each time. A closed
-     * round trip gives the day back what it returned, with a minus sign: marking zero left the cancelled buy on the counter and froze a small budget until the next day.
+     * Every move leaves a row, even at zero cost: the daily cap sums lamports, the hourly cap
+     * counts rows, and without a row a round trip could repeat without limit, paying fee and
+     * spread each time. A closed round trip logs what came back as a negative amount, or the
+     * cancelled buy stays on the counter and can freeze a small budget until the next day.
      */
     fun recordSpend(ctx: Context, lamports: Long, at: Long = System.currentTimeMillis()) {
         val a = spendLog(ctx).filter { it.first > at - 86_400_000L } + (at to lamports)
@@ -266,11 +256,7 @@ object SessionWallet {
         )
     }
 
-    /**
-     * When the day's counter breathes again. "Resumes tomorrow" is false and useless: the
-     * twenty-four hours are a sliding window, not midnight. What blocks now is the oldest row
-     * still inside, and it frees exactly twenty-four hours after it was written.
-     */
+    /** When the daily cap frees up: 24 h after the oldest spend in the sliding window, not at midnight. */
     fun freesAt(ctx: Context, now: Long = System.currentTimeMillis()): Long? =
         spendLog(ctx).filter { it.first > now - 86_400_000L && it.second > 0L }
             .minOfOrNull { it.first }?.plus(86_400_000L)

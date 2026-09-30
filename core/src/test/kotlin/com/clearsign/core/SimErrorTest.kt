@@ -6,15 +6,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The translation from a node's answer to a sentence.
- *
- * Tested because the failure mode is silent: an unrecognised shape falls back to
- * the raw JSON, which is what the screen showed before this existed, so nothing
- * breaks visibly when a case is missed. Only a test notices.
+ * Node simulation errors to sentences. A missed case silently falls back to the raw
+ * JSON, so only a test notices.
  */
 class SimErrorTest {
 
-    /** The one that started this: a swap to CATE, seen on the phone. */
+    /** Custom 6025, from a real swap to CATE. */
     @Test fun theRouteErrorReadsLikeAdvice() {
         val s = SimError.explain("""{"InstructionError":[6,{"Custom":6025}]}""", it = true)!!
         assertTrue(s.startsWith("La rotta non regge"), s)

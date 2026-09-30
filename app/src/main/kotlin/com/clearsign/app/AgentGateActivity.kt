@@ -23,11 +23,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The Agent Gate: the hardware co-signer for AI agents. An agent never holds a key: it hands
- * Totem a transaction plus a declared intent via
+ * Agent Gate: a hardware co-signer for AI agents, which never hold a key. An agent sends
  *   apex://agent/sign?tx=<base64>&intent=<json>[&account=<pubkey>][&cluster=…][&callback=<uri>][&send=0|1]
- * Totem simulates the bytes and [IntentGuard] checks the claim against the effect: any undeclared
- * outflow, wrong amount or recipient, or smuggled approval is a DANGER. The person still holds to sign with biometrics; the result (signature, or the signed transaction when send=0) returns via activity result and callback.
+ * Totem simulates it and [IntentGuard] checks the claim: an undeclared outflow, wrong amount
+ * or recipient, or smuggled approval is DANGER. The user signs with biometrics; the result
+ * (signature, or signed tx when send=0) returns via activity result and callback.
  */
 class AgentGateActivity : ComponentActivity() {
     private lateinit var bridge: ActivityResultBridge
@@ -41,7 +41,7 @@ class AgentGateActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Closing the receipt without deciding is a "no": never leave the agent hanging.
+        // Closing without deciding counts as a refusal, so the broker is not left waiting.
         envelopeJob?.let { AgentBroker.complete(it, AgentBroker.Verdict.Refused(getString(R.string.agent_declined), AgentBroker.Verdict.Refused.By.PERSON)) }
     }
 
@@ -70,29 +70,24 @@ class AgentGateActivity : ComponentActivity() {
         val tx = txB64?.let { b -> runCatching { Base64.decode(b, Base64.URL_SAFE or Base64.NO_WRAP) }.getOrNull() ?: runCatching { Base64.decode(b, Base64.DEFAULT) }.getOrNull() }
         val agentIntent = intentJson?.let { parseIntent(it) }
         if (tx == null || agentIntent == null) { fail(getString(R.string.agent_bad_link)); return }
-        // Two pockets: "envelope", the agent's capped key this app holds and signs with after the
-        // collar said "ask", presence proved by biometrics; otherwise the Seed Vault. The envelope
-        // branch signs after the collar already decided, so only a job the collar is waiting on may
-        // reach it: without that check any installed app could send `apex://agent/sign` with
-        // `signer=envelope` and its own transaction, and reach the budget key with no cap and no
-        // limit. The activity is exported; the extras are whatever the caller typed.
+        // Two signers: "envelope" is the agent's capped budget key, used after the collar said
+        // "ask" and biometrics confirm presence; otherwise the Seed Vault. The activity is
+        // exported, so only a job the collar is waiting on may use the envelope, or any app
+        // could get its own transaction signed by the budget key with no cap.
         val askedEnvelope = intent?.getStringExtra("signer") == "envelope"
         envelopeJob = intent?.getStringExtra("job")?.takeIf { askedEnvelope && AgentBroker.isPending(it) }
-        // Asked for the budget key and the collar knows nothing about it: refuse
-        // outright rather than quietly falling back to the Seed Vault, so the
-        // caller cannot use this screen to get a signature it did not ask for.
+        // Envelope asked with no pending job: refuse. Falling back to the Seed Vault
+        // would hand out a signature nobody asked for.
         if (askedEnvelope && envelopeJob == null) { fail(getString(R.string.agent_bad_link)); return }
-        // Ultra's route: we asked Jupiter for it, and Jupiter lands it.
-        // Valid only inside a job the collar is waiting on, like the rest of this branch.
+        // Jupiter Ultra request id: Jupiter lands the tx. Only valid inside a pending collar job.
         val ultraId = intent?.getStringExtra("ultra")?.takeIf { envelopeJob != null && it.isNotBlank() }
         val envelope = envelopeJob?.let { SessionWallet.current(this)?.pubkey }
         if (envelopeJob != null && envelope == null) { fail(getString(R.string.env_none_short)); return }
         val owner = envelope ?: data.getQueryParameter("account")?.takeIf { it.isNotBlank() } ?: Settings.watchWallet(this)
         if (owner == null) { fail(getString(R.string.agent_no_wallet)); return }
 
-        // Two different things, never conflated: what we can verify, and what the
-        // request claims about itself. A malicious app can call itself "Claude";
-        // it cannot fake the package Android reports, nor how the link arrived.
+        // Keep what we can verify apart from what the request claims: an app can call
+        // itself "Claude", but not fake the package Android reports or how the link arrived.
         val callerPkg = referrer?.takeIf { it.scheme == "android-app" }?.host
         val viaQr = intent?.getStringExtra("via") == "qr"
         val origin = when {
@@ -113,9 +108,8 @@ class AgentGateActivity : ComponentActivity() {
         lifecycleScope.launch {
             val analyzed = try {
                 withContext(Dispatchers.IO) {
-                    // The same expected mint the broker uses: without it the simulation cannot see a coin
-                    // arriving in an account this very transaction creates, and the intent check calls an
-                    // honest purchase a lie.
+                    // Same expected mint as the broker: without it the simulation misses a coin landing in
+                    // an account this tx creates, and a legit buy fails the intent check.
                     val expect = intentJson?.let { runCatching { org.json.JSONObject(it).optString("expectMint") }.getOrNull() }
                         ?.takeIf { it.isNotEmpty() }
                     ReceiptEngine.analyze(this@AgentGateActivity, scanner, tx, owner, cluster, requireSim = true, expectMints = listOfNotNull(expect))
@@ -156,9 +150,8 @@ class AgentGateActivity : ComponentActivity() {
                             if (send) {
                                 ui = MwaUi.Working(getString(R.string.w_sending))
                                 txSig = if (ultraId != null) {
-                                    // An Ultra route goes back to Jupiter, who asked for it: from our RPC a gasless sale, or
-                                    // one filled by a market maker, does not even leave, since Jupiter pays the fee and its
-                                    // signature is missing. The broker does this when signing alone; here, after the print, it did not.
+                                    // Ultra orders go back to Jupiter: sent from our RPC, a gasless or market-maker fill
+                                    // fails, since Jupiter pays the fee and its signature is missing.
                                     val ex = withContext(Dispatchers.IO) { JupiterUltra.execute(signed, ultraId) }
                                     ex.signature?.takeIf { ex.error == null }
                                         ?: run { ui = MwaUi.Error(getString(R.string.err_send, ex.error ?: ex.status)); deliverError(ex.error ?: "send failed"); return@launch }
@@ -170,10 +163,9 @@ class AgentGateActivity : ComponentActivity() {
                             record(receipt, owner, dApp.name, callerPkg, cluster, tx, txSig, send, how = if (envelopeJob != null) "asked" else null)
                             val signedB64 = Base64.encodeToString(signed, Base64.NO_WRAP)
                             envelopeJob?.let { j ->
-                                // A move the collar stopped and a person waved through is still a move the budget paid
-                                // for. It was never written to the spend log, and the daily cap and hourly limit come from
-                                // that log alone, so anything through "ask" was invisible to both. The exact price is the
-                                // broker's business; the honest bound here is the collar's ceiling for one move.
+                                // An approved "ask" move still spends the budget: log it, or the daily cap and
+                                // hourly limit (read from the spend log) never see it. Non-SOL outflows count
+                                // as the per-move ceiling, an upper bound.
                                 runCatching {
                                     val out = receipt.outflows.filter { it.rawAmount < 0 }
                                     val allSol = out.isNotEmpty() && out.all { it.mint == com.clearsign.core.NATIVE_SOL_MINT }

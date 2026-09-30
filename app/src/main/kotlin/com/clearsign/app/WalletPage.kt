@@ -40,11 +40,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * One person in the crowd, opened by tapping their name. The feed says a name bought a coin,
- * a headline with no story. This page tells the story we can honestly tell and stops where
- * our knowledge stops: what they hold now, live from the chain, and every move inside the
- * published window drawn on the price line. Not whether they are any good: the scanner
- * publishes the last forty events across ten thousand wallets, so a win rate would be invented.
+ * One wallet from the crowd, opened by tapping its name: current holdings, live from the
+ * chain, and every move in the published window on the price line. No win rate: the scanner
+ * publishes only the last forty events across 10k wallets, so it would be made up.
  */
 @Composable
 internal fun WalletPage(address: String, moves: List<CrowdBuy>, onDismiss: () -> Unit) {
@@ -126,7 +124,7 @@ internal fun WalletPage(address: String, moves: List<CrowdBuy>, onDismiss: () ->
             val byMint = remember(moves) { moves.groupBy { it.mint }.toList().sortedByDescending { it.second.maxOf { m -> m.at } } }
             byMint.forEach { (mint, list) -> WalletMoves(mint, list) }
 
-            // The edge of what we know, said out loud.
+            // State the limits of the data.
             Text(stringResource(R.string.wp_truth), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
             Text(
                 stringResource(if (followed) R.string.wp_star_on else R.string.wp_star_off),
@@ -162,17 +160,15 @@ private fun WalletMoves(mint: String, list: List<CrowdBuy>) {
                 val from = series.first().at
                 val to = series.last().at
                 val span = (to - from).coerceAtLeast(1L).toFloat()
-                // A move newer than the last candle belongs at the right edge, not nowhere: the last candle
-                // starts at the top of the hour, so anything bought in the last hour fell outside the range
-                // and the card claimed the move was two days old.
+                // Clamp moves newer than the last candle (which starts on the hour) to the right edge,
+                // or a buy in the last hour falls outside the range.
                 val marks = list.filter { it.at >= from }
                     .map { SparkMark(((it.at - from) / span).coerceIn(0f, 1f), it.sell) }
                 Box(Modifier.fillMaxWidth().height(72.dp)) {
                     Spark(series.map { it.close }, Halo.cyan, marks = marks)
                 }
                 if (marks.isEmpty()) {
-                    // Their move is older than the chart we can draw. Better said
-                    // than left as a line with nothing on it.
+                    // Move older than the chart: say so instead of an empty line.
                     Text(stringResource(R.string.wp_older), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
                 }
             }
@@ -181,10 +177,9 @@ private fun WalletMoves(mint: String, list: List<CrowdBuy>) {
 }
 
 /**
- * Which chart makes the moves readable. Two days of hourly candles is right for "where is
- * this coin going" and useless for a wallet that bought and sold inside twenty minutes: both
- * rings land on one pixel. When everything happened recently and close together, five-minute
- * candles over five hours pull the two apart.
+ * Pick the chart that keeps the moves apart. Two days of hourly candles put a buy and a sell
+ * twenty minutes apart on one pixel; when all moves are recent and close, use five-minute
+ * candles over five hours.
  */
 internal fun spanFor(moves: List<com.clearsign.core.CrowdBuy>): Gecko.Span {
     if (moves.isEmpty()) return Gecko.Span.HOURS

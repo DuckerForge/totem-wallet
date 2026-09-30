@@ -30,11 +30,9 @@ class IntentGuardTest {
     )
 
     /**
-     * Two silences, two answers. When the node ran the transaction and it
-     * failed, the reason is already in the receipt and the guard passes it on.
-     * When the node could not be asked, there is nothing to pass on, and the
-     * guard says the claim is unverifiable. It used to say "did not answer" for
-     * both, and the loop retried a swap that failed on slippage every round.
+     * Failed vs unavailable. If the node ran it and it failed, the guard passes on the receipt's
+     * reason; if the node could not be reached, the claim is unverifiable. One shared "did not
+     * answer" made the loop retry a slippage failure every round.
      */
     @Test fun aSimulationThatFailedKeepsItsReason() {
         val failed = Risk(RiskFlag.SIMULATION_FAILED, Severity.DANGER, "slippage tolerance exceeded")
@@ -83,10 +81,8 @@ class IntentGuardTest {
     }
 
     /**
-     * The rent for accounts this transaction opens is not a lie. An agent writing
-     * "swap 0.031 SOL" cannot know that buying a coin it has never held will also
-     * cost two account deposits, and refusing that as dishonesty stopped the loop
-     * dead on every new coin.
+     * Rent for accounts the transaction opens is not a mismatch. An agent writing "swap 0.031 SOL"
+     * cannot know a first buy also pays two account deposits; refusing it stopped the loop on every new coin.
      */
     @Test fun solTransferToleratesFeeAndTheRentItCanSee() {
         val r = receipt(listOf(d(me, NATIVE_SOL_MINT, "SOL", 9, -0.1051)), to = bob, newAccounts = 2)
@@ -95,9 +91,8 @@ class IntentGuardTest {
     }
 
     /**
-     * The other half, and the reason the slack is not a constant: SOL that leaves
-     * with nothing in the simulation to explain it is exactly what this guard is
-     * for. The old flat allowance waved through 0.003 SOL on every transfer.
+     * Why the slack is not a constant: SOL leaving with nothing in the simulation to explain it is
+     * what this guard is for. A flat allowance let 0.003 SOL through on every transfer.
      */
     @Test fun unexplainedExtraSolIsStillALie() {
         val r = receipt(listOf(d(me, NATIVE_SOL_MINT, "SOL", 9, -0.102)), to = bob)
@@ -105,7 +100,7 @@ class IntentGuardTest {
         assertEquals(RiskFlag.AGENT_INTENT_MISMATCH, risk.flag)
     }
 
-    /** The case that broke the loop, to the lamport it actually cost. */
+    /** The real case that stopped the loop, with its exact amounts. */
     @Test fun buyingABrandNewCoinIsNotALie() {
         val r = receipt(
             outs = listOf(d(me, NATIVE_SOL_MINT, "SOL", 9, -0.035953)),

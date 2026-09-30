@@ -13,18 +13,13 @@ import androidx.compose.ui.graphics.toArgb
 import java.util.Locale
 
 /**
- * What the bubble shows, chosen by the person: the face, the rows of the open panel, the
- * coin to watch, the size, where it was left. In the app's prefs so the service and the
- * page read the same thing.
+ * Bubble settings: face, panel rows, coin to watch, size, position. In the app's prefs so
+ * the service and the settings page read the same values.
  */
 object CompanionPrefs {
     private const val P = "apex_companion"
 
-    /**
-     * What the small circle says. `ROTATE` is not a face but two in turn, the open coin and the
-     * budget, four seconds each: how a bubble the size of a fingernail says both things worth
-     * knowing instead of hiding one.
-     */
+    /** The bubble's face. `ROTATE` alternates the open coin and the budget, four seconds each. */
     enum class Face { ROTATE, AGENT, HEALTH, TOTAL, COIN, BUDGET }
 
     private fun p(ctx: Context) = ctx.getSharedPreferences(P, Context.MODE_PRIVATE)
@@ -39,17 +34,16 @@ object CompanionPrefs {
     fun setSize(ctx: Context, dp: Int) = p(ctx).edit().putInt("size", dp).apply()
 
     /**
-     * Where you left it. It was not saved: any settings change restarted the service and the
-     * bubble was back top left. Something that sits over every app must stay where you put it.
-     * −1 means never dragged, and the service decides.
+     * Last drag position, saved so a service restart (any settings change) keeps it.
+     * −1 means never dragged; the service picks.
      */
     fun spotX(ctx: Context): Int = p(ctx).getInt("x", -1)
     fun spotY(ctx: Context): Int = p(ctx).getInt("y", -1)
     fun setSpot(ctx: Context, x: Int, y: Int) = p(ctx).edit().putInt("x", x).putInt("y", y).apply()
 
     /**
-     * What the bubble's notification says. Android needs the line to keep the bubble alive;
-     * on, it carries the numbers too. Off by default: nobody asked for them there.
+     * Numbers in the bubble's notification. Android needs the notification to keep the
+     * service alive; this only adds the numbers. Off by default.
      */
     fun notif(ctx: Context): Boolean = p(ctx).getBoolean("notif", false)
     fun setNotif(ctx: Context, on: Boolean) = p(ctx).edit().putBoolean("notif", on).apply()
@@ -72,28 +66,24 @@ object CompanionPrefs {
     )
 
     /**
-     * The face as a bitmap, the same drawing for the bubble and the preview. It looks like a
-     * sphere and costs nothing: real 3D would mean an OpenGL surface over every app, the GPU
-     * awake forever for a small circle. Depth is painted (radial gradient toward the light, a
-     * highlight top left, shadow gathering below, the rim lit only where the light hits) and
-     * redrawn only when the numbers change. At rest it is a still bitmap.
+     * The face as a bitmap, shared by the bubble and the preview. Depth is painted (radial
+     * gradient, highlight top left, shadow below, rim lit on the light side) instead of real 3D,
+     * which would keep an OpenGL surface and the GPU awake over every app. Redrawn only when the
+     * numbers change.
      */
     fun faceBitmap(px: Int, face: Face, d: FaceData): Bitmap {
         val p = Halo.palette
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val cx = px / 2f
-        // The sphere sits a hair above center and leaves room below for its shadow:
-        // without one, a ball over another app rests on nothing.
+        // Slightly above center, leaving room below for the shadow.
         val cy = px * 0.47f
         val r = px * 0.44f
         val body0 = p.card.toArgb()
 
-        // --- l'ombra sotto --------------------------------------------------
-        // A ball over another app has to rest on something, but the shadow was one black
-        // wash for every theme: under a pale ball on a light theme it read as a dirty ring
-        // around it, not as a shadow. It is fainter now, it hugs the ball instead of
-        // spreading past it, and it sits under the ball rather than around it.
+        // --- the shadow below -----------------------------------------------
+        // Fainter on light themes and tucked under the ball: a uniform dark wash read as a
+        // dirty ring around a pale ball.
         val light = p.ground.relativeLuminance() > 0.5
         val shadowY = cy + r * 0.34f
         val shadowR = r * 0.92f
@@ -120,8 +110,7 @@ object CompanionPrefs {
         }
 
         // --- the sphere's body --------------------------------------------------------------
-        // On the card color, not the ground's: it was a black ball on black grounds, and the painted
-        // light had nothing to light.
+        // On the card color, not the ground's: black on black leaves the painted light nothing to show.
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.35f, cy - r * 0.42f, r * 1.75f,
@@ -131,8 +120,7 @@ object CompanionPrefs {
         }
         c.drawCircle(cx, cy, r, body)
 
-        // The highlight, where the light hits first. It was twice this and fell right
-        // on the mark, which washed out.
+        // The highlight. Any larger and it washes out the mark.
         val spec = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.38f, cy - r * 0.54f, r * 0.50f,
@@ -154,7 +142,7 @@ object CompanionPrefs {
         }
         c.drawCircle(cx, cy, r - r * 0.025f, rim)
 
-        // --- l'anello coi numeri ----------------------------------------------
+        // --- the ring with the numbers ----------------------------------------
         val w = r * 0.11f
         val inset = r * 0.17f
         val rect = RectF(cx - r + inset, cy - r + inset, cx + r - inset, cy + r - inset)
@@ -197,9 +185,8 @@ object CompanionPrefs {
         }
 
         /**
-         * What the bubble shows when there is no number to say: the agent itself, the same
-         * robot as the Agent tab, drawn on its twenty-four grid so the two are one drawing.
-         * The mark was the wrong answer here: the bubble is the agent, not the app.
+         * Shown when there is no number: the Agent tab's robot, on the same 24-unit grid.
+         * The bubble is the agent, so not the app's mark.
          */
         fun mark(alpha: Int) {
             val s = r * 1.55f
@@ -258,7 +245,7 @@ object CompanionPrefs {
                     c.drawText(n.toString(), cx, cy + text.textSize * 0.34f, text)
                     text.shader = null
                 } else {
-                    // Idle: the app's mark, not a dash.
+                    // Idle: the robot, not a dash.
                     mark(if (d.trading) 255 else 190)
                 }
                 statusDot(d.trading)
@@ -302,14 +289,14 @@ object CompanionPrefs {
         return bmp
     }
 
-    /** Verso la luce. */
+    /** Blend toward white by [k]. */
     private fun lift(c: Int, k: Float) = AColor.rgb(
         (AColor.red(c) + (255 - AColor.red(c)) * k).toInt().coerceIn(0, 255),
         (AColor.green(c) + (255 - AColor.green(c)) * k).toInt().coerceIn(0, 255),
         (AColor.blue(c) + (255 - AColor.blue(c)) * k).toInt().coerceIn(0, 255),
     )
 
-    /** Verso l'ombra. */
+    /** Darken toward black by [k]. */
     private fun sink(c: Int, k: Float) = AColor.rgb(
         (AColor.red(c) * (1 - k)).toInt().coerceIn(0, 255),
         (AColor.green(c) * (1 - k)).toInt().coerceIn(0, 255),

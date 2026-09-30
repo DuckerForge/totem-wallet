@@ -87,13 +87,9 @@ class MainActivity : ComponentActivity() {
     var tapMiss by mutableStateOf(0L)
 
     /**
-     * Where a notification, a widget or the bubble asked us to land.
-     *
-     * State on the activity rather than a read of `intent`, because the read used to happen
-     * inside `remember`: first composition only. With the app already open, the bubble's
-     * buttons went through onNewIntent, updated the intent nobody read again, and the screen
-     * sat where it was. Cleared once the screen has acted on it, so going back and forth does
-     * not re-open the same sheet.
+     * Where a notification, the widget or the bubble asked us to land. Activity state, not a
+     * read of `intent` inside `remember`, which runs on first composition only and misses
+     * onNewIntent. Cleared once acted on, so coming back does not re-open the same sheet.
      */
     var openRequest by mutableStateOf<String?>(null)
 
@@ -112,9 +108,8 @@ class MainActivity : ComponentActivity() {
     internal fun resumeReader() = startReaderMode()
 
     private fun startReaderMode() {
-        // Reading and pretending to be a tag share one radio, and reader mode wins: with it on,
-        // this phone polls and emulates nothing. While the tap screen is armed we stay out of
-        // the way, or the other phone finds no card, which is what "the tap does nothing" was.
+        // Reader mode and tag emulation share the radio, and reader mode wins. Stay off while
+        // the tap screen is armed, or the other phone finds no card.
         if (TapService.armed.value) return
         val nfc = android.nfc.NfcAdapter.getDefaultAdapter(this) ?: return
         nfc.enableReaderMode(
@@ -179,9 +174,8 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { runCatching { HealthWidgetData.refresh(this@MainActivity) } }
         // A paired agent link should be listening whenever the phone is up.
         if (AgentLink.current(this) != null && SessionWallet.current(this) != null) AgentLinkService.start(this)
-        // And so should the trader. Without this the loop came back only at the
-        // next fifteen-minute keeper window, so after force-stopping the app it
-        // read as switched on and doing nothing at all.
+        // So should the trader: after a force-stop it would otherwise wait for the next
+        // 15-minute keeper window while showing as on.
         TraderKeeper.sync(this)
         // Independent of trading: it reads other people's wallets and spends nothing.
         SeekerKeeper.sync(this)
@@ -193,9 +187,8 @@ class MainActivity : ComponentActivity() {
         Themes.load(this)
         Settings.load(this); SpareJar.load(this)
         Pro.load(this)
-        // Hand the radio back and forth as the tap screen arms and disarms. Started here, not in
-        // onResume: `lifecycleScope` lives until destroy and `repeatOnLifecycle` never returns,
-        // so one per resume left a permanent collector each time, ten after ten trips home.
+        // Hand the radio back and forth as the tap screen arms and disarms. Here, not in
+        // onResume: `repeatOnLifecycle` never returns, so one per resume leaks a collector.
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
                 TapService.armed.collect { emitting -> if (emitting) stopReaderMode() else startReaderMode() }
@@ -206,10 +199,9 @@ class MainActivity : ComponentActivity() {
         signer = SeedVaultSigner(this, bridge)
         enableEdgeToEdge()
         setContent { ScaledText { HomeScreen(signer) } }
-        // What this phone already learned about coins: names, decimals, icons. They never
-        // change, and without this all were fetched again on every start. Read after the first
-        // frame and on IO: two JSON files on the main thread before `setContent` kept the splash
-        // black, longer every month. One image loader for every logo, with a memory cache.
+        // Coin names, decimals and icons cached on disk, read after the first frame on IO:
+        // on the main thread before `setContent` they kept the splash black. One image
+        // loader for every logo, with a memory cache.
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(this)
                 .memoryCache { coil.memory.MemoryCache.Builder(this).maxSizePercent(0.08).build() }
@@ -260,8 +252,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         var showSwap by remember { mutableStateOf(false) }
         // Bumped to reload the home. Up here so a swap or a send can ask for it on closing.
         var reload by remember { mutableStateOf(0) }
-        // A coin swapped away stayed on the home until a pull: nothing reloaded after the
-        // sheet closed. Reload now, and again once the chain has had time to land it.
+        // Reload now and again after 4 s, once the chain has landed it, so a swapped coin
+        // leaves the home without a pull.
         fun reloadAfterSend(who: String?) {
             reload++
             scope.launch {
@@ -284,41 +276,34 @@ fun HomeScreen(signer: SeedVaultSigner) {
         // The deal already struck with RocketX, traveling with the payment up to the signature.
         var bridgeDeal by remember { mutableStateOf<RocketX.Deal?>(null) }
         var showBridgeHistory by remember { mutableStateOf(false) }
-        // Private send enters from Send but runs through the bridge: it carries
-        // along what was already typed over there.
+        // Private send starts in Send but runs through the bridge, carrying what was typed.
         var privateSend by remember { mutableStateOf<Pair<String, String>?>(null) }
         var showContactTap by remember { mutableStateOf(false) }
         var showCustomize by remember { mutableStateOf(false) }
         var showCompanion by remember { mutableStateOf(false) }
         var showChip by remember { mutableStateOf(false) }
         var guestNote by remember { mutableStateOf(0L) }
-        // A notification about somebody you follow opens the feed straight on that
-        // coin, with the receipt already building. The alert is the start of the
-        // loop, not a link to somewhere you then have to navigate.
+        // A notification about a followed wallet opens the feed on that coin, with the
+        // receipt already building.
         var showCrowd by remember { mutableStateOf(false) }
         var crowdMint by remember { mutableStateOf((ctx as? android.app.Activity)?.intent?.getStringExtra("mint")) }
         var showHealth by remember { mutableStateOf(false) }
         var showPnl by remember { mutableStateOf(false) }
         var headline by remember { mutableStateOf<String?>(null) }
         // One scroll state for the wallet, hoisted so the header and the bottom
-        // bar can both react to it. Nothing in the app did this before.
+        // bar can both react to it.
         var scanError by remember { mutableStateOf<String?>(null) }
         val scanHome = rememberAgentScan { scanError = it }
         val walletScroll = rememberScrollState()
         val density = androidx.compose.ui.platform.LocalDensity.current
-        // A state, not a number: readers use it inside `graphicsLayer` or `layout`, so
-        // scrolling moves layers and does not recompose the page. Read here as a Float,
-        // the whole `HomeScreen` recomposed every frame.
+        // A State, not a Float: readers use it inside `graphicsLayer` or `layout`, so scrolling
+        // moves layers without recomposing. Read as a Float here, `HomeScreen` recomposes every frame.
         val collapse = remember {
             derivedStateOf { (walletScroll.value / with(density) { 180.dp.toPx() }).coerceIn(0f, 1f) }
         }
         /**
-         * One place that answers "open this", wherever the ask came from: a notification, the
-         * widget, or a button on the bubble. It used to be four separate reads of the intent
-         * done inside `remember`, so a second ask while the app was already up changed nothing,
-         * and "companion" was never listed at all: every bubble button landed on the home.
-         *
-         * Cleared after acting, or coming back to the app would re-open the same sheet.
+         * Handles "open this" from a notification, the widget or a bubble button, also while
+         * the app is already up. Cleared after acting, or coming back would re-open the sheet.
          */
         LaunchedEffect(requested) {
             when (requested) {
@@ -339,10 +324,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
         LaunchedEffect(request) { if (request != null) showSend = true }
         LaunchedEffect(Unit) { contacts = Contacts.allowlist(ctx); Exports.clean(ctx) }
         /**
-         * Unlock: what the door does when this phone has been here before. The fingerprint
-         * every time, the way Jupiter does it; the address is remembered, so the print only buys
-         * that the person holding the phone is you. Signing later calls `ensureAccount`, which
-         * authorizes the vault when something is actually signed.
+         * Unlock on a returning phone: fingerprint every time, as Jupiter does. The address is
+         * remembered, so the print only proves who holds the phone. Signing later calls
+         * `ensureAccount`, which authorizes the vault when something is actually signed.
          */
         suspend fun unlockAsking(saved: String): Presence.Result {
             val act = ctx as? android.app.Activity ?: return Presence.Result.FAILED
@@ -356,9 +340,7 @@ fun HomeScreen(signer: SeedVaultSigner) {
             return Presence.Result.OK
         }
 
-        // Leaving the app locks it. Coming back always goes through the door, so
-        // "sometimes it asks and sometimes it doesn't" stops being a thing: it
-        // asks, always.
+        // Leaving the app locks it; coming back always asks for the print.
         val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
         androidx.compose.runtime.DisposableEffect(lifecycle) {
             val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
@@ -396,9 +378,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
         ) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    // With no wallet there is nothing on any tab, and the old screen said so with a small
-                    // card over two thirds of empty page. One door, the whole screen, no tab bar until there
-                    // is something behind it. It opens rather than cuts: the scene fades and grows a touch.
+                    // No wallet: the lock screen fills the screen, no tab bar. Fade and slight scale
+                    // between the two.
                     androidx.compose.animation.AnimatedContent(
                         targetState = accounts.isEmpty(),
                         transitionSpec = {
@@ -414,20 +395,14 @@ fun HomeScreen(signer: SeedVaultSigner) {
                             scope.launch {
                                 val r = runCatching { unlockAsking(saved!!) }.getOrDefault(Presence.Result.FAILED)
                                 busy = false
-                                // Closing the sheet is not a failed print. It used to answer
-                                // "not recognized" to someone who had simply tapped away, and
-                                // the door then sat there accusing them. The button is the retry.
+                                // A dismissed prompt is not a failed print; only FAILED gets the
+                                // error. The button is the retry.
                                 if (r == Presence.Result.FAILED) status = ctx.getString(R.string.lock_failed)
                             }
                         }
-                        // A phone that has been here before asks for the print on its own, once. The
-                        // button is the retry, for a failed print or a dismissed prompt.
-                        //
-                        // Not on the first frame, though. The system's fingerprint sheet is a secure
-                        // window: it covers the door and blacks out anything that tries to record the
-                        // screen. Asked immediately, the mark writing itself was seen by nobody, not
-                        // the person holding the phone and not a camera. A second and a quarter is a
-                        // beat, not a wait, and the sheet still arrives before a thumb can reach it.
+                        // A returning phone asks for the print on its own, once; the button retries.
+                        // Delayed 1.25 s: the fingerprint sheet is a secure window that covers the
+                        // screen and blanks screen recording, so the intro animation would go unseen.
                         LaunchedEffect(saved) {
                             if (saved != null && !busy) { kotlinx.coroutines.delay(1250); if (!busy) ask() }
                         }
@@ -556,11 +531,9 @@ fun HomeScreen(signer: SeedVaultSigner) {
             ) { showSend = false; sendTo = null; sendMint = null; bridgeMemo = null; bridgeDeal = null; (ctx as? MainActivity)?.incoming = null; reloadAfterSend(owner) }
         }
         if (showTap && owner != null) TapSheet(owner) { showTap = false }
-        // A page, not a sheet: it sits over everything, tab bar included, because
-        // it is somewhere you go rather than something you peek at.
+        // A full page, not a sheet: it covers the tab bar too.
         if (showCrowd) {
-            // The feed is the terminal now: `onBuy` is only the way out for the
-            // cases the panel cannot serve, and the panel serves nearly all of them.
+            // The feed's own panel handles buys; `onBuy` is the fallback for the few it cannot.
             CrowdPage(
                 owner = owner, signer = signer, openMint = crowdMint,
                 onBuy = { mint -> showCrowd = false; swapMint = mint; showSwap = true },
@@ -594,9 +567,8 @@ fun HomeScreen(signer: SeedVaultSigner) {
                 onCompanion = { showMore = false; showCompanion = true },
             ) { showMore = false }
         }
-        // These three used to live inside the block above, which meant closing
-        // the More sheet to open one of them took the new sheet out of the tree
-        // with it: nothing appeared until More was opened a second time.
+        // Outside the block above: nested there, closing More to open one of these
+        // removed it from the tree too.
         if (showCustomize) HomeActionsSheet { showCustomize = false }
         if (showCompanion) CompanionPage(owner) { showCompanion = false }
         if (showChip && owner != null) WalletChipSheet(owner, onSettings = { tab = Tab.SETTINGS }) { showChip = false }
@@ -627,18 +599,14 @@ fun HomeScreen(signer: SeedVaultSigner) {
 }
 
 
-/**
- * Wallet health, delegations, contacts and the offline demo. They stacked under the
- * portfolio; they live in Settings now so the home stays a wallet, not a dashboard.
- */
+/** Wallet health, delegations, contacts and the offline demo, in Settings so the home stays a wallet. */
 @Composable
 private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map<String, String>, onSend: (String) -> Unit) {
     var showDemo by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 // ---- Try an attack: the receipt on a drainer, no dApp needed ----
-                // It opens over everything, like every other receipt in the app. Grown inside
-                // this page it sat under a screenful of settings, and the thing it exists to
-                // show, the risk and the button that refuses it, was below the fold.
+                // Opens over everything like other receipts; inline, the risk and the refusing
+                // button fell below the fold.
                 GlassCard {
                     Row(Modifier.fillMaxWidth().clickable { showDemo = true }, verticalAlignment = Alignment.CenterVertically) {
                         SectionTitle(stringResource(R.string.home_demo_hdr), stringResource(R.string.home_demo_sub), HIcon.FLASK)
@@ -668,8 +636,7 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
                         if (contacts.isEmpty()) EmptyLine(HIcon.PEOPLE, stringResource(R.string.contacts_empty_note))
                         val vctx = LocalContext.current
                         val verified = remember(contacts) { Contacts.verified(vctx) }
-                        // A contact is somewhere money goes: the row opens the
-                        // send sheet with the address already in it.
+                        // Tapping a contact opens send with its address filled in.
                         contacts.entries.take(20).forEach { (addr, label) ->
                             HaloRow(
                                 label, shorten(addr, 6) + (if (addr in verified) " · " + stringResource(R.string.ctap_verified) else ""),
@@ -688,24 +655,18 @@ private fun SecurityTools(signer: SeedVaultSigner, owner: String?, contacts: Map
     }
 }
 
-/**
- * The door, when there is no wallet yet. It was a card at the top of the Wallet tab with
- * an empty page under it and four tabs leading nowhere. Nothing works without a key, so
- * until there is one there is one screen and one thing to do.
- */
+/** Lock screen when there is no wallet yet: nothing works without a key, so one screen, one action. */
 @Composable
 private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onConnect: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // High on the page on purpose: the fingerprint sheet covers the bottom half, and the
-        // mark and the sentence must stay readable behind it. The name alone: the launcher art
-        // was a light square on a dark screen, pulling the eye from what is worth watching.
+        // High on purpose: the fingerprint sheet covers the bottom half and the name must stay
+        // readable. Name only, no launcher art (a light square that drew the eye).
         Spacer(Modifier.weight(0.08f))
-        // The one orchestrated moment in the app: the name comes up out of the
-        // dark like a light being switched on above it. Once, on arrival, and
-        // never again — everywhere else motion answers something you did.
+        // The app's one staged animation: the name lights up once on arrival. Elsewhere
+        // motion only answers input.
         val lit = remember { androidx.compose.animation.core.Animatable(0f) }
         LaunchedEffect(Unit) { lit.animateTo(1f, tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
         Box(contentAlignment = Alignment.Center) {
@@ -721,20 +682,16 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
             Text(
                 stringResource(R.string.door_title).uppercase(),
                 style = HaloType.screen,
-                // The name in the theme's own colour, not in ink: on a light theme a black
-                // headline over a white page had nothing to do with the mark under it or the
-                // button below, and the one page that is only the brand read as a form.
+                // Theme color, not ink: a black headline on a light theme clashed with the
+                // mark and the button.
                 color = Halo.mint.copy(alpha = 0.22f + 0.78f * lit.value),
                 letterSpacing = 3.sp,
             )
         }
-        // The name and nothing else. The sentence under it explained the scene, and a scene that
-        // needs explaining is a worse scene. What is out there arrives, asks, and the liar breaks
-        // on the glass: the whole pitch, drawn.
+        // No subtitle: the scene below explains itself.
         Spacer(Modifier.height(8.dp))
-        // Shown, not told: everything comes to this one phone and asks, and the request that
-        // lies stops at the glass. The scene takes the whole middle: planet's limb above the
-        // button, the phone holding station in the center.
+        // GateDemo fills the middle: requests reach the phone and the malicious one is
+        // stopped. Planet's limb above the button, phone in the center.
         GateDemo(Modifier.weight(1f).heightIn(min = 220.dp), opening = busy)
         Spacer(Modifier.height(12.dp))
         PrimaryButton(
@@ -757,16 +714,14 @@ private fun ConnectDoor(busy: Boolean, status: String?, returning: Boolean, onCo
 private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>, onSelect: (Tab) -> Unit) {
     val ctx = LocalContext.current
     Row(
-        // Only the top line: a border on four sides made the bar a card, and a bar is
-        // not a card.
+        // Top border only; on four sides it looks like a card.
         Modifier.fillMaxWidth().background(Halo.card)
             .drawBehind { drawLine(Halo.stroke, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
-        // The market icon says how the market is: a line going up in the accent
-        // when the big coins are up over the day, going down in red when they
-        // are down. Weighted by size, so one small coin cannot turn it.
+        // The market icon follows the big coins' day: up in the accent, down in red.
+        // Weighted by size, so one small coin cannot flip it.
         val marketUp = remember(tab) {
             val top = Market.cachedTop().take(20).filter { it.marketCap != null && it.change24h != null }
             if (top.isEmpty()) true else top.sumOf { it.marketCap!! * it.change24h!! } >= 0
@@ -794,9 +749,8 @@ private fun BottomBar(tab: Tab, collapse: androidx.compose.runtime.State<Float>,
                     else -> Halo.muted
                 }
                 HaloIcon(icon, tint, 22.dp)
-                // Scrolling down hands the screen to the content: labels fade and the bar closes up.
-                // Always composed: squeezed in layout and faded in graphicsLayer, so the bar closes
-                // without recomposing anything.
+                // Scrolling down fades the labels and shrinks the bar. Always composed: squeezed
+                // in layout and faded in graphicsLayer, so nothing recomposes.
                 Text(
                     stringResource(label), style = HaloType.label,
                     color = if (active) Halo.mint else Halo.muted,
@@ -827,10 +781,8 @@ private fun HomeHeader(account: SvAccount?, headline: String? = null, collapse: 
     var scanError by remember { mutableStateOf<String?>(null) }
     val ownScan = rememberAgentScan { scanError = it }
     val scan = onScan ?: ownScan
-    // The same header as the other tabs, and when the big number has scrolled away the line
-    // under the title picks it up, so the figure that counts never leaves. Where the mark used
-    // to sit there is the light switch: the mark is on the launcher and the door already, and
-    // at thirty-eight dp it was a dark blob. A switch earns that corner, a third logo does not.
+    // Same header as the other tabs; once the big number scrolls away, the subtitle shows it.
+    // The corner holds the light/dark switch, not the mark (a dark blob at 38 dp).
     val ctxH = LocalContext.current
     var lightNow by remember { mutableStateOf(Themes.isLight(ctxH)) }
     PageHeader(
@@ -910,10 +862,8 @@ private fun DemoSection(signer: SeedVaultSigner, connectedWallet: String?) {
                 ) { Text(stringResource(s.titleRes), fontFamily = Sora, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp, color = if (active) Halo.mint else Halo.muted) }
             }
         }
-        // The same receipt a dApp request gets, in its short form: the amount, the risks and
-        // the button. The full one carries the flow map and the decoded calls, and on this
-        // screen, under the chips, that pushed the risk and the refusal below the fold: the two
-        // things the whole demo exists to show were the two you had to go looking for.
+        // The dApp receipt in short form: amount, risks, button. The full one (flow map,
+        // decoded calls) pushed the risk and the refusal below the fold here.
         androidx.compose.runtime.key(scenario) { Column { SignReceiptBody(receipt, null, plain = true, map = false) } }
         if (receipt.blocksApproval) {
             Banner(stringResource(R.string.demo_blocked), Halo.red, HIcon.BLOCK)

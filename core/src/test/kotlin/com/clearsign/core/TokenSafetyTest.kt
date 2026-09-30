@@ -36,9 +36,8 @@ class TokenSafetyTest {
 
     @Test
     fun `USDC is not a scam for being freezable`() {
-        // Real values from Jupiter: mint AND freeze authority live, because Circle
-        // stands behind it. Flagging the most used coin on the network red would
-        // only teach people to ignore the warnings that matter.
+        // Real Jupiter values: mint and freeze authority both live, Circle is the issuer.
+        // Flagging USDC red would teach people to ignore the warnings that matter.
         val usdc = TokenFacts(
             verified = true, organic = "high", canMint = true, canFreeze = true,
             topHoldersPct = 25.0, devMints = 1, holders = 5_248_202, liquidityUsd = 410_750_782.0, sellable = true,
@@ -51,7 +50,7 @@ class TokenSafetyTest {
 
     @Test
     fun `unknown is cautious, never fatal`() {
-        // Nothing known at all: a brand-new honest coin looks exactly like this.
+        // Nothing known: a legit brand-new coin looks exactly like this.
         val s = assessToken(TokenFacts())
         assertEquals(SafetyBand.MID, s.band)
         assertTrue(SafetyFlag.UNVERIFIED in s.flags)

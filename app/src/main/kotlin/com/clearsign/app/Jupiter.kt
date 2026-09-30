@@ -57,14 +57,14 @@ object Jupiter {
     }
 
     /**
-     * Can this token be sold back? A honeypot quotes beautifully on the way in and has no route
-     * out, so the honest test is asking for the opposite trade before buying. Three answers:
-     * true (a route exists), false (Jupiter says none), null (unreachable, never an accusation).
+     * Can this token be sold back? A honeypot quotes fine on the way in and has no route out, so
+     * quote the reverse trade before buying. True: a route exists. False: Jupiter says none.
+     * Null: unreachable, never counted against the coin.
      */
     fun sellableBack(mint: String, decimals: Int, usd: Double?): Boolean? {
         if (mint == SOL_MINT || mint == com.clearsign.core.NATIVE_SOL_MINT) return true
-        // About ten dollars' worth, or one whole token when the price is unknown:
-        // dust gets "no route" from every AMM and would libel an honest coin.
+        // About $10 worth, or one whole token when the price is unknown: dust gets
+        // "no route" from every AMM and would flag a clean coin.
         val unit = Math.pow(10.0, decimals.toDouble())
         val amount = (if (usd != null && usd > 0) (10.0 / usd) * unit else unit)
             .coerceIn(1.0, 1e18).toLong()
@@ -91,10 +91,9 @@ object Jupiter {
     }
 
     /**
-     * The fee account, only when it actually exists. Jupiter does not create it: hand it a missing
-     * address and its program aborts with `Custom 6025`. The derived address always looks fine, so
-     * every swap into a coin whose treasury account was never opened failed, while USDC worked and
-     * hid the pattern. One `getAccountInfo` per mint, remembered for the process. Null means no fee on this trade, not a broken trade.
+     * The fee account, only if it exists on chain. Jupiter does not create it: a missing address
+     * aborts the swap with `Custom 6025`, and the derived address always looks valid. One
+     * `getAccountInfo` per mint, cached for the process. Null means no fee on this trade.
      */
     fun feeAccountIfUsable(outputMint: String): String? {
         val ata = feeAccountFor(outputMint) ?: return null
@@ -107,10 +106,7 @@ object Jupiter {
 
     private val feeAccountExists = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
-    /**
-     * Forget what we knew about the fee accounts, called after they are created: the cache had
-     * them missing for the process, so the swap right after "activate fees" still took none.
-     */
+    /** Clear the fee-account cache. Call after creating them, or the next swap still sees them missing. */
     fun forgetFeeAccounts() = feeAccountExists.clear()
 
     /** The platform fee wallet's ATA for [outputMint], where our cut lands. Null when no fee wallet is set. */

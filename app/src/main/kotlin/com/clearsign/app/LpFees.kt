@@ -5,11 +5,11 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Money already earned and never collected. A position in a concentrated pool on Orca or
- * Raydium earns a cut of every swap crossing its range, and it sits in the position account
- * until somebody presses collect; a balance cannot show it. No key: the position address derives
- * from the NFT's mint the same way on both venues, so one token list plus one getMultipleAccounts
- * finds them all (verified 16 Sep 2026). The amount is the fee at the last touch, so the screen says "at least". Collecting happens on the venue's page.
+ * Uncollected LP fees. A concentrated-liquidity position on Orca or Raydium earns a cut of each
+ * swap in its range, held in the position account until collected, so a balance can't show it.
+ * No key: both venues derive the position address from the NFT mint, so one token list plus one
+ * getMultipleAccounts finds them (verified 16 Sep 2026). Amounts are as of the last touch, so
+ * the screen says "at least". Collecting happens on the venue's page.
  */
 object LpFees {
     const val ORCA_PROGRAM = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"

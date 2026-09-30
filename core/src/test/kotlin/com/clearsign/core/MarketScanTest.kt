@@ -7,10 +7,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The gates and the ranking, checked against the cases they were written for.
- *
- * The ones that matter most are the negatives: a veto that stops firing is
- * invisible in an app until it costs money.
+ * Gates and ranking against the cases they were written for. The negatives matter most: a veto
+ * that stops firing goes unnoticed in the app until it costs money.
  */
 class MarketScanTest {
 
@@ -33,12 +31,9 @@ class MarketScanTest {
         s24h = ScanWindow(priceChange = 9.0, volume = 900_000.0),
     )
 
-    // ---- the entries that were costing money ---------------------------------
-    //
-    // Every number below was read off the live lists on 2026-09-14, from coins
-    // that passed every other gate that day. The scan's own momentum term is what
-    // ranked them highest, which is the point: without these two vetoes the
-    // ranking hands back exactly these.
+    // ---- entries that were losing money --------------------------------------
+    // Numbers read off the live lists on 14 Sep, from coins that passed every other gate that day.
+    // The momentum term ranked them highest; without these two vetoes the ranking returns them.
 
     /** NINA: +57% in an hour, +10664% on the day. A hundred-bagger, mid-candle. */
     @Test fun aVerticalHourIsRefused() {
@@ -49,12 +44,12 @@ class MarketScanTest {
         val why = passesGate(nina, ScanGate.CAREFUL)
         assertNotNull(why, "a coin up 57% in an hour must not be an entry")
         assertTrue(why.contains("hour"), why)
-        // The wild lane is allowed to chase harder, not to chase this.
+        // The bold lane tolerates a steeper hour, but not this one.
         assertNull(passesGate(nina.copy(s1h = ScanWindow(priceChange = 40.0), s24h = ScanWindow(priceChange = 12.0)), ScanGate.BOLD))
         assertNotNull(passesGate(nina.copy(s1h = ScanWindow(priceChange = 85.4)), ScanGate.BOLD), "STONK10 was +85%")
     }
 
-    /** EMBER: down 46% on the day, green for an hour. That is not a turn. */
+    /** EMBER: down 46% on the day, green for one hour. Refused as a bounce. */
     @Test fun aBounceOnACollapsedDayIsRefused() {
         val ember = healthy(symbol = "EMBER").copy(
             s1h = ScanWindow(priceChange = 5.1, numBuys = 900, numTraders = 700),
@@ -66,7 +61,7 @@ class MarketScanTest {
         assertNotNull(passesGate(ember, ScanGate.BOLD), "the wild lane does not want it either")
     }
 
-    /** A red day on its own is a penalty, not a veto: that was already true. */
+    /** A red day alone lowers the score but does not veto. */
     @Test fun aRedDayWithoutABounceIsStillAllowedThrough() {
         val soft = healthy().copy(
             s1h = ScanWindow(priceChange = -2.0, numBuys = 900, numTraders = 700),
@@ -90,7 +85,7 @@ class MarketScanTest {
 
     // ---- the safest of the day ----------------------------------------------
 
-    /** The whole point: the runner and the solid coin are not the same coin. */
+    /** The safest ranking picks the solid coin over the runner. */
     @Test fun safestIgnoresMomentum() {
         val solid = healthy(mint = "Sol11111111111111111111111111111111111111111", symbol = "SOLID").copy(
             liquidity = 900_000.0, mcap = 6_000_000.0, holders = 40_000, topHoldersPct = 6.0,
@@ -109,11 +104,8 @@ class MarketScanTest {
         val safest = safestPicks(pool, ScanGate.CAREFUL, limit = 2)
         assertEquals("SOLID", safest.first().c.symbol, "depth, holders and age come first when the question is safety")
 
-        // Momentum is absent, not merely outweighed: the same coin flying and the
-        // same coin flat score identically here. (The first version of this test
-        // asserted that the ordinary scan would rank the runner first instead —
-        // an assumption, and a false one: with 40k holders and an organic score of
-        // 85, the solid coin wins that ranking too.)
+        // Momentum plays no part: the same coin flying or flat scores the same. Don't assert the
+        // ordinary scan ranks the runner first: with 40k holders and organic 85, SOLID wins there too.
         val flying = solid.copy(
             s1h = ScanWindow(priceChange = 30.0, numBuys = 300, numTraders = 250),
             s24h = ScanWindow(priceChange = 140.0, volume = 400_000.0),
@@ -158,11 +150,11 @@ class MarketScanTest {
         assertNull(passesGate(healthy().copy(topHoldersPct = 38.0), ScanGate.BOLD))
     }
 
-    /** The house rule, and the one most likely to be broken by a later edit. */
+    /** House rule: missing data never vetoes. Easy to break in a later edit. */
     @Test fun missingDataNeverVetoes() {
         val bare = Candidate(
             mint = "New11111111111111111111111111111111111111111", symbol = "NEW",
-            // Above the one lane's floor (50k): the point here is the missing data, not the pool.
+            // Above the 50k liquidity floor, so only the missing data is tested.
             liquidity = 60_000.0,
             s1h = ScanWindow(priceChange = 1.0, buyVolume = 1_000.0, sellVolume = 900.0, numBuys = 60, numTraders = 50),
         )
@@ -221,10 +213,10 @@ class MarketScanTest {
     }
 
     /**
-     * A real one that got through, kept so it cannot again. DRANK, mint 5GU3VELV…BoKc, as Jupiter
-     * had it three days after launch: up 288% on the day, down 64% over six hours, liquidity down
-     * 44% in the same window. Every fatal check passed, no mint or freeze authority, 413 holders,
-     * top holders under 30%: nothing about the coin was wrong, what was wrong was happening to it.
+     * A real coin that got through, kept as a regression. DRANK, mint 5GU3VELV…BoKc, as Jupiter had
+     * it three days after launch: +288% on the day, -64% over six hours, liquidity -44% in the same
+     * window. Every fatal check passed (no mint or freeze authority, 413 holders, top holders under
+     * 30%); the problem was the pool draining.
      */
     private fun drank() = Candidate(
         mint = "5GU3VELVxiQVu83AtMvHmQyWPVkhCM721DLPiLnVBoKc", symbol = "DRANK", name = "DRANK",
@@ -237,7 +229,7 @@ class MarketScanTest {
     )
 
     @Test fun theCarefulLaneNeverSawIt() {
-        // Thin for this lane, and that alone was enough.
+        // Liquidity too thin for this lane.
         assertNotNull(passesGate(drank(), ScanGate.CAREFUL))
     }
 
@@ -246,7 +238,7 @@ class MarketScanTest {
         assertTrue(passesGate(drank(), ScanGate.BOLD)!!.contains("drained"))
     }
 
-    /** The veto is about the pool leaving, not about a bad day. */
+    /** The drain veto needs the pool leaving; a price drop alone is not a drain. */
     @Test fun aPriceFallingOnItsOwnIsNotADrain() {
         val sold = drank().copy(
             liquidity = 400_000.0,
@@ -268,11 +260,11 @@ class MarketScanTest {
         assertEquals(10.0, momentumBlend(c)!!, 0.001, "one window present means that window")
         assertNull(momentumBlend(healthy().copy(s1h = null, s6h = null, s24h = null)))
     }
-    // ---- beatsBase: conviene comprare, o tenere la base? --------------------
+    // ---- beatsBase: buy the coin, or keep the base? -------------------------
 
     /**
-     * The real case of 18 Sep 2026: SOL did +10.4% and the budget lost 5.1% buying small coins. A
-     * coin doing less than the base is not a deal, it is the same deal with more ways to end badly.
+     * Measured 18 Sep: SOL did +10.4% while the budget lost 5.1% buying small coins. A coin that
+     * lags the base is the same bet with more risk.
      */
     @Test
     fun aCoinThatLagsTheBaseIsNotWorthBuying() {
@@ -297,10 +289,7 @@ class MarketScanTest {
         assertNull(beatsBase(c, baseChange24hPct = 10.4, marginPct = 0.0))
     }
 
-    /**
-     * The house rule, and the first to break when somebody touches this file: what is not known
-     * never blocks. Without the base's number, or the coin's 24h window, it passes.
-     */
+    /** House rule: unknown never blocks. Without the base's 24h change or the coin's, it passes. */
     @Test
     fun missingDataNeverBlocks() {
         val c = healthy().copy(s24h = ScanWindow(priceChange = -30.0))

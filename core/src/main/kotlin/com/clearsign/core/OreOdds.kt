@@ -4,11 +4,11 @@ import java.math.BigInteger
 import kotlin.math.roundToLong
 
 /**
- * What a stake on the ORE grid returns, by the program's rules, read in `checkpoint.rs` and
- * `reset.rs` of `regolith-labs/ore` on 22 Sep 2026. Other people's SOL is never won: at round
- * end everyone takes theirs back, minus 1% on the winning square and about 11% on the losers.
- * The prize is the round's ORE, pro rata among those on the winning square, plus the pot once
- * every five hundred rounds. So the square does not change what stays on the table, only the ORE share: the one with less SOL on it pays best. Pure.
+ * Expected return of a stake on the ORE grid, per `checkpoint.rs` and `reset.rs` in
+ * `regolith-labs/ore` (read 22 Sep 2026). Nobody wins others' SOL: at round end everyone gets
+ * theirs back, minus 1% on the winning square and about 11% on the losers. The prize is the
+ * round's ORE, pro rata on the winning square, plus the pot once every 500 rounds. So the
+ * square only changes the ORE share: the one with the least SOL pays best. Pure.
  */
 object OreOdds {
     const val SQUARES = 25
@@ -40,7 +40,7 @@ object OreOdds {
         val stake: Long,
         /** SOL expected back, fees included, over all the squares. */
         val expectedSolBack: Long,
-        /** ORE atteso, undici decimali. */
+        /** Expected ORE, eleven decimals. */
         val expectedOre: Long,
         /** For each chosen square, the ORE share if it were the one to win. */
         val shares: DoubleArray,

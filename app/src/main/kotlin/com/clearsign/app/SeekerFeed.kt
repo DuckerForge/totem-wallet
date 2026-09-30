@@ -9,27 +9,23 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The published ranking, read rather than computed: one scanner writes a few kilobytes and
- * every phone reads it. Each phone sweeping ten thousand wallets costs the same credits once
- * per user, fine for one person, impossible for a thousand; local scanning stays as the
- * labeled fallback. A stale file is still worth showing: a ranking twenty minutes old is a
- * fact, an empty card because the network blinked is not.
+ * The published ranking, read rather than computed: one scanner writes a few KB and every
+ * phone reads it, since each phone sweeping 10k wallets would cost the same credits per user.
+ * Local scanning stays as the labeled fallback. A stale file is still shown: a ranking twenty
+ * minutes old beats an empty card on a network blip.
  */
 object SeekerFeed {
     private const val TAG = "ClearSign-Seeker"
     private const val CACHE = "seeker_feed.json"
     /**
-     * Two and a half minutes, shorter than the scan it follows: the service publishes every ten,
-     * and holding the cached file longer would leave a new publish unseen for a whole cycle. What
-     * the page shows is never more than a couple of minutes behind what exists.
+     * 2.5 min, well under the 10 min publish cycle, so a new publish is never missed for a whole
+     * cycle and the page is at most a couple of minutes behind.
      */
     private const val FRESH_MS = 150_000L
 
     /**
-     * The same list, for whoever is not looking. Two and a half minutes fits a person at the
-     * screen; for the loop, hunting every six minutes with the app closed, two reads in three
-     * return the same thing, and the crowd signal arrives late by design anyway. It multiplies:
-     * 240 reads a day per phone become 96, a gigabyte and a half a day at ten thousand phones.
+     * Freshness for the background loop, which hunts every six minutes and gets the crowd signal
+     * late by design anyway. 240 reads a day per phone become 96 (1.5 GB a day at 10k phones).
      */
     const val SLOW_FRESH_MS = 900_000L
 

@@ -5,11 +5,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /*
- * Which coin is worth looking at, out of everything trading now. [TokenSafety] answers "is this
- * a trap"; this answers which handful of thousands is worth a quote. Ported from the pool builder
- * in the MEGAGEN app, tuned against real outcomes, on the fields Jupiter's registry already
- * returns: one call, no key. [passesGate] is the veto, hard facts a high score elsewhere cannot
- * buy back; [runnerScore] ranks what survived, with multipliers that only push down. House rule: missing data is neutral, never bad, an honest coin launched an hour ago has nothing to show.
+ * Which of thousands of trading coins are worth a quote ([TokenSafety] checks for traps). Ported
+ * from the MEGAGEN pool builder, on fields Jupiter's registry already returns: one call, no key.
+ * [passesGate] is the hard veto; [runnerScore] ranks the rest with multipliers that only push
+ * down. Missing data is neutral: a coin launched an hour ago has nothing to show yet.
  */
 
 /** One time window of trading, as Jupiter reports it. Everything optional. */
@@ -28,7 +27,7 @@ data class ScanWindow(
     val holderChange: Double? = null,
 )
 
-/** A coin as it arrives from the registry, before anybody has judged it. */
+/** A coin as the registry returns it, before scoring. */
 data class Candidate(
     val mint: String,
     val symbol: String,
@@ -76,9 +75,9 @@ data class ScanGate(
     /** [rampStart, peakStart, peakEnd, zeroAt] in minutes: which age this lane wants. */
     val ageBand: List<Double>,
     /**
-     * Above this one-hour move the entry is refused. The score rewards momentum, so alone it picks
-     * whatever went vertical in the last hour, a coin flip at the top of a candle. A veto, not a
-     * penalty, because a veto can be read out loud: "it has already gone up too much this hour".
+     * One-hour move above which entry is refused. The score rewards momentum, so alone it
+     * picks whatever went vertical in the last hour. A veto rather than a penalty so the
+     * reason can be shown.
      */
     val hourlySpikeMaxPct: Double = 35.0,
     val weights: ScanWeights,
@@ -91,9 +90,8 @@ data class ScanGate(
         /** Vetted small caps. Real holders, real depth, nothing minted this morning. */
         val CAREFUL = ScanGate(
             name = "careful",
-            // Fifty thousand of liquidity, not thirty: the floor the paid bots (GMGN, Photon, Trojan)
-            // put under "low-potential" tokens, and the number that separates a pool somebody can pull
-            // from one that would cost them to. The one lane now; the wild one stays in code, out of the app.
+            // $50k liquidity, not 30k: the floor GMGN, Photon and Trojan put under "low-potential"
+            // tokens, roughly where pulling the pool stops being cheap. The only lane in the app.
             liquidityMinUsd = 50_000.0, organicScoreMin = 10.0, mcapMaxUsd = 50_000_000.0,
             topHoldersMaxPct = 30.0, holderCountMin = 150, numBuysFloor = 40,
             liqMcFloorPct = 0.001, thinIsVeto = true,
@@ -109,7 +107,7 @@ data class ScanGate(
             topHoldersMaxPct = 45.0, holderCountMin = 75, numBuysFloor = 25,
             liqMcFloorPct = 0.001, thinIsVeto = false,
             ageBand = listOf(10.0, 60.0, 1_440.0, 10_080.0),
-            // The wild lane is allowed to chase harder, not to chase anything.
+            // Looser spike cap, but still capped.
             hourlySpikeMaxPct = 70.0,
             weights = ScanWeights(0.20, 0.12, 0.18, 0.12, 0.12, 0.12, 0.08, 0.06),
         )
@@ -121,9 +119,9 @@ data class ScanGate(
 
 /** The eight components, summing to one. Names match the original. */
 data class ScanWeights(
-    /** Share of traders who were distinct organic buyers: demand with many faces. */
+    /** Distinct organic buyers over all traders. */
     val breadth: Double,
-    /** Share of buy volume that was organic rather than bot: demand that is real. */
+    /** Organic (non-bot) share of buy volume. */
     val orgShare: Double,
     /** Decay-weighted price move across the windows. */
     val mom: Double,
@@ -145,14 +143,12 @@ data class Scored(val c: Candidate, val score: Double, val notes: List<String>)
 private fun clamp01(v: Double) = max(0.0, min(1.0, v))
 
 /**
- * The veto: null when the coin may be looked at, or the reason it may not, in words the agent
- * can repeat. A reason instead of a boolean: "nothing found" is useless, "eleven coins thrown
- * out, nine for a live freeze authority" is true.
+ * Hard veto: null if the coin passes, else a reason the agent can repeat. A reason, not a
+ * boolean, so a scan can report "nine of eleven dropped for a live freeze authority".
  */
 fun passesGate(c: Candidate, gate: ScanGate): String? {
-    // A live freeze authority can lock your balance where it sits, a live mint authority can
-    // double the supply behind you: vetoes at every level. Only a confirmed-live authority
-    // vetoes; an audit we never got stays neutral.
+    // Live freeze or mint authority vetoes in every lane. Only a confirmed-live one:
+    // a missing audit stays neutral.
     if (c.canFreeze) return "the creator can still freeze balances"
     if (c.canMint) return "the creator can still mint more supply"
     if (c.liquidity < gate.liquidityMinUsd) return "liquidity under $" + gate.liquidityMinUsd.toLong()
@@ -169,22 +165,18 @@ fun passesGate(c: Candidate, gate: ScanGate): String? {
     if (gate.thinIsVeto && mc > 0 && c.liquidity > 0 && c.liquidity / mc < ScanGate.MIN_LIQ_MCAP_RATIO) {
         return "too little liquidity for its size"
     }
-    // The pool being pulled out from under it. Added after DRANK got through: up 288% on the
-    // day, down 64% over six hours, liquidity down 44% in the same window, and every check here
-    // passed it because nothing about the coin was fatal. The price falling is people selling, the
-    // liquidity falling with it is the other side of the book walking away. 40% because the
-    // most-traded list has honest coins at 35, and a veto that fires on them is a veto nobody keeps.
+    // Pool being pulled. DRANK passed every other check while up 288% on the day, down 64%
+    // over six hours and liquidity down 44% in the same window. 40% because legit coins on
+    // the most-traded list reach 35.
     c.s6h?.liquidityChange?.let { if (it <= -40.0) return "liquidity drained " + (-it).toInt() + "% in six hours" }
-    // Already vertical. The score's own momentum term is what puts this coin at
-    // the top of the list, and buying the top of an hourly candle with a stop
-    // fifteen percent below it is how a scan that looks clever loses money.
+    // Already vertical: momentum would rank it first, and buying the top of an hourly
+    // candle with a 15% stop below loses money.
     c.s1h?.priceChange?.let {
         if (gate.hourlySpikeMaxPct > 0 && it > gate.hourlySpikeMaxPct) {
             return "already up " + it.toInt() + "% in the last hour"
         }
     }
-    // A day deep in the red with a green hour is not a turn, it is the people who
-    // are still holding finding a bid. Both windows have to be present to say it.
+    // A deep red day with a green hour is usually a bounce. Needs both windows.
     val day = c.s24h?.priceChange
     val hour = c.s1h?.priceChange
     if (day != null && hour != null && day < -35.0 && hour > 0.0) {
@@ -204,7 +196,7 @@ internal fun momentumBlend(c: Candidate): Double? {
     return if (wsum > 0) sum / wsum else null
 }
 
-/** Age against the lane's window. Unknown age is neutral: a coin whose first pool we cannot date is not thereby suspicious. */
+/** Age against the lane's window. Unknown age is neutral. */
 internal fun ageScore(minutes: Double?, gate: ScanGate): Double {
     if (minutes == null) return 0.5
     val (r, p0, p1, z) = gate.ageBand.let { listOf(it[0], it[1], it[2], it[3]) }
@@ -218,11 +210,10 @@ internal fun ageScore(minutes: Double?, gate: ScanGate): Double {
 }
 
 /**
- * Does the coin beat the base, or is holding SOL better? The loop answered "is this a trap" and
- * "which of these five is best", not the question that counts when everything rises. Measured
- * 18 Sep 2026 on a real budget: 0.1761 SOL became 0.1671 in thirty-three hours, minus 5.1%,
- * while SOL did +10.4%; fees were 0.9% of the loss, the coins were the cost. Returns the reason
- * in words like [passesGate], or null when buying is fine; null [baseChange24hPct] or no 24h window passes. [marginPct] is how much it must beat the base: matching SOL with a small coin's risk is the same deal with more ways to end badly.
+ * Null when buying is fine, else why holding SOL is better, in words like [passesGate]. Null
+ * [baseChange24hPct] or no 24h window passes. [marginPct] is how much the coin must beat SOL
+ * to be worth the extra risk. Measured 18 Sep 2026: 0.1761 SOL became 0.1671 in 33 hours
+ * (-5.1%) while SOL did +10.4%; fees were 0.9% of the loss.
  */
 fun beatsBase(c: Candidate, baseChange24hPct: Double?, marginPct: Double = 3.0): String? {
     val base = baseChange24hPct ?: return null
@@ -231,12 +222,12 @@ fun beatsBase(c: Candidate, baseChange24hPct: Double?, marginPct: Double = 3.0):
     return "SOL is up " + pct(base) + " today and this is " + pct(mine) + " — holding SOL is the better trade"
 }
 
-/** A percentage as a person would say it: signed, no useless decimals. */
+/** Signed percentage, with a decimal only when needed. */
 private fun pct(v: Double): String = (if (v >= 0) "+" else "") + (if (v == v.toInt().toDouble()) v.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", v)) + "%"
 
 /**
- * The shape of the chart, from the windows we have. A coin can look excellent on every
- * number and be bleeding right now, and buying it reads as the agent ignoring the chart. Neutral when there is too little to say.
+ * Chart shape from the windows we have: a coin can score well on every number and still
+ * be falling right now. Neutral with fewer than two windows.
  */
 internal fun structureScore(c: Candidate): Double {
     val p5 = c.s5m?.priceChange
@@ -256,7 +247,7 @@ internal fun structureScore(c: Candidate): Double {
     return clamp01(0.45 * consistency + 0.3 * recentOk + 0.25 * accel)
 }
 
-/** Rank a coin that passed the gate. Higher is better, and the number means nothing alone: it only orders one scan against itself. */
+/** Rank a coin that passed the gate. Higher is better; only comparable within one scan. */
 fun runnerScore(c: Candidate, gate: ScanGate): Pair<Double, List<String>> {
     val s = c.s1h ?: c.s5m ?: c.s24h ?: return 0.0001 to listOf("no trading data")
     val notes = ArrayList<String>()
@@ -269,9 +260,8 @@ fun runnerScore(c: Candidate, gate: ScanGate): Pair<Double, List<String>> {
     val buyers = (s.numOrganicBuyers ?: s.numNetBuyers ?: 0).toDouble()
     val breadth = if ((s.numTraders ?: 0) > 0) clamp01(buyers / s.numTraders!!) else 0.3
 
-    // Organic share of buying. Neutral when the field is missing: reading it as
-    // "all organic" would hand a perfect score to exactly the wash-traded coins
-    // this is meant to bury.
+    // Organic share of buying. Neutral when missing: "all organic" would give
+    // wash-traded coins a perfect score.
     val buyOrg = s.buyOrganicVolume
     val orgShare = if (bv > 0 && buyOrg != null) clamp01(buyOrg / bv) else 0.5
     val pressure = if (bv + sv > 0) bv / (bv + sv) else 0.5
@@ -300,8 +290,8 @@ fun runnerScore(c: Candidate, gate: ScanGate): Pair<Double, List<String>> {
 
     // Multipliers below can only lower the score. None of them can lift a coin.
 
-    // Still going up right now, against an hour that already went up: the softer half of the
-    // vertical-hour veto, for the coin mid-candle as we look. Buying while it runs is buying from whoever is about to stop.
+    // Still rising within an hour that already rose: the soft half of the hourly spike
+    // veto, for a coin mid-candle.
     val runMult = run {
         val h = c.s1h?.priceChange
         val m5 = c.s5m?.priceChange
@@ -358,7 +348,7 @@ fun runnerScore(c: Candidate, gate: ScanGate): Pair<Double, List<String>> {
     } else 1.0
     if (orgFlowMult < 0.9) notes += "real wallets are net sellers"
 
-    // Short of the veto, liquidity walking away still counts against it.
+    // Liquidity leaving below the veto threshold still costs score.
     val drain = c.s6h?.liquidityChange ?: c.s1h?.liquidityChange ?: 0.0
     val drainMult = if (drain < -10.0) clamp01(1 + (drain + 10.0) / 30.0) * 0.7 + 0.3 else 1.0
     if (drainMult < 1) notes += "liquidity is leaving"
@@ -380,15 +370,13 @@ fun runnerScore(c: Candidate, gate: ScanGate): Pair<Double, List<String>> {
     return score to notes
 }
 
-/** What the scan threw out and why, so "nothing found" is never the whole answer. */
+/** Picks, plus rejection counts by reason. */
 data class MarketPicks(val picks: List<Scored>, val rejected: Map<String, Int>, val looked: Int)
 
 /**
- * The other question: not which coin is moving, but which one is standing up. [runnerScore]
- * hunts a runner and is right to; asked for "the safest coins of the day" it answers with
- * whatever climbs fastest. This scores what does not move: liquidity against market cap,
- * holders, how little the top wallets own, age, Jupiter's organic score. Momentum is absent
- * on purpose. Same gate as everything else.
+ * Safest coins rather than fastest: [runnerScore] would answer "safest of the day" with
+ * whatever climbs most. Scores liquidity against market cap, holders, top-wallet share, age
+ * and Jupiter's organic score. No momentum on purpose. Same gate as the scan.
  */
 fun safestPicks(candidates: List<Candidate>, gate: ScanGate, limit: Int = 3): List<Scored> {
     val kept = ArrayList<Scored>()
@@ -396,16 +384,16 @@ fun safestPicks(candidates: List<Candidate>, gate: ScanGate, limit: Int = 3): Li
         if (passesGate(c, gate) != null) continue
         val notes = ArrayList<String>()
 
-        // Depth is the one that matters most: it is what lets you leave.
+        // Depth weighs most: it is what lets you exit.
         val mc = c.mcap ?: c.fdv ?: 0.0
         val depth = if (mc > 0) clamp01(c.liquidity / mc / 0.15) else clamp01(c.liquidity / 500_000.0)
         if (c.liquidity >= 250_000) notes += "deep liquidity"
 
-        // Many holders is many people who are not one person.
+        // Holder count, saturating at 20k.
         val holders = clamp01(((c.holders ?: 0).toDouble()) / 20_000.0)
         if ((c.holders ?: 0) >= 10_000) notes += (c.holders!! / 1000).toString() + "k holders"
 
-        // Concentration, inverted: 5% in the top wallets is calm, 30% is a cliff.
+        // Top-wallet share, inverted: 5% is fine, 35% scores zero.
         val spread = c.topHoldersPct?.let { clamp01(1.0 - (it / 35.0)) } ?: 0.5
         if ((c.topHoldersPct ?: 100.0) <= 12.0) notes += "supply not concentrated"
 

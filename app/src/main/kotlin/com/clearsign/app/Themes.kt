@@ -19,8 +19,7 @@ object Themes {
 
     /** Apply the saved selection. Call before `setContent` in every activity. */
     fun load(ctx: Context) {
-        // The one place every entry point passes through before it draws anything, which
-        // makes it the place to note what language the resources resolved to.
+        // Every entry point passes here before drawing: record the resolved resource language.
         AppLocale.remember(ctx)
         CustomTheme.palette(ctx) // prime the custom palette so byId() can return it
         val id = prefs(ctx).getString(KEY_SELECTED, Palettes.default.id)
@@ -32,15 +31,12 @@ object Themes {
         val p = Palettes.byId(id)
         if (!isUnlocked(ctx, p.id)) return
         val e = prefs(ctx).edit().putString(KEY_SELECTED, p.id)
-        // Any dark theme you pick is the one the switch brings back, whether you picked it
-        // here or in the settings: remembering only the one you happened to leave from sent
-        // people back to the default they had already moved away from.
+        // Any dark theme picked, here or in settings, is the one the light switch returns to.
         if (p.ground.relativeLuminance() <= 0.5) e.putString(KEY_DARK, p.id)
         e.apply()
         Halo.palette = p
-        // Everything that paints outside Compose reads the palette once and keeps it: the
-        // home widget in its own process, the bubble in its own service. Changing the theme
-        // used to leave both on the old colours until something else happened to redraw them.
+        // The home widget (own process) and the bubble (own service) cache the palette and
+        // keep the old colors until told to redraw.
         repaintEverything(ctx)
     }
 
@@ -63,15 +59,10 @@ object Themes {
     /** Is the light theme on now. */
     fun isLight(ctx: Context): Boolean = Halo.palette.ground.relativeLuminance() > 0.5
 
-    /**
-     * The one switch on the header: to the light theme and back to whichever dark one you
-     * were using. Without remembering it, coming back landed everyone on the default and
-     * the theme you had picked was gone.
-     */
+    /** Header switch: to the light theme, and back to the last dark one used, not the default. */
     fun toggleLight(ctx: Context) {
         if (isLight(ctx)) {
-            // The two are a pair: with nothing remembered the light one goes to its own night,
-            // not to the app default, which is a different design.
+            // Nothing remembered: go to the light theme's dark pair, not the app default.
             val back = prefs(ctx).getString(KEY_DARK, Palettes.velaNight.id) ?: Palettes.velaNight.id
             select(ctx, if (Palettes.byId(back).ground.relativeLuminance() > 0.5) Palettes.default.id else back)
         } else {

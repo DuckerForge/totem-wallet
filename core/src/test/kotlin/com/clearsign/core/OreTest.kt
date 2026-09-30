@@ -8,11 +8,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * ORE read from the real bytes. The four accounts in `resources/ore` were downloaded from the
- * chain on 22 Sep 2026: the Board at round 413544, the Config, that Round, and the Miner with
- * the most ORE to claim among the first sixty found. The offsets below come from those bytes,
- * not from a summary of the source: the first summary said 728 bytes for the Miner and 56 for
- * the Config's admin part, and they were 744 and 72.
+ * ORE read from real bytes. The four accounts in `resources/ore` were fetched on 22 Sep 2026:
+ * the Board at round 413544, the Config, that Round, and the Miner with the most ORE to claim
+ * among the first sixty found. Offsets come from these bytes, not a source summary (which said
+ * 728 bytes for the Miner and 56 for the Config admin part; they are 744 and 72).
  */
 class OreTest {
     private fun fixture(name: String): ByteArray =
@@ -24,7 +23,7 @@ class OreTest {
     private val me = "D1nsSnCRwcmjweKNZAfHtApfPBskuALHD7dEKhybzNkj"
     private val other = "39FeRfGVCH5Bq5fzChHmL3LAsQCXAvFt7idaLipAQsCs"
 
-    // ---- i conti ----------------------------------------------------------------
+    // ---- the accounts -----------------------------------------------------------
 
     @Test fun `la Board dice il giro e quanto manca`() {
         val b = assertNotNull(Ore.board(fixture("board")))
@@ -108,7 +107,7 @@ class OreTest {
         assertNull(Ore.config(fixture("round")))
     }
 
-    // ---- le istruzioni --------------------------------------------------------------
+    // ---- instructions ---------------------------------------------------------------
 
     @Test fun `Deploy si legge e si scrive uguale, e l'ammontare e' per casella`() {
         val data = Ore.deployData(10_000_000L, Ore.maskOf(listOf(0, 6, 24)))

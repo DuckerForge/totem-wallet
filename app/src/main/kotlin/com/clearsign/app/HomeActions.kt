@@ -48,10 +48,9 @@ import androidx.compose.foundation.Canvas
 internal enum class HomeAction { SEND, RECEIVE, SWAP, SCAN, CROWD, TAP, LINK, WIDGET, BRIDGE, MORE }
 
 /*
- * The action grid: eight round, neutral buttons. The three tinted tiles this replaces implied
- * a hierarchy between Swap, Send and Receive that does not exist, and eight accents would
- * turn the accent into decoration. Color comes from the balance and the logos; the buttons
- * are a dark circle, a hand-drawn line icon, a label.
+ * The action grid: eight round, neutral buttons. No per-button tint: it implied a hierarchy
+ * between Swap, Send and Receive, and eight accents make the accent decoration. Color comes
+ * from the balance and the logos.
  */
 /** Every circle the home can show: its icon and its name. "More" stays out of the list: it is always last. */
 internal fun homeActionIcon(a: HomeAction): HIcon = when (a) {
@@ -97,8 +96,7 @@ internal fun HomeActionsSheet(onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SheetHeader(stringResource(R.string.home_customize), stringResource(R.string.home_customize_sub), HIcon.SETTINGS, onClose = onDismiss)
-            // The home itself, above the switches. Every change lands here
-            // first, so nobody has to close the sheet to see what they did.
+            // Live preview of the home above the switches: changes show without closing the sheet.
             Text(stringResource(R.string.home_customize_preview).uppercase(), style = HaloType.label, color = Halo.muted)
             Column(
                 Modifier.fillMaxWidth().clip(rs(18)).background(Halo.ground).padding(horizontal = 14.dp, vertical = 16.dp),
@@ -179,21 +177,18 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
-        // The circle answers the finger, like every other surface: it used to only shrink,
-        // and a shrink alone reads as the page moving rather than the button taking the tap.
+        // Press feedback like every other surface; shrinking alone read as the page moving.
         val pressed by src.collectIsPressedAsState()
         val glow = animateFloatAsState(if (pressed) 1f else 0f, tween(120), label = "tap")
         val lit = Halo.mint
         Box(
-            // The same living hairline as the cards, so a theme that moves moves
-            // everywhere rather than in one place.
+            // Same animated hairline as the cards, so an animated theme animates here too.
             Modifier.size(58.dp).clip(rs(Radius.pill)).background(Halo.cardSoft)
                 .drawWithContent { drawContent(); if (glow.value > 0f) drawRect(lit, alpha = 0.14f * glow.value) }
                 .haloBorder(rs(Radius.pill), living = false),
             contentAlignment = Alignment.Center,
         ) {
-            // Every circle wears an icon of the same size, on the same grid. Scout used to
-            // bring its own Canvas here and came out visibly bigger than its neighbours.
+            // Same icon size and grid for every circle; a custom Canvas here came out visibly bigger.
             HaloIcon(icon, tint, 23.dp)
         }
         Text(label, style = HaloType.label, color = tint, textAlign = TextAlign.Center, maxLines = 1)
@@ -204,8 +199,7 @@ private fun ActionButton(icon: HIcon, label: String, enabled: Boolean, modifier:
 private fun SeekerGlyph(tint: androidx.compose.ui.graphics.Color) {
     val body = Halo.cardSoft
     Canvas(Modifier.size(24.dp)) {
-        // The real Seeker is 46% as wide as it is tall, which at icon size reads as a
-        // stick. An icon is a sign, not a scale drawing: it gets a body.
+        // The real Seeker is 46% as wide as tall, a stick at icon size: draw it wider.
         val h = size.height * 0.92f
         val w = h * 0.62f
         drawPhone((size.width - w) / 2f, (size.height - h) / 2f, w, h, back = true, body = body, edge = tint, ink = tint, glass = body)
@@ -229,8 +223,7 @@ internal fun RecentReceiptsCard(onOpen: () -> Unit) {
         }
     }
     if (entries.isEmpty()) return
-    // A row taps and opens that receipt: it had the shape of the Receipts rows and
-    // did nothing, while the title opened the tab.
+    // Tapping a row opens its receipt, like the rows in the Receipts tab.
     var selected by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<LedgerEntry?>(null) }
     selected?.let { e -> ReceiptDetailSheet(e) { selected = null } }
     GlassCard {
@@ -251,8 +244,8 @@ internal fun RecentReceiptsCard(onOpen: () -> Unit) {
 }
 
 /**
- * What the agent has been doing, where Jupiter puts the watchlist. Most days the agent is
- * off; an empty box invites action, so with no agent this is one line and a way in, not a hole.
+ * Recent agent activity, where Jupiter puts the watchlist. The agent is usually off, so then
+ * this is one line with a way to start it, not an empty box.
  */
 @Composable
 internal fun AgentGlanceCard(onOpen: () -> Unit) {
@@ -269,7 +262,7 @@ internal fun AgentGlanceCard(onOpen: () -> Unit) {
     }
 }
 
-/** A quiet card title with the arrow that says there is more behind it. */
+/** Muted card title with an arrow to the full view. */
 @Composable
 private fun CardHeader(title: String, onOpen: () -> Unit) {
     Row(
@@ -290,10 +283,7 @@ private fun shortWhen(at: Long): String {
     }
 }
 
-/**
- * Everything that did not earn a place among the eight. The home is a wallet, not a
- * dashboard: health, cleanup, contacts and the widget live here, one tap away.
- */
+/** The More sheet: everything not on the home grid (health, cleanup, contacts, widget), one tap away. */
 @Composable
 internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit, onBridge: () -> Unit = {}, onGift: () -> Unit = {}, onContactTap: () -> Unit = {}, onCompanion: () -> Unit = {}, hidden: List<HomeAction> = emptyList(), onAction: (HomeAction) -> Unit = {}, onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(
@@ -307,15 +297,12 @@ internal fun MoreSheet(onTap: () -> Unit, onHealth: () -> Unit, onContacts: () -
             Modifier.fillMaxWidth().padding(horizontal = Space.xl).padding(bottom = Space.lg),
             verticalArrangement = Arrangement.spacedBy(Space.md),
         ) {
-            // Every row its own icon, so the list can be read by shape alone.
-            // First the actions taken off the front page: Swap, Scan, Agent, the crowd.
-            // Removed from there, they must stay one tap from here.
+            // One distinct icon per row. First the actions hidden from the home grid, so they
+            // stay one tap away.
             for (a in hidden) MoreRow(homeActionIcon(a), stringResource(homeActionLabel(a))) { onAction(a) }
             MoreRow(HIcon.NFC, stringResource(R.string.home_act_tap), onTap)
             if (RocketX.enabled) MoreRow(HIcon.BRIDGE, stringResource(R.string.bridge_title), onBridge)
-            // Sending money with a link was not in here because it was always on the front page. When
-            // the bridge took its place it stayed reachable only from Send and Customize, for those who
-            // knew. What leaves the front page enters this list at the same moment.
+            // The bridge took the gift link's slot on the home grid, so it is listed here.
             MoreRow(HIcon.GIFT, stringResource(R.string.gift_title), onGift)
             MoreRow(HIcon.CONTACTS, stringResource(R.string.ctap_open), onContactTap)
             MoreRow(HIcon.SHIELD_LOCK, stringResource(R.string.more_health), onHealth)
@@ -333,7 +320,7 @@ private fun MoreRow(icon: HIcon, label: String, onClick: () -> Unit) {
     HaloRow(label, onGround = true, leading = { HaloIcon(icon, Halo.ink, 20.dp) }, onClick = onClick)
 }
 
-/** Realized P&L, behind the balance's own change. The card already existed. */
+/** Realized P&L sheet, opened from the balance's change figure. */
 @Composable
 internal fun PnlSheet(onDismiss: () -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -386,10 +373,7 @@ internal fun HealthSheet(owner: String?, signer: SeedVaultSigner, onDismiss: () 
     }
 }
 
-/**
- * The header every sheet had written by hand, twelve times, only three with a way out. A
- * full-height sheet must say how to leave it: swiping down is not something to guess.
- */
+/** Shared sheet header with a close button: on a full-height sheet, swiping down is not obvious. */
 @Composable
 internal fun SheetHeader(title: String, sub: String?, icon: HIcon, onClose: () -> Unit) {
     Row(

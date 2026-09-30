@@ -38,11 +38,10 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /*
- * What the coin has been doing, under the thing about to buy it: a line, three spans, and
- * the change across the one you look at. A line, not candles: at this size a wick two pixels
- * wide is decoration, and the question is only which way and how violently. Prices from the
- * busiest pool on GeckoTerminal, a different vendor from the one quoting the swap, which is
- * the point. Nothing blocks the swap; no history means no chart, never a flat line.
+ * Price line shown with the swap: three spans and the change over the selected one. A line,
+ * not candles: at this size only direction and size of the move matter. Prices from the busiest
+ * GeckoTerminal pool, deliberately a different vendor from the swap quote. Never blocks the
+ * swap; no history means no chart, never a flat line.
  */
 /** A price worth a line on the chart: an order, or an alert. [key] restarts the entrance when it changes. */
 @androidx.compose.runtime.Immutable
@@ -113,9 +112,8 @@ internal fun PriceChart(mint: String, symbol: String, targets: List<ChartTarget>
 }
 
 /**
- * A moment on the line: somebody was in or out of this coin right here. [at] is a fraction of
- * the chart's width, zero at the oldest candle, one at the newest. The price under it is
- * whatever the line does there: nobody publishes what a wallet actually paid.
+ * A wallet's entry or exit on the line. [at] is a fraction of the chart's width, 0 at the oldest
+ * candle, 1 at the newest. It sits on the line's price: what a wallet paid isn't published.
  */
 internal class SparkMark(val at: Float, val sell: Boolean)
 
@@ -127,18 +125,15 @@ internal fun Spark(
     targets: List<ChartTarget> = emptyList(),
     marks: List<SparkMark> = emptyList(),
 ) {
-    // The scale stretches to fit the targets, so a line at +30% is on the
-    // picture and not off the top of it. Capped at four times the range of the
-    // prices themselves: a target at +300% would flatten the whole story.
+    // Stretch the scale to fit the targets, capped at four times the price range:
+    // a +300% target would flatten the line.
     val (lo, span) = remember(values, targets) {
         val range = (values.max() - values.min()).takeIf { it > 0 } ?: (values.max() * 0.02).coerceAtLeast(1e-12)
         val lo = minOf(values.min(), targets.minOfOrNull { it.priceUsd }?.coerceAtLeast(values.min() - 4 * range) ?: values.min())
         val hi = maxOf(values.max(), targets.maxOfOrNull { it.priceUsd }?.coerceAtMost(values.max() + 4 * range) ?: values.max())
         lo to ((hi - lo).takeIf { it > 0 } ?: 1.0)
     }
-    // Each target slides in from the top when it first appears, or when its key
-    // changes: an order being placed is a line arriving, not a line that was
-    // always there.
+    // Targets slide in from the top when they appear or their key changes.
     val reveals = targets.map { rememberReveal(it.key, durationMs = 700) }
     val tm = androidx.compose.ui.text.rememberTextMeasurer()
     // Measured once per label, not once per frame while a line slides in.
@@ -170,7 +165,7 @@ internal fun Spark(
             Brush.verticalGradient(listOf(tint.copy(alpha = 0.22f), Color.Transparent)),
         )
         drawPath(line, tint, style = Stroke(width = 1.8f * density, cap = StrokeCap.Round))
-        // Where it is now, so the eye lands on the end of the story.
+        // Mark the latest price.
         drawCircle(tint, 3.2f * density, Offset(size.width - 1f, y(values[n - 1])))
         drawCircle(tint.copy(alpha = 0.22f), 7f * density, Offset(size.width - 1f, y(values[n - 1])))
 
@@ -191,9 +186,8 @@ internal fun Spark(
             drawText(lay, topLeft = Offset(6f * density, ty))
         }
 
-        // Where somebody was in or out. A ring on the line rather than a dot,
-        // so it reads as a moment on the price and not as a data point of its
-        // own, with a faint stem down to the floor to say "at this time".
+        // Entry/exit markers: a ring on the line rather than a dot, plus a faint stem
+        // down to the floor to mark the time.
         marks.forEach { m ->
             val x = (size.width * m.at).coerceIn(0f, size.width)
             val idx = ((n - 1) * m.at).toInt().coerceIn(0, n - 1)

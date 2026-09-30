@@ -44,11 +44,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The safest two or three coins on Solana today, bought in one gesture. The loop hunts
- * runners; this is the other kind of buy, a few coins picked because they are solid, the
- * money split evenly, no stop-loss watching minute by minute ([com.clearsign.core.safestPicks]
- * ranks them without looking at the price). It spends the budget, never the Seed Vault, and
- * every purchase goes through [AgentBroker] like the loop's: same collar, same simulation.
+ * Two or three of the safest coins on Solana today, bought in one tap with the money split
+ * evenly and no stop-loss ([com.clearsign.core.safestPicks] ranks without looking at price).
+ * Spends the budget, never the Seed Vault; every buy goes through [AgentBroker] like the loop's.
  */
 @Composable
 internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
@@ -82,8 +80,7 @@ internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
 
     val n = count.toInt().coerceIn(1, 3)
     val slice = each.toLong()
-    // The collar's silent threshold is the real ceiling here: above it every buy
-    // would stop and wait for a fingerprint, which is not what a one-tap button is.
+    // The collar's silent threshold is the real cap: above it each buy waits for a fingerprint.
     val ceiling = policy?.let { minOf(it.perTxLamports, it.askAboveLamports.takeIf { v -> v > 0 } ?: it.perTxLamports) } ?: 0L
     val tooBig = slice > ceiling
     val enough = (free ?: 0L) >= slice * n + 6_000_000L
@@ -102,7 +99,7 @@ internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
             Text(stringResource(R.string.lucky_sub), style = HaloType.small, color = Halo.muted, lineHeight = 17.sp)
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // One lane now; the chips that chose between two are gone.
+                // Single lane, so no lane chips.
             }
 
             when (val p = picks) {
@@ -149,8 +146,7 @@ internal fun LuckySheet(onDone: () -> Unit, onDismiss: () -> Unit) {
                     for (s in chosen) {
                         val ok = buyOne(ctx, pub, s.c, slice)
                         if (ok) bought += s.c.symbol else failed += s.c.symbol
-                        // The same breath the sell-everything loop needs: Jupiter
-                        // rate-limits a burst from one client.
+                        // Pause between buys, as in sell-everything: Jupiter rate-limits bursts.
                         kotlinx.coroutines.delay(900)
                     }
                     busy = false
@@ -197,10 +193,7 @@ private fun fmtCompact(v: Double): String = when {
     else -> v.toInt().toString()
 }
 
-/**
- * Buy one, through the same door as everything else: the collar simulates, judges, signs or
- * refuses. A button bypassing that would be a second way to spend money, and this wallet has one.
- */
+/** Buy one through [AgentBroker], like every other spend: the collar simulates, then signs or refuses. */
 private suspend fun buyOne(ctx: android.content.Context, owner: String, c: com.clearsign.core.Candidate, slice: Long): Boolean {
     val quote = withContext(Dispatchers.IO) {
         runCatching { Jupiter.quote(Jupiter.SOL_MINT, c.mint, slice, feeBps = 0) }.getOrNull()

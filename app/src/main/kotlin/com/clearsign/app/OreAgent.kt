@@ -8,11 +8,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The agent that digs. Not one round a minute from the phone (1,400 calls a day): it hands part
- * of the budget to an executor opened with `Automate`, so much SOL on so many squares each round
- * while the deposit lasts, then checks the account once per tick and claims. The collar applies:
- * the deposit is a spend under the caps, with a receipt. On close the automation stops, the rest
- * returns, the ORE goes home. Measured 22 Sep 2026: executors take 7,000 lamports a round, so a cap too low for one square is said, not ignored.
+ * ORE mining for the agent. Instead of one round a minute from the phone (1,400 calls a day),
+ * part of the budget goes to an executor via `Automate`: fixed SOL on fixed squares each round
+ * while the deposit lasts; each tick checks the account and claims. The deposit is a collar
+ * spend with a receipt. On close the automation stops and SOL and ORE go home. Measured
+ * 22 Sep 2026: executors take 7,000 lamports a round; a cap too low for one square is reported.
  */
 object OreAgent {
     /** What it pays the executor, per round. Measured on live automations. */
@@ -68,11 +68,10 @@ object OreAgent {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /**
-     * The squares follow the network. The ORE share is your part of the square, so at equal cost
-     * the square others leave empty pays more. Every quarter hour the closed rounds are read from
-     * the archive, the least crowded squares taken, and if they differ from now an Automate goes
-     * out with the same amount, same fee, zero deposit: the program updates the mask in place.
-     * Through the collar like every move, one network fee. Without enough rounds, nothing changes.
+     * Move to the least crowded squares: ORE is split by share of the square, so at equal cost
+     * an emptier square pays more. Every 15 min, read closed rounds from the archive and, if the
+     * best squares changed, send an Automate with the same amount and fee and zero deposit:
+     * the program updates the mask in place. One network fee, through the collar.
      */
     private suspend fun renew(ctx: Context, envelope: ByteArray, auto: Ore.Automation): TraderLoop.Tick? {
         val p = prefs(ctx)
@@ -130,7 +129,7 @@ object OreAgent {
         }
 
         if (alive) {
-            // The account of what happened, only when something did.
+            // Report progress only when it changed.
             val p = prefs(ctx)
             val spent = auto!!.totalSolSpent; val earned = auto.totalOreEarned
             if (spent != p.getLong("spent", -1L) || earned != p.getLong("earned", -1L)) {
@@ -197,7 +196,7 @@ object OreAgent {
         return TraderLoop.handle(ctx, tx, intent, AgentBroker.Job.Source.IN_APP)
     }
 
-    /** Signed by the budget key, no collar: this is the close, and the money goes home. */
+    /** Signed by the budget key without the collar: only for the close, sending funds home. */
     private suspend fun sendDirect(ctx: Context, envelope: ByteArray, ixs: List<WalletTx.Instruction>, label: String): String? = withContext(Dispatchers.IO) {
         val rpc = SolanaRpc.urlFor(null)
         val bh = SolanaRpc.latestBlockhash(rpc) ?: return@withContext ctx.getString(R.string.wa_no_blockhash)
@@ -226,7 +225,7 @@ object OreAgent {
         sayOnce(ctx, "refused:$why", ctx.getString(R.string.trace_ore_refused, why))
     }
 
-    /** A thing that does not change is said once a day, not every round. */
+    /** Log a repeated message at most once a day. */
     private fun sayOnce(ctx: Context, key: String, text: String) {
         val p = prefs(ctx)
         val day = System.currentTimeMillis() / 86_400_000L

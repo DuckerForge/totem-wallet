@@ -14,11 +14,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * What the Seeker crowd is buying, read off the chain, on its own Helius key, never the
- * agent's: if the scan exhausts its month, trading must not notice. That is why
- * [BuildConfig.SCAN_RPC_URL] exists. The cost trick: asking who moved is one call per hundred
- * wallets, since a swap always changes the balance if only by the fee, and only the movers
- * cost a lookup each. One call per wallet would be a hundred times the price.
+ * What the Seeker crowd is buying, read from chain on its own Helius key
+ * ([BuildConfig.SCAN_RPC_URL]), so a scan that exhausts its monthly quota never affects trading.
+ * One call per hundred wallets finds who moved (a swap always changes the SOL balance, if only
+ * by the fee); only movers get a lookup each.
  */
 object SeekerScan {
     private const val TAG = "ClearSign-Seeker"
@@ -70,9 +69,8 @@ object SeekerScan {
         for ((a, v) in snap) fresh.putIfAbsent(a, v)
         writeSnap(ctx, fresh)
         if (cold) {
-            // A cold pass has nothing to compare against, so on its own it would leave
-            // the card empty until the next one. Instead, read the last day straight
-            // from the biggest wallets: one expensive start, then deltas forever.
+            // A cold pass has nothing to diff against, so read the last day directly from the
+            // biggest wallets: one expensive start, then deltas.
             val seed = watch.sortedByDescending { it.centiSol }.take(SEED)
             val since0 = System.currentTimeMillis() - 24 * 3600_000L
             val first = seed.flatMap { buysOf(it, since0) }
@@ -186,7 +184,7 @@ object SeekerScan {
                 break
             }
         }
-        // Paying in USDC is still paying. Counted at one dollar, which is what it is.
+        // USDC payments count too, at $1.
         val usdcOut = (pre[com.clearsign.core.AgentPolicy.USDC]?.first ?: 0.0) -
             (post[com.clearsign.core.AgentPolicy.USDC]?.first ?: 0.0)
         val spent = if (solSpent > 0.001) solSpent else if (usdcOut > 1.0) usdcOut / 200.0 else 0.0

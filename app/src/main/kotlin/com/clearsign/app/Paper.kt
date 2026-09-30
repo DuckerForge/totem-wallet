@@ -9,11 +9,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The shadow book: what every exit rule would have done on the coins this agent actually met.
- * A target and a stop are two numbers somebody picked once, and the only way to learn whether
- * +30/−15 fits these coins without paying for the answer is to run the other rules beside the
- * real one. Two kinds of row: bought ("was your exit the right exit") and blocked by collar,
- * threshold, veto or web check ("did that wall save or cost me money"). Nothing here signs or touches a key: a notebook.
+ * Shadow book: what every exit rule would have done on the coins this agent actually met, to learn
+ * whether +30/−15 fits them without paying to find out. Two kinds of row: bought (was the exit
+ * right) and blocked by policy, threshold, veto or web check (did the block save or cost money).
+ * Nothing here signs or touches a key.
  */
 object Paper {
     private const val PREFS = "apex_paper"
@@ -75,8 +74,7 @@ object Paper {
     ) {
         if (entryLamports <= 0 || sizeLamports <= 0) return
         val book = all(ctx).toMutableList()
-        // One row per coin at a time: the same coin picked twice in an hour is one
-        // opinion about that coin, not two.
+        // One open row per coin: picking it twice in an hour is not a second data point.
         if (book.any { it.mint == mint && it.open }) return
         if (book.count { it.open } >= MAX_OPEN) return
         val now = System.currentTimeMillis()
@@ -126,9 +124,8 @@ object Paper {
     }
 
     /**
-     * What the walls did, in lamports. Positive: the coins the agent was stopped from buying went
-     * on to make money, so the wall cost you that. Negative: it saved you that. Measured on the
-     * rule you actually run, the trade you would have made.
+     * What the blocks did, in lamports, measured on the rule you actually run. Positive: blocked
+     * coins went on to make money, so the block cost that much. Negative: it saved that much.
      */
     fun blockedVerdict(ctx: Context, yourRule: String = ExitRule.YOURS): Pair<Int, Long> {
         val rows = all(ctx).filter { it.blockedBy != null }

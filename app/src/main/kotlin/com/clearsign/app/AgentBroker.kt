@@ -27,10 +27,9 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The decider: one job in, one verdict out. Simulate the bytes, check the agent's claim
- * against what the network says will happen, run the collar. Under the rules the budget
- * signs here, silently, and tells you after; over them the ordinary receipt waits for your
- * fingerprint; outside them a refusal goes back with the reason in plain words.
+ * One job in, one verdict out: simulate the bytes, check the agent's claim against the
+ * simulation, run the collar. Within the rules the budget signs silently and notifies after;
+ * above them the receipt waits for a fingerprint; outside them it is refused with the reason.
  */
 object AgentBroker {
     private const val TAG = "Apex-Broker"
@@ -40,10 +39,7 @@ object AgentBroker {
     const val MILESTONE_ID = 5200
     private const val ASK_TIMEOUT_MS = 90_000L   // a blockhash lives about that long
 
-    /**
-     * One job for the judge: bytes plus a claim about them. Where it came from changes only how
-     * the answer is delivered, never how it is judged.
-     */
+    /** Bytes plus a claim about them. The source changes only how the answer is delivered. */
     data class Job(
         val id: String,
         val tx: ByteArray,
@@ -58,9 +54,9 @@ object AgentBroker {
     }
 
     /**
-     * The verdict, in a shape a machine can branch on. [rule] is the collar's stable code
-     * (`per_tx`, `destination`, `vault_touched`…); [said] is the agent's claim and [simulated]
-     * what the network says, so a caller can print both and let a person judge the judge.
+     * Machine-readable verdict. [rule] is the collar's stable code (`per_tx`, `destination`,
+     * `vault_touched`…); [said] is the agent's claim and [simulated] the network's, so a caller
+     * can show both.
      */
     sealed class Verdict(val code: String, val reason: String?, val signature: String?) {
         var rule: String? = null
@@ -70,10 +66,8 @@ object AgentBroker {
         class SignedSilently(signature: String) : Verdict("signed_silently", null, signature)
         class Confirmed(signature: String?) : Verdict("confirmed_by_user", null, signature)
         /**
-         * [by] says who said no, because three things mean opposite things. The collar is a bug
-         * report about the proposal. A person is an answer, and asking again in six minutes makes a
-         * nuisance. Everything else is the system (a failed send, an unreadable key, an expired
-         * blockhash): worth a retry, never a stop. All three used to read "you turned it down".
+         * [by] says who refused. COLLAR: the proposal is at fault. PERSON: an answer, don't ask again
+         * soon. SYSTEM (failed send, unreadable key, expired blockhash): worth a retry, never a stop.
          */
         class Refused(reason: String, val by: By = By.SYSTEM) : Verdict("refused", reason, null) {
             enum class By { PERSON, COLLAR, SYSTEM }
@@ -98,9 +92,8 @@ object AgentBroker {
         val intent = parseIntent(job.intentJson) ?: return Verdict.Refused(ctx.getString(R.string.agent_bad_link))
         val locale = deviceLocaleTag()
 
-        // The mint the proposal says is coming back. Without it the simulation
-        // cannot see a coin arriving into an account that this very transaction
-        // creates, and the intent check reads that as the agent lying.
+        // The mint the proposal expects back. Without it the simulation can't see a coin landing
+        // in an account this same transaction creates, and the intent check flags a mismatch.
         val expect = runCatching { JSONObject(job.intentJson).optString("expectMint") }.getOrNull()
             ?.takeIf { it.isNotEmpty() }
         val analyzed = try {
@@ -118,9 +111,9 @@ object AgentBroker {
         // the writable set comes from the decoded message, not from the claim.
         val vault = Settings.watchWallet(ctx)
         val writable = SolanaTx.decode(job.tx)?.writableKeys?.toSet().orEmpty()
-        // Who chose the route. Only bytes we asked Jupiter for, with this budget as taker, carry an
-        // Ultra requestId: no outside link does, and the collar uses it to recognize an exchange by
-        // shape rather than by program name, since Ultra changes route every call. See isExchange in AgentPolicy.
+        // Only bytes we requested from Jupiter, with this budget as taker, carry an Ultra requestId.
+        // The collar then recognizes an exchange by shape, not program name, since Ultra's route
+        // changes every call. See isExchange in AgentPolicy.
         val routeIsOurs = job.ultraRequestId != null
         val decision = PolicyEngine.decide(
             policy, receipt, guard, SessionWallet.history(ctx), prices,
@@ -142,18 +135,14 @@ object AgentBroker {
                 Log.i(TAG, "asking: ${decision.reason}")
                 AgentLink.noteAction(ctx, ctx.getString(R.string.agent_last_asked, what))
                 val v = ask(ctx, job, session.pubkey, decision.reason, what)
-                // A question nobody answered used to leave no trace at all: the
-                // refusals were in the Receipts tab and the expiries were nowhere,
-                // so a loop stuck on a timeout looked like a loop doing nothing.
+                // Record expiries too, or a loop stuck on timeouts looks idle.
                 if (v is Verdict.Timeout) record(ctx, receipt, session.pubkey, job, "expired", null, false, v.reason)
                 v.explained()
             }
             Decision.Auto -> {
-                // What the budget actually loses, which is what the rolling caps count. A sale loses
-                // nothing, the coin becomes SOL in the same pocket; counting it burned the daily cap twice
-                // per round trip. A leg nobody can price used to count as zero, the one certainly wrong
-                // answer: the collar already refused anything above the per-move ceiling, so that ceiling
-                // is the honest worst case.
+                // Count what the budget actually loses, as the rolling caps do. A sale loses nothing, or a
+                // round trip would burn the daily cap twice. An unpriced leg counts as the per-move cap,
+                // the worst case: the collar already refused anything above it.
                 val legs = receipt.outflows.filter { it.rawAmount < 0 }.map { prices(it) }
                 val value = when {
                     PolicyEngine.isUnwind(policy, receipt, routeIsOurs) -> 0L
@@ -175,9 +164,8 @@ object AgentBroker {
         } else {
             val rpc = SolanaRpc.urlFor(job.cluster)
             val out = withContext(Dispatchers.IO) { SolanaRpc.send(rpc, signed) }
-            // No answer is not no transaction. A read timeout after the node forwarded the bytes came
-            // back as "refused", and the coin the budget now held had no row: no target, no stop,
-            // nothing counted against the day. The signature is in the bytes, so the chain can be asked.
+            // No answer doesn't mean no transaction: a read timeout can follow a forwarded send, leaving
+            // a held coin with no position row. The signature is in the bytes, so ask the chain.
             out.signature ?: run {
                 val own = SolanaTx.firstSignature(signed)
                 val landed = own != null && withContext(Dispatchers.IO) { SolanaRpc.confirmed(rpc, own) }
@@ -185,9 +173,8 @@ object AgentBroker {
                 own
             }
         }
-        // A round trip that comes home gives the day back what it returns: lamports
-        // with a minus sign, and still a row, because it is still a move. See
-        // staysInPocket and recordSpend.
+        // A sale back into SOL is recorded as negative spend, still as a row since it is a move.
+        // See staysInPocket and recordSpend.
         val pol = SessionWallet.policy(ctx)
         val homeAgain = pol != null && com.clearsign.core.staysInPocket(receipt, pol, routeIsOurs)
         SessionWallet.recordSpend(ctx, if (homeAgain) -valueLamports else valueLamports)
@@ -199,9 +186,7 @@ object AgentBroker {
         }
         record(ctx, receipt, envelope, job, "auto", txSig, true, null)
         AgentLink.noteAction(ctx, ctx.getString(R.string.agent_last_signed, what))
-        // "Spent from the budget" was false on a sale, half the cases: a sale spends nothing, it
-        // brings money back into the same pocket. The same notice said it under a sale the person
-        // had asked for, finger on the button.
+        // A sale spends nothing, so it gets its own notice instead of "spent from the budget".
         notify(ctx, ctx.getString(if (homeAgain) R.string.agent_notif_sold else R.string.agent_notif_signed), what, txSig)
         runCatching { HealthWidgetData.refresh(ctx) }
         return Verdict.SignedSilently(txSig)
@@ -282,9 +267,8 @@ object AgentBroker {
     }
 
     /**
-     * Say something went wrong, once, where a person will see it. For the loop, running with the
-     * app closed: a note nobody reads is no note, and a stuck agent must be loud exactly once
-     * rather than quiet eighty-four times.
+     * Report a problem once, where a person will see it. For the loop running with the app
+     * closed: a stuck agent should alert once, not fail silently over and over.
      */
     fun warn(
         ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null, color: Int? = null,
@@ -321,7 +305,7 @@ object AgentBroker {
         return r.channel
     }
 
-    /** The quiet card: one notification rewritten in place, never a sound. The loop's pulse for somebody glancing at the shade. */
+    /** Silent progress notification, updated in place: the loop's status at a glance. */
     fun progress(ctx: Context, title: String, body: String, picture: android.graphics.Bitmap? = null) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(QUIET) == null) {

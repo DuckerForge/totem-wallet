@@ -12,11 +12,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The exit arithmetic, and the reading of a buy out of a receipt.
- *
- * These are the two places where a mistake spends real money in the dark: a
- * wrong entry price sells a winner as if it were a loser, and a misread receipt
- * creates a position that does not match what is actually in the wallet.
+ * Exit arithmetic and reading a buy from a receipt: a wrong entry price sells a winner as a
+ * loser, and a misread receipt opens a position that doesn't match the wallet.
  */
 class PositionsTest {
 
@@ -50,16 +47,13 @@ class PositionsTest {
         assertNull(pos().verdict(9_000.0))
     }
 
-    /** Exactly on the line counts: a target reached is a target. */
+    /** Exactly on the line counts as reached. */
     @Test fun theBoundariesCount() {
         assertEquals(Positions.Exit.Why.TARGET, pos().verdict(13_000.0)?.why)
         assertEquals(Positions.Exit.Why.STOP, pos().verdict(8_500.0)?.why)
     }
 
-    /**
-     * The one that matters most: no price means hold. A tick that could not
-     * reach Jupiter must never read that as a coin gone to zero.
-     */
+    /** No price means hold: a tick that could not reach Jupiter must not read it as a coin at zero. */
     @Test fun anUnknownPriceNeverSells() {
         assertNull(pos().verdict(null))
         assertNull(pos().verdict(0.0))
@@ -95,10 +89,9 @@ class PositionsTest {
     }
 
     /**
-     * The first buy of a coin opens its account, and that rent comes back when the account is
-     * closed. The numbers of 30 Sep, read on chain: 0.006658 left the budget, 0.001488 of it the
-     * CYBERLEEK account's rent; the coin came back at 0.005149. That is -0.5%, not the -22.7%
-     * that sold it at the stop on the first tick.
+     * The first buy opens the coin's account, and that rent returns on close. Measured on chain
+     * 30 Sep: 0.006658 left the budget, 0.001488 of it CYBERLEEK account rent, and the coin was
+     * worth 0.005149: -0.5%, not the -22.7% that hit the stop on the first tick.
      */
     @Test fun theRentOfANewAccountIsNotPartOfTheCost() {
         val leek = "ApZuxdpzLeek11111111111111111111111111111111"
@@ -120,7 +113,7 @@ class PositionsTest {
         assertNull(Positions.fromReceipt(r, env, 30, 15))
     }
 
-    /** Two tokens back at once is not something this store can describe honestly. */
+    /** Two tokens back at once can't be described by this store. */
     @Test fun aMultiLegSwapIsLeftAlone() {
         val r = receipt(
             outs = listOf(d(env, NATIVE_SOL_MINT, "SOL", 9, -10_000_000L)),
@@ -148,9 +141,8 @@ class PositionsTest {
     }
 
     // ---- the book against the chain -----------------------------------------
-    // The night this was written the agent had spent sixteen hours trying to sell 1214 LEVERCAT
-    // belonging to a closed budget: the new key never held them, every simulation moved nothing,
-    // the collar read that as lying, and the tick stopped there. The chain always wins.
+    // The chain wins over the book: a stale row makes the agent try to sell coins
+    // the key never held, and every simulation of that sale moves nothing.
 
     private val old = "Old11111111111111111111111111111111111111111"
 
@@ -179,10 +171,7 @@ class PositionsTest {
         assertTrue(r.keep.single().parked)
     }
 
-    /**
-     * A cancel that Jupiter accepted is not a cancel that landed. The key stays
-     * until Jupiter no longer lists the order and the coins are back.
-     */
+    /** An accepted cancel may not land: keep the key until Jupiter no longer lists the order and the coins are back. */
     @Test fun anOrderKeyIsDroppedOnlyOnJupitersWord() {
         val p = pos().copy(owner = env, triggerOrder = "OrderXXXX")
         // Coins back, Jupiter asked, order not there: the key goes.
@@ -225,9 +214,8 @@ class PositionsTest {
     }
 
     /**
-     * The other direction is refused on purpose. More coins against the same cost
-     * reads as a lower entry price, and a lower entry price sells at a target the
-     * position never reached.
+     * Growing the book from the chain is refused: more units at the same cost lower the entry
+     * price and would sell at a target never reached.
      */
     @Test fun aBiggerBalanceDoesNotMoveTheEntryPrice() {
         val p = pos(units = 1_000.0, cost = 10_000_000L).copy(owner = env)

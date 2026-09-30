@@ -34,28 +34,23 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The mark: a Seeker with wings. A line of light writes itself up the dark, violet to cyan;
- * the Seeker lights up under it, and the line turns out to be its right edge; behind it the two
- * panels of the old V open as wings, the thunderbird; then the scene settles on the mark itself.
- * Same geometry as `scripts/make_totem_mark.py`, which paints the bitmap, so the door lands on
- * the launcher's own image. Rules: no stars, nothing falling, one motion at a time, a breath of
- * silence at the end.
+ * Logo animation: a violet-to-cyan line draws upward, the Seeker lights up under it (the line is
+ * its right edge), the two panels of the old V open behind it as wings, then it settles on the
+ * bitmap. Same geometry as `scripts/make_totem_mark.py`, so it ends on the launcher image.
+ * Rules: no stars, nothing falling, one motion at a time, a still pause at the end.
  */
 @Composable
 internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
-    // Once only. A story that keeps restarting stops being a story and becomes a
-    // moving background: the first time you watch, the third annoys. At the end
-    // the mark stays, still.
+    // Runs once, then the mark stays still. Looped, it turns into background noise.
     val run = remember { Animatable(0f) }
     LaunchedEffect(Unit) { run.animateTo(1f, tween(4000, easing = LinearEasing)) }
     val t = run.value
 
-    // The real mark, not a drawing that resembles it: the same image as the
-    // launcher, so if it ever changes it changes here too.
+    // The launcher's own bitmap, so a logo change shows up here too.
     val mark = ImageBitmap.imageResource(R.mipmap.brand_bird)
 
-    // The door pulls the scene back while it opens, and lets it return if the print fails.
-    // One way only, the scene stayed at fifteen percent for ever after one bad finger.
+    // Fades the scene while the gate opens, and back in if the fingerprint fails
+    // (one-way, it stayed at 15% after a bad finger).
     val open = remember { Animatable(0f) }
     LaunchedEffect(opening) { open.animateTo(if (opening) 1f else 0f, tween(900, easing = FastOutSlowInEasing)) }
 
@@ -64,37 +59,31 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         val h = size.height
         val op = open.value
 
-        // The mark lives in a square of its own, not in the box it gets: that one is
-        // `weight(1f)` and takes all the height left over.
+        // The mark gets its own square: the canvas is `weight(1f)` and takes all remaining height.
         val d = min(w * 0.46f, h * 0.62f)
         val cx = w / 2f
         val cy = h * 0.17f
 
-        // The phone and the wings, measured in the bitmap: the subject fills 0.92 of the
-        // square and the phone is 0.78 of that, so the composition fills the square instead
-        // of sitting in the middle of it like a stamp.
+        // Proportions from the bitmap: the subject fills 0.92 of the square, the phone about three quarters of that.
         val sq = d * 0.92f
         val phoneLen = sq * 0.74f
-        val phoneW = phoneLen * (69.56f / 150.86f)   // il Seeker vero: 150,86 x 69,56 mm
+        val phoneW = phoneLen * (69.56f / 150.86f)   // real Seeker: 150.86 x 69.56 mm
         val pc = Offset(cx, cy + sq * 0.01f)
 
-        // --- the timing, which is the story -----------------------------------------------
+        // --- timing ------------------------------------------------------------------------
         val spark = ease(seg(t, 0.04f, 0.30f))
-        // A still beat with the stroke lit and nothing under it, then the Seeker lights up,
-        // already in place: no movement, revealed under a light that was already there.
+        // A pause with only the stroke lit, then the Seeker fades in, already in place.
         val arrive = ease(seg(t, 0.34f, 0.50f))
         // The wings open behind it, from nearly closed to their seat.
         val wings = ease(seg(t, 0.52f, 0.76f))
-        // And the scene settles on the bitmap, which is the same picture.
+        // Crossfade to the bitmap, which is the same picture.
         val become = ease(seg(t, 0.78f, 0.92f))
 
-        // Opening the door does not skip the story, it lets it finish and then pulls everything
-        // back. `opening` used to push the scene straight to the mark, and the flag stayed up while
-        // the door tried the unlock, so after a failed print the phones were never seen again and
-        // the door showed a frozen logo. Now the cycle runs on its own and the opening fades it out.
+        // Opening lets the cycle finish and fades it out. Jumping straight to the mark left the flag
+        // up during unlock, so a failed fingerprint showed a frozen logo.
         val leaving = 1f - op * 0.85f
 
-        // --- il respiro dietro ---------------------------------------------
+        // --- the glow behind -----------------------------------------------
         drawCircle(
             Brush.radialGradient(
                 listOf(NEON_MID.copy(alpha = 0.05f * (0.3f + 0.7f * max(spark, wings))), Color.Transparent),
@@ -104,8 +93,7 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         )
 
         // --- the wings, behind ---------------------------------------------
-        // Low and wide, pivoted near the middle: high and narrow they came out above the
-        // phone like a pair of horns, and a dark shape with two horns is a steakhouse sign.
+        // Low and wide, pivoted near the middle: high and narrow they looked like horns.
         val wingW = phoneW * 0.92f
         val wingL = phoneLen * 0.56f
         listOf(-1f, 1f).forEach { side ->
@@ -119,23 +107,22 @@ internal fun GateDemo(modifier: Modifier = Modifier, opening: Boolean = false) {
         }
 
         // --- the Seeker, from the back --------------------------------------
-        // Out entirely as the bitmap comes in: half of each drawn at once showed two phones
-        // slightly apart, and the camera island jumped.
+        // Fully out as the bitmap comes in: crossfading both showed two phones slightly apart.
         phone(pc, phoneLen, phoneW, 0f, arrive * leaving * (1f - become), arrive * (0.4f + spark), back = true)
 
-        // --- the line of light, which comes first ------------------------------------------
-        // On the phone's right edge, one corner radius in at both ends, written bottom to top:
-        // drawn where the edge will be, so when the phone arrives the line is already its edge.
+        // --- the line of light -------------------------------------------------------------
+        // On the phone's right edge, one corner radius in at each end, drawn bottom to top,
+        // so it is already the edge when the phone appears.
         if (spark > 0f && become < 1f) {
             val x = pc.x + phoneW / 2f
             val a = Offset(x, pc.y + phoneLen / 2f - phoneLen * 0.092f)
             val b = Offset(x, pc.y - phoneLen / 2f + phoneLen * 0.092f)
-            // As thick as in the bitmap, measured on the phone it runs along: scaled from the
-            // mark square it came out over twice as wide, a tube that shrank at the handover.
+            // Thickness from the phone length, as in the bitmap. Scaled from the mark square it
+            // was twice as wide and shrank at the handover.
             neon(a, b, spark, (0.4f + 0.6f * spark), phoneLen * 0.011f, (1f - become) * leaving)
         }
 
-        // --- and the mark settles --------------------------------------------
+        // --- the bitmap ------------------------------------------------------
         val markAlpha = become * leaving
         if (markAlpha > 0.01f) {
             drawImage(
@@ -168,17 +155,15 @@ private fun DrawScope.wing(pivot: Offset, degrees: Float, lift: Float, wide: Flo
 }
 
 /** Violet at the bottom and cyan at the top: the two ends of the brand. */
-// Same three stops as NEON_LOW / NEON_MID / NEON_HIGH in scripts/make_totem_mark.py.
-// The door animates this thread and settles on the bitmap that script paints, so the two
-// ramps have to be the same numbers or the animation ends on a different colour.
+// Same stops as NEON_LOW / NEON_MID / NEON_HIGH in scripts/make_totem_mark.py. Keep them equal,
+// or the animation ends on a different color than the bitmap.
 private val NEON_LOW = Color(0xFF9945FF)
 private val NEON_MID = Color(0xFF4CC9FF)
 private val NEON_HIGH = Color(0xFF14F195)
 
 /**
- * The stroke that draws itself, color flowing along its length. In pieces, not one go, because
- * the color changes along the way and that is how only the arrived part shows. Three passes:
- * a wide faint halo, a medium one, and the real thread, which is the one read.
+ * The self-drawing stroke, color changing along its length. Drawn in segments so only the revealed
+ * part shows. Three passes: wide faint halo, medium halo, core line.
  */
 private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, core: Float, fade: Float = 1f) {
     if (reveal <= 0f) return
@@ -195,8 +180,7 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, cor
         drawLine(c.copy(alpha = (0.24f + 0.22f * glow) * fade), p0, p1, core * 2.1f, StrokeCap.Round)
         drawLine(c.copy(alpha = fade), p0, p1, core, StrokeCap.Round)
     }
-    // The tip lit while traveling, nothing once arrived: a thread still glowing
-    // at the top would say something is still happening.
+    // Glowing tip only while drawing; left on, it would look unfinished.
     if (reveal < 1f) {
         val head = Offset(a.x + (b.x - a.x) * reveal, a.y + (b.y - a.y) * reveal)
         val c = if (reveal < 0.5f) lerp(NEON_LOW, NEON_MID, reveal * 2f) else lerp(NEON_MID, NEON_HIGH, (reveal - 0.5f) * 2f)
@@ -206,11 +190,9 @@ private fun DrawScope.neon(a: Offset, b: Offset, reveal: Float, glow: Float, cor
 }
 
 /**
- * A Seeker. The phone is already drawn elsewhere, not by eye: `drawPhone` in TapAnimation
- * comes from the Seeker's factory drawing (three-lens island with the flash beside it, side
- * keys, 150.86 x 69.56 mm) and the tap between two phones uses it; a second drawing here
- * would diverge at the first fix. One from the back, because at this size a phone seen from
- * the front is a black rectangle that could be anyone's: the island says Seeker.
+ * A Seeker from the back: from the front it is an anonymous black rectangle, the camera island
+ * says Seeker. Reuses `drawPhone` from TapAnimation (from the factory drawing, 150.86 x 69.56 mm)
+ * rather than a second drawing that would drift.
  */
 private fun DrawScope.phone(
     center: Offset,
@@ -222,9 +204,8 @@ private fun DrawScope.phone(
     back: Boolean,
 ) {
     if (alpha <= 0.01f) return
-    // The body warms as the stroke passes: the one thing that ties the two
-    // objects instead of leaving them side by side.
-    // The same dark glass the bitmap is filled with, so the handover shows nothing.
+    // Body tints toward the stroke color as it passes, tying the two together. Base is the
+    // bitmap's dark glass, so the handover is invisible.
     val body = lerp(Color(0xFF1B2036), NEON_MID, 0.10f * glow)
     rotate(angle, center) {
         drawPhone(
@@ -248,7 +229,7 @@ private fun mix(a: Offset, b: Offset, k: Float) = Offset(a.x + (b.x - a.x) * k, 
 private fun seg(t: Float, from: Float, to: Float): Float =
     if (t <= from) 0f else if (t >= to) 1f else (t - from) / (to - from)
 
-/** Niente si muove a velocita' costante: rallenta arrivando. */
+/** Cubic ease-out: slows down on arrival. */
 private fun ease(p: Float): Float {
     val c = min(1f, max(0f, p))
     return 1f - (1f - c) * (1f - c) * (1f - c)

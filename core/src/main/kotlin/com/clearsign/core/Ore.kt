@@ -1,11 +1,10 @@
 package com.clearsign.core
 
 /**
- * ORE, read and written by hand. ORE today is a grid of 25 squares and one round a minute: put
- * SOL on squares, one wins, whoever is on it splits one ORE, the SOL comes back minus fees (see
- * [OreOdds]). The program is Steel, not Anchor: no IDL on chain, so the bytes are written here.
- * Everything in this file was checked on chain on 22 Sep 2026: recomputed PDAs match the fixed
- * accounts, a real Miner reads with these offsets, a Deploy built here passes simulation. The program is `oreV3…`, not the v2 the sites list. Pure: keys as base58 strings or 32 bytes.
+ * ORE by hand: a grid of 25 squares, one round a minute. SOL goes on squares, one wins, its miners
+ * split one ORE, the SOL comes back minus fees (see [OreOdds]). Steel, not Anchor: no IDL on chain.
+ * Checked on chain 22 Sep 2026 (PDAs match, a real Miner reads, a Deploy built here simulates).
+ * The program is `oreV3…`, not the v2 the sites list. Pure: keys as base58 strings or 32 bytes.
  */
 object Ore {
     const val PROGRAM = "oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"
@@ -23,8 +22,8 @@ object Ore {
     private val SPLIT_BYTES: ByteArray = byteArrayOf(6, -99, 12, 49, -121, 89, -79, -26, 115, 111, 41, -98, 119, 77, -2, -3, 56, 29, 124, 92, -40, 81, 47, 16, -56, -111, -114, 0, 0, 0, 0, 1)
     const val CHECKPOINT_FEE_LAMPORTS = 10_000L
     /**
-     * One slot, roughly, for the countdown only. Nominal is 400 ms; measured 22 Sep 2026 on the
-     * network, 46 slots in twelve seconds, 260 ms. At 400 the countdown ran at half speed and said "six seconds" after the round had ended.
+     * One slot, roughly, for the countdown only. Nominal is 400 ms; measured 22 Sep 2026:
+     * 46 slots in 12 s, 260 ms. At 400 the countdown ran well behind the round.
      */
     const val SLOT_MS = 260L
     const val ONE_ORE = 100_000_000_000L
@@ -56,7 +55,7 @@ object Ore {
     const val ACC_BOARD = 105
     const val ACC_ROUND = 109
 
-    // ---- le istruzioni, lette --------------------------------------------------
+    // ---- instructions, read ----------------------------------------------------
 
     /** A call to the program, in the words a receipt needs. */
     sealed interface Call {
@@ -66,7 +65,7 @@ object Ore {
         }
         data class Checkpoint(val authority: String?) : Call
         object ClaimSol : Call
-        /** [bps] su 10000: quanta parte dell'ORE si riscuote. */
+        /** [bps] out of 10000: the share of the ORE to claim. */
         data class ClaimOre(val bps: Long) : Call
         /** [executor] is account 2, who will play the rounds. [deposit] is what is handed over. */
         data class Automate(
@@ -135,7 +134,7 @@ object Ore {
         return ProgramCall(PROGRAM, "ORE", method, args)
     }
 
-    // ---- le istruzioni, scritte -----------------------------------------------
+    // ---- instructions, written ------------------------------------------------
 
     fun deployData(amountPerSquare: Long, mask: Int): ByteArray = byteArrayOf(IX_DEPLOY.toByte()) + le64(amountPerSquare) + le32(mask)
     fun checkpointData(): ByteArray = byteArrayOf(IX_CHECKPOINT.toByte())
@@ -154,7 +153,7 @@ object Ore {
         byteArrayOf(strategy.toByte()) + le64(if (reload) 1L else 0L) +
         le64(maxProductionCost) + le16(minMotherlode) + le16(maxMotherlode) + le16(splitTiles) + le16(soloTiles) + ByteArray(8)
 
-    // ---- i conti -----------------------------------------------------------------
+    // ---- the accounts ------------------------------------------------------------
 
     data class Board(val roundId: Long, val startSlot: Long, val endSlot: Long, val productionCostEma: Long) {
         /** How much is left of the round, from the current slot. Zero when over. */
@@ -194,7 +193,7 @@ object Ore {
         /** The ten squares of this round that pay one miner only: known beforehand, from the id. */
         val soloMask: Int get() = distributionMask(id)
         fun isSolo(square: Int): Boolean = soloMask and (1 shl square) != 0
-        /** Il giro e' chiuso e diviso pro quota: `top_miner` e' l'indirizzo SPLIT. */
+        /** The round closed with a pro rata split: `top_miner` is the SPLIT address. */
         val isSplit: Boolean get() = topMiner.contentEquals(SPLIT_BYTES)
         /** The winning square, if the round is closed: `(r1 ^ r2 ^ r3 ^ r4) % 25` over the slot hash's four u64, as `Round::winning_square`. */
         val winningSquare: Int? get() {
@@ -315,7 +314,7 @@ object Ore {
         )
     }
 
-    // ---- numeri ----------------------------------------------------------------------
+    // ---- numbers ---------------------------------------------------------------------
 
     /** Lamports as SOL, with the digits needed and no trailing zeros. */
     fun sol(lamports: Long): String {
@@ -324,7 +323,7 @@ object Ore {
         return s.trimEnd('0').trimEnd('.')
     }
 
-    /** Grammi in ORE, allo stesso modo. */
+    /** ORE base units (grams, 11 decimals) as ORE, the same way. */
     fun ore(raw: Long): String {
         val v = raw / 1e11
         val s = String.format(java.util.Locale.ROOT, if (v >= 1) "%.4f" else "%.6f", v)

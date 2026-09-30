@@ -5,11 +5,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Who is connected to this wallet, and the ability to end it. MWA hands a dApp an auth token on
- * first approval so it can return without asking, and the wallet is meant to remember: this app
- * held no record, `onReauthorizeRequest` said yes to everything forever. This is the record, one
- * row per identity, checked when it returns; revoking declines the next reauthorize and the dApp
- * asks again in front of you. No standing permission to move money: a connection means "this app may ask".
+ * dApps connected to this wallet, and a way to end them. MWA gives a dApp an auth token on first
+ * approval so it can return without asking; this is the record, one row per identity, checked in
+ * `onReauthorizeRequest`. Revoking declines the next reauthorize, so the dApp must ask again.
+ * A connection only means "this app may ask", never permission to move money.
  */
 object Connections {
     private const val PREFS = "apex_connections"
@@ -61,8 +60,8 @@ object Connections {
 
     /**
      * May this identity come back without asking? Unknown is yes: an authorization can predate
-     * this record, and turning every old connection into a silent failure is how a security
-     * feature gets blamed for breaking a wallet. Only an explicit revoke says no.
+     * this record, and silently failing old connections would look like a broken wallet. Only
+     * an explicit revoke says no.
      */
     fun allowed(ctx: Context, id: String): Boolean = all(ctx).firstOrNull { it.id == id }?.revoked != true
 

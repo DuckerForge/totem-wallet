@@ -14,17 +14,16 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * The phone buzzes when somebody you follow buys. Following used to only feed the agent a
- * candidate, if a budget was open; with no budget the star did nothing and never said so.
- * Fifteen minutes because that is WorkManager's floor and the scanner publishes every ten. The
- * button does not buy: it opens the feed with that coin unfolded, on the receipt. A purchase
- * signed from a notification is a purchase nobody read, and a receiver's ten seconds could not quote, simulate and sign anyway.
+ * Notify when a followed wallet trades. Every 15 min: WorkManager's floor, and the scanner
+ * publishes every ten. The notification opens the feed on that coin's receipt and never buys:
+ * a buy signed from a notification is unread, and a receiver's ten seconds cannot quote,
+ * simulate and sign anyway.
  */
 object FollowWatch {
     private const val WORK = "follow-watch"
     private const val PREF = "follow_alerts"
     private const val NOTIF_BASE = 5300
-    /** Three is a glance. Ten is a reason to turn notifications off. */
+    /** Max notifications per run; many more and people turn them off. */
     private const val MAX_PER_ROUND = 3
 
     fun enabled(ctx: Context): Boolean =
@@ -61,9 +60,8 @@ object FollowWatch {
             val fresh = feed.events
                 .filter { it.at > since && it.wallet in follows }
                 .sortedByDescending { it.at }
-            // Even with nothing to say, the clock moves on: otherwise the first
-            // round after turning this on would shout about everything in the
-            // window, which on a busy hour is forty notifications.
+            // Advance the cursor even when silent, or the first run after enabling
+            // notifies the whole window (forty on a busy hour).
             Follows.setLastSeenAt(ctx, maxOf(since, feed.events.maxOfOrNull { it.at } ?: since))
             if (fresh.isEmpty() || since == 0L) return Result.success()
 

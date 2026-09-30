@@ -29,11 +29,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /**
- * Everything this wallet is connected to, and the way to end it. Two things it keeps saying
- * because other wallets imply the opposite: a connection means the app may ask, never sign;
- * and disconnecting does something, a revoked identity is declined on reauthorize
- * ([MobileWalletAdapterActivity] checks [Connections.allowed]) and asks again in front of you.
- * Row counts come from the ledger, which already records the dApp behind every signature.
+ * Connected apps and how to disconnect them. A connection lets an app ask, never sign, and
+ * disconnecting works: a revoked identity is declined on reauthorize
+ * ([MobileWalletAdapterActivity] checks [Connections.allowed]) and must ask again.
+ * Signing counts come from the ledger, which records the dApp behind every signature.
  */
 @Composable
 internal fun ConnectionsSheet(onDismiss: () -> Unit) {
@@ -110,7 +109,7 @@ private fun ConnectionRow(c: Connections.Conn, signed: Int, onChange: () -> Unit
     }
 }
 
-/** "today", "yesterday", or the date. Nobody needs a timestamp to the second here. */
+/** "today", "yesterday", or days ago. */
 private fun fmtWhen(ctx: android.content.Context, at: Long): String {
     if (at <= 0L) return ctx.getString(R.string.conn_never)
     val days = ((System.currentTimeMillis() - at) / 86_400_000L).toInt()

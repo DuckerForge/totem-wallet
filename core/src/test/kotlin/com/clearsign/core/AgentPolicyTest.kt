@@ -76,13 +76,13 @@ class AgentPolicyTest {
         assertTrue(d is Decision.Refuse && d.code == "destination", d.toString())
     }
 
-    // The closed list is now a choice, so these two say so out loud.
+    // The closed mint list is opt-in; tests that need it pass this.
     private val closed = policy.copy(allowAnyMint = false)
 
     /**
-     * Spending most of a small budget on a trade is the trade, not a drain. Numbers measured on
-     * the phone on 2026-09-15: a 0.08 SOL budget that had bought one coin, a slice of 0.033 SOL,
-     * 93% of the SOL left into a Jupiter swap. DRAINS_BALANCE fired as DANGER and the loop switched itself off for the night.
+     * Spending most of a small budget on a swap is a trade, not a drain. Measured on the phone
+     * 15 Sep 2026: a 0.08 SOL budget put a 0.033 SOL slice, 93% of its SOL left, into a Jupiter
+     * swap, and DRAINS_BALANCE fired as DANGER and stopped the loop.
      */
     @Test fun aSwapThatSpendsMostOfTheBudgetIsNotADrain() {
         val drain = Risk(RiskFlag.DRAINS_BALANCE, Severity.DANGER, "sends out 93% of your SOL balance")
@@ -98,7 +98,7 @@ class AgentPolicyTest {
         assertTrue(d is Decision.Refuse && d.code == "danger", d.toString())
     }
 
-    /** And a swap that gives nothing back is caught by the rule that measures it. */
+    /** A swap that returns nothing is caught by the rate rule. */
     @Test fun aSwapThatReturnsNothingIsStillRefused() {
         val drain = Risk(RiskFlag.DRAINS_BALANCE, Severity.DANGER, "sends out 93% of your SOL balance")
         val dust = swap(0.01, usdc, "USDC", 0.0001).copy(risks = listOf(drain))
@@ -149,22 +149,17 @@ class AgentPolicyTest {
         assertTrue(decide(transferTo(luca, 0.001), p = policy.copy(mode = AgentMode.READ_ONLY)) is Decision.Refuse)
     }
 
-    /**
-     * The point of the open mode: a coin nobody put on a list is tradeable, and
-     * what still governs it is the money, not the ticker.
-     */
+    /** Open mode: unlisted coins are tradeable, still bound by the money rules. */
     @Test fun anyMintLetsAnUnlistedCoinThrough() {
         val buy = swap(0.01, bonk, "BONK", 50_000.0)
-        // Closed, the coin itself is what stops it; open, the only thing left to
-        // ask about is the price nobody could quote.
+        // Closed: the mint asks. Open: only the missing price asks.
         assertEquals("asset_in", (decide(buy, p = closed) as Decision.Ask).code)
         val d = decide(buy)
         assertTrue(d is Decision.Ask && d.code == "unknown_value", d.toString())
     }
 
     @Test fun anyMintSellsBackWithoutAsking() {
-        // The exit matters more than the entry: a stop-loss at three in the
-        // morning must not wait for a fingerprint.
+        // Sales must not wait for a fingerprint: a stop-loss fires unattended.
         val out = transferTo(luca, 0.0).copy(outflows = listOf(d(env, bonk, "BONK", 5, -1000.0)))
         assertTrue(decide(out) !is Decision.Refuse, decide(out).toString())
     }
@@ -187,9 +182,9 @@ class AgentPolicyTest {
     }
 
     /**
-     * The trade the agent was stopped on, numbers off the phone: 0.031225 SOL into the swap,
-     * coins worth about the same back, two new accounts at 0.00204 each and the fee. Counting the
-     * rent as part of the exchange turned a 1% trade into an "84%" one and asked for a fingerprint nobody was there to give.
+     * Numbers from the phone: 0.031225 SOL into the swap, about the same back in coins, two new
+     * accounts at 0.00204 each plus the fee. Counting rent as part of the exchange made a 1% trade
+     * read as 84% and ask for a fingerprint.
      */
     @Test fun rentIsNotPartOfTheExchange() {
         val rentAcct = "NewAcct1111111111111111111111111111111111111"
@@ -223,7 +218,7 @@ class AgentPolicyTest {
     }
 
     @Test fun absurdRateIsRefusedAsNotAnExchange() {
-        // A tenth back is not a bad price, it is a transfer with a receipt stapled on.
+        // A tenth back is under the rate_quality floor: treated as a transfer.
         val d = decide(swap(0.01, usdc, "USDC", 0.10))
         assertTrue(d is Decision.Refuse && d.code == "rate_quality", d.toString())
     }
@@ -257,18 +252,17 @@ class AgentPolicyTest {
         assertTrue(line.contains("0.25") && line.contains("SOL") && line.contains("8ncU"), line)
     }
 
-    // ---- the round trip home --------------------------------------------------
-    // The daily cap limits what can leave in a day. Buying and selling back sends nothing away:
-    // the pocket stays as it was, in another form for a while. Counting it twice means an agent
-    // with a small budget makes one trip and then asks for the print forever.
+    // ---- round trips and the daily cap ----------------------------------------
+    // The daily cap limits what leaves. A buy and a sale back leave nothing, so they don't count;
+    // otherwise a small budget makes one trip and then asks for the fingerprint every time.
 
     @Test fun aRealSwapDoesNotSpendTheDay() {
         assertTrue(staysInPocket(swap(0.01, usdc, "USDC", 1.0), policy))
     }
 
     @Test fun aRoundTripStillCountsAsAMove() {
-        // The round trip does not spend the day, but it is a move: the hourly cap counts moves,
-        // not money, and an agent spinning without touching any limit pays fee and spread every turn.
+        // A round trip doesn't spend the daily cap, but the hourly cap counts moves: churning
+        // costs fee and spread every time.
         val full = SpendHistory(spentLast24hLamports = 0L, txLastHour = policy.maxTxPerHour)
         val d = decide(swap(0.01, usdc, "USDC", 1.0), h = full)
         assertTrue(d is Decision.Refuse && d.code == "rate", d.toString())
@@ -279,13 +273,12 @@ class AgentPolicyTest {
     }
 
     @Test fun aSwapWithoutAnAllowedExchangeSpendsTheDay() {
-        // Without an allowed exchange program it is not an exchange, the same condition that keeps
-        // a disguised transfer from getting here: the exemption cannot be gamed.
+        // No allowed exchange program, no exemption: the same check that stops a disguised transfer.
         assertFalse(staysInPocket(swap(0.01, usdc, "USDC", 1.0, AgentPolicy.SYSTEM, AgentPolicy.TOKEN), policy))
     }
 
     @Test fun sellingBackIntoSolDoesNotSpendTheDay() {
-        // The sale: a coin leaves, SOL comes back. Same pocket, nothing lost.
+        // A coin out, SOL back: nothing leaves the budget.
         val sale = Receipt(
             primaryRecipient = "PoolAuthorityXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", recipientLabel = null, recipientTrust = TrustLevel.NEW,
             outflows = listOf(d(env, usdc, "USDC", 6, -1.0)),
@@ -302,11 +295,10 @@ class AgentPolicyTest {
         assertTrue(d is Decision.Refuse && d.code == "destination", d.toString())
     }
 
-    // ---- we choose the route ----------------------------------------------------
-    // Ultra does not always pass through the same program: sometimes a market maker fills the
-    // sale and there is no aggregator in the transaction, only token transfers to an address no
-    // destination list can ever hold. From an agent's bytes that is a transfer and is refused. From
-    // our own route it is a sale and gets signed: the same shot a stop loss has to fire.
+    // ---- our own route ----------------------------------------------------------
+    // Ultra sometimes fills a sale via a market maker: no aggregator, just token transfers to an
+    // address no destination list holds. From an agent that is a transfer and is refused; from
+    // our own route it is a sale and is signed, as a stop-loss needs.
 
     /** A sale filled by a market maker: no aggregator among the programs. */
     private val maker = "MakerXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
@@ -330,14 +322,13 @@ class AgentPolicyTest {
     }
 
     @Test fun ourRouteDoesNotExcuseATransferWearingASwapsClothes() {
-        // Dust coming back passes the shape and fails the measure: rule ten compares what leaves
-        // with what returns, and it is what protected the money before too.
+        // Dust back passes the shape check but fails rule ten, which compares what leaves with what returns.
         val d = decide(rfqSale(0.000001), ours = true)
         assertTrue(d is Decision.Refuse && d.code == "rate_quality", d.toString())
     }
 
     @Test fun ourRouteDoesNotExcuseTheRestOfTheCollar() {
-        // Il conto principale resta intoccabile, e i pericoli restano pericoli.
+        // The vault and the hard refusals still apply to our own route.
         val d = decide(rfqSale(0.01), g = lie, ours = true)
         assertTrue(d is Decision.Refuse && d.code == "intent_mismatch", d.toString())
     }
@@ -353,12 +344,9 @@ class AgentPolicyTest {
     }
 
     // ---- coming home ---------------------------------------------------------
-    //
-    // Selling a coin back into SOL is the one move the caps must never stand in
-    // front of. A cap bounds what the budget can lose; a sale loses nothing and
-    // can pay nobody. The agent that could buy a coin and then not be allowed to
-    // sell it is the worst shape a rule can take, and from a loop with nobody in
-    // front of the phone an "ask" is a ninety-second wait and a dead blockhash.
+    // Caps never block selling a coin back into SOL: a cap bounds what the budget can lose, and a
+    // sale loses nothing and pays nobody. With nobody at the phone, an "ask" is a ninety-second
+    // wait and an expired blockhash.
 
     /** A coin worth more than the per-move cap, sold back into SOL. */
     private fun comingHome(solBack: Double) = Receipt(
@@ -369,7 +357,7 @@ class AgentPolicyTest {
         stats = stats(AgentPolicy.COMPUTE_BUDGET, AgentPolicy.JUPITER_V6),
     )
 
-    /** BONK at nine hundredths of a SOL for the whole holding: over every cap here. */
+    /** The whole BONK holding priced at 0.09 SOL: over every cap here. */
     private val richBonk: (BalanceDelta) -> Long? = { dd ->
         when (dd.mint) {
             NATIVE_SOL_MINT, AgentPolicy.WSOL -> Math.abs(dd.rawAmount)
@@ -391,15 +379,12 @@ class AgentPolicyTest {
         assertEquals(Decision.Auto, home(comingHome(0.085), h = spent))
     }
 
-    /**
-     * Getting out of a thin coin pays the spread and the impact. Asking there is
-     * the same as refusing, and the alternative to a bad exit is holding the bag.
-     */
+    /** Exiting a thin coin pays spread and impact. Asking there would just mean holding the bag. */
     @Test fun aPoorRateOnTheWayOutIsNotAQuestion() {
         assertEquals(Decision.Auto, home(comingHome(0.05)))
     }
 
-    /** Half is the line, and below it this is not a sale, it is a donation. */
+    /** Under half the value back is refused. */
     @Test fun givingTheCoinAwayIsStillRefused() {
         val d = home(comingHome(0.02))
         assertTrue(d is Decision.Refuse && d.code == "rate_quality", d.toString())
@@ -411,7 +396,7 @@ class AgentPolicyTest {
     }
 
     @Test fun buyingIsStillMeasuredAgainstTheCap() {
-        // The same money, the other way round: SOL out for a coin, and the cap holds.
+        // The reverse, SOL out for a coin, is still capped.
         val buy = swap(0.09, bonk, "BONK", 50_000.0)
         val d = PolicyEngine.decide(policy, buy, ok, quiet, richBonk, now, "en")
         assertTrue(d is Decision.Ask && d.code == "per_tx", d.toString())
@@ -424,7 +409,7 @@ class AgentPolicyTest {
         assertTrue(dd is Decision.Ask && dd.code == "unknown_value", dd.toString())
     }
 
-    /** No exchange program in the transaction: it is a payment wearing a swap's coat. */
+    /** No exchange program in the transaction: a payment, not a sale. */
     @Test fun aTransferOutIsNeverComingHome() {
         val r = comingHome(0.085).copy(stats = stats(AgentPolicy.SYSTEM, AgentPolicy.TOKEN))
         val dd = home(r)
@@ -438,13 +423,13 @@ class AgentPolicyTest {
         assertTrue(dd is Decision.Ask && dd.code == "per_tx", dd.toString())
     }
 
-    /** "Always ask me" is a choice about every move, and this is a move. */
+    /** ASK_ALWAYS applies to sales too. */
     @Test fun askAlwaysStillAsksOnTheWayOut() {
         val dd = home(comingHome(0.085), p = policy.copy(mode = AgentMode.ASK_ALWAYS))
         assertTrue(dd is Decision.Ask && dd.code == "ask_always", dd.toString())
     }
 
-    /** The hard refusals do not care which way the money is going. */
+    /** Hard refusals apply both ways. */
     @Test fun aLieOnTheWayOutIsStillRefused() {
         val dd = PolicyEngine.decide(policy, comingHome(0.085), lie, quiet, richBonk, now, "en")
         assertTrue(dd is Decision.Refuse && dd.code == "intent_mismatch", dd.toString())
@@ -455,7 +440,7 @@ class AgentPolicyTest {
         assertTrue(dd is Decision.Refuse && dd.code == "rate", dd.toString())
     }
 
-    /** A refusal carries its key, and the key says it in the other language with the same words. */
+    /** A refusal carries its key, so it can be rendered in either language. */
     @Test fun aRefusalCanBeSaidAgainInAnotherLanguage() {
         val d = decide(transferTo(stranger, 0.001))
         assertTrue(d is Decision.Refuse && d.text != null, d.toString())
@@ -464,7 +449,7 @@ class AgentPolicyTest {
         assertEquals("Atta…XXXX non è fra i destinatari ammessi", Refusals.say(r.text!!, "it"))
     }
 
-    /** Rows written before the key only have the sentence. The one from 19 Sep, read back and said in English. */
+    /** Rows from before the key only have the Italian sentence: parse it back (real row from 19 Sep). */
     @Test fun anOldItalianRefusalIsReadBack() {
         val t = Refusals.read("FSbz…JhrT non è fra i destinatari ammessi (rotta: JUP6…TaV4)")
         assertEquals(Refusals.Text("destination_route", listOf("FSbz…JhrT", "JUP6…TaV4")), t)

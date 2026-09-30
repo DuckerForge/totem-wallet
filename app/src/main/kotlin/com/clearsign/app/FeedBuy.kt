@@ -36,11 +36,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The terminal, inside the row. The loop used to be: see a buy, press Buy, watch Scout be
- * destroyed, land in a sheet with an empty amount, type, wait, review, sign, come back to a
- * feed rebuilt from scratch. Now the row opens downward and it all happens in it: the
- * coin's price and shape, what that person put in, your amount, the receipt from the real
- * bytes, the hold. The speed comes from not going anywhere.
+ * The buy panel inside a feed row: the coin's price and chart, what that wallet put in, your
+ * amount and a short receipt from the real bytes, with the full receipt one tap away. No
+ * navigation, so the feed keeps its state.
  */
 @Composable
 internal fun FeedBuyPanel(
@@ -62,10 +60,8 @@ internal fun FeedBuyPanel(
     var balance by remember(owner) { mutableStateOf<Long?>(null) }
 
     var chartTry by remember(mint) { mutableIntStateOf(0) }
-    // It insists on its own instead of giving up at the first no. The chart source refuses in
-    // bursts and then returns; before the pacing, the panel retried on every recomposition and
-    // the chart "appeared after a while". Three tries eight seconds apart while the row says it
-    // is still looking, then it gives up, and a tap asks again.
+    // Retry on its own: the chart source refuses in bursts, then recovers. Three tries 8 s
+    // apart while the row says it is still looking, then give up; a tap asks again.
     var giveUp by remember(mint) { mutableStateOf(false) }
     LaunchedEffect(mint, chartTry) {
         withContext(Dispatchers.IO) {
@@ -91,7 +87,7 @@ internal fun FeedBuyPanel(
         Modifier.fillMaxWidth().clip(rs(Radius.row)).background(Halo.ground).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        // The coin, priced. The row above says who and what; this says how much.
+        // The coin's price; the row above says who and what.
         Row(verticalAlignment = Alignment.CenterVertically) {
             TokenLogo(mint, symbol, JupiterTokens.cached(mint)?.icon, 26.dp)
             Spacer(Modifier.width(9.dp))
@@ -110,24 +106,21 @@ internal fun FeedBuyPanel(
             }
         }
 
-        // Two days of hourly closes with this wallet's moves marked on them, the whole point of the
-        // panel: "somebody bought BONK" is a name; a ring where they went in, and the line since, is
-        // a thing you can have an opinion about. Nothing is drawn when the pool is too young, never a flat line.
+        // Two days of hourly closes with this wallet's moves marked on them. Nothing is drawn
+        // when the pool is too young, never a flat line.
         if (series.size > 2) {
             val from = series.first().at
             val to = series.last().at
             val span = (to - from).coerceAtLeast(1L).toFloat()
-            // Anything after the last candle sits at the right edge: the last
-            // candle opens at the top of the hour, so a purchase from ten minutes
-            // ago is newer than it and would otherwise vanish from the line.
+            // Moves after the last candle go to the right edge: the last candle opens on the
+            // hour, so a buy from ten minutes ago is newer than it.
             val marks = moves
                 .filter { it.at >= from }
                 .map { SparkMark(((it.at - from) / span).coerceIn(0f, 1f), it.sell) }
             Box(Modifier.fillMaxWidth().height(if (marks.isEmpty()) 58.dp else 72.dp)) {
                 Spark(series.map { it.close }, if ((px?.change24h ?: 0.0) >= 0) Halo.mint else Halo.red, marks = marks)
             }
-            // How far back this is. Without it the line has no width: the same shape means one thing
-            // over five hours and another over three months. Three marks: two look like a caption, four crowd.
+            // Three time labels give the line a scale; two look like a caption, four crowd.
             Row(Modifier.fillMaxWidth()) {
                 listOf(from, (from + to) / 2, to).forEachIndexed { i, t ->
                     Text(
@@ -138,9 +131,8 @@ internal fun FeedBuyPanel(
                     )
                 }
             }
-            // What the price has done since they went in. Read off the chart, so
-            // it is the coin's move over that stretch and not a claim about the
-            // money they made, which nobody can see from here.
+            // The coin's move since their buy, read off the chart. Not their profit, which
+            // is not visible from here.
             moves.firstOrNull { !it.sell && it.at >= from }?.let { entry ->
                 val i = (((entry.at - from) / span) * (series.size - 1)).toInt().coerceIn(0, series.lastIndex)
                 val then = series[i].close
@@ -156,16 +148,13 @@ internal fun FeedBuyPanel(
             }
         }
 
-        // No chart at all, said rather than left blank: a hole where the picture goes reads as a
-        // failed load, and people tap it again.
+        // Say there is no chart yet rather than leave a blank, which reads as a failed load.
         if (series.size <= 2 && !giveUp) {
             Text(stringResource(R.string.feed_chart_wait), style = HaloType.small, color = Halo.muted, lineHeight = 16.sp)
         }
         if (series.size <= 2 && giveUp) {
-            // Said as what it is, not as a fact about the coin. "Nobody runs a pool deep enough to chart
-            // it" sounded authoritative and was usually false: a coin the app said that about had
-            // twenty pools. The source refuses after a few quick requests and a refusal looks exactly
-            // like an absence, so we say the one thing we know and offer to look again.
+            // No claim about the coin: the source refuses after a few quick requests, and a refusal
+            // looks like a missing pool. Say we could not load it and offer to retry.
             Text(
                 stringResource(R.string.feed_no_chart),
                 style = HaloType.small, color = Halo.cyan, lineHeight = 16.sp,
@@ -174,9 +163,7 @@ internal fun FeedBuyPanel(
         }
 
         if (sell) {
-            // The fact, and nothing after it. A sentence about somebody walking away, printed under
-            // every sale, became wallpaper. What this panel says about a sale is in what it does not
-            // offer: no buy button under it.
+            // Just the fact; a sale gets no buy button.
             Text(
                 stringResource(R.string.feed_they_sold, fmtSol((solSpent * 1e9).toLong(), 3)),
                 style = HaloType.small, color = Halo.amber, lineHeight = 16.sp,
@@ -204,8 +191,8 @@ private fun BuyBody(
 ) {
     val ctx = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    // The reserve the swap sheet keeps for the temporary wSOL account plus the
-    // fee. Offering a slice that cannot be signed is worse than offering fewer.
+    // Reserve for the temporary wSOL account plus the fee, as in the swap sheet: never
+    // offer a slice that cannot be signed.
     val reserve = 3_000_000L
     val slices = listOf(50_000_000L, 100_000_000L, 250_000_000L)
     var chosen by remember(mint) { mutableStateOf<Long?>(null) }
@@ -229,9 +216,8 @@ private fun BuyBody(
         working = false
     }
 
-    // The price keeps moving while you look, and so does the blockhash in the transaction.
-    // Same fifteen seconds and same rule as the swap sheet: a fresher price on the same route
-    // is swapped in, a different route is not, because that would change what you are reading.
+    // Price and blockhash age while you look. Same 15 s rule as the swap sheet: a fresher
+    // price on the same route is swapped in, a different route is not.
     LaunchedEffect(built) {
         val b = built ?: return@LaunchedEffect
         val lamports = chosen ?: return@LaunchedEffect
@@ -268,9 +254,7 @@ private fun BuyBody(
     error?.let { Text(it, style = HaloType.small, color = Halo.red, lineHeight = 16.sp) }
 
     built?.let { b ->
-        // Three lines, not the whole signing sheet: the full receipt belongs on a screen that exists
-        // to be read before a signature, and in a feed row it buried the point under distributions
-        // and risk cards. What is out, what is in, what it costs, what the engine flagged.
+        // A short receipt: out, in, fee, and what the engine flagged. The full one gets its own screen.
         Column(
             Modifier.fillMaxWidth().clip(rs(12)).background(Halo.cardSoft).padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -293,9 +277,8 @@ private fun BuyBody(
                 }
             }
         }
-        // The cut, said before the signature and not after. Jupiter Ultra adds it
-        // to the route when a referral account exists, so it is already inside the
-        // numbers above; this line is so nobody has to work that out.
+        // The referral fee, stated before signing. Jupiter Ultra adds it when a referral
+        // account exists, so it is already in the numbers above.
         if (BuildConfig.JUP_REFERRAL.isNotBlank()) {
             Text(
                 stringResource(R.string.feed_fee_note, String.format(java.util.Locale.ROOT, "%.2f", JupiterUltra.REFERRAL_FEE_BPS / 100.0)),
@@ -305,9 +288,7 @@ private fun BuyBody(
         if (b.analyzed.receipt.blocksApproval) {
             Text(stringResource(R.string.feed_blocked), style = HaloType.small, color = Halo.red, lineHeight = 16.sp)
         } else {
-            // Nothing is signed from inside a row any more. The three lines above are the menu; what
-            // you sign has a screen of its own, every time. It used to be signed off a four-line
-            // summary, the one place in the product where the receipt was optional.
+            // Never sign from the row: the button opens the full receipt.
             PrimaryButton(stringResource(R.string.gift_see_receipt), danger = false, enabled = !working, icon = HIcon.RECEIPT) {
                 review = true
             }

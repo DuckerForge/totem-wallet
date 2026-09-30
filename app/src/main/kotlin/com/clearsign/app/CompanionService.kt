@@ -31,11 +31,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The floating companion: the wallet as a bubble over every other app. Closed, a sphere with
- * two alternating faces (the agent's coin, the budget); open, the panel with the chart, the two
- * numbers that count and the two buttons that decide. Learned on the phone: Hide next to Open
- * killed the service, now it sits under the gear; the position was not saved; the panel was
- * titled "APEX". Classic Views, not Compose: an overlay has no Activity to host a Composition.
+ * The floating companion: the wallet as a bubble over other apps. Collapsed, a sphere that
+ * alternates two faces (the agent's coin, the budget); open, a panel with the bar, two key
+ * numbers and two buttons. Hide sits under the gear, away from Open. Classic Views, not
+ * Compose: an overlay has no Activity to host a Composition.
  */
 class CompanionService : Service() {
 
@@ -71,7 +70,7 @@ class CompanionService : Service() {
     private var flip = false
     private var last: Shot = Shot()
 
-    /** Everything the two faces and the panel know right now. */
+    /** Current snapshot shown by both faces and the panel. */
     private data class Shot(
         val health: HealthWidgetData.Snapshot? = null,
         val trading: Boolean = false,
@@ -112,16 +111,14 @@ class CompanionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Every startForegroundService owes a startForeground, even to a bubble already up:
-        // On or auto start on a running bubble crashed the app a few seconds later.
+        // Every startForegroundService needs a startForeground, even with the bubble already up,
+        // or the app crashes a few seconds later.
         runCatching { startForeground(NOTIF_ID, notification()) }
         when (intent?.action) {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACTION_HIDE -> hide()
             ACTION_SHOW -> show()
-            // The theme, or the page's face, size, coin or rows, changed under it. The bubble
-            // paints its own bitmap and reads the palette once at start, so without this it
-            // kept the old colours until it died.
+            // Theme or bubble settings changed. The bubble reads the palette only at start, so reload it.
             ACTION_REPAINT -> { Themes.load(this); reread() }
             // The notification setting changed: the startForeground above already reposted it.
             ACTION_NOTIF -> Unit
@@ -137,12 +134,11 @@ class CompanionService : Service() {
         root = null
     }
 
-    // ---- nascosta, ma viva -------------------------------------------------
+    // ---- hidden, still running ---------------------------------------------
 
     /**
-     * Off the screen, not out of memory. Hiding did `stopSelf()`, and the bubble came back
-     * only by finding the switch in the app. What hides with a finger must return with a
-     * finger, and that finger is already on the service notification Android makes us keep.
+     * Removes the overlay but keeps the service, so the bubble can come back from the service
+     * notification (which Android makes us keep anyway) instead of from the app.
      */
     private fun hide() {
         if (hidden) return
@@ -163,9 +159,8 @@ class CompanionService : Service() {
     }
 
     /**
-     * The page's choices, taken in place: size, face, coin, rows. Stopping and starting the
-     * service for each chip made the bubble blink out on screen. Hidden, there is nothing to
-     * redraw; [show] builds it from the same prefs.
+     * Apply the settings page's choices (size, face, coin, rows) in place: restarting the service
+     * per chip made the bubble blink. When hidden, [show] builds from the same prefs.
      */
     private fun reread() {
         val r = root ?: return
@@ -220,7 +215,7 @@ class CompanionService : Service() {
             layoutParams = FrameLayout.LayoutParams(dp(PANEL_DP), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // ---- il pannello ---------------------------------------------------
+        // ---- panel ---------------------------------------------------------
         val main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -280,7 +275,7 @@ class CompanionService : Service() {
         main.addView(head); main.addView(targets); main.addView(bar)
         main.addView(money); main.addView(agent); main.addView(health); main.addView(actions)
 
-        // ---- la rotellina --------------------------------------------------
+        // ---- gear menu -----------------------------------------------------
         val settings = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         val shead = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val stitle = TextView(this).apply {
@@ -298,7 +293,7 @@ class CompanionService : Service() {
         card.addView(main); card.addView(settings)
         container.addView(card)
 
-        // Dove l'hai lasciata, o il primo posto ragionevole.
+        // Where it was left, or a sensible default.
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -320,30 +315,26 @@ class CompanionService : Service() {
         putLine = put; nowLine = now; nowPct = nowP; agentLine = agent; healthLine = health; moneyBox = money
         sellButton = sell; stopButton = stop
 
-        // Alive on its own: every minute the numbers redraw. The beat stays a minute because
-        // what really moves is the value of what we hold, asked of Jupiter, not the chain. The
-        // balance is no longer asked every beat, see [chainEvery]: a bubble asked it 1,440 times
-        // a day, more than a working agent, for a number that changes only on a buy or a sale.
+        // Redraw every minute: what moves is the value of held coins, priced by Jupiter. The
+        // balance is read only every [chainEvery]; every beat was 1,440 reads a day per bubble.
         ticker?.cancel()
         ticker = scope.launch { while (true) { kotlinx.coroutines.delay(60_000); refresh() } }
         startSpinner()
     }
 
     /**
-     * How often the chain is bothered for the balance; the beat is one minute. It was five
-     * minutes, 288 reads a day per bubble, three million a day at ten thousand bubbles on keys
-     * that give eight a month in all. The number changes only on a buy or a sale, and whoever
-     * moves it redraws the screen anyway: half an hour loses nothing.
+     * Balance read interval. Five minutes was 288 reads a day per bubble, three million a day at
+     * ten thousand bubbles, far past the keys' monthly quota. The balance changes only on a buy
+     * or sale, which redraws the screen anyway.
      */
     private val chainEvery = 30 * 60_000L
     private var freeAt = 0L
     private var freeCached: Long? = null
 
     /**
-     * The budget's free SOL, asked of the chain at most every [chainEvery]. Between reads the
-     * last known number is redrawn, and it is still true: a budget's balance moves only when
-     * the agent buys or sells, and whoever moved it updates the screen. A failed read keeps the
-     * previous one, for the reason in HealthWidgetData.refresh: a silent node is not an empty wallet.
+     * The budget's free SOL, read at most every [chainEvery]; in between the cached value holds,
+     * since only the agent's trades move it. A failed read keeps the previous value: a silent
+     * node is not an empty wallet (see HealthWidgetData.refresh).
      */
     private suspend fun freeLamports(pubkey: String): Long? {
         val now = System.currentTimeMillis()
@@ -354,9 +345,8 @@ class CompanionService : Service() {
     }
 
     /**
-     * The two faces in turn, asking the network nothing. Turns every four seconds but does
-     * not reload: it redraws the same snapshot with the other face; the sixty-second tick
-     * brings the data. A bubble polling every four seconds would drain the phone to show the same number.
+     * Alternate the two faces every four seconds from the same snapshot, no network.
+     * The sixty-second tick brings new data.
      */
     private fun startSpinner() {
         spinner?.cancel()
@@ -370,7 +360,7 @@ class CompanionService : Service() {
         }
     }
 
-    // ---- i pezzi di interfaccia -------------------------------------------
+    // ---- view helpers -----------------------------------------------------
 
     private fun small(label: String, tint: Int, width: Int) = TextView(this).apply {
         text = label; setTextColor(tint); textSize = 11.5f
@@ -415,9 +405,8 @@ class CompanionService : Service() {
     private enum class Glyph { GEAR, CLOSE, BACK }
 
     /**
-     * The three glyphs, drawn by hand. The rest of the app uses its own icon set, never emoji
-     * or system icons; outside Compose that set cannot be called, so the same two Canvas lines
-     * draw them, rather than a typographic character that changes face on every phone.
+     * Hand-drawn glyphs: the app's icon set can't be called outside Compose, and a text
+     * character renders differently on every phone.
      */
     private fun glyph(kind: Glyph, tint: Int, onClick: () -> Unit) = ImageView(this).apply {
         val px = dp(22f)
@@ -500,9 +489,8 @@ class CompanionService : Service() {
         mainBox?.visibility = View.VISIBLE
         bubble?.visibility = View.GONE
         panel?.visibility = View.VISIBLE
-        // The panel is ten times the bubble's width: docked right or low, open it would
-        // leave the screen. The anchor shifts just enough to stay inside, and returns
-        // when it closes.
+        // The panel is far wider than the bubble: shift the anchor to keep it on screen.
+        // [collapse] puts it back.
         params?.let { lp ->
             val m = resources.displayMetrics
             val w = dp(PANEL_DP)
@@ -545,12 +533,12 @@ class CompanionService : Service() {
         collapse()
     }
 
-    // ---- i due tasti che decidono -----------------------------------------
+    // ---- the two buttons --------------------------------------------------
 
     /**
-     * Selling from here is selling from inside the app: the same door as the notification and
-     * the in-app row, `SessionActions.sellSaid`, the collar. Below the silent threshold it
-     * signs alone, above it opens the receipt and asks for the print. The bubble decides nothing.
+     * Same path as the notification and the in-app row: `SessionActions.sellSaid`, then the
+     * collar. Below the silent threshold it signs alone; above, it opens the receipt and asks
+     * for the fingerprint.
      */
     private fun sellNow() {
         val pos = last.pos ?: return
@@ -563,11 +551,7 @@ class CompanionService : Service() {
         }
     }
 
-    /**
-     * The one button: stop when it runs, start when it does not. It used to stop in both
-     * cases, writing "stopped from the notification" as the last word of a loop never started.
-     * When starting is impossible the reason is the loop's own, said here.
-     */
+    /** Stop when running, start when not. If the loop can't start, show its reason here. */
     private fun toggleAgent() {
         val ctx = this
         if (TraderLoop.config(ctx).on) {
@@ -594,9 +578,8 @@ class CompanionService : Service() {
     private fun refresh() {
         if (root == null) return
         render()
-        // A newer read supersedes one still in flight: two chips in a row started two reads,
-        // and the slower one landed last with the numbers of the face just left. Not cancelled,
-        // only ignored: cancelling it mid widget refresh erased the widget's total.
+        // A newer read supersedes one in flight, or the slower one lands last with stale numbers.
+        // Ignored, not cancelled: cancelling mid widget refresh erased the widget's total.
         val seq = ++readSeq
         scope.launch {
             val ctx = this@CompanionService
@@ -649,8 +632,7 @@ class CompanionService : Service() {
     private fun paintFace() {
         val chosen = CompanionPrefs.face(this)
         val face = if (chosen != CompanionPrefs.Face.ROTATE) chosen else {
-            // The coin and the budget in turn. With nothing open the coin has nothing to
-            // say, and the agent's dot takes its place.
+            // Coin and budget in turn; with no open position, budget only.
             if (flip || last.pos == null) CompanionPrefs.Face.BUDGET else CompanionPrefs.Face.COIN
         }
         val sym = last.pos?.symbol ?: last.coinSymbol
@@ -671,15 +653,12 @@ class CompanionService : Service() {
         val ctx = this
         val p = Halo.palette
         paintFace()
-        // With numbers on, the notification line follows the bubble: same numbers, no second
-        // truth. Off, its one quiet line never changes, so it is not posted again every minute.
+        // With numbers on, the notification mirrors the bubble. Off, its fixed line isn't reposted.
         if (CompanionPrefs.notif(ctx)) repost()
 
         val pos = last.pos
         val move = last.posPct
-        // The title is the coin, or what the loop is doing, or the app's name:
-        // "agent off" as a title and again as a line under it was one sentence
-        // said twice.
+        // Title: the coin, else the loop state, else the app name, so "agent off" isn't shown twice.
         symbolLine?.text = pos?.symbol ?: getString(if (last.trading) R.string.trader_idle else R.string.app_name)
         pctLine?.text = move?.let { String.format(java.util.Locale.ROOT, "%+.1f%%", it) } ?: ""
         pctLine?.setTextColor((if ((move ?: 0.0) >= 0) p.accent else p.red).toArgb())
@@ -740,11 +719,9 @@ class CompanionService : Service() {
     // ---- foreground notification ------------------------------------------
 
     /**
-     * The notification a foreground service must have, as small as Android allows: lowest
-     * importance (no sound, no status-bar icon, a collapsed line at the bottom of the shade),
-     * secret on the lock screen, deferred until the bubble has been up a while. Its one line
-     * carries the bubble's numbers only if [CompanionPrefs.notif] says so, otherwise it just
-     * says the bubble is on. Swipeable on Android 14+.
+     * The required foreground notification, kept minimal: lowest importance, secret on the lock
+     * screen, deferred until the bubble has been up a while. Shows the bubble's numbers only if
+     * [CompanionPrefs.notif], else just that it is on. Swipeable on Android 14+.
      */
     private fun notification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
@@ -776,7 +753,7 @@ class CompanionService : Service() {
             .setShowWhen(false)
             .setVisibility(Notification.VISIBILITY_SECRET)
         if (android.os.Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
-        // Hidden, you come back from here, where the finger already is.
+        // When hidden, Show lives here.
         if (hidden) {
             b.addAction(Notification.Action.Builder(null, getString(R.string.comp_show), pi(ACTION_SHOW, 2)).build())
         } else {
@@ -806,9 +783,8 @@ class CompanionService : Service() {
         const val ACTION_NOTIF = "com.clearsign.app.COMPANION_NOTIF"
 
         /**
-         * True while the bubble is on screen. Asked before sending it anything: starting the
-         * service to tell it about a theme would put a bubble over the phone of someone who
-         * never asked for one.
+         * True while the bubble is on screen. Checked before messaging it, so a theme change
+         * never starts a bubble nobody asked for.
          */
         @Volatile
         private var alive = false
@@ -826,9 +802,8 @@ class CompanionService : Service() {
         }
 
         /**
-         * Start a running bubble again, so it comes back built in the language just chosen: its
-         * words are read once, at creation. The pause matters: a start that lands before the stop
-         * has finished is swallowed with it.
+         * Restart a running bubble so it picks up a new language (strings are read at creation).
+         * The delay matters: a start that lands before the stop finishes is swallowed.
          */
         fun relaunch(ctx: Context) {
             if (!alive) return

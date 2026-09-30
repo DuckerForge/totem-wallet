@@ -1,11 +1,10 @@
 package com.clearsign.core
 
 /*
- * Paying by holding two phones together. What travels over NFC is a request, never a key or
- * a signature: the merchant's phone pretends to be an NFC tag holding a Solana Pay URI, the
- * payer's phone reads it and opens its ordinary receipt. Touching does not pay, it fills the
- * form; simulation, risk engine and fingerprint are unchanged. Pure bytes, tested without
- * hardware: a reader's conversation with a tag is a fixed sequence of APDUs.
+ * Paying by touching phones. Only a request travels over NFC, never a key or signature: the
+ * merchant's phone emulates a tag holding a Solana Pay URI, the payer's phone reads it and opens
+ * its normal receipt. Touch only fills the form; simulation, risk engine and fingerprint still
+ * apply. Pure bytes, testable without hardware: a reader talks to a tag in a fixed APDU sequence.
  */
 
 /** NDEF: the tiny message format an NFC tag carries. */
@@ -58,9 +57,8 @@ object Ndef {
             repeat(4) { v = (v shl 8) or (message[i++].toInt() and 0xFF) }
             v
         }
-        // The IL flag means the record carries an id: one length byte here, the id bytes after the
-        // type. Skipping only the length byte left the id where the payload was expected, and a tag
-        // written with an id handed back an address with stray characters in front.
+        // IL flag: the record has an id, one length byte here and the id bytes after the type.
+        // Skipping only the length byte returned an address with stray characters in front.
         val idLen = if ((header and 0x08) != 0) {
             if (message.size < i + 1) return null
             message[i++].toInt() and 0xFF
@@ -76,9 +74,9 @@ object Ndef {
 }
 
 /**
- * The NFC Forum Type 4 tag a reader expects, emulated in software. A reader always does the
- * same four things: pick the NDEF application, read the capability container for the sizes,
- * pick the NDEF file, read it in chunks of its own choosing. Anything else gets a refusal, never an invented answer.
+ * NFC Forum Type 4 tag, emulated. A reader always selects the NDEF app, reads the capability
+ * container for the sizes, selects the NDEF file and reads it in chunks of its choosing.
+ * Anything else gets an error status.
  */
 class Type4Tag(message: ByteArray) {
 

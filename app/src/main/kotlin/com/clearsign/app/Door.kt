@@ -1,10 +1,9 @@
 package com.clearsign.app
 
 /**
- * The door asks for the print every time you come back into the app. But the camera for a
- * scan, or the share sheet, is another activity over ours: ours stops, the door fired anyway,
- * and on return it asked for the finger for something never left. Whoever launches one of
- * those calls [hold] just before; the stop that follows is let through, once.
+ * The lock asks for the fingerprint on every return to the app. The scan camera and the share
+ * sheet also stop our activity, which would trigger it for nothing. Call [hold] right before
+ * launching one: the next stop is let through, once.
  */
 internal object Door {
     @Volatile private var heldAt = 0L

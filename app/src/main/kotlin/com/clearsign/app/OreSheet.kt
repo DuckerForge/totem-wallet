@@ -54,11 +54,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * ORE, from the wallet: what you can do on top, the grid under it, the numbers at the bottom, so
- * buttons and receipt show without scrolling. The countdown redraws every second from a slot
- * read once and rereads when the round is over. Claim and Dig go through preview, receipt and
- * print like everything this wallet sends. A round lasts about fifty seconds and the print takes
- * a few: the Deploy is rebuilt on the current round when held, and only if [SIGN_MARGIN_S] seconds remain (22 Sep: signed at round end, the node refuses).
+ * ORE from the wallet: actions on top, the grid below, numbers at the bottom, so buttons and
+ * receipt show without scrolling. The countdown ticks every second off one slot read. Claim and
+ * Dig go through preview, receipt and fingerprint. A round lasts about 50 s, so the Deploy is rebuilt
+ * on the current round at signing, only with [SIGN_MARGIN_S] left: the node refuses it at round end.
  */
 private sealed interface OreState {
     object Idle : OreState
@@ -87,7 +86,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Uni
     var digging by remember { mutableStateOf(false) }
     var perSquare by remember { mutableStateOf("0.001") }
     var picked by remember { mutableStateOf(setOf<Int>()) }
-    /** "Wait for the next round", which disappears on its own when the round restarts: not an error, a moment. */
+    /** "Wait for the next round": clears itself when the round restarts. Not an error. */
     var waiting by remember { mutableStateOf(false) }
     /**
      * The rolling die: when a new closed round arrives the grid lights square by square and stops
@@ -98,7 +97,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Uni
     LaunchedEffect(view?.lastRound?.id) {
         val last = view?.lastRound ?: return@LaunchedEffect
         val win = last.winningSquare ?: return@LaunchedEffect
-        // The first read is not an event: shown, no more. From the second round on you see it roll.
+        // No roll on the first read, only from the next closed round.
         if (revealed < 0) { revealed = last.id; return@LaunchedEffect }
         if (last.id == revealed) return@LaunchedEffect
         revealed = last.id
@@ -162,9 +161,8 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Uni
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = Halo.ground2, contentColor = Halo.ink, dragHandle = null,
     ) {
-        // The sheet takes the whole screen as a separate window that eats the system
-        // insets: `statusBarsPadding` is zero here. The status bar is measured from
-        // resources, which do not lie.
+        // The sheet is a separate window that eats the system insets, so `statusBarsPadding`
+        // is zero here. Read the status bar height from resources instead.
         val density = androidx.compose.ui.platform.LocalDensity.current
         val statusBar = remember(density) {
             with(density) {
@@ -220,7 +218,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Uni
                 loading && v == null -> Working(stringResource(R.string.ore_loading))
                 v == null -> Banner(stringResource(R.string.ore_unreachable), Halo.amber, HIcon.WARNING)
                 else -> {
-                    // The end-of-round crowd, the average of the last archived rounds: the share is counted on that.
+                    // Average end-of-round deposits over the archived rounds; shares are computed on it.
                     val crowd = if (past.size >= 5) OreCrowd.averageDeployed(past) else null
                     // ---- what you can do, above the grid -----------------------------------
                     when (val s = state) {
@@ -267,13 +265,12 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Uni
                                         fontFamily = Inter, fontSize = 12.sp, color = Halo.ink,
                                     )
                                 }
-                                // The emptiest squares now: the ORE share is my part of the square, and
-                                // the cost is the same everywhere.
+                                // Suggest the emptiest squares: the cost is the same everywhere, the ORE share bigger.
                                 v.round?.let { r ->
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text(stringResource(R.string.ore_best_label), style = HaloType.small, color = Halo.muted)
                                         listOf(1, 3, 5).forEach { k ->
-                                            // A square you are already on the program skips: not offered again.
+                                            // Leave out squares already deployed on: the program skips them.
                                             SmallChip(k.toString(), null, tint = Halo.cyan) {
                                                 val mine = v.mySquares.toSet()
                                                 picked = OreOdds.best(Ore.SQUARES, r.deployed, r.count).filter { it !in mine }.take(k).toSet(); Haptics.tick(ctx)
@@ -419,7 +416,7 @@ internal fun OreSheet(owner: String, signer: SeedVaultSigner, onSpare: () -> Uni
                         Text(stringResource(R.string.ore_history_best, OreCrowd.best(3, past).joinToString(", ") { (it + 1).toString() }), style = HaloType.label, color = Halo.cyan)
                     }
 
-                    // ---- i numeri ----------------------------------------------------------------
+                    // ---- the numbers -------------------------------------------------------------
                     GlassCard {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(Modifier.fillMaxWidth()) {

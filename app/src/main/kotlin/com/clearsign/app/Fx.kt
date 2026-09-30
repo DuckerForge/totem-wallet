@@ -11,11 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Dollars in the viewer's currency. The market is read in dollars because CoinGecko, Jupiter
- * and GeckoTerminal all answer in USD; the portfolio already counted in the currency chosen
- * in Settings and the Market did not, two units on one screen. The rate is the ECB's for a
- * currency and SOL's own price when counting in SOL, kept half an hour.
- * Until it arrives amounts are written in dollars with the dollar sign: the number stays true, only the unit changes later.
+ * USD amounts in the Settings currency, since CoinGecko, Jupiter and GeckoTerminal all answer
+ * in USD. ECB rate for fiat, SOL's price when counting in SOL, cached half an hour. Until the
+ * rate arrives, amounts show in dollars with the dollar sign.
  */
 @Immutable
 internal data class Fx(val cur: String, val rate: Double) {
@@ -25,7 +23,7 @@ internal data class Fx(val cur: String, val rate: Double) {
     /** A total: what you hold is worth. */
     fun fiat(usd: Double): String = fmtFiat(usd * rate, cur)
 
-    /** Cifre grandi accorciate: liquidita', volume, capitalizzazione. */
+    /** Large figures, shortened: liquidity, volume, market cap. */
     fun cap(usd: Double): String = fmtCap(usd * rate, cur)
 
     /** The bare number for the chart scale, no symbol. */
@@ -42,7 +40,7 @@ internal data class Fx(val cur: String, val rate: Double) {
             if (cur == "USD") usd
             else cache[cur]?.takeIf { System.currentTimeMillis() - it.first < TTL_MS }?.let { Fx(cur, it.second) }
 
-        /** Bloccante: chiamare su IO. Se nessuno risponde restano i dollari. */
+        /** Blocking: call on IO. Falls back to USD if nobody answers. */
         fun fetch(cur: String): Fx {
             cached(cur)?.let { return it }
             val r = when (cur) {

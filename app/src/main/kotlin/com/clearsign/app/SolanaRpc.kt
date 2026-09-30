@@ -12,11 +12,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 /**
- * Minimal Solana JSON-RPC client: simulate (the node runs v0, lookup tables and
- * the token programs, which the on-device decoder cannot) and send. All calls
- * block; never on the main thread. Every read uses `commitment: processed`, the
- * simulation's level, but two nodes are not on one slot: what lines them up is
- * the slot in `result.context`, checked in [simulateEffects].
+ * Minimal Solana JSON-RPC client: simulate (the node handles v0, lookup tables and the
+ * token programs, which the on-device decoder cannot) and send. All calls block; never on
+ * the main thread. Reads use `commitment: processed` like the simulation, but nodes can
+ * sit on different slots, so [simulateEffects] checks the slot in `result.context`.
  */
 object SolanaRpc {
 
@@ -27,8 +26,7 @@ object SolanaRpc {
      *  (never committed); when blank, the public nodes are used. */
     @Volatile var customRpc: String? = BuildConfig.HELIUS_RPC_URL.takeIf { it.isNotBlank() }
 
-    // Who actually answers is the pool's call, in [Rpc]: this is only the name
-    // readers use to ask for "mainnet".
+    // The pool in [Rpc] picks the actual node; this is just the name for "mainnet".
     private const val MAINNET_PRIMARY = "https://api.mainnet-beta.solana.com"
 
     private const val COMMITMENT = "processed"
@@ -40,9 +38,8 @@ object SolanaRpc {
     private fun <T> async(block: () -> T): Future<T> = pool.submit(Callable(block))
 
     /**
-     * Wait for a read, never forever. The HTTP timeouts are bounded, so a get still
-     * pending after a minute never started; waiting with no deadline turned a stuck
-     * pool into a stuck app.
+     * Wait for a read with a deadline. HTTP timeouts are bounded, so a get still pending
+     * after a minute never started; without a deadline a stuck pool froze the app.
      */
     private fun <T> Future<T>.await(): T? =
         runCatching { get(60, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull()
@@ -178,9 +175,8 @@ object SolanaRpc {
 
     /**
      * The owner's token accounts (both programs), cached a minute unless [force].
-     * Lenient: a failed call reads as an empty list, right for a screen. But a half
-     * answer is never cached: when the second program did not answer, the truncated
-     * list sat there sixty seconds and `WalletHealth` scored it as if whole.
+     * Lenient: a failed call reads as an empty list, fine for a screen. A partial answer
+     * (one program missing) is never cached, or `WalletHealth` would score it as whole.
      */
     fun tokenAccountsOf(rpcUrl: String, owner: String, force: Boolean = false): List<TokenAccountInfo> {
         val key = "$rpcUrl|$owner"
@@ -197,10 +193,10 @@ object SolanaRpc {
     // ---- effects -------------------------------------------------------------
 
     /**
-     * The real balance effects on [owner] and on every wallet in [destinations]: simulate on the
-     * cluster, diff SOL and token balances, which shows a payment split across hidden fee accounts.
-     * Only the owner's token accounts among [txKeys] are tracked, so the one being drained never
-     * falls outside the window. The diff is taken only between two states on the same slot (`result.context.slot`): retry once, else a state boxed in by two identical reads ([alignedPre]), else `Unavailable`.
+     * Real balance effects on [owner] and on every wallet in [destinations]: simulate, then diff
+     * SOL and token balances, which exposes a payment split across hidden fee accounts. Tracks the
+     * owner's token accounts among [txKeys], so the drained one is never cut off by the cap. Pre and
+     * post must be on the same slot: retry once, else [alignedPre], else `Unavailable`.
      */
     fun simulateEffects(
         rpcUrl: String,
@@ -210,8 +206,8 @@ object SolanaRpc {
         txKeys: Set<String>? = null,
         /**
          * Mints the caller expects to receive. A first buy creates the token account in the
-         * same transaction and Jupiter hides it in a lookup table, so it is in neither list;
-         * from the mint we derive the address and watch it.
+         * same transaction and Jupiter puts it in a lookup table, so it is in neither list;
+         * we derive the address from the mint and watch it.
          */
         expectMints: List<String> = emptyList(),
     ): SimOutcome {
@@ -221,9 +217,8 @@ object SolanaRpc {
             else -> allTokens.take(25)
         }
         val tokenPubkeys = tokenAccts.map { it.pubkey }.toSet()
-        // Accounts this transaction creates that we do not own yet. Without them the
-        // simulation showed SOL leaving and nothing arriving, and the intent check
-        // rightly called that a lie.
+        // Accounts this transaction creates for us. Without them the simulation shows SOL
+        // leaving and nothing arriving, and the intent check flags it.
         val fresh = expectedAtas(owner, expectMints).filter { it !in tokenPubkeys }
         // Candidate destination wallets (excl. the owner and its own token accounts).
         val dests = destinations.asSequence().filter { it != owner && it !in tokenPubkeys }.distinct().take(24).toList()
@@ -255,7 +250,7 @@ object SolanaRpc {
         var pre = preF.await()
         if (sim == null) { Log.i(TAG, "simulate Unavailable"); return SimOutcome.Unavailable }
         if (pre == null) { Log.i(TAG, "pre-state missing → Unavailable"); return SimOutcome.Unavailable }
-        // A refusal is an answer whatever the slot: the node ran it and it failed.
+        // A failed simulation is final whatever the slot.
         failureOf(sim)?.let { return it }
 
         if (pre.slot != sim.slot) {
@@ -280,7 +275,7 @@ object SolanaRpc {
         if (sim.value.isNull("err")) null
         else SimOutcome.Failed(sim.value.get("err").toString()).also { Log.i(TAG, "simulate Failed: ${it.err}") }
 
-    /** I conti che la simulazione riporta, nell'ordine in cui li riporta. */
+    /** The accounts the simulation reports, in its order. */
     internal data class Tracked(val owner: String, val tokens: List<TokenAccountInfo>, val dests: List<String>, val fresh: List<String>) {
         fun order(): List<String> = listOf(owner) + tokens.map { it.pubkey } + dests + fresh
     }
@@ -292,11 +287,10 @@ object SolanaRpc {
     internal data class Sim(val slot: Long?, val value: JSONObject)
 
     /**
-     * Which starting read can be subtracted from a simulation at [simSlot], given
-     * [first] and [second] taken before and after. Clean answer: the second, if it sits
-     * exactly on the simulation's slot. Else the first, if the two reads box the
-     * simulation in and every account in [keys] is identical in both: a state that did
-     * not move on either side was that state in the middle. Otherwise null, `Unavailable`.
+     * Which pre-state can be subtracted from a simulation at [simSlot], given reads [first]
+     * and [second] taken before and after it. The second if it is exactly on [simSlot]. Else
+     * the first, if the reads bracket the simulation and every account in [keys] is identical
+     * in both, so nothing moved in between. Otherwise null (`Unavailable`).
      */
     internal fun alignedPre(first: PreState, second: PreState, simSlot: Long?, keys: List<String>): PreState? {
         if (simSlot == null) return null
@@ -309,10 +303,9 @@ object SolanaRpc {
     }
 
     /**
-     * The part without network: from a starting state and a simulation, the diffs.
-     * Lives alone so a JSON file can test it, and with it the drain gate downstream.
-     * Two things make it answer `Unavailable` before subtracting: slots that differ,
-     * and an owner missing from the read. Both used to be silences that became `Ok`.
+     * The network-free part: pre-state and simulation in, diffs out. Separate so JSON
+     * fixtures can test it and the drain gate downstream. Returns `Unavailable` before
+     * subtracting when the slots differ or an account is missing from the read.
      */
     internal fun effectsOf(
         pre: PreState,
@@ -326,23 +319,19 @@ object SolanaRpc {
         val value = sim.value
         if (!value.isNull("err")) return SimOutcome.Failed(value.get("err").toString())
         if (pre.slot == null || sim.slot == null || pre.slot != sim.slot) { Log.i(TAG, "slot mismatch pre=${pre.slot} sim=${sim.slot} → Unavailable"); return SimOutcome.Unavailable }
-        // Without the starting state there is nothing to subtract from. A failed read once
-        // became an empty map and everything went quiet: no SOL pre-balance, no owner
-        // diff, and the drain gate in `RiskEngine.assessEffects` skips coins with no
-        // starting balance, so DRAINS_BALANCE never fired and this returned `Ok`.
-        // `Unavailable` means "retry", distinct from `Failed`, "the node ran it and it broke".
+        // No pre-state, nothing to subtract. An empty map would skip the drain gate in
+        // `RiskEngine.assessEffects` (no starting balance) and return `Ok`.
+        // `Unavailable` means retry; `Failed` means the node ran it and it failed.
         val accts = pre.accounts
         if (owner !in accts) { Log.i(TAG, "pre-state missing → Unavailable"); return SimOutcome.Unavailable }
-        // The same for every account the simulation reports: a diff against a number
-        // that was never read is invented.
+        // Same for every account the simulation reports: no pre-read, no diff.
         if (tracked.order().any { it !in accts }) { Log.i(TAG, "pre-state incomplete → Unavailable"); return SimOutcome.Unavailable }
 
         val computeUnits = if (value.isNull("unitsConsumed")) null else value.optLong("unitsConsumed")
         val logCount = value.optJSONArray("logs")?.length() ?: 0
-        // Owner's pre-balances by mint: what "you send 95% of your SOL" is measured against.
-        // Only from this read. Accounts not read used to fall back on the cached list, up
-        // to a minute old, and that number fed the drain gate's denominator. An untracked
-        // coin has no diff, so the gate has nothing to ask it.
+        // Owner's pre-balances by mint, the denominator for "you send 95% of your SOL".
+        // Only from this read, never the cached list (up to a minute stale). An untracked
+        // coin has no diff, so the gate does not need it.
         val preBalances = HashMap<String, Long>()
         accts[owner]?.lamports?.let { preBalances[com.clearsign.core.NATIVE_SOL_MINT] = it }
         allTokens.forEach { ta -> accts[ta.pubkey]?.let { preBalances[ta.mint] = (preBalances[ta.mint] ?: 0L) + (it.tokenAmount ?: 0L) } }
@@ -376,9 +365,8 @@ object SolanaRpc {
             // rent to *create* it (ATA/PDA), not a payment to someone's wallet.
             if (d != 0L) deltas.add(com.clearsign.core.BalanceDelta(addr, com.clearsign.core.NATIVE_SOL_MINT, "SOL", 9, d, createdAccount = preLam == 0L))
         }
-        // Token accounts born inside this transaction count only if the simulated account
-        // says in its own bytes that we own it: mint at offset 0, owner at 32. The account
-        // claims us, we do not assume.
+        // Token accounts created by this transaction count only if their simulated bytes
+        // name us as owner: mint at offset 0, owner at 32.
         tracked.fresh.forEachIndexed { i, addr ->
             val acc = accounts.optJSONObject(freshBase + i) ?: return@forEachIndexed
             val before = accts[addr]?.tokenAmount ?: 0L
@@ -438,9 +426,8 @@ object SolanaRpc {
 
     /**
      * One getMultipleAccounts (base64) for many accounts; missing ones read as 0.
-     * All or nothing: a half read was a half map, and a half map is the number one
-     * hole. The node caps at 100 keys and we never ask more than 65, so it is one
-     * call and one slot.
+     * All or nothing, since a partial map means wrong pre-balances. The node caps at
+     * 100 keys and we never ask for more than 65, so it is one call on one slot.
      */
     private fun getAccountsMulti(rpcUrl: String, pubkeys: List<String>): PreState? {
         if (pubkeys.isEmpty()) return PreState(null, emptyMap())
@@ -630,17 +617,16 @@ object SolanaRpc {
     }
 
     /**
-     * What a wallet holds, or null when the chain could not be asked. The lenient reader turns a
-     * failed call into an empty list, right for a screen and wrong for anything that acts: the loop
-     * once read a rate-limited node as "holds nothing" and dropped every open position, no stop
-     * watching. Both programs must answer. Also reads strangers' wallets on the scanner's key, never the agent's. Blocking, two calls: IO only.
+     * What a wallet holds, or null when the chain could not be asked. Strict, unlike the
+     * lenient reader: a failed call read as empty makes the loop drop its open positions.
+     * Both programs must answer. Also reads other wallets on the scanner's key, never the
+     * agent's. Blocking, two calls: IO only.
      */
     fun tokensOf(rpcUrl: String, owner: String, force: Boolean = false): List<TokenAccountInfo>? {
         val key = "$rpcUrl|$owner"
         val now = System.currentTimeMillis()
-        // This cache was written and never read, so every call was two fresh reads even
-        // a moment after the same answer: a tick reconciles the book and a sale rereads
-        // the same wallet right after. Whoever needs the exact number asks with [force].
+        // A tick and a sale read the same wallet moments apart; the cache saves the
+        // second pair of calls. Pass [force] for the exact number.
         if (!force) tokenListCache[key]?.let { if (now - it.at < TOKEN_LIST_TTL_MS) return it.value }
         val parts = readTokenAccounts(rpcUrl, owner)
         if (parts.any { it == null }) return null
@@ -652,10 +638,9 @@ object SolanaRpc {
 
     /* One list per token program, in order; null for a program whose call did not come back. */
     private fun readTokenAccounts(rpcUrl: String, owner: String): List<List<TokenAccountInfo>?> {
-        // The two token programs in a row, on the caller's thread. They used to be two
-        // more tasks on the same fixed pool, waited on with a blocking get; with six
-        // wallets all six threads waited for work that could never run, and every
-        // simulation in the process hung. One extra round trip, no deadlock.
+        // Both programs in sequence on the caller's thread, not on the shared pool: with
+        // six wallets, blocking gets there took all six threads and deadlocked every
+        // simulation. One extra round trip, no deadlock.
         return listOf(TOKEN_PROGRAM, TOKEN_2022).map { program ->
             runCatching {
                 val params = JSONArray()
@@ -769,10 +754,9 @@ object SolanaRpc {
 
     /**
      * Submit a signed transaction. A deterministic rejection (expired blockhash,
-     * insufficient funds) is [SendOutcome.error], not retried. "Not sent" only when
-     * true: a transport falling after the node propagated the bytes once left the
-     * transaction alive while the answer said otherwise. The signature is in the bytes,
-     * so before any retry the chain is asked; "already processed" means landed.
+     * insufficient funds) is [SendOutcome.error], not retried. A transport error can come
+     * after the node propagated the bytes, so before any retry the chain is asked about
+     * the signature; "already processed" means landed.
      */
     fun send(rpcUrl: String, signedTx: ByteArray): SendOutcome {
         val sig = SolanaTx.firstSignature(signedTx)
@@ -821,7 +805,7 @@ object SolanaRpc {
 
     /**
      * What the chain says of [signature], once: true landed, false failed on chain, null
-     * unknown or unreachable. "The node took it" and "it went through" are two sentences.
+     * unknown or unreachable. Accepted by a node does not mean landed.
      */
     fun verdictOf(rpcUrl: String, signature: String): Boolean? {
         val resp = post(rpcUrl, "getSignatureStatuses", JSONArray().put(JSONArray().put(signature)).put(JSONObject().put("searchTransactionHistory", true)))
@@ -844,11 +828,10 @@ object SolanaRpc {
     }
 
     /**
-     * Pauses between confirmation checks. Fixed 1.5 s for 30 s was twenty calls per
-     * confirmation, each with its fallback chain, and the first ones almost always too
-     * early. Growing steps: seven calls worst case, three or four normally, same window.
-     * [confirmed] polls with them: true when confirmed or finalized without error, false
-     * on error or timeout, which callers must read as "not landed".
+     * Growing pauses between confirmation checks: seven calls worst case, three or four
+     * normally, in 30 s (a fixed 1.5 s step made twenty, the first ones too early).
+     * [confirmed] returns true when confirmed or finalized without error, false on error
+     * or timeout, which callers must read as "not landed".
      */
     private val CONFIRM_STEPS_MS = longArrayOf(1_000, 1_000, 2_000, 3_000, 5_000, 8_000, 10_000)
 
@@ -891,8 +874,8 @@ object SolanaRpc {
     }
 
     /**
-     * Two network constants, remembered six hours. An epoch lasts about two days and
-     * inflation moves once a year; they were fetched on every load for a staker.
+     * Two network constants, cached six hours: an epoch lasts about two days and
+     * inflation changes once a year.
      */
     private val netConst = ConcurrentHashMap<String, Cached<Double>>()
     private const val NET_CONST_TTL_MS = 6 * 3600_000L
@@ -913,9 +896,8 @@ object SolanaRpc {
 
     fun stakeAccounts(rpcUrl: String, owner: String): List<StakeAccount> {
         // `dataSize` before the memcmp, or this scans the whole Stake program: an unfiltered
-        // `getProgramAccounts` is the most expensive call there is and the classic way to
-        // get a key suspended, and it ran on every wallet load. A stake account is 200
-        // bytes; with the filter the node searches an index.
+        // `getProgramAccounts` is the costliest call and gets keys suspended. A stake account
+        // is 200 bytes; with the filter the node searches an index.
         val params = JSONArray().put("Stake11111111111111111111111111111111111111").put(
             JSONObject().put("encoding", "jsonParsed").put(
                 "filters",
@@ -1026,10 +1008,9 @@ object SolanaRpc {
     }
 
     /**
-     * What the network answered: three things, not two. `post()` used to return a body
-     * or nothing, and the body could be the last error seen, a rate limit on the first
-     * node while the other two died on transport. Callers read "the chain said no" where
-     * the truth was "nobody answered". A refusal is an answer; a silence is a retry.
+     * What the network answered: a result, a refusal, or nothing. Body-or-null let the last
+     * error seen (say a rate limit on one node while the others timed out) read as "the
+     * chain said no". A refusal is final; no answer means retry.
      */
     sealed interface Answer {
         /** A node answered with a result. [slot] is the one in `result.context`, when present. */
@@ -1047,7 +1028,7 @@ object SolanaRpc {
     internal fun slotOf(json: JSONObject): Long? =
         json.optJSONObject("result")?.optJSONObject("context")?.takeIf { it.has("slot") && !it.isNull("slot") }?.optLong("slot")
 
-    /** A JSON-RPC error worth retrying elsewhere: it speaks of the node, not of the call. */
+    /** A JSON-RPC error about the node, not the call: worth retrying elsewhere. */
     internal fun isTransient(error: JSONObject): Boolean = RpcPool.classify(200, error) != RpcPool.Outcome.REFUSED
 
     /**
@@ -1076,7 +1057,7 @@ object SolanaRpc {
         return Answer.Unreachable
     }
 
-    /** Cosa e' successo, nelle parole del pool, piu' l'errore JSON-RPC se c'era. */
+    /** What happened, in the pool's terms, plus the JSON-RPC error if any. */
     private fun outcomeOf(r: Http): Pair<RpcPool.Outcome, JSONObject?> = when (r) {
         is Http.Ok -> { val err = r.json.optJSONObject("error"); RpcPool.classify(200, err) to err }
         is Http.Status -> RpcPool.classify(r.code, null) to null

@@ -75,7 +75,7 @@ internal fun WalletHero(
     val currency by Settings.currency
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var refreshKey by remember { mutableStateOf(0) }
-    // Starts from what we already knew, not from nothing: see Portfolio.cached.
+    // Seeded from Portfolio.cached so the page never starts empty.
     val pv by produceState<PortfolioView?>(Portfolio.cached(ctx, owner, currency), owner, currency, refreshKey, reload) {
         val fresh = owner?.let { runCatching { Portfolio.load(ctx, it, currency) }.getOrNull() }
         // A failed refresh keeps the last good view rather than blanking the page.
@@ -84,8 +84,8 @@ internal fun WalletHero(
     }
     LaunchedEffect(pv) { onTotal(pv?.let { fmtFiat(it.total, it.currency) }) }
     var curve by remember { mutableStateOf<List<Double>>(emptyList()) }
-    // The coins the curve is made of, biggest first: the line drops one of each
-    // as it passes. Six at most, which is all the curve looks up anyway.
+    // Coins the curve is built from, biggest first; the line drops one of each as it passes.
+    // Six at most, as many as the curve looks up.
     val curveCoins = remember(pv) {
         pv?.let { v ->
             val byMint = HashMap<String, Double>()
@@ -117,8 +117,7 @@ internal fun WalletHero(
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.xl)) {
-        // The one hero of the page, and it sits on the page rather than in a card:
-        // a box around the number would make it one panel among the others.
+        // The total sits on the page, not in a card, so it doesn't read as one panel among many.
         Column(
             Modifier.fillMaxWidth().graphicsLayer {
                 val c = collapse.value
@@ -130,11 +129,10 @@ internal fun WalletHero(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
-            // A long press covers everything for a guest; a tap on the covered
-            // number asks the print to bring it back.
+            // Long press hides balances (guest mode); a tap on the hidden number asks for the fingerprint.
             val guest by Settings.guest
             val ctx = LocalContext.current
-            // The hidden gesture is spelled out until it has been done once.
+            // Show the long-press hint until it has been used once.
             var hintSeen by remember { mutableStateOf(Settings.hideHintSeen(ctx)) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HaloIcon(if (guest) HIcon.LOCK else HIcon.UNLOCK, Halo.muted, 12.dp)
@@ -167,14 +165,11 @@ internal fun WalletHero(
             }
         }
 
-        // The shape of the month under the buttons, not beside them. A chart of your own
-        // money had nowhere to go, and a card of its own would push the holdings down for
-        // something read at a glance: up or down, steady or jagged. See BalanceCurve for
-        // what it is a chart of, which is not the obvious thing.
+        // Month curve behind the action buttons: a card of its own would push the holdings down
+        // for a glance-only chart. See BalanceCurve for what it plots, which is not the obvious thing.
         Box(Modifier.fillMaxWidth()) {
-            // The curve answers the tap, and lands where the pill above it lands: both are
-            // the same question, what did this do. It sits under HomeActions, which is
-            // declared after it and so takes its own taps first.
+            // A tap opens the same P&L as the pill above. HomeActions is declared after it,
+            // so the buttons get their own taps first.
             if (curve.size >= 8) BalanceSpark(curve, curveCoins, Modifier.matchParentSize().clickable(onClick = onPnl))
             HomeActions(enabled = owner != null, onAction = onAction)
         }
@@ -182,7 +177,7 @@ internal fun WalletHero(
         pv?.let { view ->
             val main = view.main.filter { it.raw > 0 }
             val others = view.others.filter { it.raw > 0 }
-            // An empty wallet says so, and says what to do: before, the card just disappeared.
+            // Empty wallet: say so and offer Receive instead of hiding the card.
             if (main.isEmpty() && others.isEmpty() && view.defi.isEmpty()) {
                 GlassCard {
                     EmptyState(HIcon.WALLET, stringResource(R.string.hero_empty_title), stringResource(R.string.hero_empty_body), stringResource(R.string.receive_btn) to { onAction(HomeAction.RECEIVE) })
@@ -194,10 +189,8 @@ internal fun WalletHero(
                         var showAll by remember(view) { mutableStateOf(false) }
                         var showOthers by remember(view) { mutableStateOf(false) }
                         val hctx = LocalContext.current
-                        // The whole card rolls up. Open, it is the tallest thing on the screen (twelve
-                        // coins, the unpriced ones, the DeFi under it) and someone who knows what they
-                        // hold scrolls past it every time. Closed, one line still says how much is in
-                        // there, and it stays closed tomorrow: a drawer that reopens itself is not a drawer.
+                        // The card collapses to one line with the count. Open, it is the tallest thing
+                        // on screen and people scroll past it. The state is persisted.
                         val open by Settings.walletOpen
                         Row(
                             Modifier.fillMaxWidth().clickable {
@@ -220,8 +213,7 @@ internal fun WalletHero(
                         }
                         if (!open) return@Column
                         (if (showAll || main.size <= MAX_COLLAPSED) main else main.take(MAX_COLLAPSED)).forEach { h -> HoldingRow(h, currency) { picked = h } }
-                        // DeFi positions stay in view, right under the main coins: they are few and
-                        // they are money, not dust and NFTs. Whoever looks for ORE must not dig for Dig.
+                        // DeFi stays visible under the main coins, not behind "show all": few rows, real money.
                         if (view.defi.isNotEmpty()) {
                             Spacer(Modifier.height(Space.xs))
                             Text(stringResource(R.string.hero_defi).uppercase(), style = HaloType.label, color = Halo.muted)
@@ -277,9 +269,8 @@ internal fun tokenColor(mint: String): androidx.compose.ui.graphics.Color {
 /** Logo from the token metadata, or coloured initials while it loads / when there is none. */
 @Composable
 internal fun TokenLogo(mint: String, symbol: String, image: String?, size: androidx.compose.ui.unit.Dp) {
-    // ORE is not a coin like the others here, it is the grid. Its official logo is a
-    // black and white wordmark that vanishes among colored discs; an amber gem, the
-    // theme's gold, is found at a glance without shouting.
+    // ORE's official logo is a black and white wordmark that vanishes among colored discs,
+    // so it gets an amber gem in the theme's gold.
     if (mint == com.clearsign.core.Ore.MINT) { OreMark(size); return }
     val tint = tokenColor(mint)
     val initials: @Composable () -> Unit = {
@@ -287,12 +278,11 @@ internal fun TokenLogo(mint: String, symbol: String, image: String?, size: andro
             Text(symbol.take(2).uppercase(), fontFamily = Sora, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.36f).sp, color = tint)
         }
     }
-    // The initials are always there; the picture lands on top when it has
-    // loaded. One composition per logo, not two, and nothing to swap.
+    // Initials always drawn, the image on top once loaded: one composition, nothing to swap.
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         initials()
-        // SOL and USDC keep one logo everywhere: CoinGecko's list and Jupiter's "Wrapped SOL" each
-        // brought their own picture, and the one in the followed row kept changing with the source.
+        // Fixed logo for SOL and USDC: CoinGecko and Jupiter ("Wrapped SOL") serve different
+        // images, so it changed with the source.
         val src = TokenSymbols.canonicalImage(mint) ?: image
         if (src != null) coil.compose.AsyncImage(
             model = src, contentDescription = null,
@@ -313,16 +303,12 @@ internal fun OreMark(size: androidx.compose.ui.unit.Dp) {
 }
 
 /**
- * One coin you hold. The star that followed a coin from here is gone: a coin you
- * own is already the one you watch most, and for native SOL it could not even tell
- * the truth (the wallet says "SOL", the market says the mint). Following lives in
- * one place now, where the list it feeds is visible.
+ * One held coin. No follow star here: following lives next to the list it feeds, and for
+ * native SOL the star mixed up "SOL" (wallet) and the mint (market).
  */
 @Composable
 private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
-    // How much you hold, and what one of them costs. The second half is
-    // the number you go to another app to look up, and it carries the
-    // day's direction in its colour the way a price always does.
+    // Amount held and unit price; the price is colored by the day's move.
     val unit = h.fiat?.takeIf { h.ui > 0 }?.let { fmtPrice(it / h.ui, currency) }
     val move = h.change24h
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -348,7 +334,7 @@ private fun HoldingRow(h: Holding, currency: String, onClick: () -> Unit) {
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            // The number you came to see: it reads at body size, not as a footnote.
+            // Fiat value at body size.
             Text(
                 h.fiat?.let { fmtFiat(it, currency) } ?: "—",
                 style = HaloType.body.copy(fontFamily = Sora, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
@@ -367,7 +353,7 @@ private fun pct(c: Double): String = (if (c >= 0) "+" else "−") + "%.1f%%".for
 @Composable
 private fun ChangePill(delta: Double, p: Double, currency: String, modifier: Modifier = Modifier) {
     val up = delta >= 0
-    // The chevron is the promise that there is something behind the number.
+    // Chevron: the pill opens the P&L.
     DeltaPill(
         (if (up) "+" else "−") + fmtFiat(kotlin.math.abs(delta), currency) + "  ·  " + pct(p) + "  " + stringResource(R.string.hero_today),
         up, modifier, chevron = true,
@@ -419,17 +405,13 @@ private fun TokenSheet(
                     accounts?.let { StatRow(stringResource(R.string.token_rent), "+" + fmtSol(it.sumOf { a -> a.lamports }, 5) + " SOL") }
                 }
             }
-            // Send and sell, the two things you want to do with a coin you hold, and for a long
-            // time the one place they were missing: you backed out and picked the same coin
-            // again from the home actions. Both open with this coin already chosen.
+            // Send and swap, with this coin preselected.
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostButton(stringResource(R.string.send_btn), Modifier.weight(1f), HIcon.SEND, tint = Halo.mint) { onSend() }
                 GhostButton(stringResource(R.string.swap_btn), Modifier.weight(1f), HIcon.SWAP, tint = Halo.cyan) { onSwap() }
             }
-            // The rest of what this card can do, two to a row, whatever survives. Fixed rows
-            // each hid their own buttons, and on SOL that left one stretched button per row,
-            // stacked, which reads as a mistake. A list that pairs itself stays balanced for
-            // every coin, even when a price-driven button appears late.
+            // Other actions, paired two per row from whichever apply. Fixed rows left SOL with
+            // single stretched buttons; pairing stays balanced even when a price button appears late.
             var priceUsd by remember(h.mint) { mutableStateOf<Double?>(null) }
             LaunchedEffect(h.mint) { priceUsd = withContext(Dispatchers.IO) { runCatching { Prices.usd(listOf(h.mint))[h.mint] }.getOrNull() } }
             var tp by remember { mutableStateOf(false) }
@@ -438,8 +420,8 @@ private fun TokenSheet(
             val orderable = !h.isNft && h.raw > 0 && priceUsd != null
 
             val actions = buildList<TokenAction> {
-                // Native SOL's mint field is the placeholder "SOL": nothing to copy, and an
-                // explorer given it said "invalid address". The explorer opens the wallet instead.
+                // Native SOL's mint is the placeholder "SOL": nothing to copy, and Solscan says
+                // "invalid address", so it opens the wallet instead.
                 if (!isSol) add(
                     TokenAction(stringResource(R.string.copy), HIcon.COPY, Halo.muted) {
                         (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
@@ -452,8 +434,7 @@ private fun TokenSheet(
                         runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(solscanUrl(target, null)))) }
                     },
                 )
-                // A take profit sells the coin into SOL, so SOL has none. "Tell me when SOL moves"
-                // has no such problem and is probably the most wanted alert in the app.
+                // Take profit sells into SOL, so none for SOL itself. Price alerts work for SOL too.
                 if (orderable && !isSol) add(TokenAction(stringResource(R.string.order_tp_short), HIcon.HOURGLASS, Halo.mint) { tp = true })
                 if (orderable) add(TokenAction(stringResource(R.string.order_alert), HIcon.WARNING, Halo.amber) { alert = true })
             }
@@ -475,20 +456,15 @@ private fun TokenSheet(
     }
 }
 
-/**
- * The number the page is about. Bigger than any other text, it counts to its new
- * value instead of jumping, and a soft light sweeps the digits now and then.
- */
+/** The total: largest text on the page, animates to new values, sheen when it changes. */
 @Composable
 private fun BigTotal(total: Double, currency: String) {
     val shown by androidx.compose.animation.core.animateFloatAsState(
         total.toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "total",
     )
-    // The sheen passes twice and stops. Infinite, and with a real blur behind the
-    // number (`RenderEffect` below), a gradient that scrolls forever redoes the blur
-    // every frame and the home page never rests: measured while scrolling, 828 frames,
-    // median 29 ms, p90 38, on a 120 Hz screen where a frame is 8.3. The sheen says
-    // "this number just changed", so it runs when it changes. Parked at 2 it is flat.
+    // Sheen runs twice per change, then stops. Looping, with the `RenderEffect` blur below, it
+    // redid the blur every frame: 828 frames while scrolling, median 29 ms, p90 38, against
+    // 8.3 ms per frame at 120 Hz. At 2 nothing is drawn.
     val sweepAnim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(2f) }
     androidx.compose.runtime.LaunchedEffect(total) {
         repeat(2) {
@@ -496,9 +472,7 @@ private fun BigTotal(total: Double, currency: String) {
             sweepAnim.animateTo(2f, androidx.compose.animation.core.tween(3600, delayMillis = 1400, easing = androidx.compose.animation.core.LinearEasing))
         }
     }
-    // The digits stay in ink. In the accent they read as a terminal, not as money: a balance
-    // is a fact, and colour on a fact says it means something it does not. The accent belongs
-    // behind it, in the halo, and in the sheen that runs when the number changes.
+    // Digits in ink; in the accent they looked like a terminal. The accent goes in the glow and sheen.
     val ink = Halo.ink
     val lit = Halo.mint
     // The blur is created once: inside `graphicsLayer` it was rebuilt on every
@@ -507,17 +481,15 @@ private fun BigTotal(total: Double, currency: String) {
         android.graphics.RenderEffect.createBlurEffect(18f, 18f, android.graphics.Shader.TileMode.DECAL).asComposeRenderEffect()
     }
     androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-        // The glow behind: the accent, blurred wide, so the number sits in its own light instead
-        // of on bare paper. On a dark page a faint one is plenty; under a black headline on
-        // white nothing of it reached the eye, so the light themes get it stronger.
+        // Blurred accent glow behind the number. Faint is enough on dark themes; light themes need
+        // it stronger to show at all under black text.
         Text(
             fmtFiat(shown.toDouble(), currency),
             style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = lit.copy(alpha = if (Halo.isLight) 0.30f else 0.18f)),
             modifier = Modifier.graphicsLayer { renderEffect = blur },
         )
-        // The sheen is a drawing over the text, not a brush in the style: read in
-        // composition, `sweepAnim.value` relaid the text sixty times a second for ten
-        // seconds. Read here, in draw, it only moves pixels.
+        // Sheen drawn over the text, not as a style brush: read in composition, `sweepAnim.value`
+        // relaid out the text every frame. Read in draw it only repaints.
         Text(
             fmtFiat(shown.toDouble(), currency),
             style = HaloType.amount.copy(fontSize = 44.sp, lineHeight = 50.sp, color = ink),
@@ -541,10 +513,8 @@ private fun BigTotal(total: Double, currency: String) {
 }
 
 /**
- * One thing that is yours outside the token list: what, where, whether it is live.
- * It used to carry the money too, from an API that only sees its own platforms and
- * an estimated APR; four estimates in a corner read as a statement. A number that
- * precise about someone's money is right or absent, so the row says what is true.
+ * A position outside the token list: what, where, whether it is live. No value shown: the API
+ * only sees its own platforms and estimates APR, and a money figure must be right or absent.
  */
 @Composable
 private fun DefiRow(d: DefiPosition, onClick: (() -> Unit)? = null) {
@@ -574,7 +544,7 @@ private fun DefiRow(d: DefiPosition, onClick: (() -> Unit)? = null) {
     }
 }
 
-/** A DeFi position as a tile: logo, what it is, what it is worth. Three per row, scrolling past that. The ORE tile is tappable. */
+/** A DeFi position as a tile: logo, kind, value. Three fit per row; more scroll. */
 @Composable
 private fun DefiTile(d: DefiPosition, currency: String, onClick: () -> Unit) {
     val what = when (d.kind) {
@@ -586,8 +556,8 @@ private fun DefiTile(d: DefiPosition, currency: String, onClick: () -> Unit) {
         DefiPosition.Kind.ORE -> d.sub.substringBefore(" · ")
         else -> d.fiat?.let { fmtFiat(it, currency) } ?: d.sub
     }
-    // 106 dp: three tiles plus two gaps fit the card's 339 dp on a 411-wide phone.
-    // The fourth scrolls the row. Every tile opens a sheet, and says so with the chevron and the press.
+    // 106 dp: three tiles plus two gaps fit the card's 339 dp on a 411 dp phone; a fourth scrolls.
+    // Every tile opens a sheet.
     HaloTile(106.dp, onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TokenLogo(if (d.kind == DefiPosition.Kind.ORE) com.clearsign.core.Ore.MINT else d.symbol, d.symbol, d.image, 24.dp)
@@ -606,11 +576,9 @@ private fun DefiTile(d: DefiPosition, currency: String, onClick: () -> Unit) {
 private class TokenAction(val label: String, val icon: HIcon, val tint: androidx.compose.ui.graphics.Color, val onClick: () -> Unit)
 
 /**
- * The curve: an area under a line, faint enough to read the buttons through. Green
- * when the month ends higher, red when not, and nothing else: no axis, no numbers.
- * Everything runs on one clock: the line finishes at [LINE_END] of the run and the
- * rest of the time belongs to the last coins falling, so nothing freezes mid-air the
- * way it did when the coins shared a progress that stopped when the line arrived.
+ * The curve: a faint area under a line, green if the month ends higher, red if not; no axis or
+ * numbers. One clock drives it all: the line ends at [LINE_END], the rest is left for the last
+ * coins to finish falling so none freezes mid-air.
  */
 private const val LINE_END = 0.66f
 
@@ -620,20 +588,15 @@ private const val FALL = 0.30f
 @Composable
 private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Modifier) {
     val tint = if (values.last() >= values.first()) Halo.mint else Halo.red
-    // It draws itself left to right, the way the month happened: appearing at once it
-    // read as a texture that had always been there, and a line arriving from the left
-    // is the only hint that the left edge is the past. Once per curve, not per
-    // recomposition. Two seconds at a steady speed, not the app's ease-out: a pen moves
-    // at the speed it moves, and a head that bolts then crawls reads as a stutter.
+    // Draws left to right once per curve, so the left edge reads as the past. Linear, not the
+    // app's ease-out: a head that bolts then crawls looks like a stutter.
     val growth = remember(values) { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(values) {
         growth.animateTo(1f, androidx.compose.animation.core.tween(5200, easing = androidx.compose.animation.core.LinearEasing))
     }
-    // `growth` is read inside the draw, not here: read in composition the spark
-    // recomposed every frame for five seconds. Images load out here, a composable's
-    // business, keyed on the mint: remembered state in a loop is handed out by
-    // position, and when the list changed length every coin got another coin's slot,
-    // every image went null, and the icons vanished from a picture just drawn.
+    // `growth` is read in draw; read here, the spark recomposed every frame. Bitmaps are keyed
+    // on the mint: remembered state in a loop is positional, and when the list changed length
+    // every image went null.
     val marks = coins.map { m -> androidx.compose.runtime.key(m) { rememberCoinBitmap(m) } }
     val lo = androidx.compose.runtime.remember(values) { values.min() }
     val hi = androidx.compose.runtime.remember(values) { values.max() }
@@ -641,8 +604,7 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
         val p = growth.value
         val grow = (p / LINE_END).coerceAtMost(1f)
         val span = (hi - lo).takeIf { it > 0.0 } ?: 1.0
-        // Kept off the floor and the ceiling: a line that touches either edge
-        // reads as clipped, as if the real shape carried on outside the box.
+        // Margins top and bottom: a line touching the edge looks clipped.
         val top = size.height * 0.16f
         val usable = size.height * 0.66f
         fun px(i: Int) = size.width * i / (values.size - 1).toFloat()
@@ -667,9 +629,8 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
             )
             drawPath(line, tint.copy(alpha = 0.24f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f))
         }
-        // What the line is made of, shaken loose as the head goes by: the same coins the
-        // curve is built from, biggest first, each picked up by the head and dropped. Nothing
-        // is left lying on the page, because under this are eight buttons someone is reading.
+        // The curve's coins, biggest first, each dropped as the head passes. None stays on
+        // screen: the action buttons are under this.
         marks.forEachIndexed { i, bmp ->
             if (bmp == null) return@forEachIndexed
             // Where on the line it sits, and when on the clock it is let go.
@@ -680,9 +641,7 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
             if (fall >= 1f) return@forEachIndexed
             val vi = ((values.size - 1) * at).toInt().coerceIn(0, values.size - 1)
             val r = 11.dp.toPx()
-            // Thrown, not dropped. Straight gravity read as a coin released by something that
-            // stopped caring; the head is moving, so what it lets go keeps moving, a little up
-            // and forward, then down.
+            // Arc up and forward with the head's motion, then down; a straight drop looked limp.
             val y0 = py(values[vi])
             val dist = size.height - y0 + r * 2
             val rise = 0.34f
@@ -691,9 +650,7 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
                 size.width * at + dist * 0.13f * fall,
                 y0 + drop,
             )
-            // It turns as it goes and gets smaller, and it is gone well before
-            // it would have reached anything. A coin that simply fades on the
-            // spot looks switched off; one that tumbles away looks thrown.
+            // Spins and shrinks, gone before it lands. Fading in place looked like switching off.
             val fade = (1f - fall * fall).coerceIn(0f, 1f)
             val spin = (if (i % 2 == 0) 1f else -1f) * 46f * fall
             val d = (r * 1.7f * (1f - 0.28f * fall)).toInt()
@@ -706,8 +663,7 @@ private fun BalanceSpark(values: List<Double>, coins: List<String>, modifier: Mo
                 )
             }
         }
-        // The head of the line while it travels, so the eye has something to
-        // follow. It stops existing the moment the curve is whole.
+        // A dot at the line's head while it draws.
         if (grow < 1f) {
             val i = ((values.size - 1) * grow).toInt().coerceIn(0, values.size - 1)
             val head = androidx.compose.ui.geometry.Offset(size.width * grow, py(values[i]))

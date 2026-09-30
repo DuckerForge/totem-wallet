@@ -688,16 +688,38 @@ def _after_agent() -> None:
         PRO_TAPPED.clear()
 
 
-VOICE_TAPPED: list[bool] = []  # prep switched the page's voice off so the take can switch it on
+VOICE_WAS: list[bool] = []    # the page's voice before the prep switched it on
+WATCH_LOOK = 14.0             # take second of the loop's look: its line types on "line by line"
+
+
+def _next_look(timeout: float = 100.0) -> float:
+    """
+    When the loop will look next, in time.monotonic(). It waits for one look in the phone's log
+    (TraderLoop writes "Apex-Loop: look" as it starts one), then adds the breath between two:
+    ninety seconds after a tick that, holding one coin, takes a fifth of one (measured: 90.17).
+    """
+    # One shell word: split, date read "%H:%M:%S.000" as a second argument and logcat refused the time.
+    since = record.sh("shell", "date '+%m-%d %H:%M:%S.000'").strip()
+    log = subprocess.Popen(["adb", "logcat", "-T", since, "-s", "Apex-Loop:I"], stdout=subprocess.PIPE, text=True)
+    try:
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            line = log.stdout.readline()
+            if "look" in line:
+                return time.monotonic() + 90.2
+        raise RuntimeError("prep: the loop did not look within 100 s. Is it on?")
+    finally:
+        log.kill()
 
 
 def prep_watch() -> list[tuple]:
     # The live page of a running agent that holds a coin: it opens on "watch it work", the chart
     # and its three lines are there for "charts" and "entry, target, stop", the thoughts come up
-    # on "what it is thinking", the voice is switched on on "a voice". This prep starts nothing,
-    # buys nothing, sells nothing: with the loop off or no coin held it stops, and drawn.py's
-    # scene is the one to use. "Look now" and the coin's chips are never tapped.
-    VOICE_TAPPED.clear()
+    # on "what it is thinking", and the loop's own look lands on "line by line", read out by the
+    # voice, already on. This prep starts nothing, buys nothing, sells nothing: with the loop off
+    # or no coin held it stops, and drawn.py's scene is the one to use. "Look now" and the coin's
+    # chips are never tapped: the look is the loop's, timed from its log.
+    VOICE_WAS.clear()
     _fresh("agent")
     xml = record.dump()
     if not _has(xml, "Stop the agent"):
@@ -710,42 +732,42 @@ def prep_watch() -> list[tuple]:
     xml = record.dump()
     if not _has(xml, "WHAT IT IS THINKING"):
         raise RuntimeError("prep: the live page did not open")
-    if _has(xml, "Voice on"):
-        record.tap(*_need("Voice on", xml))
-        VOICE_TAPPED.append(True)
+    VOICE_WAS.append(_has(xml, "Voice on"))
+    if not VOICE_WAS[0]:
+        record.tap(*_need("Voice off", xml))
         time.sleep(1.0)
         xml = record.dump()
-    # The thoughts brought up to mid-screen, when they start below it. The chip is read after
-    # the same drag, since it moves with them.
+    # The thoughts brought up to mid-screen, when they start below it.
     think = _y("WHAT IT IS THINKING", xml) or 0
     lift = min(1100, think - 900) if think > 1500 else 0
     drag = (600, 2100, 600, 2100 - lift, 1600)
-    if lift:
-        record.swipe(*drag)
-        time.sleep(1.5)
-        xml = record.dump()
-    voice = _need("Voice off", xml)
     _close_sheets()
     # A tab change starts the page over at the top, where the link was found.
     _go(("tap", TABS["wallet"], TAB_Y), ("wait", 1.0), ("tap", TABS["agent"], TAB_Y), ("wait", 2.0))
     _see("link", link)
     _see("thoughts", f"y {think}, lift {lift}")
-    _see("voice", voice)
+    # The take starts WATCH_LOOK seconds before the loop's next look.
+    look = _next_look()
+    wait = look - WATCH_LOOK - time.monotonic()
+    if wait < 3.0:
+        wait += 90.2
+    _see("look", f"take starts in {wait:.0f} s")
+    time.sleep(wait)
     steps = [("at", 5.9, "xy", *link)]
     if lift:
         steps.append(("at", 13.1, "swipe", *drag))
-    return steps + [("at", 16.3, "xy", *voice), ("wait", 5.0)]
+    # The take lasts as long as its steps: run past the scene's end (18.6) with the voice speaking.
+    return steps + [("wait", 15.0)]
 
 
 def _after_watch() -> None:
     """The voice back as it was, then the page closed."""
-    if VOICE_TAPPED:
-        VOICE_TAPPED.clear()
-    else:
+    if VOICE_WAS and not VOICE_WAS[0]:
         xml = record.dump()
         if _has(xml, "Voice on"):
             record.tap(*_need("Voice on", xml))
             time.sleep(1.0)
+    VOICE_WAS.clear()
     _close_sheets()
 
 

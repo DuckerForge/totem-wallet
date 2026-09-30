@@ -1180,6 +1180,8 @@
     <string name="trace_unsafe">%1$s non passa la sicurezza (%2$d su 100)</string>
     <string name="trace_web_stop">sul web si dice male di %1$s</string>
     <string name="trace_idle">niente da fare, riguardo fra poco</string>
+    <string name="trace_checking">controllo le monete che tengo…</string>
+    <string name="trace_holding">%1$s %2$s · la tengo, la vendo a +%3$d%% o a −%4$d%%</string>
     <string name="live_title">L\'agente, in diretta</string>
     <string name="live_off">L\'agente è spento.</string>
     <string name="lucky_title">Colpo di fortuna</string>

@@ -209,6 +209,8 @@ object TraderLoop {
         }
         lookedAt.longValue = now
         if (mayHunt) huntedAt.longValue = now
+        // One line per look, so a take can be timed on the loop from outside (logcat).
+        android.util.Log.i("Apex-Loop", "look hunt=$mayHunt")
         AgentTrace.working { tickInner(ctx, mayHunt) }.also { if (it.acted) forgetRoom() }
     }
 
@@ -524,6 +526,9 @@ object TraderLoop {
             val feed = SeekerFeed.cached(ctx) ?: return@runCatching emptyMap()
             com.clearsign.core.SeekerCrowd.signals(feed.events, mirrored, at).filterIsInstance<com.clearsign.core.CrowdSignal.FollowedSell>().associateBy { it.mint }
         }.getOrDefault(emptyMap())
+        // Said before the verdicts, so every look writes its lines even when a price has not moved:
+        // one repeated line is dropped as idling, and the page stayed still under a running loop.
+        if (Positions.open(ctx).isNotEmpty()) AgentTrace.say(ctx.getString(R.string.trace_checking))
         for (pos in Positions.open(ctx)) {
             // Failed three times already: it gets a slower lane, not the same
             // ninety seconds forever.
@@ -546,7 +551,15 @@ object TraderLoop {
                 problem = ctx.getString(R.string.trader_sell_failed, pos.symbol, whyNot)
                 continue
             }
-            val exit = pos.verdict(now) ?: continue
+            val exit = pos.verdict(now)
+            if (exit == null) {
+                // A look that changes nothing is still a look. Unsaid, the page of its thoughts read
+                // "Quiet" for as long as it held a coin, and the voice had nothing to say (30 Sep).
+                moves[pos.mint]?.let { m ->
+                    AgentTrace.say(ctx.getString(R.string.trace_holding, pos.symbol, String.format(java.util.Locale.ROOT, "%+.1f%%", m), pos.takeProfitPct, pos.stopLossPct))
+                }
+                continue
+            }
 
             // The coins sit in Jupiter's escrow under a take-profit order, so no swap of ours
             // can move them: take the order back first, sell next tick. Otherwise the stop

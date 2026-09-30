@@ -1180,6 +1180,8 @@
     <string name="trace_unsafe">%1$s fails the safety check (%2$d of 100)</string>
     <string name="trace_web_stop">the web speaks badly of %1$s</string>
     <string name="trace_idle">nothing to do, looking again shortly</string>
+    <string name="trace_checking">checking the coins it holds…</string>
+    <string name="trace_holding">%1$s %2$s · holding, it sells at +%3$d%% or −%4$d%%</string>
     <string name="live_title">The agent, live</string>
     <string name="live_off">The agent is off.</string>
     <string name="lucky_title">Feeling lucky</string>

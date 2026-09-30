@@ -22,12 +22,12 @@ python3 scripts/apex_agent/cli.py wallet "$WALLET" mainnet >/dev/null
 
 case "$MODE" in
   honest) python3 scripts/apex_agent/cli.py transfer "$DEST" "$AMOUNT" \
-            "Test del gate: invio dichiarato correttamente" --adb ;;
+            "Gate test: a transfer, declared as it is" --adb ;;
   liar)   python3 scripts/apex_agent/cli.py lie "$DEST" "$AMOUNT" --adb ;;
   swap)   # Sign-only: proves the v0 path, the quote-derived intent and the QR
           # density for a swap, without putting a market order on chain.
           python3 scripts/apex_agent/cli.py swap SOL USDC "${APEX_SWAP:-0.001}" \
-            "Test del gate: swap dichiarato dal preventivo" --send0 --adb ;;
+            "Gate test: a swap, declared from the quote" --send0 --adb ;;
   result) ID="${2:?serve il req_id stampato dal passo honest}"
           python3 scripts/apex_agent/cli.py watch "$ID" 120 ;;
   *) echo "uso: $0 honest|liar|result [req_id]"; exit 2 ;;

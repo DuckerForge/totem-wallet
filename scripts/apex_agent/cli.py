@@ -195,8 +195,8 @@ def main(argv: list[str]) -> int:
         # Flags are not prose: never let "--adb" end up as the reason the phone shows.
         words = [a for a in rest[2:] if not a.startswith("--")]
         reason = words[0] if words else (
-            "Demo: l'agente dichiara uno swap ma la transazione è un invio" if cmd == "lie"
-            else "Test del gate dalla riga di comando"
+            "Demo: the agent declares a swap, but the transaction is a transfer" if cmd == "lie"
+            else "Gate test from the command line"
         )
         built = agent.build_transfer(to, amount, reason, NAME)
         lie = {"action": "swap", "outMint": "SOL", "outAmount": amount, "inMint": "USDC", "inAmount": 1.0} if cmd == "lie" else None
